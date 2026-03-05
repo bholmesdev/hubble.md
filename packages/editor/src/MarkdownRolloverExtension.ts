@@ -93,13 +93,23 @@ function maybeHandleEscapeAtBoundary(view: EditorView): boolean {
 	if (!canEscapeBoundaryAtCursor(state, escapedBoundary)) return false;
 
 	const boundaryMatch = getBoundaryMatchAtPos(state, state.selection.from);
-	if (!boundaryMatch) return false;
+	if (boundaryMatch) {
+		const tr = state.tr.removeStoredMark(boundaryMatch.markType);
+		tr.setMeta(MarkdownRolloverKey, {
+			pos: state.selection.from,
+			markName: boundaryMatch.markType.name,
+		} satisfies NonNullable<EscapedBoundaryState>);
+		view.dispatch(tr);
+		return true;
+	}
 
-	const tr = state.tr.removeStoredMark(boundaryMatch.markType);
-	tr.setMeta(MarkdownRolloverKey, {
-		pos: state.selection.from,
-		markName: boundaryMatch.markType.name,
-	} satisfies NonNullable<EscapedBoundaryState>);
+	let tr = state.tr;
+	for (const markName of MARK_PRIORITY) {
+		const markType = state.schema.marks[markName];
+		if (markType) {
+			tr = tr.removeStoredMark(markType);
+		}
+	}
 	view.dispatch(tr);
 	return true;
 }
@@ -111,19 +121,21 @@ function canEscapeBoundaryAtCursor(
 	if (!state.selection.empty) return false;
 
 	const boundaryMatch = getBoundaryMatchAtPos(state, state.selection.from);
-	if (!boundaryMatch) return false;
-	if (boundaryMatch.boundary !== "end") return false;
-	if (
-		isBoundaryEscaped(
-			escapedBoundary,
-			state.selection.from,
-			boundaryMatch.markType.name,
-		)
-	) {
-		return false;
+	if (boundaryMatch) {
+		if (boundaryMatch.boundary !== "end") return false;
+		if (
+			isBoundaryEscaped(
+				escapedBoundary,
+				state.selection.from,
+				boundaryMatch.markType.name,
+			)
+		) {
+			return false;
+		}
+		return isMarkEffectivelyActiveAtCursor(state, boundaryMatch.markType);
 	}
 
-	return isMarkEffectivelyActiveAtCursor(state, boundaryMatch.markType);
+	return hasStoredFormattingMarks(state);
 }
 
 function getBoundaryMatchAtPos(
@@ -187,6 +199,13 @@ function isMarkEffectivelyActiveAtCursor(
 	return !!getAdjacentInsertionMark(state, markType);
 }
 
+function hasStoredFormattingMarks(state: EditorState): boolean {
+	if (!state.storedMarks) return false;
+	return state.storedMarks.some((mark) =>
+		(MARK_PRIORITY as readonly string[]).includes(mark.type.name),
+	);
+}
+
 function isBoundaryEscaped(
 	escapedBoundary: EscapedBoundaryState,
 	pos: number,
@@ -227,5 +246,6 @@ export const __testing = {
 	canEscapeBoundaryAtCursor,
 	findByPriority,
 	getBoundaryMatchAtPos,
+	hasStoredFormattingMarks,
 	isBoundaryEscaped,
 };
