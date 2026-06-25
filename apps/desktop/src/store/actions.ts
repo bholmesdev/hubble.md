@@ -640,6 +640,97 @@ export async function moveSidebarItem(
 	}
 }
 
+export async function renameFolder(sourcePath: string, nextName: string) {
+	const workspacePath = workspaceStore.get().workspacePath;
+	if (!workspacePath) return;
+	const filesBeforeMove = workspaceStore.get().files;
+	const trimmedName = nextName.trim();
+	if (!trimmedName) return;
+
+	const sourceParent = dirname(sourcePath);
+	if (!sourceParent) return;
+	const nextPath = /[\\/]/.test(trimmedName)
+		? absoluteWorkspacePath(normalizePath(trimmedName), workspacePath)
+		: normalizePath(joinPath(sourceParent, trimmedName));
+	if (!isSafeRelativeRenamePath(trimmedName, nextPath, workspacePath)) return;
+	if (pathEquals(sourcePath, nextPath)) return;
+	if (pathStartsWithFolder(nextPath, sourcePath)) {
+		toast.error("Failed to rename folder", {
+			description: "A folder cannot be renamed into itself.",
+		});
+		return;
+	}
+	if (await desktopApi.pathExists(nextPath)) {
+		toast.error("Failed to rename folder", {
+			description: "A file or folder already exists at that path.",
+		});
+		return;
+	}
+
+	const current = viewerStore.get();
+	const currentPath = current.currentPath;
+	const currentAffected =
+		currentPath && moveAffectsPath(currentPath, sourcePath, true);
+	const movedFiles = movedMarkdownFiles(
+		filesBeforeMove,
+		sourcePath,
+		nextPath,
+		true,
+	);
+
+	try {
+		if (currentAffected && currentPath) {
+			await savePathContent(currentPath, current.content, { force: true });
+		}
+		await desktopApi.renameFile(sourcePath, nextPath);
+		appStore.set((state) => ({
+			...state,
+			workspace: {
+				...state.workspace,
+				files: state.workspace.files.map((file) => ({
+					...file,
+					path: replacePathPrefix(file.path, sourcePath, nextPath),
+				})),
+				folders: state.workspace.folders.map((folder) => ({
+					...folder,
+					path: replacePathPrefix(folder.path, sourcePath, nextPath),
+				})),
+				pinnedNotes: state.workspace.pinnedNotes.map((pinnedPath) =>
+					replacePathPrefix(pinnedPath, sourcePath, nextPath),
+				),
+				lastOpenedPaths: Object.fromEntries(
+					Object.entries(state.workspace.lastOpenedPaths).map(
+						([workspace, openedPath]) => [
+							workspace,
+							replacePathPrefix(openedPath, sourcePath, nextPath),
+						],
+					),
+				),
+			},
+			document: {
+				...state.document,
+				currentPath: state.document.currentPath
+					? replacePathPrefix(state.document.currentPath, sourcePath, nextPath)
+					: null,
+				lastOpenedPath: state.document.lastOpenedPath
+					? replacePathPrefix(
+							state.document.lastOpenedPath,
+							sourcePath,
+							nextPath,
+						)
+					: null,
+			},
+		}));
+		await updateMovedLinks(movedFiles, filesBeforeMove);
+		await syncPinnedNotes();
+		await refreshFiles();
+	} catch (err) {
+		const message = handleFileError(err);
+		toast.error("Failed to rename folder", { description: message });
+		await refreshFiles();
+	}
+}
+
 export async function createMarkdownFileInFolder(parentPath: string) {
 	const path = uniqueMarkdownPath(parentPath);
 	try {

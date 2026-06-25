@@ -696,6 +696,110 @@ describe("desktop moveSidebarItem", () => {
 	});
 });
 
+describe("desktop renameFolder", () => {
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("renames a folder in place and updates descendants", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(false);
+		api.readFileText.mockImplementation(async (path: string) => {
+			if (path === "/workspace/renamed/note.md")
+				return "[Outside](../outside.md)";
+			return "[Note](folder/note.md)";
+		});
+		const { appStore, renameFolder, viewerStore, workspaceStore } =
+			await loadStoreActions(api);
+
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [
+					{ path: "/workspace/folder/note.md", modified_at: 1 },
+					{ path: "/workspace/outside.md", modified_at: 1 },
+				],
+				folders: [{ path: "/workspace/folder", modified_at: 1 }],
+				pinnedNotes: ["/workspace/folder/note.md"],
+				lastOpenedPaths: { "/workspace": "/workspace/folder/note.md" },
+			},
+			document: {
+				...current.document,
+				currentPath: "/workspace/folder/note.md",
+				lastOpenedPath: "/workspace/folder/note.md",
+				content: "[Outside](../outside.md)",
+				diskContent: "[Outside](../outside.md)",
+				externalChange: { kind: "none" },
+				status: "ready",
+				error: null,
+			},
+		}));
+
+		await renameFolder("/workspace/folder", "renamed");
+
+		expect(api.renameFile).toHaveBeenCalledWith(
+			"/workspace/folder",
+			"/workspace/renamed",
+		);
+		expect(viewerStore.get().currentPath).toBe("/workspace/renamed/note.md");
+		expect(workspaceStore.get().pinnedNotes).toEqual([
+			"/workspace/renamed/note.md",
+		]);
+		expect(api.writeWorkspaceConfig).toHaveBeenCalledWith("/workspace", {
+			version: 1,
+			pinnedNotes: ["renamed/note.md"],
+		});
+		expect(api.writeFileText).toHaveBeenCalledWith(
+			"/workspace/outside.md",
+			"[Note](renamed/note.md)",
+		);
+	});
+
+	it("renames to a workspace-relative slash path", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(false);
+		const { appStore, renameFolder } = await loadStoreActions(api);
+
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [{ path: "/workspace/folder/note.md", modified_at: 1 }],
+			},
+		}));
+
+		await renameFolder("/workspace/folder", "archive/renamed");
+
+		expect(api.renameFile).toHaveBeenCalledWith(
+			"/workspace/folder",
+			"/workspace/archive/renamed",
+		);
+	});
+
+	it("blocks collisions and descendant targets", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValueOnce(true);
+		const { appStore, renameFolder } = await loadStoreActions(api);
+
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [{ path: "/workspace/folder/note.md", modified_at: 1 }],
+			},
+		}));
+
+		await renameFolder("/workspace/folder", "existing");
+		await renameFolder("/workspace/folder", "folder/child");
+
+		expect(api.renameFile).not.toHaveBeenCalled();
+	});
+});
+
 describe("desktop loadPath", () => {
 	beforeEach(() => {
 		vi.unstubAllGlobals();

@@ -16,6 +16,7 @@ import {
 	loadPath,
 	moveSidebarItem,
 	openWorkspace,
+	renameFolder,
 	renameMarkdownFile,
 	setSidebarOpen,
 	setSortMode,
@@ -124,6 +125,9 @@ export function Sidebar({
 			}}
 			revealLabel={revealFileLabel(desktopApi.platform)}
 			onRenameFile={(path, nextName) => void renameMarkdownFile(path, nextName)}
+			onRenameFolder={(folderId, nextName) =>
+				void renameFolder(absolutePath(folderId), nextName)
+			}
 			onDeleteFile={(path) => void deleteMarkdownFile(path)}
 			onTogglePinnedFile={(path) => void togglePinnedNote(path)}
 			onCreateFile={(folderId) =>

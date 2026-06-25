@@ -168,8 +168,39 @@ export function useSidebarTree({
 		(id: string) => setExpanded(id, !expandedFolders.has(id)),
 		[expandedFolders, setExpanded],
 	);
+	const migrateExpandedFolder = useCallback(
+		(fromId: string, toId: string) => {
+			const fromPrefix = normalizeFolderId(fromId);
+			const toPrefix = normalizeFolderId(toId);
+			if (!fromPrefix || !toPrefix || fromPrefix === toPrefix) return;
+			setExpandedState((current) => {
+				const folders =
+					current.key === storageKey
+						? current.folders
+						: readExpandedFolders(storageKey);
+				let changed = false;
+				const next = new Set<string>();
+				for (const id of folders) {
+					if (id === fromPrefix || id.startsWith(fromPrefix)) {
+						next.add(`${toPrefix}${id.slice(fromPrefix.length)}`);
+						changed = true;
+					} else {
+						next.add(id);
+					}
+				}
+				return changed ? { key: storageKey, folders: next } : current;
+			});
+		},
+		[storageKey],
+	);
 
-	return { collapseFolder, expandFolder, rows, toggleFolder };
+	return {
+		collapseFolder,
+		expandFolder,
+		migrateExpandedFolder,
+		rows,
+		toggleFolder,
+	};
 }
 
 function makeFolder(id: string, name: string): FolderNode {
@@ -388,4 +419,9 @@ function writeExpandedFolders(
 ) {
 	if (!storageKey || typeof localStorage === "undefined") return;
 	localStorage.setItem(storageKey, JSON.stringify([...expandedFolders]));
+}
+
+function normalizeFolderId(id: string) {
+	const normalized = normalizeDisplayPath(id).replace(/\/+$/, "");
+	return normalized ? `${normalized}/` : "";
 }

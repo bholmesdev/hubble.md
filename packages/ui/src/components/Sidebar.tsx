@@ -67,6 +67,10 @@ export type SidebarFocusedItem =
 	| { kind: "folder"; folderId: string }
 	| null;
 
+type RenameTarget =
+	| { kind: "file"; path: string }
+	| { kind: "folder"; folderId: string };
+
 const sidebarActionClass =
 	"flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] font-normal outline-hidden select-none";
 const sidebarActionIconClass =
@@ -132,6 +136,7 @@ export function Sidebar({
 	onFocusedItemChange,
 	revealLabel,
 	onRenameFile,
+	onRenameFolder,
 	onDeleteFile,
 	onTogglePinnedFile,
 	onCreateFile,
@@ -158,6 +163,7 @@ export function Sidebar({
 	onFocusedItemChange?: (item: SidebarFocusedItem) => void;
 	revealLabel?: string;
 	onRenameFile?: (path: string, nextName: string) => void;
+	onRenameFolder?: (folderId: string, nextName: string) => void;
 	onDeleteFile?: (path: string) => void;
 	onTogglePinnedFile?: (path: string) => void;
 	onCreateFile?: (folderId: string | null) => Promise<string | null>;
@@ -167,7 +173,7 @@ export function Sidebar({
 	const navRef = useRef<HTMLDivElement>(null);
 	const renameInputRef = useRef<HTMLInputElement | null>(null);
 	const [openActionsPath, setOpenActionsPath] = useState<string | null>(null);
-	const [renamingPath, setRenamingPath] = useState<string | null>(null);
+	const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 	const [showFooterBorder, setShowFooterBorder] = useState(false);
 	const [deleteOnCancel, setDeleteOnCancel] = useState<{
@@ -181,7 +187,13 @@ export function Sidebar({
 	const [activeDragLabel, setActiveDragLabel] = useState<string | null>(null);
 	const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
 	const highlightPath = pendingPath ?? currentPath;
-	const { collapseFolder, expandFolder, rows, toggleFolder } = useSidebarTree({
+	const {
+		collapseFolder,
+		expandFolder,
+		migrateExpandedFolder,
+		rows,
+		toggleFolder,
+	} = useSidebarTree({
 		files,
 		folders,
 		getDisplayPath,
@@ -200,7 +212,7 @@ export function Sidebar({
 		) => {
 			const name = splitFileName(label).name;
 			setOpenActionsPath(null);
-			setRenamingPath(file.path);
+			setRenameTarget({ kind: "file", path: file.path });
 			setRenameDraft(name);
 			setDeleteOnCancel(
 				options?.deleteOnUnchangedCancel
@@ -211,6 +223,14 @@ export function Sidebar({
 		},
 		[],
 	);
+	const beginFolderRename = useCallback((folderId: string) => {
+		const draft = folderId.replace(/\/+$/, "");
+		setOpenActionsPath(null);
+		setRenameTarget({ kind: "folder", folderId });
+		setRenameDraft(draft);
+		setDeleteOnCancel(null);
+		setRenameError(null);
+	}, []);
 	const createFile = useCallback(
 		async (folderId: string | null) => {
 			if (!onCreateFile) return;
@@ -234,10 +254,12 @@ export function Sidebar({
 	const enterRowEdit = useCallback(
 		(row: SidebarRow) => {
 			if (row.kind === "file" && onRenameFile) beginRename(row.file, row.label);
+			else if (row.kind === "folder" && onRenameFolder)
+				beginFolderRename(row.id);
 			else if (row.kind === "section") return;
 			else activateRow(row);
 		},
-		[activateRow, beginRename, onRenameFile],
+		[activateRow, beginFolderRename, beginRename, onRenameFile, onRenameFolder],
 	);
 	const expandRow = useCallback(
 		(row: SidebarRow) => {
@@ -280,9 +302,11 @@ export function Sidebar({
 		if (!pendingFocusDisplayPath) return;
 		const index = rows.findIndex(
 			(row) =>
-				row.kind === "file" &&
-				normalizeDisplayPath(getDisplayPath(row.file.path)) ===
-					pendingFocusDisplayPath,
+				(row.kind === "file" &&
+					normalizeDisplayPath(getDisplayPath(row.file.path)) ===
+						pendingFocusDisplayPath) ||
+				(row.kind === "folder" &&
+					folderIdToComparableDisplayPath(row.id) === pendingFocusDisplayPath),
 		);
 		if (index < 0) return;
 		setFocusedIndex(index);
@@ -340,10 +364,10 @@ export function Sidebar({
 	}, [activeDragLabel, dropTarget, expandFolder, rows]);
 
 	useEffect(() => {
-		if (!renamingPath) return;
+		if (!renameTarget) return;
 		renameInputRef.current?.focus();
 		renameInputRef.current?.select();
-	}, [renamingPath]);
+	}, [renameTarget]);
 
 	useEffect(() => {
 		const navEl = navRef.current;
@@ -370,7 +394,7 @@ export function Sidebar({
 	}, []);
 
 	const resetRename = useCallback(() => {
-		setRenamingPath(null);
+		setRenameTarget(null);
 		setRenameDraft("");
 		setDeleteOnCancel(null);
 		setRenameError(null);
@@ -379,54 +403,84 @@ export function Sidebar({
 	const cancelRename = useCallback(() => {
 		const shouldDelete =
 			deleteOnCancel &&
-			deleteOnCancel.path === renamingPath &&
+			renameTarget?.kind === "file" &&
+			deleteOnCancel.path === renameTarget.path &&
 			deleteOnCancel.draft === renameDraft;
 		if (shouldDelete && onDeleteFile) onDeleteFile(deleteOnCancel.path);
 		resetRename();
-	}, [deleteOnCancel, onDeleteFile, renameDraft, renamingPath, resetRename]);
+	}, [deleteOnCancel, onDeleteFile, renameDraft, renameTarget, resetRename]);
 
 	const getRenameError = useCallback(
-		(path: string, draft: string) => {
+		(target: RenameTarget, draft: string) => {
 			const nextName = draft.trim();
 			if (!nextName) return null;
-			const targetName = renameTargetName(path, nextName, getDisplayPath);
-			if (!renameTargetExists(path, nextName, files, getDisplayPath))
+			const sourceDisplayPath =
+				target.kind === "file"
+					? normalizeDisplayPath(getDisplayPath(target.path))
+					: folderIdToComparableDisplayPath(target.folderId);
+			const targetDisplayPath =
+				target.kind === "file"
+					? renameTargetDisplayPath(target.path, nextName, getDisplayPath)
+					: folderRenameTargetDisplayPath(target.folderId, nextName);
+			const targetName = fileNameFromPath(targetDisplayPath);
+			if (
+				!renameTargetExists({
+					files,
+					folders,
+					getDisplayPath,
+					sourceDisplayPath,
+					sourcePath: target.kind === "file" ? target.path : null,
+					targetDisplayPath,
+				})
+			) {
 				return null;
-			return `A file ${targetName} already exists at this location.`;
+			}
+			return `A ${target.kind} ${targetName} already exists at this location.`;
 		},
-		[files, getDisplayPath],
+		[files, folders, getDisplayPath],
 	);
 
 	const commitRename = useCallback(
 		(focusTree = false) => {
-			const path = renamingPath;
-			if (!path || !onRenameFile) return;
+			const target = renameTarget;
+			if (!target) return;
+			if (target.kind === "file" && !onRenameFile) return;
+			if (target.kind === "folder" && !onRenameFolder) return;
 			const nextName = renameDraft.trim();
 			if (!nextName) {
 				resetRename();
 				if (focusTree) requestAnimationFrame(() => navRef.current?.focus());
 				return;
 			}
-			const error = getRenameError(path, nextName);
+			const error = getRenameError(target, nextName);
 			if (error) {
 				setRenameError(error);
 				requestAnimationFrame(() => renameInputRef.current?.focus());
 				return;
 			}
+			const targetDisplayPath =
+				target.kind === "file"
+					? renameTargetDisplayPath(target.path, nextName, getDisplayPath)
+					: folderRenameTargetDisplayPath(target.folderId, nextName);
 			if (focusTree) {
-				setPendingFocusDisplayPath(
-					renameTargetDisplayPath(path, nextName, getDisplayPath),
-				);
+				setPendingFocusDisplayPath(targetDisplayPath);
 				requestAnimationFrame(() => navRef.current?.focus());
 			}
 			resetRename();
-			onRenameFile(path, nextName);
+			if (target.kind === "file") {
+				onRenameFile?.(target.path, nextName);
+			} else {
+				migrateExpandedFolder(target.folderId, `${targetDisplayPath}/`);
+				onRenameFolder?.(target.folderId, nextName);
+			}
 		},
 		[
 			getRenameError,
+			migrateExpandedFolder,
 			onRenameFile,
+			onRenameFolder,
 			renameDraft,
-			renamingPath,
+			renameTarget,
 			resetRename,
 			getDisplayPath,
 		],
@@ -455,7 +509,12 @@ export function Sidebar({
 						row.kind === "file" && row.file.path === highlightPath;
 					const isFocused = focusedIndex === index;
 					const isRenaming =
-						row.kind === "file" && row.file.path === renamingPath;
+						(row.kind === "file" &&
+							renameTarget?.kind === "file" &&
+							row.file.path === renameTarget.path) ||
+						(row.kind === "folder" &&
+							renameTarget?.kind === "folder" &&
+							row.id === renameTarget.folderId);
 					const isPinnedFile = row.kind === "file" && row.file.pinned;
 					const canTogglePinnedFile = isPinnedFile && onTogglePinnedFile;
 					const isPinnedSectionEnd =
@@ -547,6 +606,7 @@ export function Sidebar({
 											row.kind === "folder" &&
 											!onRevealFolder &&
 											!onCreateFile &&
+											!onRenameFolder &&
 											!onDeleteFolder
 										)
 											return;
@@ -571,8 +631,14 @@ export function Sidebar({
 													setRenameDraft(value);
 													setRenameError(
 														row.kind === "file"
-															? getRenameError(row.file.path, value)
-															: null,
+															? getRenameError(
+																	{ kind: "file", path: row.file.path },
+																	value,
+																)
+															: getRenameError(
+																	{ kind: "folder", folderId: row.id },
+																	value,
+																),
 													);
 												}}
 												onCancel={cancelRename}
@@ -633,7 +699,10 @@ export function Sidebar({
 									)}
 									<div className="absolute inset-y-0 end-0.5 flex items-center gap-0.5">
 										{row.kind === "folder" &&
-											(onRevealFolder || onCreateFile || onDeleteFolder) && (
+											(onRevealFolder ||
+												onCreateFile ||
+												onRenameFolder ||
+												onDeleteFolder) && (
 												<FolderActionsMenu
 													id={row.id}
 													label={row.label}
@@ -644,6 +713,7 @@ export function Sidebar({
 													onRevealFolder={onRevealFolder}
 													revealLabel={revealLabel}
 													onCreateFile={(id) => void createFile(id)}
+													onRenameFolder={beginFolderRename}
 													onDeleteFolder={onDeleteFolder}
 												/>
 											)}
@@ -1235,6 +1305,7 @@ function FolderActionsMenu({
 	onRevealFolder,
 	revealLabel,
 	onCreateFile,
+	onRenameFolder,
 	onDeleteFolder,
 }: {
 	id: string;
@@ -1244,6 +1315,7 @@ function FolderActionsMenu({
 	onRevealFolder?: (id: string) => void;
 	revealLabel?: string;
 	onCreateFile?: (id: string) => void;
+	onRenameFolder?: (id: string) => void;
 	onDeleteFolder?: (id: string) => void;
 }) {
 	return (
@@ -1263,6 +1335,14 @@ function FolderActionsMenu({
 					onClick={() => onCreateFile(id)}
 				>
 					New file
+				</ActionItem>
+			)}
+			{onRenameFolder && (
+				<ActionItem
+					icon={<MingcuteEditLine />}
+					onClick={() => onRenameFolder(id)}
+				>
+					Rename
 				</ActionItem>
 			)}
 			{onDeleteFolder && (
@@ -1507,35 +1587,37 @@ function writeSidebarWidth(storageKey: string, width: number) {
 	localStorage.setItem(storageKey, String(clampSidebarWidth(width)));
 }
 
-function renameTargetExists(
-	path: string,
-	nextName: string,
-	files: SidebarFile[],
-	getDisplayPath: (path: string) => string,
-) {
-	const targetDisplayPath = renameTargetDisplayPath(
-		path,
-		nextName,
-		getDisplayPath,
-	);
-
-	return files.some((file) => {
-		if (file.path === path) return false;
-		return (
+function renameTargetExists({
+	files,
+	folders = [],
+	getDisplayPath,
+	sourceDisplayPath,
+	sourcePath,
+	targetDisplayPath,
+}: {
+	files: SidebarFile[];
+	folders?: SidebarFolder[];
+	getDisplayPath: (path: string) => string;
+	sourceDisplayPath: string;
+	sourcePath: string | null;
+	targetDisplayPath: string;
+}) {
+	const targetKey = targetDisplayPath.toLocaleLowerCase();
+	for (const file of files) {
+		if (sourcePath && file.path === sourcePath) continue;
+		if (
 			normalizeDisplayPath(getDisplayPath(file.path)).toLocaleLowerCase() ===
-			targetDisplayPath.toLocaleLowerCase()
-		);
-	});
-}
-
-function renameTargetName(
-	path: string,
-	nextName: string,
-	getDisplayPath: (path: string) => string,
-) {
-	return fileNameFromPath(
-		renameTargetDisplayPath(path, nextName, getDisplayPath),
-	);
+			targetKey
+		) {
+			return true;
+		}
+	}
+	for (const folder of folders) {
+		const displayPath = normalizeDisplayPath(getDisplayPath(folder.path));
+		if (displayPath === sourceDisplayPath) continue;
+		if (displayPath.toLocaleLowerCase() === targetKey) return true;
+	}
+	return false;
 }
 
 function renameTargetDisplayPath(
@@ -1553,6 +1635,18 @@ function renameTargetDisplayPath(
 			? `${parent}/${targetName}${extension}`
 			: `${targetName}${extension}`,
 	);
+}
+
+function folderRenameTargetDisplayPath(folderId: string, nextName: string) {
+	const sourceDisplayPath = folderIdToComparableDisplayPath(folderId);
+	const parent = dirname(sourceDisplayPath);
+	const targetName = normalizeDisplayPath(nextName.trim());
+	if (targetName.includes("/")) return targetName;
+	return normalizeDisplayPath(parent ? `${parent}/${targetName}` : targetName);
+}
+
+function folderIdToComparableDisplayPath(folderId: string) {
+	return normalizeDisplayPath(folderId).replace(/\/+$/, "");
 }
 
 function stripMatchingExtension(name: string, extension: string) {
