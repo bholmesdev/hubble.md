@@ -10,6 +10,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Added
 
 ### Changed
+- Cloud Sync create/connect commands now run an initial sync
 
 ### Fixed
 

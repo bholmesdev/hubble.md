@@ -176,6 +176,9 @@ async function writeCloudConnection(
 	console.log(`Cloud Sync connected: ${opts.label}`);
 	console.log(`  workspace: ${config.cloudSync?.workspaceId}`);
 	console.log(`  device: ${config.cloudSync?.deviceId}`);
+	if (config.cloudSync) {
+		await syncOnce(workspacePath, config.cloudSync, "initial");
+	}
 }
 
 function getDeploymentUrl(opts: Pick<CliArgs, "deploymentUrl">): string {
@@ -416,6 +419,8 @@ function printCreateHelp() {
 	console.log("Usage:");
 	console.log("  hubble [--cwd path] cloud create --name name [--url url]");
 	console.log("");
+	console.log("Creates, links, and runs the initial sync.");
+	console.log("");
 	console.log("Options:");
 	console.log("  --name name  Remote workspace name to create");
 	console.log("  --url url    Convex deployment URL");
@@ -426,6 +431,8 @@ function printConnectHelp() {
 	console.log(
 		"  hubble [--cwd path] cloud connect (--name name|--id id) [--url url]",
 	);
+	console.log("");
+	console.log("Links and runs the initial sync.");
 	console.log("");
 	console.log("Options:");
 	console.log("  --name name  Existing remote workspace name");
