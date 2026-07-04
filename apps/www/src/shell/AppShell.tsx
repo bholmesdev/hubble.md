@@ -24,6 +24,7 @@ import { Toolbar } from "./Toolbar";
 
 type Props = {
 	url: string;
+	token: string;
 	workspaceId: string;
 	filePath: string | null;
 	onSelectFile: (path: string) => void;
@@ -34,6 +35,7 @@ type Props = {
 
 export function AppShell({
 	url,
+	token,
 	workspaceId,
 	filePath,
 	onSelectFile,
@@ -49,12 +51,14 @@ export function AppShell({
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: snapshot reloads only when workspace identity changes; file route changes load below
 	useEffect(() => {
-		void loadWorkspaceSnapshot(url, workspaceId, filePath).then((loaded) => {
-			if (!loaded) return;
-			saveWorkspace(workspaceId);
-			onWorkspaceLoaded(workspaceId);
-		});
-	}, [url, workspaceId]);
+		void loadWorkspaceSnapshot(url, token, workspaceId, filePath).then(
+			(loaded) => {
+				if (!loaded) return;
+				saveWorkspace(workspaceId);
+				onWorkspaceLoaded(workspaceId);
+			},
+		);
+	}, [url, token, workspaceId]);
 
 	useEffect(() => {
 		if (workspace.snapshot?.id !== workspaceId) return;
@@ -74,7 +78,7 @@ export function AppShell({
 	// biome-ignore lint/correctness/useExhaustiveDependencies: subscription owns its lifecycle by url+workspaceId
 	useEffect(() => {
 		if (!workspace.snapshot) return;
-		const subscriber = createConvexSubscriber(url);
+		const subscriber = createConvexSubscriber(url, token);
 		const unsubscribe = subscriber.onFilesChanged(
 			workspace.snapshot.id,
 			() => {
@@ -98,7 +102,7 @@ export function AppShell({
 			unsubscribeAssets();
 			void subscriber.close();
 		};
-	}, [url, workspace.snapshot]);
+	}, [url, token, workspace.snapshot]);
 
 	useEffect(() => {
 		if (newNoteName !== null) {
@@ -176,6 +180,7 @@ export function AppShell({
 			sidebar={
 				<Sidebar
 					url={url}
+					token={token}
 					workspaceId={workspace.snapshot.id}
 					workspaceName={workspace.snapshot.name}
 					onSelectFile={onSelectFile}
@@ -189,7 +194,7 @@ export function AppShell({
 				<ExternalChangeBanner
 					message={workspace.error}
 					onReload={() => {
-						void loadWorkspaceSnapshot(url, workspaceId, filePath);
+						void loadWorkspaceSnapshot(url, token, workspaceId, filePath);
 					}}
 				/>
 			)}

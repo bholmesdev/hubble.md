@@ -1,9 +1,10 @@
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
 	internalMutation,
 	type MutationCtx,
 	mutation,
+	type QueryCtx,
 	query,
 } from "./_generated/server";
 import {
@@ -18,6 +19,114 @@ async function contentHash(content: string): Promise<string> {
 	const bytes = new Uint8Array(hash);
 	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+const tokenArg = v.object({
+	token: v.string(),
+	ip: v.optional(v.string()),
+	userAgent: v.optional(v.string()),
+});
+const scopeArg = v.union(
+	v.literal("read"),
+	v.literal("write"),
+	v.literal("admin"),
+);
+
+type AuthScope = "read" | "write" | "admin";
+type AuthCtx = QueryCtx | MutationCtx;
+
+async function sha256(value: string): Promise<string> {
+	return contentHash(value);
+}
+
+function canUseScope(actual: AuthScope, required: AuthScope): boolean {
+	if (actual === "admin") return true;
+	if (actual === "write") return required !== "admin";
+	return required === "read";
+}
+
+async function hasDevices(ctx: AuthCtx): Promise<boolean> {
+	const first = await ctx.db.query("devices").first();
+	return first !== null;
+}
+
+async function requireDevice(
+	ctx: AuthCtx,
+	auth: { token: string },
+	requiredScope: AuthScope,
+	workspaceId?: Id<"workspaces">,
+): Promise<Doc<"devices">> {
+	const tokenHash = await sha256(auth.token);
+	const device = await ctx.db
+		.query("devices")
+		.withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
+		.unique();
+	const now = Date.now();
+	if (!device || device.revokedAt !== undefined || device.expiresAt <= now) {
+		throw new Error("Invalid or expired device token");
+	}
+	if (!canUseScope(device.scope, requiredScope)) {
+		throw new Error("Device token scope denied");
+	}
+	if (
+		workspaceId !== undefined &&
+		device.workspaceIds.length > 0 &&
+		!device.workspaceIds.includes(workspaceId)
+	) {
+		throw new Error("Device token workspace denied");
+	}
+	return device;
+}
+
+export const mintDevice = mutation({
+	args: {
+		auth: v.optional(tokenArg),
+		label: v.string(),
+		scope: scopeArg,
+		workspaceIds: v.optional(v.array(v.id("workspaces"))),
+		expiresAt: v.optional(v.number()),
+		token: v.string(),
+	},
+	handler: async (
+		ctx,
+		{ auth, label, scope, workspaceIds, expiresAt, token },
+	) => {
+		if (await hasDevices(ctx)) {
+			if (!auth) throw new Error("Admin token required");
+			await requireDevice(ctx, auth, "admin");
+		}
+		const now = Date.now();
+		const tokenHash = await sha256(token);
+		const existing = await ctx.db
+			.query("devices")
+			.withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
+			.unique();
+		if (existing) throw new Error("Device token already exists");
+		return ctx.db.insert("devices", {
+			label,
+			tokenHash,
+			scope,
+			workspaceIds: workspaceIds ?? [],
+			createdAt: now,
+			expiresAt: expiresAt ?? now + 365 * 24 * 60 * 60 * 1000,
+		});
+	},
+});
+
+export const listDevices = query({
+	args: { auth: tokenArg },
+	handler: async (ctx, { auth }) => {
+		await requireDevice(ctx, auth, "admin");
+		return ctx.db.query("devices").collect();
+	},
+});
+
+export const revokeDevice = mutation({
+	args: { auth: tokenArg, id: v.id("devices") },
+	handler: async (ctx, { auth, id }) => {
+		await requireDevice(ctx, auth, "admin");
+		await ctx.db.patch(id, { revokedAt: Date.now() });
+	},
+});
 
 async function upsertFile(
 	ctx: MutationCtx,
@@ -60,8 +169,9 @@ async function upsertFile(
 }
 
 export const getWorkspace = query({
-	args: { name: v.string() },
-	handler: async (ctx, { name }) => {
+	args: { auth: tokenArg, name: v.string() },
+	handler: async (ctx, { auth, name }) => {
+		await requireDevice(ctx, auth, "read");
 		return ctx.db
 			.query("workspaces")
 			.withIndex("by_name", (q) => q.eq("name", name))
@@ -70,8 +180,9 @@ export const getWorkspace = query({
 });
 
 export const createWorkspace = mutation({
-	args: { name: v.string() },
-	handler: async (ctx, { name }) => {
+	args: { auth: tokenArg, name: v.string() },
+	handler: async (ctx, { auth, name }) => {
+		await requireDevice(ctx, auth, "admin");
 		const existing = await ctx.db
 			.query("workspaces")
 			.withIndex("by_name", (q) => q.eq("name", name))
@@ -82,8 +193,9 @@ export const createWorkspace = mutation({
 });
 
 export const listWorkspaces = query({
-	args: {},
-	handler: async (ctx) => {
+	args: { auth: tokenArg },
+	handler: async (ctx, { auth }) => {
+		await requireDevice(ctx, auth, "read");
 		return ctx.db.query("workspaces").collect();
 	},
 });
@@ -91,10 +203,12 @@ export const listWorkspaces = query({
 export const getFilesByWorkspace = query({
 	args: {
 		workspaceId: v.id("workspaces"),
+		auth: tokenArg,
 		since: v.optional(v.number()),
 		includeDeleted: v.optional(v.boolean()),
 	},
-	handler: async (ctx, { workspaceId, since, includeDeleted }) => {
+	handler: async (ctx, { auth, workspaceId, since, includeDeleted }) => {
+		await requireDevice(ctx, auth, "read", workspaceId);
 		const q = ctx.db.query("files").withIndex("by_workspace", (q) => {
 			const base = q.eq("workspaceId", workspaceId);
 			return since !== undefined ? base.gt("updatedAt", since) : base;
@@ -107,6 +221,7 @@ export const getFilesByWorkspace = query({
 export const pushFile = mutation({
 	args: {
 		workspaceId: v.id("workspaces"),
+		auth: tokenArg,
 		path: v.string(),
 		contentHash: v.string(),
 		content: v.string(),
@@ -114,8 +229,9 @@ export const pushFile = mutation({
 	},
 	handler: async (
 		ctx,
-		{ workspaceId, path, contentHash, content, deviceId },
+		{ auth, workspaceId, path, contentHash, content, deviceId },
 	) => {
+		await requireDevice(ctx, auth, "write", workspaceId);
 		return upsertFile(ctx, {
 			workspaceId,
 			path,
@@ -129,10 +245,12 @@ export const pushFile = mutation({
 export const softDeleteFile = mutation({
 	args: {
 		workspaceId: v.id("workspaces"),
+		auth: tokenArg,
 		path: v.string(),
 		deviceId: v.string(),
 	},
-	handler: async (ctx, { workspaceId, path, deviceId }) => {
+	handler: async (ctx, { auth, workspaceId, path, deviceId }) => {
+		await requireDevice(ctx, auth, "write", workspaceId);
 		const existing = await ctx.db
 			.query("files")
 			.withIndex("by_workspace_path", (q) =>
@@ -195,8 +313,9 @@ async function upsertAsset(
 }
 
 export const generateAssetUploadUrl = mutation({
-	args: {},
-	handler: async (ctx) => {
+	args: { auth: tokenArg, workspaceId: v.id("workspaces") },
+	handler: async (ctx, { auth, workspaceId }) => {
+		await requireDevice(ctx, auth, "write", workspaceId);
 		return ctx.storage.generateUploadUrl();
 	},
 });
@@ -204,6 +323,7 @@ export const generateAssetUploadUrl = mutation({
 export const pushAsset = mutation({
 	args: {
 		workspaceId: v.id("workspaces"),
+		auth: tokenArg,
 		path: v.string(),
 		storageId: v.id("_storage"),
 		contentHash: v.string(),
@@ -211,8 +331,9 @@ export const pushAsset = mutation({
 	},
 	handler: async (
 		ctx,
-		{ workspaceId, path, storageId, contentHash, deviceId },
+		{ auth, workspaceId, path, storageId, contentHash, deviceId },
 	) => {
+		await requireDevice(ctx, auth, "write", workspaceId);
 		return upsertAsset(ctx, {
 			workspaceId,
 			path,
@@ -226,9 +347,11 @@ export const pushAsset = mutation({
 export const getAssetsByWorkspace = query({
 	args: {
 		workspaceId: v.id("workspaces"),
+		auth: tokenArg,
 		since: v.optional(v.number()),
 	},
-	handler: async (ctx, { workspaceId, since }) => {
+	handler: async (ctx, { auth, workspaceId, since }) => {
+		await requireDevice(ctx, auth, "read", workspaceId);
 		const q = ctx.db.query("assets").withIndex("by_workspace", (q) => {
 			const base = q.eq("workspaceId", workspaceId);
 			return since !== undefined ? base.gt("updatedAt", since) : base;
@@ -238,8 +361,19 @@ export const getAssetsByWorkspace = query({
 });
 
 export const getAssetDownloadUrl = query({
-	args: { storageId: v.id("_storage") },
-	handler: async (ctx, { storageId }) => {
+	args: {
+		auth: tokenArg,
+		workspaceId: v.id("workspaces"),
+		storageId: v.id("_storage"),
+	},
+	handler: async (ctx, { auth, workspaceId, storageId }) => {
+		await requireDevice(ctx, auth, "read", workspaceId);
+		const asset = await ctx.db
+			.query("assets")
+			.withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+			.filter((q) => q.eq(q.field("storageId"), storageId))
+			.first();
+		if (!asset) return null;
 		return ctx.storage.getUrl(storageId);
 	},
 });
@@ -247,10 +381,12 @@ export const getAssetDownloadUrl = query({
 export const softDeleteAsset = mutation({
 	args: {
 		workspaceId: v.id("workspaces"),
+		auth: tokenArg,
 		path: v.string(),
 		deviceId: v.string(),
 	},
-	handler: async (ctx, { workspaceId, path, deviceId }) => {
+	handler: async (ctx, { auth, workspaceId, path, deviceId }) => {
+		await requireDevice(ctx, auth, "write", workspaceId);
 		const existing = await ctx.db
 			.query("assets")
 			.withIndex("by_workspace_path", (q) =>
@@ -270,8 +406,9 @@ export const softDeleteAsset = mutation({
 });
 
 export const listOrphanAssetCandidates = query({
-	args: { workspaceId: v.id("workspaces") },
-	handler: async (ctx, { workspaceId }) => {
+	args: { auth: tokenArg, workspaceId: v.id("workspaces") },
+	handler: async (ctx, { auth, workspaceId }) => {
+		await requireDevice(ctx, auth, "read", workspaceId);
 		// Full-workspace scan for admin inspection. Avoid calling from reactive UI
 		// paths or save/sync flows; large workspaces should use an indexed design.
 		const [files, assets] = await Promise.all([
@@ -329,8 +466,9 @@ async function markOrphanAssetCandidatesForWorkspace(
 }
 
 export const markOrphanAssetCandidates = mutation({
-	args: { workspaceId: v.id("workspaces") },
-	handler: async (ctx, { workspaceId }) => {
+	args: { auth: tokenArg, workspaceId: v.id("workspaces") },
+	handler: async (ctx, { auth, workspaceId }) => {
+		await requireDevice(ctx, auth, "write", workspaceId);
 		return markOrphanAssetCandidatesForWorkspace(ctx, workspaceId);
 	},
 });
@@ -384,10 +522,12 @@ async function deleteOrphanAssetsForWorkspace(
 
 export const deleteOrphanAssets = mutation({
 	args: {
+		auth: tokenArg,
 		workspaceId: v.id("workspaces"),
 		gracePeriodMs: v.number(),
 	},
-	handler: async (ctx, { workspaceId, gracePeriodMs }) => {
+	handler: async (ctx, { auth, workspaceId, gracePeriodMs }) => {
+		await requireDevice(ctx, auth, "write", workspaceId);
 		return deleteOrphanAssetsForWorkspace(ctx, workspaceId, gracePeriodMs);
 	},
 });
@@ -423,12 +563,14 @@ export const runOrphanAssetCleanupForAllWorkspaces = internalMutation({
 
 export const debugRemoteEdit = mutation({
 	args: {
+		auth: tokenArg,
 		workspaceId: v.id("workspaces"),
 		path: v.string(),
 		content: v.string(),
 		deviceId: v.optional(v.string()),
 	},
-	handler: async (ctx, { workspaceId, path, content, deviceId }) => {
+	handler: async (ctx, { auth, workspaceId, path, content, deviceId }) => {
+		await requireDevice(ctx, auth, "write", workspaceId);
 		return upsertFile(ctx, {
 			workspaceId,
 			path,

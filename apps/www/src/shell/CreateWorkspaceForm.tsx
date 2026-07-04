@@ -6,10 +6,11 @@ import { categorizeError, describeError } from "../connection/convex-error";
 
 type Props = {
 	client: ConvexHttpClient;
+	token: string;
 	onCreated: (id: string) => void;
 };
 
-export function CreateWorkspaceForm({ client, onCreated }: Props) {
+export function CreateWorkspaceForm({ client, token, onCreated }: Props) {
 	const [name, setName] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export function CreateWorkspaceForm({ client, onCreated }: Props) {
 		setError(null);
 		try {
 			const id = await client.mutation(api.sync.createWorkspace, {
+				auth: { token },
 				name: trimmed,
 			});
 			onCreated(id);

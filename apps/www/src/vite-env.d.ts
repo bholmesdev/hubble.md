@@ -3,6 +3,7 @@
 interface ImportMetaEnv {
 	readonly VITE_TEST_CONVEX_URL?: string;
 	readonly VITE_TEST_WORKSPACE_ID?: string;
+	readonly VITE_TEST_TOKEN?: string;
 }
 
 interface ImportMeta {

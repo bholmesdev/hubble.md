@@ -9,12 +9,19 @@ type Workspace = Doc<"workspaces">;
 
 type Props = {
 	url: string;
+	token: string;
 	onSelected: (id: string) => void;
 	onDisconnect: () => void;
 };
 
-export function OpenWorkspaceScreen({ url, onSelected, onDisconnect }: Props) {
+export function OpenWorkspaceScreen({
+	url,
+	token,
+	onSelected,
+	onDisconnect,
+}: Props) {
 	const [client] = useState(() => new ConvexHttpClient(url));
+	const auth = { token };
 	const [workspaces, setWorkspaces] = useState<Workspace[] | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [name, setName] = useState("");
@@ -25,7 +32,7 @@ export function OpenWorkspaceScreen({ url, onSelected, onDisconnect }: Props) {
 		let cancelled = false;
 		(async () => {
 			try {
-				const result = await client.query(api.sync.listWorkspaces, {});
+				const result = await client.query(api.sync.listWorkspaces, { auth });
 				if (cancelled) return;
 				setWorkspaces(result);
 				if (result.length === 1) {
@@ -54,6 +61,7 @@ export function OpenWorkspaceScreen({ url, onSelected, onDisconnect }: Props) {
 		setError(null);
 		try {
 			const id = await client.mutation(api.sync.createWorkspace, {
+				auth,
 				name: trimmed,
 			});
 			select(id);

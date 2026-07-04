@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { parseArgs as parseNodeArgs } from "node:util";
 import {
@@ -15,7 +16,10 @@ import {
 	writeSyncState,
 } from "@hubble.md/sync";
 import { createNodeFileSystem } from "@hubble.md/sync/node";
+import { api } from "@hubble.md/sync-backend";
+import type { Id } from "@hubble.md/sync-backend/types";
 import chokidar from "chokidar";
+import { ConvexHttpClient } from "convex/browser";
 
 const fs = createNodeFileSystem();
 
@@ -29,6 +33,8 @@ type CliArgs = {
 	workspaceName?: string;
 	workspaceId?: string;
 	deploymentUrl?: string;
+	token?: string;
+	scope?: "read" | "write" | "admin";
 	extraArgs: string[];
 	workspacePath: string;
 };
@@ -49,6 +55,11 @@ async function main() {
 
 	if (parsed.command === "cloud") {
 		await runCloudCommand(parsed);
+		return;
+	}
+
+	if (parsed.command === "tokens") {
+		await runTokensCommand(parsed);
 		return;
 	}
 
@@ -89,6 +100,30 @@ async function runCloudCommand(parsed: CliArgs) {
 	process.exitCode = 1;
 }
 
+async function runTokensCommand(parsed: CliArgs) {
+	const [action, ...extraArgs] = parsed.extraArgs;
+	if (extraArgs.length > 1) {
+		printUsage();
+		process.exitCode = 1;
+		return;
+	}
+
+	switch (action) {
+		case "mint":
+			await runTokenMint(parsed, extraArgs[0]);
+			return;
+		case "list":
+			await runTokenList(parsed);
+			return;
+		case "revoke":
+			await runTokenRevoke(parsed, extraArgs[0]);
+			return;
+	}
+
+	printUsage();
+	process.exitCode = 1;
+}
+
 async function runManualSync(workspacePath: string) {
 	const cloudSync = await readCloudSyncConfig(workspacePath);
 	if (!cloudSync) return;
@@ -116,10 +151,13 @@ async function runCreate(workspacePath: string, opts: CliArgs) {
 	}
 
 	const deploymentUrl = getDeploymentUrl(opts);
-	const backend = createConvexBackend(deploymentUrl);
+	const token = getToken(opts);
+	if (!token) return;
+	const backend = createConvexBackend(deploymentUrl, token);
 	const workspaceId = await backend.createWorkspace(opts.workspaceName);
 	await writeCloudConnection(workspacePath, {
 		deploymentUrl,
+		token,
 		workspaceId,
 		label: opts.workspaceName,
 	});
@@ -138,7 +176,9 @@ async function runConnect(workspacePath: string, opts: CliArgs) {
 	}
 
 	const deploymentUrl = getDeploymentUrl(opts);
-	const backend = createConvexBackend(deploymentUrl);
+	const token = getToken(opts);
+	if (!token) return;
+	const backend = createConvexBackend(deploymentUrl, token);
 	const workspaceId =
 		opts.workspaceId ?? (await backend.getWorkspace(opts.workspaceName ?? ""));
 
@@ -150,6 +190,7 @@ async function runConnect(workspacePath: string, opts: CliArgs) {
 
 	await writeCloudConnection(workspacePath, {
 		deploymentUrl,
+		token,
 		workspaceId,
 		label: opts.workspaceName ?? workspaceId,
 	});
@@ -159,6 +200,7 @@ async function writeCloudConnection(
 	workspacePath: string,
 	opts: {
 		deploymentUrl: string;
+		token: string;
 		workspaceId: string;
 		label: string;
 	},
@@ -168,6 +210,7 @@ async function writeCloudConnection(
 	const config = await writeCloudSyncConfig(fs, workspacePath, {
 		provider: "convex",
 		deploymentUrl: opts.deploymentUrl,
+		token: opts.token,
 		workspaceId: opts.workspaceId,
 		deviceId,
 		backgroundSync: current.cloudSync?.backgroundSync ?? false,
@@ -182,12 +225,76 @@ function getDeploymentUrl(opts: Pick<CliArgs, "deploymentUrl">): string {
 	return opts.deploymentUrl ?? getConvexUrl();
 }
 
+function getToken(opts: Pick<CliArgs, "token">): string | null {
+	const token = opts.token ?? process.env.HUBBLE_TOKEN;
+	if (token) return token;
+	console.error("Missing required --token or HUBBLE_TOKEN.");
+	process.exitCode = 1;
+	return null;
+}
+
+function createAuth(token: string) {
+	return { token };
+}
+
+function createDeviceToken(scope: "read" | "write" | "admin"): string {
+	return `hbl_${scope}_${randomBytes(32).toString("base64url")}`;
+}
+
+async function runTokenMint(parsed: CliArgs, label?: string) {
+	if (!label) {
+		console.error("Missing token label.");
+		process.exitCode = 1;
+		return;
+	}
+	const deploymentUrl = getDeploymentUrl(parsed);
+	const token = createDeviceToken(parsed.scope ?? "write");
+	const adminToken = parsed.token ?? process.env.HUBBLE_TOKEN;
+	const client = new ConvexHttpClient(deploymentUrl);
+	await client.mutation(api.sync.mintDevice, {
+		auth: adminToken ? createAuth(adminToken) : undefined,
+		label,
+		scope: parsed.scope ?? "write",
+		token,
+	});
+	console.log(token);
+}
+
+async function runTokenList(parsed: CliArgs) {
+	const token = getToken(parsed);
+	if (!token) return;
+	const client = new ConvexHttpClient(getDeploymentUrl(parsed));
+	const devices = await client.query(api.sync.listDevices, {
+		auth: createAuth(token),
+	});
+	for (const device of devices) {
+		const status = device.revokedAt ? "revoked" : "active";
+		console.log(`${device._id}\t${device.scope}\t${status}\t${device.label}`);
+	}
+}
+
+async function runTokenRevoke(parsed: CliArgs, id?: string) {
+	const token = getToken(parsed);
+	if (!token) return;
+	if (!id) {
+		console.error("Missing device id.");
+		process.exitCode = 1;
+		return;
+	}
+	const client = new ConvexHttpClient(getDeploymentUrl(parsed));
+	await client.mutation(api.sync.revokeDevice, {
+		auth: createAuth(token),
+		id: id as Id<"devices">,
+	});
+	console.log(`Revoked ${id}`);
+}
+
 async function syncOnce(
 	workspacePath: string,
 	cloudSync: CloudSyncConfig,
 	reason: string,
 ) {
-	const backend = createConvexBackend(cloudSync.deploymentUrl);
+	const backend = createConvexBackend(cloudSync.deploymentUrl, cloudSync.token);
 	const result = await runSync(backend, fs, workspacePath);
 	logResult(reason, result);
 	return result;
@@ -204,7 +311,7 @@ async function syncContinuously(
 	const scheduler = createSyncScheduler(workspacePath, cloudSync);
 	await scheduler.enqueue("startup");
 
-	const subscriber = createConvexSubscriber(convexUrl);
+	const subscriber = createConvexSubscriber(convexUrl, cloudSync.token);
 	const unsubscribe = subscriber.onFilesChanged(
 		cloudSync.workspaceId,
 		() => {
@@ -342,8 +449,19 @@ function parseCliArgs(argv: string[]) {
 				name: { type: "string" },
 				id: { type: "string" },
 				url: { type: "string" },
+				token: { type: "string" },
+				scope: { type: "string" },
 			},
 		});
+		const scope = values.scope;
+		if (
+			scope !== undefined &&
+			scope !== "read" &&
+			scope !== "write" &&
+			scope !== "admin"
+		) {
+			return { error: "--scope must be read, write, or admin." } as const;
+		}
 		const [command, ...extraArgs] = positionals;
 		return {
 			command,
@@ -351,6 +469,8 @@ function parseCliArgs(argv: string[]) {
 			workspaceName: values.name,
 			workspaceId: values.id,
 			deploymentUrl: values.url,
+			token: values.token,
+			scope,
 			extraArgs,
 			workspacePath: values.cwd ? resolve(values.cwd) : process.cwd(),
 		} as const;
@@ -363,6 +483,10 @@ function parseCliArgs(argv: string[]) {
 
 function printHelp(args: CliArgs) {
 	if (args.command !== "cloud") {
+		if (args.command === "tokens") {
+			printTokensHelp();
+			return;
+		}
 		printRootHelp();
 		return;
 	}
@@ -395,9 +519,11 @@ function printHelp(args: CliArgs) {
 function printRootHelp() {
 	console.log("Usage:");
 	console.log("  hubble [--cwd path] cloud <command>");
+	console.log("  hubble tokens <command>");
 	console.log("");
 	console.log("Commands:");
 	console.log("  cloud    Manage Cloud Sync");
+	console.log("  tokens   Manage device tokens");
 }
 
 function printCloudHelp() {
@@ -414,23 +540,27 @@ function printCloudHelp() {
 
 function printCreateHelp() {
 	console.log("Usage:");
-	console.log("  hubble [--cwd path] cloud create --name name [--url url]");
+	console.log(
+		"  hubble [--cwd path] cloud create --name name [--url url] [--token token]",
+	);
 	console.log("");
 	console.log("Options:");
 	console.log("  --name name  Remote workspace name to create");
 	console.log("  --url url    Convex deployment URL");
+	console.log("  --token tok  Admin token; defaults to HUBBLE_TOKEN");
 }
 
 function printConnectHelp() {
 	console.log("Usage:");
 	console.log(
-		"  hubble [--cwd path] cloud connect (--name name|--id id) [--url url]",
+		"  hubble [--cwd path] cloud connect (--name name|--id id) [--url url] [--token token]",
 	);
 	console.log("");
 	console.log("Options:");
 	console.log("  --name name  Existing remote workspace name");
 	console.log("  --id id      Existing remote workspace id");
 	console.log("  --url url    Convex deployment URL");
+	console.log("  --token tok  Device token; defaults to HUBBLE_TOKEN");
 }
 
 function printSyncHelp() {
@@ -454,15 +584,31 @@ function printDisconnectHelp() {
 	console.log("Removes cloudSync from .hubble/config.json.");
 }
 
+function printTokensHelp() {
+	console.log("Usage:");
+	console.log(
+		"  hubble tokens mint label [--scope read|write|admin] [--url url] [--token admin]",
+	);
+	console.log("  hubble tokens list [--url url] [--token admin]");
+	console.log("  hubble tokens revoke id [--url url] [--token admin]");
+}
+
 function printUsage() {
 	console.error("Usage:");
-	console.error("  hubble [--cwd path] cloud create --name name [--url url]");
 	console.error(
-		"  hubble [--cwd path] cloud connect (--name name|--id id) [--url url]",
+		"  hubble [--cwd path] cloud create --name name [--url url] [--token token]",
+	);
+	console.error(
+		"  hubble [--cwd path] cloud connect (--name name|--id id) [--url url] [--token token]",
 	);
 	console.error("  hubble [--cwd path] cloud sync");
 	console.error("  hubble [--cwd path] cloud watch");
 	console.error("  hubble [--cwd path] cloud disconnect");
+	console.error(
+		"  hubble tokens mint label [--scope read|write|admin] [--url url] [--token admin]",
+	);
+	console.error("  hubble tokens list [--url url] [--token admin]");
+	console.error("  hubble tokens revoke id [--url url] [--token admin]");
 }
 
 void main();

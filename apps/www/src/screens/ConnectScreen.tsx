@@ -1,33 +1,36 @@
 import { api } from "@hubble.md/sync-backend";
 import { ConvexHttpClient } from "convex/browser";
 import { useState } from "react";
-import { saveConnectionUrl } from "../connection/connection";
+import { saveConnection } from "../connection/connection";
 import { categorizeError, describeError } from "../connection/convex-error";
 import { ensureDeviceId } from "../connection/deviceId";
 
 type Props = {
-	onConnected: (url: string) => void;
+	onConnected: (url: string, token: string) => void;
 };
 
 export function ConnectScreen({ onConnected }: Props) {
 	const [url, setUrl] = useState("");
+	const [token, setToken] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const handleSubmit = async (event: React.FormEvent) => {
 		event.preventDefault();
 		const trimmed = url.trim();
-		if (!trimmed) return;
+		const trimmedToken = token.trim();
+		if (!trimmed || !trimmedToken) return;
 		setBusy(true);
 		setError(null);
 		try {
 			const client = new ConvexHttpClient(trimmed);
 			await client.query(api.sync.getWorkspace, {
+				auth: { token: trimmedToken },
 				name: "__hubble_connect_probe__",
 			});
-			saveConnectionUrl(trimmed);
+			saveConnection(trimmed, trimmedToken);
 			ensureDeviceId();
-			onConnected(trimmed);
+			onConnected(trimmed, trimmedToken);
 		} catch (err) {
 			setError(describeError(categorizeError(err)));
 		} finally {
@@ -44,7 +47,7 @@ export function ConnectScreen({ onConnected }: Props) {
 				<div>
 					<h1 className="m-0 text-base font-semibold">Connect to hubble.md</h1>
 					<p className="m-0 mt-1 text-xs text-muted-foreground">
-						Paste the URL of your Convex deployment.
+						Paste your Convex deployment URL and device token.
 					</p>
 				</div>
 				<input
@@ -56,6 +59,15 @@ export function ConnectScreen({ onConnected }: Props) {
 					value={url}
 					onChange={(event) => setUrl(event.target.value)}
 					placeholder="https://your-deployment.convex.cloud"
+					disabled={busy}
+					className="rounded-sm border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-ring"
+				/>
+				<input
+					type="password"
+					required
+					value={token}
+					onChange={(event) => setToken(event.target.value)}
+					placeholder="hbl_write_..."
 					disabled={busy}
 					className="rounded-sm border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-ring"
 				/>

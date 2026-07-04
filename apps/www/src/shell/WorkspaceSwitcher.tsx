@@ -8,6 +8,7 @@ import { CreateWorkspaceForm } from "./CreateWorkspaceForm";
 
 type Props = {
 	url: string;
+	token: string;
 	currentWorkspaceId: string;
 	currentWorkspaceName: string;
 	onSelect: (id: string) => void;
@@ -16,6 +17,7 @@ type Props = {
 
 export function WorkspaceSwitcher({
 	url,
+	token,
 	currentWorkspaceId,
 	currentWorkspaceName,
 	onSelect,
@@ -31,7 +33,9 @@ export function WorkspaceSwitcher({
 		let cancelled = false;
 		(async () => {
 			try {
-				const result = await client.query(api.sync.listWorkspaces, {});
+				const result = await client.query(api.sync.listWorkspaces, {
+					auth: { token },
+				});
 				if (cancelled) return;
 				setWorkspaces(result);
 			} catch (err) {
@@ -41,7 +45,7 @@ export function WorkspaceSwitcher({
 		return () => {
 			cancelled = true;
 		};
-	}, [client]);
+	}, [client, token]);
 
 	return (
 		<>
@@ -93,6 +97,7 @@ export function WorkspaceSwitcher({
 			>
 				<CreateWorkspaceForm
 					client={client}
+					token={token}
 					onCreated={(id) => {
 						setCreateOpen(false);
 						onSelect(id);

@@ -24,6 +24,7 @@ export async function init(
 		workspacePath: string;
 		workspaceName: string;
 		deploymentUrl: string;
+		token: string;
 		backgroundSync?: boolean;
 	},
 ): Promise<WorkspaceConfig> {
@@ -37,6 +38,7 @@ export async function init(
 	const cloudSync: CloudSyncConfig = {
 		provider: "convex",
 		deploymentUrl: opts.deploymentUrl,
+		token: opts.token,
 		workspaceId,
 		deviceId: crypto.randomUUID(),
 		backgroundSync: opts.backgroundSync ?? false,
@@ -205,7 +207,7 @@ export async function sync(
 	const remoteAssetByPath = new Map(remoteAssets.map((a) => [a.path, a]));
 
 	async function pushAsset(path: string, hash: string) {
-		const uploadUrl = await backend.generateAssetUploadUrl();
+		const uploadUrl = await backend.generateAssetUploadUrl(workspaceId);
 		const data = await fs.readBinaryFile(`${workspacePath}/${path}`);
 		const res = await fetch(uploadUrl, {
 			method: "POST",
@@ -225,7 +227,10 @@ export async function sync(
 	}
 
 	async function pullAsset(remote: RemoteAsset) {
-		const url = await backend.getAssetDownloadUrl(remote.storageId);
+		const url = await backend.getAssetDownloadUrl(
+			workspaceId,
+			remote.storageId,
+		);
 		if (!url) return;
 		const res = await fetch(url);
 		const buf = new Uint8Array(await res.arrayBuffer());

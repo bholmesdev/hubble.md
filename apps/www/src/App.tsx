@@ -16,6 +16,7 @@ import { workspaceStore } from "./store/state";
 
 type Connection = {
 	url: string;
+	token: string;
 	workspaceId: string | null;
 };
 
@@ -34,13 +35,14 @@ function readTestBootstrap(): Connection | null {
 	if (params.get("test") !== "1") return null;
 	const url = import.meta.env.VITE_TEST_CONVEX_URL;
 	const workspaceId = import.meta.env.VITE_TEST_WORKSPACE_ID;
-	if (!url || !workspaceId) {
+	const token = import.meta.env.VITE_TEST_TOKEN;
+	if (!url || !workspaceId || !token) {
 		console.warn(
-			"?test=1 set but VITE_TEST_CONVEX_URL / VITE_TEST_WORKSPACE_ID are missing — falling back to normal routing.",
+			"?test=1 set but VITE_TEST_CONVEX_URL / VITE_TEST_WORKSPACE_ID / VITE_TEST_TOKEN are missing — falling back to normal routing.",
 		);
 		return null;
 	}
-	return { url, workspaceId };
+	return { url, token, workspaceId };
 }
 
 export default function App() {
@@ -64,9 +66,10 @@ function AppRoutes() {
 		navigate("/", { replace: true });
 	};
 
-	const handleConnected = (url: string) => {
+	const handleConnected = (url: string, token: string) => {
 		setConnection({
 			url,
+			token,
 			workspaceId: getWorkspaceIdFromPath(location.pathname),
 		});
 	};
@@ -128,7 +131,7 @@ function HomeRoute({
 	onDisconnect,
 }: {
 	connection: Connection | null;
-	onConnected: (url: string) => void;
+	onConnected: (url: string, token: string) => void;
 	onSelected: (workspaceId: string) => void;
 	onDisconnect: () => void;
 }) {
@@ -154,6 +157,7 @@ function HomeRoute({
 	return (
 		<OpenWorkspaceScreen
 			url={connection.url}
+			token={connection.token}
 			onSelected={onSelected}
 			onDisconnect={onDisconnect}
 		/>
@@ -169,7 +173,7 @@ function WorkspaceRoute({
 }: {
 	connection: Connection | null;
 	filePath?: string | null;
-	onConnected: (url: string) => void;
+	onConnected: (url: string, token: string) => void;
 	onWorkspaceLoaded: (workspaceId: string) => void;
 	onDisconnect: () => void;
 }) {
@@ -188,6 +192,7 @@ function WorkspaceRoute({
 	return (
 		<AppShell
 			url={connection.url}
+			token={connection.token}
 			workspaceId={workspaceId}
 			filePath={routeFilePath}
 			onSelectFile={(path) => {

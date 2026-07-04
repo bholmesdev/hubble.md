@@ -11,6 +11,7 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export function Sidebar({
 	url,
+	token,
 	workspaceId,
 	workspaceName,
 	onSelectFile,
@@ -18,6 +19,7 @@ export function Sidebar({
 	onDisconnect,
 }: {
 	url: string;
+	token: string;
 	workspaceId: string;
 	workspaceName: string;
 	onSelectFile: (path: string) => void;
@@ -43,6 +45,7 @@ export function Sidebar({
 			header={
 				<WorkspaceSwitcher
 					url={url}
+					token={token}
 					currentWorkspaceId={workspaceId}
 					currentWorkspaceName={workspaceName}
 					onSelect={onSwitch}

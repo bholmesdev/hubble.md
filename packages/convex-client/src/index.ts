@@ -17,18 +17,25 @@ export type Subscriber = {
 	close(): Promise<void>;
 };
 
-export function createConvexBackend(url: string): SyncBackend {
+type AuthArgs = { token: string };
+
+export function createConvexBackend(url: string, token: string): SyncBackend {
 	const client = new ConvexHttpClient(url);
+	const auth: AuthArgs = { token };
 	return {
 		async getWorkspace(name) {
-			const workspace = await client.query(api.sync.getWorkspace, { name });
+			const workspace = await client.query(api.sync.getWorkspace, {
+				auth,
+				name,
+			});
 			return workspace?._id ?? null;
 		},
 		async createWorkspace(name) {
-			return client.mutation(api.sync.createWorkspace, { name });
+			return client.mutation(api.sync.createWorkspace, { auth, name });
 		},
 		async getFiles(workspaceId, opts) {
 			const files = await client.query(api.sync.getFilesByWorkspace, {
+				auth,
 				workspaceId: workspaceId as Id<"workspaces">,
 				since: opts?.since,
 				includeDeleted: opts?.includeDeleted,
@@ -40,17 +47,20 @@ export function createConvexBackend(url: string): SyncBackend {
 		async pushFile(args) {
 			await client.mutation(api.sync.pushFile, {
 				...args,
+				auth,
 				workspaceId: args.workspaceId as Id<"workspaces">,
 			});
 		},
 		async softDeleteFile(args) {
 			await client.mutation(api.sync.softDeleteFile, {
 				...args,
+				auth,
 				workspaceId: args.workspaceId as Id<"workspaces">,
 			});
 		},
 		async getAssets(workspaceId, since) {
 			return client.query(api.sync.getAssetsByWorkspace, {
+				auth,
 				workspaceId: workspaceId as Id<"workspaces">,
 				since,
 			});
@@ -58,6 +68,7 @@ export function createConvexBackend(url: string): SyncBackend {
 		async pushAsset(args) {
 			await client.mutation(api.sync.pushAsset, {
 				...args,
+				auth,
 				workspaceId: args.workspaceId as Id<"workspaces">,
 				storageId: args.storageId as Id<"_storage">,
 			});
@@ -65,22 +76,29 @@ export function createConvexBackend(url: string): SyncBackend {
 		async softDeleteAsset(args) {
 			await client.mutation(api.sync.softDeleteAsset, {
 				...args,
+				auth,
 				workspaceId: args.workspaceId as Id<"workspaces">,
 			});
 		},
-		async generateAssetUploadUrl() {
-			return client.mutation(api.sync.generateAssetUploadUrl, {});
+		async generateAssetUploadUrl(workspaceId) {
+			return client.mutation(api.sync.generateAssetUploadUrl, {
+				auth,
+				workspaceId: workspaceId as Id<"workspaces">,
+			});
 		},
-		async getAssetDownloadUrl(storageId) {
+		async getAssetDownloadUrl(workspaceId, storageId) {
 			return client.query(api.sync.getAssetDownloadUrl, {
+				auth,
+				workspaceId: workspaceId as Id<"workspaces">,
 				storageId: storageId as Id<"_storage">,
 			});
 		},
 	};
 }
 
-export function createConvexSubscriber(url: string): Subscriber {
+export function createConvexSubscriber(url: string, token: string): Subscriber {
 	const client = new ConvexClient(url);
+	const auth: AuthArgs = { token };
 	return {
 		onFilesChanged(workspaceId, callback, onError) {
 			// Convex's onUpdate fires immediately with current state, then on
@@ -90,7 +108,7 @@ export function createConvexSubscriber(url: string): Subscriber {
 			// where changes during subscription setup get dropped.
 			return client.onUpdate(
 				api.sync.getFilesByWorkspace,
-				{ workspaceId: workspaceId as Id<"workspaces"> },
+				{ auth, workspaceId: workspaceId as Id<"workspaces"> },
 				() => callback(),
 				onError,
 			);
@@ -98,7 +116,7 @@ export function createConvexSubscriber(url: string): Subscriber {
 		onAssetsChanged(workspaceId, callback, onError) {
 			return client.onUpdate(
 				api.sync.getAssetsByWorkspace,
-				{ workspaceId: workspaceId as Id<"workspaces"> },
+				{ auth, workspaceId: workspaceId as Id<"workspaces"> },
 				() => callback(),
 				onError,
 			);

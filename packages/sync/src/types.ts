@@ -5,6 +5,7 @@ export const WorkspaceConfigSchema = z.object({
 		.object({
 			provider: z.literal("convex"),
 			deploymentUrl: z.string(),
+			token: z.string(),
 			workspaceId: z.string(),
 			deviceId: z.string(),
 			backgroundSync: z.boolean(),

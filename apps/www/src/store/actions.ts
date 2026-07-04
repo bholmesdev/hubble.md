@@ -20,21 +20,27 @@ import {
 type Ctx = {
 	backend: SyncBackend;
 	workspaceId: string;
+	token: string;
 	deviceId: string;
 };
 
 let ctx: Ctx | null = null;
 
-function createCtx(url: string, workspaceId: string): Ctx {
+function createCtx(url: string, token: string, workspaceId: string): Ctx {
 	return {
-		backend: createConvexBackend(url),
+		backend: createConvexBackend(url, token),
 		workspaceId,
+		token,
 		deviceId: ensureDeviceId(),
 	};
 }
 
-export function initActions(url: string, workspaceId: string): void {
-	ctx = createCtx(url, workspaceId);
+export function initActions(
+	url: string,
+	token: string,
+	workspaceId: string,
+): void {
+	ctx = createCtx(url, token, workspaceId);
 }
 
 export function teardownActions(): void {
@@ -60,12 +66,14 @@ type WorkspaceSnapshot = {
 
 async function fetchWorkspaceSnapshot(
 	url: string,
+	token: string,
 	workspaceId: string,
 	selectedPath: string | null,
 ): Promise<WorkspaceSnapshot> {
 	const client = new ConvexHttpClient(url);
-	const workspacesPromise = client.query(api.sync.listWorkspaces, {});
-	const backend = createConvexBackend(url);
+	const auth = { token };
+	const workspacesPromise = client.query(api.sync.listWorkspaces, { auth });
+	const backend = createConvexBackend(url, token);
 	const filesPromise = backend.getFiles(workspaceId);
 	const assetsPromise = backend.getAssets(workspaceId);
 	const [files, assets] = await Promise.all([filesPromise, assetsPromise]);
@@ -104,6 +112,7 @@ export const loadWorkspaceSnapshot = latest(
 	async (
 		{ isStale },
 		url: string,
+		token: string,
 		workspaceId: string,
 		selectedPath: string | null = null,
 	): Promise<boolean> => {
@@ -118,11 +127,12 @@ export const loadWorkspaceSnapshot = latest(
 		try {
 			const snapshot = await fetchWorkspaceSnapshot(
 				url,
+				token,
 				workspaceId,
 				selectedPath,
 			);
 			if (isStale()) return false;
-			ctx = createCtx(url, workspaceId);
+			ctx = createCtx(url, token, workspaceId);
 			appStore.set((state) => ({
 				workspace: {
 					...state.workspace,
@@ -302,7 +312,7 @@ export async function resolveAssetDownloadUrl(
 	notePath: string,
 	path: string,
 ): Promise<string | null> {
-	const { backend } = requireCtx();
+	const { backend, workspaceId } = requireCtx();
 	const assetPath = resolveMarkdownAssetPath(notePath, path);
 	const asset = workspaceStore
 		.get()
@@ -310,7 +320,7 @@ export async function resolveAssetDownloadUrl(
 	if (!asset) return null;
 	const cached = assetDownloadUrlCache.get(assetPath);
 	if (cached?.storageId === asset.storageId) return cached.url;
-	const url = await backend.getAssetDownloadUrl(asset.storageId);
+	const url = await backend.getAssetDownloadUrl(workspaceId, asset.storageId);
 	assetDownloadUrlCache.set(assetPath, { storageId: asset.storageId, url });
 	return url;
 }
@@ -323,7 +333,7 @@ export async function uploadAssetFile(args: {
 	const bytes = await args.file.arrayBuffer();
 	const contentHash = await computeBytesHash(bytes);
 	const paths = assetPathsForNote(args.path, contentHash, args.file);
-	const uploadUrl = await backend.generateAssetUploadUrl();
+	const uploadUrl = await backend.generateAssetUploadUrl(workspaceId);
 	const uploadResponse = await fetch(uploadUrl, {
 		method: "POST",
 		headers: { "Content-Type": args.file.type || "application/octet-stream" },

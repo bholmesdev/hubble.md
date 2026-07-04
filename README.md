@@ -81,6 +81,18 @@ pnpm check            # run Biome
 pnpm typecheck        # typecheck all packages
 ```
 
+## Cloud Sync tokens
+
+Cloud Sync uses per-device tokens. Bootstrap the first admin token, then pass a
+token when connecting a workspace:
+
+```sh
+hubble tokens mint "MacBook" --scope admin --url https://your-deployment.convex.cloud
+HUBBLE_TOKEN=hbl_admin_... hubble cloud create --name Notes --url https://your-deployment.convex.cloud
+hubble tokens list --url https://your-deployment.convex.cloud --token hbl_admin_...
+hubble tokens revoke <device-id> --url https://your-deployment.convex.cloud --token hbl_admin_...
+```
+
 ## Documentation
 
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) covers the contribution flow, local setup, and pre-PR checks.
