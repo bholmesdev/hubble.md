@@ -12,4 +12,6 @@ Use this note to test **bold text**, *italic text*, `inline code`, [[effective-l
 
 Open `file-index.html` or `todo-demo.html` from the sidebar to try full-screen HTML Apps. See [[samples/interview-prep]] for prompts.
 
+<iframe src="./tailwind-card.dist.html"></iframe>
+
 ![Project sketch](project-ideas.assets/project-sketch.jpg)

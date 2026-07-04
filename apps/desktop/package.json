@@ -24,6 +24,7 @@
 		"bundle:linux": "pnpm build && electron-builder --linux",
 		"bundle:linux:arm64": "pnpm build && electron-builder --linux --arm64",
 		"preview": "vite preview",
+		"build:html-embed": "node scripts/build-html-embed.mjs",
 		"sync:playground": "node scripts/sync-playground.mjs",
 		"test": "vitest run"
 	},

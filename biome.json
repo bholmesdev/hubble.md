@@ -54,6 +54,16 @@
 					}
 				}
 			}
+		},
+		{
+			"includes": ["**/*.dist.html"],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noImportantStyles": "off"
+					}
+				}
+			}
 		}
 	]
 }

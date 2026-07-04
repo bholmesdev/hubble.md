@@ -8,6 +8,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ## [Unreleased]
 
 ### Added
+- HTML iframe embeds can now be built into `.dist.html` files with pruned Tailwind v4 CSS.
 
 ### Changed
 

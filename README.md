@@ -81,6 +81,22 @@ pnpm check            # run Biome
 pnpm typecheck        # typecheck all packages
 ```
 
+## HTML App Tailwind builds
+
+For local HTML Apps or iframe Embeds that use Tailwind utilities, build a static artifact instead of loading Tailwind at runtime:
+
+```sh
+pnpm --filter @hubble.md/desktop build:html-embed path/to/file-index.html
+```
+
+The default output is `path/to/file-index.dist.html`. Point Markdown embeds at the built file:
+
+```html
+<iframe src="./file-index.dist.html"></iframe>
+```
+
+The builder scans the source HTML class attributes, compiles Tailwind v4 CSS for those candidates only, and inlines the result into the output HTML.
+
 ## Documentation
 
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) covers the contribution flow, local setup, and pre-PR checks.
