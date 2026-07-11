@@ -325,6 +325,7 @@ export function EditorView({
 				/>
 				<ReviewCommentPopover
 					editor={editor}
+					filePath={path}
 					viewportRef={editorViewportRef}
 					request={reviewCommentRequest}
 					onMessage={onMessage}

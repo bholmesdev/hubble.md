@@ -35,6 +35,28 @@ type ReviewComment = {
 type AnchorRange = { from: number; to: number };
 type PopoverMode = "new" | "thread";
 
+export function buildReviewAgentPrompt({
+	filePath,
+	commentId,
+	anchorText,
+	commentBody,
+}: {
+	filePath: string;
+	commentId: string;
+	anchorText: string;
+	commentBody: string;
+}) {
+	return `Address Hubble review comment ${commentId} in ${filePath}.
+
+Anchored text:
+${anchorText}
+
+Comment:
+${commentBody}
+
+Read the file before editing. Reply by appending a reply object to this comment's inline hubble-review metadata, then resolve the comment only if the request is addressed. Preserve CriticMarkup markers, the anchor id, unknown review metadata, and unrelated Markdown.`;
+}
+
 function reviewCommentAttrs(mark: Mark) {
 	if (mark.type.name !== "reviewMark" || mark.attrs.type !== "reviewComment") {
 		return null;
@@ -139,11 +161,13 @@ function selectionReference(
 
 export function ReviewCommentPopover({
 	editor,
+	filePath,
 	viewportRef,
 	request,
 	onMessage,
 }: {
 	editor: Editor | null;
+	filePath: string;
 	viewportRef: RefObject<HTMLDivElement | null>;
 	request: number;
 	onMessage?: (message: string, type: "success" | "error") => void;
@@ -335,6 +359,26 @@ export function ReviewCommentPopover({
 		);
 	}, [activeComment, editor, onMessage]);
 
+	const askAgent = useCallback(async () => {
+		if (!editor || !activeComment) return;
+		const prompt = buildReviewAgentPrompt({
+			filePath,
+			commentId: activeComment.id,
+			anchorText: editor.state.doc.textBetween(
+				activeComment.from,
+				activeComment.to,
+				"\n",
+			),
+			commentBody: activeComment.attrs.body ?? "",
+		});
+		try {
+			await navigator.clipboard.writeText(prompt);
+			onMessage?.("Agent request copied", "success");
+		} catch {
+			onMessage?.("Could not copy agent request", "error");
+		}
+	}, [activeComment, editor, filePath, onMessage]);
+
 	if (!editor) return null;
 
 	return (
@@ -462,6 +506,15 @@ export function ReviewCommentPopover({
 								className="mt-3 min-h-16 w-full resize-y rounded-sm border border-input bg-card px-2.5 py-2 text-xs outline-hidden placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40"
 							/>
 							<div className="mt-2 flex items-center justify-between gap-1.5">
+								<Button
+									type="button"
+									variant="ghost"
+									size="xs"
+									onClick={() => void askAgent()}
+								>
+									<MingcuteSendPlaneLine />
+									Ask agent
+								</Button>
 								<Button
 									type="button"
 									variant="ghost"
