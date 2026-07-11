@@ -51,9 +51,12 @@ export {
 	tiptapDocToMarkdown,
 } from "./prosemirrorToMarkdown";
 export {
+	parseReviewMetadata,
 	type ReviewMarkAttrs,
 	ReviewMarkExtension,
 	type ReviewMarkName,
+	type ReviewReply,
+	serializeReviewMetadata,
 } from "./ReviewMark";
 export {
 	createRichTextClipboardSerializer,

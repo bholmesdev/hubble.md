@@ -44,6 +44,7 @@ import {
 import { FindBar } from "./FindBar";
 import { FormatCommandMenu } from "./FormatCommandMenu";
 import { FormattingStatusBar } from "./FormattingStatusBar";
+import { ReviewCommentPopover } from "./ReviewCommentPopover";
 import { SelectionFormattingToolbar } from "./SelectionFormattingToolbar";
 import type { VirtualCursorMode } from "./virtualCursorMode";
 
@@ -114,6 +115,7 @@ export function EditorView({
 		useState<HTMLDivElement | null>(null);
 	const [cursorModeOverride, setCursorModeOverride] =
 		useState<VirtualCursorMode | null>(null);
+	const [reviewCommentRequest, setReviewCommentRequest] = useState(0);
 	const [frontMatterState, setFrontMatterState] = useState(() =>
 		frontMatterStateFromMarkdown(initialMarkdown),
 	);
@@ -319,6 +321,13 @@ export function EditorView({
 				<SelectionFormattingToolbar
 					editor={editor}
 					viewportRef={editorViewportRef}
+					onComment={() => setReviewCommentRequest((value) => value + 1)}
+				/>
+				<ReviewCommentPopover
+					editor={editor}
+					viewportRef={editorViewportRef}
+					request={reviewCommentRequest}
+					onMessage={onMessage}
 				/>
 				<FormatCommandMenu editor={editor} viewportRef={editorViewportRef} />
 			</div>

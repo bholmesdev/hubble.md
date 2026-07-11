@@ -3,6 +3,7 @@ import type { Fragment } from "@tiptap/pm/model";
 import type { Selection } from "@tiptap/pm/state";
 import type { LinkAttrs } from "./Link";
 import { wikiDisplayNameForTarget } from "./markdownPath";
+import { serializeReviewMetadata } from "./ReviewMark";
 
 /**
  * Convert TipTap JSONContent (ProseMirror document) -> Markdown string
@@ -253,6 +254,9 @@ function inlineNodesToMarkdown(nodes: JSONContent[]): string {
 				result += `{==${content}==}`;
 			}
 			if (mark.attrs?.id) result += `{#${mark.attrs.id}}`;
+			if (type === "reviewComment") {
+				result += serializeReviewMetadata(mark.attrs ?? {});
+			}
 			i = j;
 			continue;
 		}

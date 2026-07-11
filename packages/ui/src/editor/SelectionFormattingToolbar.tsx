@@ -17,6 +17,7 @@ import {
 	useState,
 } from "react";
 import MingcuteBoldLine from "~icons/mingcute/bold-line";
+import MingcuteCommentLine from "~icons/mingcute/comment-line";
 import MingcuteHeading1Line from "~icons/mingcute/heading-1-line";
 import MingcuteHeading2Line from "~icons/mingcute/heading-2-line";
 import MingcuteHeading3Line from "~icons/mingcute/heading-3-line";
@@ -135,9 +136,11 @@ function shouldShowToolbar(editor: Editor) {
 export function SelectionFormattingToolbar({
 	editor,
 	viewportRef,
+	onComment,
 }: {
 	editor: Editor | null;
 	viewportRef: RefObject<HTMLDivElement | null>;
+	onComment?: () => void;
 }) {
 	const [position, setPosition] = useState<ToolbarPosition | null>(null);
 	// Scale from the edge facing the selection, like Base UI popups do via
@@ -364,6 +367,20 @@ export function SelectionFormattingToolbar({
 			{INLINE_ACTIONS.map((action) => (
 				<ToolbarButton key={action.kind} editor={editor} action={action} />
 			))}
+			{onComment && (
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon-sm"
+					aria-label="Comment"
+					title="Comment"
+					className="text-muted-foreground"
+					onMouseDown={(event) => event.preventDefault()}
+					onClick={onComment}
+				>
+					<MingcuteCommentLine className="size-4" />
+				</Button>
+			)}
 			<Separator orientation="vertical" className="mx-0.5" />
 			{HEADING_ACTIONS.map((action) => (
 				<ToolbarButton key={action.kind} editor={editor} action={action} />

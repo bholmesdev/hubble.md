@@ -7,11 +7,74 @@ export type ReviewMarkName =
 	| "reviewDeletion"
 	| "reviewReplacement";
 
+export type ReviewReply = {
+	body: string;
+	id: string;
+	author?: "human" | "agent";
+	createdAt?: string;
+};
+
 export type ReviewMarkAttrs = {
 	body?: string;
 	id?: string | null;
 	original?: string;
+	replies?: ReviewReply[];
+	resolved?: boolean;
+	metadata?: Record<string, unknown>;
+	type?: ReviewMarkName;
 };
+
+const REVIEW_METADATA_PATTERN = /^<!--\s*hubble-review:([\s\S]*?)-->\s*$/;
+
+export function serializeReviewMetadata(attrs: ReviewMarkAttrs): string {
+	if (attrs.type !== "reviewComment") return "";
+	if (!attrs.resolved && (!attrs.replies || attrs.replies.length === 0)) {
+		return "";
+	}
+
+	const metadata = encodeURIComponent(
+		JSON.stringify({
+			...(attrs.metadata ?? {}),
+			replies: attrs.replies ?? [],
+			resolved: attrs.resolved === true,
+		}),
+	);
+	return `<!-- hubble-review:${metadata}-->`;
+}
+
+export function parseReviewMetadata(
+	value: string | undefined,
+): Pick<ReviewMarkAttrs, "metadata" | "replies" | "resolved"> | null {
+	if (!value) return null;
+	const match = value.match(REVIEW_METADATA_PATTERN);
+	if (!match) return null;
+
+	try {
+		const parsed = JSON.parse(decodeURIComponent(match[1] ?? "")) as Record<
+			string,
+			unknown
+		> & {
+			replies?: unknown;
+			resolved?: unknown;
+		};
+		const replies = Array.isArray(parsed.replies)
+			? parsed.replies.filter(isReviewReply)
+			: [];
+		return {
+			replies,
+			resolved: parsed.resolved === true,
+			metadata: parsed,
+		};
+	} catch {
+		return null;
+	}
+}
+
+function isReviewReply(value: unknown): value is ReviewReply {
+	if (!value || typeof value !== "object") return false;
+	const reply = value as Partial<ReviewReply>;
+	return typeof reply.id === "string" && typeof reply.body === "string";
+}
 
 /**
  * The Markdown parser stores review spans as marks so review state can move
@@ -43,6 +106,14 @@ export const ReviewMarkExtension = Mark.create({
 				renderHTML: (attributes) =>
 					attributes.id ? { "data-review-id": attributes.id } : {},
 			},
+			replies: { default: null, renderHTML: () => ({}) },
+			resolved: {
+				default: false,
+				parseHTML: (element) => element.hasAttribute("data-review-resolved"),
+				renderHTML: (attributes) =>
+					attributes.resolved ? { "data-review-resolved": "" } : {},
+			},
+			metadata: { default: null, renderHTML: () => ({}) },
 			original: {
 				default: null,
 				parseHTML: (element) => element.getAttribute("data-review-original"),

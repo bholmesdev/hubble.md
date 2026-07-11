@@ -11,6 +11,7 @@ import remarkParse from "remark-parse";
 import { type Plugin, unified } from "unified";
 import { visit } from "unist-util-visit";
 import { wikiDisplayNameForTarget } from "./markdownPath";
+import { parseReviewMetadata } from "./ReviewMark";
 
 // Convert Markdown (string) -> TipTap JSONContent (ProseMirror document)
 export function markdownToTiptapDoc(markdown: string): JSONContent {
@@ -268,6 +269,16 @@ function inlineToPM(children: Content[]): JSONContent[] {
 	const out: JSONContent[] = [];
 	for (let index = 0; index < (children ?? []).length; index += 1) {
 		const child = children[index];
+		const reviewSpan = reviewSpanFromChildren(children, index);
+		if (reviewSpan) {
+			if (reviewSpan.prefix) out.push(...textToPM(reviewSpan.prefix));
+			const content = inlineToPM(reviewSpan.content);
+			out.push(...applyMark(content, "reviewMark", reviewSpan.attrs));
+			if (reviewSpan.suffix) out.push(...textToPM(reviewSpan.suffix));
+			index = reviewSpan.endIndex;
+			continue;
+		}
+
 		const replacement = replacementFromGfmDelete(
 			children[index + 1],
 			child,
@@ -328,6 +339,9 @@ function inlineToPM(children: Content[]): JSONContent[] {
 				if (child.alt) out.push({ type: "text", text: child.alt });
 				break;
 			case "html":
+				if (mergeReviewMetadata(out, child.value)) {
+					break;
+				}
 				if (isHtmlLineBreak(child.value)) {
 					out.push({ type: "hardBreak" });
 				} else if (child.value) {
@@ -340,6 +354,96 @@ function inlineToPM(children: Content[]): JSONContent[] {
 		}
 	}
 	return out;
+}
+
+function reviewSpanFromChildren(children: Content[], index: number) {
+	// remark parses emphasis inside a review wrapper as sibling mdast nodes;
+	// reconstruct the wrapper before recursively converting its formatted content.
+	const first = children[index];
+	if (first?.type !== "text") return null;
+
+	const opening = ["{==", "{++", "{--"].find((value) =>
+		first.value.endsWith(value),
+	);
+	if (!opening) return null;
+
+	const baseType =
+		opening === "{=="
+			? "reviewHighlight"
+			: opening === "{++"
+				? "reviewInsertion"
+				: "reviewDeletion";
+	const closing = opening === "{==" ? "==}" : opening === "{++" ? "++}" : "--}";
+
+	for (let endIndex = index + 1; endIndex < children.length; endIndex += 1) {
+		const candidate = children[endIndex];
+		if (candidate?.type !== "text") continue;
+		const closeIndex = candidate.value.indexOf(closing);
+		if (closeIndex === -1) continue;
+
+		let suffix = candidate.value.slice(closeIndex + closing.length);
+		let type = baseType;
+		let attrs: Record<string, unknown> = { type };
+		if (baseType === "reviewHighlight") {
+			const comment = suffix.match(
+				/^\{>>([\s\S]*?)<<\}(?:\{#([A-Za-z0-9_-]+)\})?/,
+			);
+			if (comment) {
+				type = "reviewComment";
+				attrs = {
+					type,
+					body: comment[1] ?? "",
+					id: comment[2] ?? null,
+				};
+				suffix = suffix.slice(comment[0].length);
+			}
+		} else {
+			const id = suffix.match(/^\{#([A-Za-z0-9_-]+)\}/);
+			if (id) {
+				attrs = { type, id: id[1] };
+				suffix = suffix.slice(id[0].length);
+			}
+		}
+
+		const content = children.slice(index + 1, endIndex);
+		const innerText = candidate.value.slice(0, closeIndex);
+		if (innerText) content.push({ type: "text", value: innerText });
+		return {
+			prefix: first.value.slice(0, -opening.length),
+			content,
+			suffix,
+			endIndex,
+			attrs,
+		};
+	}
+
+	return null;
+}
+
+function mergeReviewMetadata(nodes: JSONContent[], value: string | undefined) {
+	const metadata = parseReviewMetadata(value);
+	if (!metadata) return false;
+
+	for (let index = nodes.length - 1; index >= 0; index -= 1) {
+		const node = nodes[index];
+		if (node.type !== "text") continue;
+		const reviewMarkIndex = node.marks?.findIndex(
+			(mark) =>
+				mark.type === "reviewMark" && mark.attrs?.type === "reviewComment",
+		);
+		if (reviewMarkIndex === undefined || reviewMarkIndex === -1) continue;
+
+		const marks = [...(node.marks ?? [])];
+		const mark = marks[reviewMarkIndex];
+		marks[reviewMarkIndex] = {
+			...mark,
+			attrs: { ...mark.attrs, ...metadata },
+		};
+		nodes[index] = { ...node, marks };
+		return true;
+	}
+
+	return false;
 }
 
 function replacementFromGfmDelete(
@@ -490,7 +594,7 @@ function textToPM(text: string): JSONContent[] {
 
 function applyMark(
 	nodes: JSONContent[],
-	markType: "bold" | "italic" | "strike" | "link",
+	markType: "bold" | "italic" | "strike" | "link" | "reviewMark",
 	attrs?: Record<string, unknown>,
 ): JSONContent[] {
 	return nodes.map((n) => {

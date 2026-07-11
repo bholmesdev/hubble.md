@@ -75,4 +75,44 @@ describe("CriticMarkup review conversion", () => {
 		).toBe(false);
 		expect(tiptapDocToMarkdown(doc)).toBe(markdown);
 	});
+
+	it("round-trips inline thread metadata without rendering it", () => {
+		const markdown =
+			"{==commented==}{>>A note<<}{#c7}<!-- hubble-review:%7B%22source%22%3A%22agent%22%2C%22replies%22%3A%5B%7B%22id%22%3A%22r1%22%2C%22body%22%3A%22Reply%22%7D%5D%2C%22resolved%22%3Atrue%7D-->";
+		const doc = markdownToTiptapDoc(markdown);
+		const node = textNodes(doc)[0];
+
+		expect(node?.marks).toContainEqual({
+			type: "reviewMark",
+			attrs: {
+				type: "reviewComment",
+				body: "A note",
+				id: "c7",
+				replies: [{ id: "r1", body: "Reply" }],
+				resolved: true,
+				metadata: {
+					source: "agent",
+					replies: [{ id: "r1", body: "Reply" }],
+					resolved: true,
+				},
+			},
+		});
+		expect(tiptapDocToMarkdown(doc)).toBe(markdown);
+	});
+
+	it("round-trips comments around formatted text", () => {
+		const markdown = "Use {==**bold text**==}{>>A note<<}{#c1}";
+		const doc = markdownToTiptapDoc(markdown);
+		const node = textNodes(doc).find(
+			(candidate) => candidate.text === "bold text",
+		);
+
+		expect(node?.text).toBe("bold text");
+		expect(node?.marks).toContainEqual({ type: "bold" });
+		expect(node?.marks).toContainEqual({
+			type: "reviewMark",
+			attrs: { type: "reviewComment", body: "A note", id: "c1" },
+		});
+		expect(tiptapDocToMarkdown(doc)).toBe(markdown);
+	});
 });
