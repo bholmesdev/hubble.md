@@ -208,6 +208,13 @@ export function ReviewCommentPopover({
 	}, [editor, refreshComments]);
 
 	useEffect(() => {
+		if (open && mode === "thread" && !activeComment) {
+			setOpen(false);
+			setAnchorRange(null);
+		}
+	}, [activeComment, mode, open]);
+
+	useEffect(() => {
 		const viewport = viewportRef.current;
 		const refreshLayout = () => setLayoutRevision((value) => value + 1);
 		viewport?.addEventListener("scroll", refreshLayout, { passive: true });
@@ -415,7 +422,7 @@ export function ReviewCommentPopover({
 					);
 				})}
 			</div>
-			{open && anchorRange && (
+			{open && anchorRange && (mode === "new" || activeComment) && (
 				<div
 					ref={setPopoverEl}
 					role="dialog"
