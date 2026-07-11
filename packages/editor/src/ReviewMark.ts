@@ -27,22 +27,29 @@ export const ReviewMarkExtension = Mark.create({
 				default: "reviewHighlight",
 				parseHTML: (element) =>
 					element.getAttribute("data-review-type") ?? "reviewHighlight",
-				renderHTML: () => ({}),
+				renderHTML: (attributes) => ({
+					"data-review-type": attributes.type,
+				}),
 			},
 			body: {
 				default: null,
 				parseHTML: (element) => element.getAttribute("data-review-body"),
-				renderHTML: () => ({}),
+				renderHTML: (attributes) =>
+					attributes.body ? { "data-review-body": attributes.body } : {},
 			},
 			id: {
 				default: null,
 				parseHTML: (element) => element.getAttribute("data-review-id"),
-				renderHTML: () => ({}),
+				renderHTML: (attributes) =>
+					attributes.id ? { "data-review-id": attributes.id } : {},
 			},
 			original: {
 				default: null,
 				parseHTML: (element) => element.getAttribute("data-review-original"),
-				renderHTML: () => ({}),
+				renderHTML: (attributes) =>
+					attributes.original
+						? { "data-review-original": attributes.original }
+						: {},
 			},
 		};
 	},
@@ -51,18 +58,11 @@ export const ReviewMarkExtension = Mark.create({
 			{ tag: "mark[data-review-type]" },
 			{ tag: "ins[data-review-type]" },
 			{ tag: "del[data-review-type]" },
-			{ tag: "span[data-review-type='replacement']" },
+			{ tag: "span[data-review-type='reviewReplacement']" },
 		];
 	},
 	renderHTML({ HTMLAttributes }) {
-		const {
-			type: rawType,
-			body,
-			id,
-			original,
-			...domAttributes
-		} = HTMLAttributes;
-		const type = rawType as string;
+		const type = HTMLAttributes["data-review-type"] as string;
 		const tag =
 			type === "reviewInsertion"
 				? "ins"
@@ -71,16 +71,6 @@ export const ReviewMarkExtension = Mark.create({
 					: type === "reviewReplacement"
 						? "span"
 						: "mark";
-		return [
-			tag,
-			{
-				...domAttributes,
-				"data-review-type": type,
-				...(body ? { "data-review-body": body } : {}),
-				...(id ? { "data-review-id": id } : {}),
-				...(original ? { "data-review-original": original } : {}),
-			},
-			0,
-		];
+		return [tag, HTMLAttributes, 0];
 	},
 });
