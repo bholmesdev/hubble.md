@@ -51,6 +51,11 @@ export {
 	tiptapDocToMarkdown,
 } from "./prosemirrorToMarkdown";
 export {
+	type ReviewMarkAttrs,
+	ReviewMarkExtension,
+	type ReviewMarkName,
+} from "./ReviewMark";
+export {
 	createRichTextClipboardSerializer,
 	RichTextClipboardExtension,
 } from "./RichTextClipboardExtension";

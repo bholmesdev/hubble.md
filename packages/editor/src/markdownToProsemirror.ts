@@ -266,7 +266,25 @@ function htmlToEmbed(raw: string | undefined): JSONContent | null {
 
 function inlineToPM(children: Content[]): JSONContent[] {
 	const out: JSONContent[] = [];
-	for (const child of children ?? []) {
+	for (let index = 0; index < (children ?? []).length; index += 1) {
+		const child = children[index];
+		const replacement = replacementFromGfmDelete(
+			children[index + 1],
+			child,
+			children[index + 2],
+		);
+		if (replacement) {
+			const next = children[index + 2];
+			if (child.type === "text")
+				out.push(...textToPM(child.value.slice(0, -1)));
+			out.push(replacement.node);
+			if (next?.type === "text") {
+				out.push(...textToPM(next.value.slice(replacement.closeLength)));
+			}
+			index += 2;
+			continue;
+		}
+
 		switch (child.type) {
 			case "text":
 				if (child.value && child.value.length > 0) {
@@ -324,13 +342,115 @@ function inlineToPM(children: Content[]): JSONContent[] {
 	return out;
 }
 
+function replacementFromGfmDelete(
+	child: Content | undefined,
+	previous: Content | undefined,
+	next: Content | undefined,
+) {
+	// remark-gfm parses the `~~...~~` inside a CriticMarkup replacement as a
+	// delete node, so recover the surrounding braces before normal inline parsing.
+	if (
+		child?.type !== "delete" ||
+		previous?.type !== "text" ||
+		next?.type !== "text" ||
+		!previous.value.endsWith("{")
+	) {
+		return null;
+	}
+
+	const deletedText = child.children
+		.filter((nested) => nested.type === "text")
+		.map((nested) => nested.value)
+		.join("");
+	const replacement = deletedText.match(/^([\s\S]+?)~>([\s\S]+)$/);
+	const closing = next.value.match(/^\}(?:\{#([A-Za-z0-9_-]+)\})?/);
+	if (!replacement || !closing) return null;
+
+	return {
+		node: {
+			type: "text",
+			text: replacement[2],
+			marks: [
+				{
+					type: "reviewMark",
+					attrs: {
+						type: "reviewReplacement",
+						original: replacement[1],
+						id: closing[1] ?? null,
+					},
+				},
+			],
+		},
+		closeLength: closing[0].length,
+	};
+}
+
 function isHtmlLineBreak(value: string | undefined): boolean {
 	return typeof value === "string" && /^<br\s*\/?>$/i.test(value.trim());
 }
 
 function textToPM(text: string): JSONContent[] {
 	const out: JSONContent[] = [];
+	const reviewPattern =
+		/\{==([\s\S]+?)==\}(?:\{>>([\s\S]*?)<<\})?(?:\{#([A-Za-z0-9_-]+)\})?|\{\+\+([\s\S]+?)\+\+\}(?:\{#([A-Za-z0-9_-]+)\})?|\{--([\s\S]+?)--\}(?:\{#([A-Za-z0-9_-]+)\})?|\{~~([\s\S]+?)~>([\s\S]+?)~~\}(?:\{#([A-Za-z0-9_-]+)\})?/g;
 	const wikiLinkPattern = /\[\[([^\]\n]+)\]\]/g;
+	const matches = [...text.matchAll(reviewPattern)];
+	if (matches.length > 0) {
+		let lastIndex = 0;
+		for (const match of matches) {
+			const index = match.index ?? 0;
+			if (index > lastIndex) {
+				out.push(...textToPM(text.slice(lastIndex, index)));
+			}
+
+			const commentText = match[2];
+			const commentId = match[3] ?? match[5] ?? match[7] ?? match[10] ?? null;
+			const mark =
+				commentText !== undefined
+					? {
+							type: "reviewMark",
+							attrs: {
+								type: "reviewComment",
+								body: commentText,
+								id: commentId,
+							},
+						}
+					: match[1] !== undefined
+						? {
+								type: "reviewMark",
+								attrs: {
+									type: "reviewHighlight",
+									id: commentId,
+								},
+							}
+						: match[4] !== undefined
+							? {
+									type: "reviewMark",
+									attrs: { type: "reviewInsertion", id: commentId },
+								}
+							: match[6] !== undefined
+								? {
+										type: "reviewMark",
+										attrs: { type: "reviewDeletion", id: commentId },
+									}
+								: {
+										type: "reviewMark",
+										attrs: {
+											type: "reviewReplacement",
+											original: match[8] ?? "",
+											id: commentId,
+										},
+									};
+			const value = match[1] ?? match[4] ?? match[6] ?? match[9] ?? match[0];
+			out.push({ type: "text", text: value, marks: [mark] });
+			lastIndex = index + match[0].length;
+		}
+		if (lastIndex < text.length) {
+			out.push(...textToPM(text.slice(lastIndex)));
+		}
+		return out;
+	}
+
 	let lastIndex = 0;
 	for (const match of text.matchAll(wikiLinkPattern)) {
 		const index = match.index ?? 0;

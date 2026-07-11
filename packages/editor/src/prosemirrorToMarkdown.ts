@@ -223,6 +223,40 @@ function inlineToMarkdown(nodes: JSONContent[]): string {
 function inlineNodesToMarkdown(nodes: JSONContent[]): string {
 	let result = "";
 	for (let i = 0; i < nodes.length; ) {
+		const mark = getReviewMark(nodes[i]);
+		if (mark) {
+			if (mark.attrs?.type === "reviewReplacement") {
+				const replacement = nodeToMarkdown(removeMark(nodes[i], mark));
+				result += `{~~${mark.attrs?.original ?? ""}~>${replacement}~~}`;
+				if (mark.attrs?.id) result += `{#${mark.attrs.id}}`;
+				i += 1;
+				continue;
+			}
+
+			let j = i;
+			const grouped: JSONContent[] = [];
+			while (j < nodes.length) {
+				const nextReviewMark = getReviewMark(nodes[j]);
+				if (!nextReviewMark || !isSameMark(nextReviewMark, mark)) break;
+				grouped.push(removeMark(nodes[j], mark));
+				j += 1;
+			}
+			const content = inlineNodesToMarkdown(grouped);
+			const type = mark.attrs?.type;
+			if (type === "reviewComment") {
+				result += `{==${content}==}{>>${mark.attrs?.body ?? ""}<<}`;
+			} else if (type === "reviewInsertion") {
+				result += `{++${content}++}`;
+			} else if (type === "reviewDeletion") {
+				result += `{--${content}--}`;
+			} else {
+				result += `{==${content}==}`;
+			}
+			if (mark.attrs?.id) result += `{#${mark.attrs.id}}`;
+			i = j;
+			continue;
+		}
+
 		const node = nodes[i];
 		const delimitedMark = getDelimitedMark(node, nodes[i + 1]);
 		if (delimitedMark) {
@@ -266,6 +300,12 @@ function inlineNodesToMarkdown(nodes: JSONContent[]): string {
 		i = j;
 	}
 	return result;
+}
+
+function getReviewMark(node: JSONContent | undefined) {
+	return (
+		node?.marks?.find((candidate) => candidate.type === "reviewMark") ?? null
+	);
 }
 
 const BOUNDARY_SENSITIVE_MARKS = new Set(["bold", "italic", "strike", "link"]);

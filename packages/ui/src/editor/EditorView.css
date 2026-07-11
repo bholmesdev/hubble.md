@@ -276,6 +276,29 @@
 	font-size: 0.9em;
 }
 
+[data-hubble-editor] .ProseMirror [data-review-type="reviewComment"],
+[data-hubble-editor] .ProseMirror [data-review-type="reviewHighlight"] {
+	background: color-mix(in oklab, var(--brand) 18%, transparent);
+	box-shadow: inset 0 -2px color-mix(in oklab, var(--brand) 48%, transparent);
+	border-radius: 2px;
+}
+
+[data-hubble-editor] .ProseMirror [data-review-type="reviewInsertion"] {
+	background: color-mix(in oklab, #2f9e44 18%, transparent);
+	box-shadow: inset 0 -2px color-mix(in oklab, #2f9e44 48%, transparent);
+}
+
+[data-hubble-editor] .ProseMirror [data-review-type="reviewDeletion"] {
+	background: color-mix(in oklab, #d94841 14%, transparent);
+	text-decoration: line-through;
+	text-decoration-color: color-mix(in oklab, #d94841 70%, currentColor);
+}
+
+[data-hubble-editor] .ProseMirror [data-review-type="reviewReplacement"] {
+	background: color-mix(in oklab, #e67700 16%, transparent);
+	box-shadow: inset 0 -2px color-mix(in oklab, #e67700 48%, transparent);
+}
+
 [data-hubble-editor] .ProseMirror pre {
 	background: var(--muted);
 	padding-block: 1.5rem;
