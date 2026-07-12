@@ -115,4 +115,52 @@ describe("CriticMarkup review conversion", () => {
 		});
 		expect(tiptapDocToMarkdown(doc)).toBe(markdown);
 	});
+
+	it("round-trips one comment across code and wiki-link inline marks", () => {
+		const body =
+			"Open `file-index.html` or `todo-demo.html` from the sidebar to try full-screen HTML Apps. See [[samples/interview-prep]] for prompts.";
+		const doc = markdownToTiptapDoc(body);
+		const reviewMark = {
+			type: "reviewMark",
+			attrs: { type: "reviewComment", body: "A note", id: "c1" },
+		};
+		const paragraph = doc.content?.[0];
+
+		if (!paragraph?.content) throw new Error("Expected paragraph content");
+		paragraph.content = paragraph.content.map((node) =>
+			node.type === "text"
+				? { ...node, marks: [...(node.marks ?? []), reviewMark] }
+				: node,
+		);
+
+		expect(tiptapDocToMarkdown(doc)).toBe(`{==${body}==}{>>A note<<}{#c1}`);
+	});
+
+	it("loads comment metadata without exposing CriticMarkup as text", () => {
+		const markdown =
+			"{==Open `file-index.html` or `todo-demo.html` from the sidebar to try full-screen HTML Apps. See [[samples/interview-prep]] for prompts.==}{>>A note<<}{#c1}<!-- hubble-review:%7B%22replies%22%3A%5B%5D%2C%22resolved%22%3Afalse%7D-->";
+		const doc = markdownToTiptapDoc(markdown);
+		const nodes = textNodes(doc);
+
+		expect(nodes.some((node) => node.text?.includes("{=="))).toBe(false);
+		expect(
+			nodes
+				.filter((node) =>
+					node.marks?.some(
+						(mark) =>
+							mark.type === "reviewMark" &&
+							mark.attrs?.type === "reviewComment",
+					),
+				)
+				.map((node) => node.text),
+		).toEqual([
+			"Open ",
+			"file-index.html",
+			" or ",
+			"todo-demo.html",
+			" from the sidebar to try full-screen HTML Apps. See ",
+			"interview-prep",
+			" for prompts.",
+		]);
+	});
 });

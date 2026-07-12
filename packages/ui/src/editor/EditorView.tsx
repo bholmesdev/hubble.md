@@ -3,6 +3,7 @@ import {
 	FakeSelectionExtension,
 	FindExtension,
 	HeadingExtension,
+	InlineCodeExtension,
 	LinkExtension,
 	listExtensions,
 	MarkdownRolloverExtension,
@@ -151,7 +152,8 @@ export function EditorView({
 
 	const editor = useEditor({
 		extensions: [
-			StarterKit.configure({ codeBlock: false, listItem: false }),
+			StarterKit.configure({ code: false, codeBlock: false, listItem: false }),
+			InlineCodeExtension,
 			HubbleCodeBlock,
 			LinkExtension,
 			RichTextClipboardExtension,

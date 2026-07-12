@@ -362,10 +362,11 @@ function reviewSpanFromChildren(children: Content[], index: number) {
 	const first = children[index];
 	if (first?.type !== "text") return null;
 
-	const opening = ["{==", "{++", "{--"].find((value) =>
-		first.value.endsWith(value),
+	const opening = ["{==", "{++", "{--"].find(
+		(value) => first.value.endsWith(value) || first.value.startsWith(value),
 	);
 	if (!opening) return null;
+	const openingAtStart = first.value.startsWith(opening);
 
 	const baseType =
 		opening === "{=="
@@ -405,11 +406,23 @@ function reviewSpanFromChildren(children: Content[], index: number) {
 			}
 		}
 
-		const content = children.slice(index + 1, endIndex);
+		const content: Content[] = openingAtStart
+			? [
+					...(first.value.slice(opening.length)
+						? [
+								{
+									type: "text" as const,
+									value: first.value.slice(opening.length),
+								},
+							]
+						: []),
+					...children.slice(index + 1, endIndex),
+				]
+			: children.slice(index + 1, endIndex);
 		const innerText = candidate.value.slice(0, closeIndex);
 		if (innerText) content.push({ type: "text", value: innerText });
 		return {
-			prefix: first.value.slice(0, -opening.length),
+			prefix: openingAtStart ? "" : first.value.slice(0, -opening.length),
 			content,
 			suffix,
 			endIndex,

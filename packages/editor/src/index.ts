@@ -21,6 +21,7 @@ export {
 	setMarkdownFrontMatter,
 } from "./frontMatter";
 export { HeadingExtension } from "./Heading";
+export { InlineCodeExtension } from "./InlineCode";
 export {
 	createLinkMark,
 	getActiveLinkRange,
