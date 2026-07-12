@@ -33,3 +33,13 @@ clipboard. An installed agent can use that request as its on-ramp:
 3. Reply by appending an object to the inline `replies` metadata.
 4. Resolve the comment only after addressing it.
 5. Preserve CriticMarkup markers, unknown review metadata, and unrelated Markdown.
+
+Install the companion Hubble skills to give an agent a reusable workflow for
+this handoff:
+
+```bash
+npx skills add bholmesdev/hubble-skills
+```
+
+The `review-markdown-comments` skill handles the file-backed reply and resolve
+workflow described above.
