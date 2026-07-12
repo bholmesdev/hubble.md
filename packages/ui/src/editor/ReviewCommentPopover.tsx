@@ -305,6 +305,24 @@ export function ReviewCommentPopover({
 		setActiveComment(null);
 	}, []);
 
+	useEffect(() => {
+		if (!open) return;
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target;
+			if (!(target instanceof Node)) return;
+			if (popoverEl?.contains(target)) return;
+			if (
+				target instanceof Element &&
+				target.closest("[data-review-comment-anchor]")
+			) {
+				return;
+			}
+			close();
+		};
+		document.addEventListener("pointerdown", handlePointerDown);
+		return () => document.removeEventListener("pointerdown", handlePointerDown);
+	}, [close, open, popoverEl]);
+
 	const addComment = useCallback(() => {
 		if (!editor || !anchorRange || !draft.trim()) return;
 		const markType = editor.state.schema.marks.reviewMark;
@@ -401,6 +419,7 @@ export function ReviewCommentPopover({
 							key={comment.id}
 							type="button"
 							aria-label={`Open comment ${comment.id}`}
+							data-review-comment-anchor
 							title={
 								comment.attrs.resolved ? "Resolved comment" : "Open comment"
 							}

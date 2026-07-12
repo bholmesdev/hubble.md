@@ -64,6 +64,38 @@ describe("ReviewCommentPopover", () => {
 
 		expect(document.querySelector("[data-review-comment-popover]")).toBeNull();
 	});
+
+	it("closes when a pointer starts outside the comment thread", async () => {
+		const editor = new Editor({
+			element: document.createElement("div"),
+			extensions: [StarterKit, ReviewMarkExtension],
+			content: markdownToTiptapDoc("{==commented==}{>>A note<<}{#c1}"),
+		});
+		editors.push(editor);
+
+		const viewport = document.createElement("div");
+		viewport.append(editor.view.dom);
+		document.body.append(viewport);
+		renderPopover(editor, viewport);
+
+		const mark = editor.view.dom.querySelector(
+			'[data-review-type="reviewComment"]',
+		);
+		await act(async () => {
+			mark?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(
+			document.querySelector("[data-review-comment-popover]"),
+		).not.toBeNull();
+
+		const outside = document.createElement("button");
+		document.body.append(outside);
+		await act(async () => {
+			outside.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+		});
+
+		expect(document.querySelector("[data-review-comment-popover]")).toBeNull();
+	});
 });
 
 function renderPopover(editor: Editor, viewport: HTMLDivElement) {
