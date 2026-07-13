@@ -46,4 +46,28 @@ describe("getActiveLinkRange", () => {
 			target: null,
 		});
 	});
+
+	it("does not merge adjacent links with different attributes", () => {
+		const doc = schema.node("doc", null, [
+			schema.node("paragraph", null, [
+				schema.text("a", [
+					schema.marks.link.create({ href: "https://a.example" }),
+				]),
+				schema.text("b", [
+					schema.marks.link.create({ href: "https://b.example" }),
+				]),
+			]),
+		]);
+		const state = EditorState.create({
+			schema,
+			doc,
+			selection: TextSelection.create(doc, 1),
+		});
+
+		expect(getActiveLinkRange(state)).toMatchObject({
+			from: 1,
+			to: 2,
+			href: "https://a.example",
+		});
+	});
 });

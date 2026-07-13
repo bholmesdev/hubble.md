@@ -16,6 +16,7 @@ const MAC_SYMBOLS: Record<string, string> = {
 	option: "⌥",
 	opt: "⌥",
 	shift: "⇧",
+	backspace: "⌫",
 	enter: "⏎",
 	return: "⏎",
 };
@@ -32,6 +33,7 @@ const OTHER_WORDS: Record<string, string> = {
 	option: "Alt",
 	opt: "Alt",
 	shift: "Shift",
+	backspace: "Backspace",
 	enter: "Enter",
 	return: "Enter",
 };

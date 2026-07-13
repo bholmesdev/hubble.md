@@ -32,6 +32,34 @@ type Props = {
 	onDisconnect: () => void;
 };
 
+async function onRemoteFilesChanged() {
+	const ctx = getActionCtx();
+	if (!ctx) return;
+	const remote = await ctx.backend.getFiles(ctx.workspaceId, {
+		includeDeleted: true,
+	});
+	// One tombstone-inclusive fetch updates the sidebar and detects whether
+	// the current file was deleted.
+	const visible = remote
+		.filter((file) => !file.deleted)
+		.map((file) => ({
+			path: file.path,
+			contentHash: file.contentHash,
+			updatedAt: file.updatedAt,
+			deleted: file.deleted,
+		}));
+	workspaceStore.set((state) => ({ ...state, files: visible }));
+
+	const viewer = viewerStore.get();
+	if (!viewer.currentPath) return;
+	const current = remote.find((file) => file.path === viewer.currentPath);
+	if (!current || current.deleted) {
+		markRemoteDeleted(viewer.currentPath);
+		return;
+	}
+	applyRemoteChange(viewer.currentPath, current.content, current.contentHash);
+}
+
 export function AppShell({
 	url,
 	workspaceId,
@@ -71,7 +99,6 @@ export function AppShell({
 		};
 	}, []);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: subscription owns its lifecycle by url+workspaceId
 	useEffect(() => {
 		if (!workspace.snapshot) return;
 		const subscriber = createConvexSubscriber(url);
@@ -129,34 +156,6 @@ export function AppShell({
 		setNewNoteSubmitted(false);
 		await refreshFiles();
 		onSelectFile(path);
-	};
-
-	const onRemoteFilesChanged = async () => {
-		const ctx = getActionCtx();
-		if (!ctx) return;
-		const remote = await ctx.backend.getFiles(ctx.workspaceId, {
-			includeDeleted: true,
-		});
-		// One tombstone-inclusive fetch updates the sidebar and detects whether
-		// the current file was deleted.
-		const visible = remote
-			.filter((f) => !f.deleted)
-			.map((f) => ({
-				path: f.path,
-				contentHash: f.contentHash,
-				updatedAt: f.updatedAt,
-				deleted: f.deleted,
-			}));
-		workspaceStore.set((state) => ({ ...state, files: visible }));
-
-		const v = viewerStore.get();
-		if (!v.currentPath) return;
-		const current = remote.find((f) => f.path === v.currentPath);
-		if (!current || current.deleted) {
-			markRemoteDeleted(v.currentPath);
-			return;
-		}
-		applyRemoteChange(v.currentPath, current.content, current.contentHash);
 	};
 
 	if (!workspace.snapshot) {

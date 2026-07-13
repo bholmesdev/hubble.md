@@ -19,6 +19,10 @@ export function OpenWorkspaceScreen({ url, onSelected, onDisconnect }: Props) {
 	const [error, setError] = useState<string | null>(null);
 	const [name, setName] = useState("");
 	const [busy, setBusy] = useState(false);
+	const select = (id: string) => {
+		saveWorkspace(id);
+		onSelected(id);
+	};
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: select uses stable saveWorkspace + props
 	useEffect(() => {
@@ -40,11 +44,6 @@ export function OpenWorkspaceScreen({ url, onSelected, onDisconnect }: Props) {
 			cancelled = true;
 		};
 	}, [client]);
-
-	const select = (id: string) => {
-		saveWorkspace(id);
-		onSelected(id);
-	};
 
 	const handleCreate = async (event: React.FormEvent) => {
 		event.preventDefault();

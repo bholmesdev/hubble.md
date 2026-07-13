@@ -1,60 +1,165 @@
 name: Implement Ready Issues
 
-# Runs an Oz cloud agent when an issue receives the ready-to-implement label.
-# The agent follows .agents/skills/implementation/SKILL.md to implement the issue,
-# verify it end-to-end, open a pull request, and report progress back to the
-# original issue.
+# Gives an Oz agent read-only GitHub access when an issue is ready to implement,
+# then publishes its local changes from a separate privileged job.
 
 on:
   issues:
     types: [labeled]
+  # May be triggered by `triage` workflow directly.
+  workflow_call:
+    inputs:
+      issue_number:
+        description: Issue number to implement
+        required: true
+        type: string
 
 concurrency:
-  group: implement-issue-${{ github.event.issue.number }}
+  group: implement-issue-${{ inputs.issue_number || github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
   implement:
     name: Implement issue
     runs-on: ubuntu-latest
-    if: github.event.label.name == 'ready-to-implement'
+    # inputs is only populated on workflow_call; the github context is inherited
+    # from the caller there, so event_name/label cannot distinguish the two paths.
+    if: inputs.issue_number != '' || github.event.label.name == 'ready-to-implement'
     permissions:
-      contents: write        # let the agent commit and push an implementation branch
-      issues: write          # let the agent post progress and final PR link comments
-      pull-requests: write   # let the agent open the implementation PR
+      contents: read
+      issues: read
+    env:
+      ISSUE_NUMBER: ${{ inputs.issue_number || github.event.issue.number }}
+    outputs:
+      has_changes: ${{ steps.patch.outputs.has_changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Do not leave a writable GitHub credential where the agent can use it.
+          persist-credentials: false
+
+      - name: Record baseline
+        id: baseline
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch issue context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh issue view "$ISSUE_NUMBER" \
+            --repo "$REPO" \
+            --json number,title,body,labels,comments \
+            > issue-context.json
+
+      - name: Implement issue with Oz agent
+        uses: warpdotdev/oz-agent-action@v1
+        with:
+          model: gpt-5-6-sol-low
+          name: "Implement issue #${{ env.ISSUE_NUMBER }}"
+          prompt: |
+            Implement the ready GitHub issue described in `issue-context.json`.
+
+            Read `.agents/skills/implementation/SKILL.md` and follow its code,
+            verification, and review-readiness guidance. This workflow replaces
+            the skill's tracker and publication steps: do not use `gh`, mutate
+            GitHub, create a branch, commit, push, or open a pull request. Make
+            and verify the smallest cohesive implementation only in the local
+            checkout.
+
+            After verification, use `.agents/skills/create-pr/SKILL.md` to
+            author the pull request description. Complete the repository's pull
+            request template and write only the final body to `pr-body.md`. Do
+            not add that workflow artifact to the implementation. A separate
+            trusted job will perform the skill's GitHub publication step and
+            open the draft pull request. Do not modify `issue-context.json`.
+
+            - Repository: ${{ github.repository }}
+            - Issue number: #${{ env.ISSUE_NUMBER }}
+          warp_api_key: ${{ secrets.WARP_API_KEY }}
+          profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
+
+      - name: Package implementation
+        id: patch
+        env:
+          BASE_SHA: ${{ steps.baseline.outputs.sha }}
+        run: |
+          test -s pr-body.md
+          grep -Fq '## Description' pr-body.md
+          grep -Fq '## Type of Change' pr-body.md
+          grep -Fq '## Testing' pr-body.md
+          grep -Fq '## Checklist' pr-body.md
+          grep -Fq "#${ISSUE_NUMBER}" pr-body.md
+
+          mv pr-body.md "$RUNNER_TEMP/pr-body.md"
+          rm issue-context.json
+          git add -N -- .
+
+          if git diff --quiet "$BASE_SHA"; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git diff --binary --full-index "$BASE_SHA" > implementation.patch
+          mkdir workflow-artifact
+          mv implementation.patch workflow-artifact/
+          mv "$RUNNER_TEMP/pr-body.md" workflow-artifact/
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload implementation
+        if: steps.patch.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: implementation-${{ env.ISSUE_NUMBER }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: workflow-artifact/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Open draft PR
+    needs: implement
+    if: needs.implement.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: write
+    env:
+      ISSUE_NUMBER: ${{ inputs.issue_number || github.event.issue.number }}
+      REPO: ${{ github.repository }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Implement issue with Oz agent
-        uses: warpdotdev/oz-agent-action@v1
-        id: implement
-        env:
-          # Authenticates the `gh` CLI the agent uses for issues, branches, and PRs.
-          GH_TOKEN: ${{ github.token }}
+      - name: Download implementation
+        uses: actions/download-artifact@v4
         with:
-          model: gpt-5-5-low
-          name: "Implement issue #${{ github.event.issue.number }}"
-          prompt: |
-            Use the Implementation skill in this repository to implement the GitHub issue that was just labeled ready to implement.
+          name: implementation-${{ env.ISSUE_NUMBER }}-${{ github.run_id }}-${{ github.run_attempt }}
 
-            First read `.agents/skills/implementation/SKILL.md`, then follow it exactly, including its verification step: exercise the changed behavior end-to-end with the repo's verification skills (for desktop changes, `.agents/skills/test-desktop-app/SKILL.md`) rather than relying on typechecks alone.
+      - name: Publish draft PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
 
-            - Repository: ${{ github.repository }}
-            - Issue number: #${{ github.event.issue.number }}
-            - Issue URL: ${{ github.event.issue.html_url }}
-            - Applied label: ${{ github.event.label.name }}
+          git apply --index implementation.patch
 
-            Fetch the full issue and comments with the authenticated `gh` CLI,
-            inspect this checked-out codebase, implement the smallest cohesive
-            fix or feature, validate it, create a branch, push it, and open a
-            GitHub pull request. Post implementation progress comments to the
-            original issue as directed by the skill, using only an Oz run or Oz
-            session URL as the follow-along link. Do not use the GitHub Actions
-            workflow URL as the follow-along link. Do not post a final success
-            comment until the pull request has been opened. The final issue
-            comment must include the PR URL, and the PR body must link to this
-            issue using `Closes #${{ github.event.issue.number }}` when the
-            implementation fully resolves it.
-          warp_api_key: ${{ secrets.WARP_API_KEY }}
-          profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
+          BRANCH="agent/issue-${ISSUE_NUMBER}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          TITLE="$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json title --jq '.title')"
+
+          git config user.name "Oz Agent"
+          git config user.email "oz-agent@warp.dev"
+          git switch -c "$BRANCH"
+          git commit -m "Implement issue #${ISSUE_NUMBER}" \
+            --trailer "Co-Authored-By: Oz <oz-agent@warp.dev>"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --repo "$REPO" \
+            --base "$BASE_BRANCH" \
+            --head "$BRANCH" \
+            --draft \
+            --title "$TITLE" \
+            --body-file pr-body.md

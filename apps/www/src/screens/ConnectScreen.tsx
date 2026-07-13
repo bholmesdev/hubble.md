@@ -27,10 +27,10 @@ export function ConnectScreen({ onConnected }: Props) {
 			});
 			saveConnectionUrl(trimmed);
 			ensureDeviceId();
+			setBusy(false);
 			onConnected(trimmed);
 		} catch (err) {
 			setError(describeError(categorizeError(err)));
-		} finally {
 			setBusy(false);
 		}
 	};

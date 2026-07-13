@@ -38,6 +38,17 @@ const NO_CONFLICT: ExternalChange = { kind: "none" };
 
 export const MAX_RECENT = 10;
 export const LOADING_DELAY_MS = 150;
+export const MAX_HISTORY = 50;
+
+export type HistoryStack = {
+	entries: string[];
+	index: number;
+};
+
+export type HistoryState = {
+	byWorkspace: Record<string, HistoryStack>;
+	isNavigating: boolean;
+};
 
 export const emptyDoc = (
 	lastOpenedPath: string | null = null,
@@ -143,6 +154,11 @@ export const appStore = store<DesktopState>(getInitialState(), {
 	middleware: [localStoragePersist(STORAGE_KEY, serialize)],
 });
 
+export const historyStore = store<HistoryState>({
+	byWorkspace: {},
+	isNavigating: false,
+});
+
 export const workspaceStore = appStore.select("workspace");
 export const viewerStore = appStore.select("document");
 export const uiStore = appStore.select("ui");
@@ -160,3 +176,6 @@ export const pendingTerminalCommandStore = uiStore.select(
 export const chatCommandStore = appStore
 	.select("settings")
 	.select("chatCommand");
+export const lastSeenVersionStore = appStore
+	.select("settings")
+	.select("lastSeenVersion");

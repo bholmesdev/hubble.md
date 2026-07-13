@@ -1,7 +1,7 @@
 {
 	"name": "@hubble.md/desktop",
 	"private": true,
-	"version": "0.1.18",
+	"version": "0.1.20",
 	"description": "Desktop app for Hubble.md",
 	"license": "MIT",
 	"author": "Ben Holmes <hey@bholmes.dev>",
@@ -68,6 +68,7 @@
 		"@types/react": "^19.1.8",
 		"@types/react-dom": "^19.1.6",
 		"@vitejs/plugin-react": "^4.6.0",
+		"babel-plugin-react-compiler": "^1.0.0",
 		"chokidar": "^4.0.3",
 		"electron": "^42.3.1",
 		"electron-builder": "^26.8.1",

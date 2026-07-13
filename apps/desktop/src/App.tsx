@@ -3,13 +3,15 @@ import {
 	Button,
 	classifyHref,
 	EditorView,
+	GlobalSearchPalette,
 	Input,
 	MarkdownSourceEditor,
+	type PaletteFile,
 	type WikiTarget,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
@@ -17,10 +19,7 @@ import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
 import { TerminalPanel } from "./components/TerminalPanel";
 import { Toolbar } from "./components/Toolbar";
-import {
-	SidebarUpdateCallout,
-	UpdatesSection,
-} from "./components/UpdatesSection";
+import { SidebarCallout, UpdatesSection } from "./components/UpdatesSection";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { desktopApi } from "./desktopApi";
 import type { DesktopUpdateState } from "./desktopApi/types";
@@ -29,6 +28,7 @@ import { handleImageDrop, handleImagePaste } from "./editor/handleImagePaste";
 import { IframeView, toAssetUrl } from "./editor/IframeView";
 import { createImageExtension } from "./editor/ImageExtension";
 import { createHtmlFile, createMarkdownFile } from "./fileActions";
+import { isChangelogPath } from "./lib/changelogNote";
 import { copyText } from "./lib/clipboard";
 import {
 	hasHtmlExtension,
@@ -42,8 +42,11 @@ import {
 	createWorkspaceWithSidebar,
 	forceKeepLocalEdits,
 	getPendingRenameTarget,
+	goBack,
+	goForward,
 	handleExternalFileChange,
 	loadPath,
+	openChangelog,
 	openWorkspace,
 	openWorkspaceWithSidebar,
 	refreshFiles,
@@ -52,14 +55,18 @@ import {
 	requestChatAboutNote,
 	savePathContent,
 	setChatCommand,
+	setLastSeenVersion,
 	setSidebarOpen,
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
 	toggleTerminal,
 	updateEditorContent,
 } from "./store/actions";
+import { canGoBack, canGoForward } from "./store/history";
+import { useHistoryNav } from "./store/hooks";
 import {
 	chatCommandStore,
+	lastSeenVersionStore,
 	sidebarOpenStore,
 	terminalPositionStore,
 	uiStore,
@@ -96,12 +103,43 @@ async function revealPath(path: string | null) {
 	}
 }
 
+async function openFilePicker() {
+	const currentPath = viewerStore.get().currentPath;
+	const defaultPath =
+		(isChangelogPath(currentPath) ? null : currentPath) ??
+		workspaceStore.get().workspacePath ??
+		undefined;
+	const selected = await desktopApi.openFilePicker({ defaultPath });
+	if (typeof selected === "string") {
+		await loadPath(selected);
+	}
+}
+
+let nextSearchRequestId = 0;
+
+/**
+ * Content search reads the sidebar snapshot's paths rather than asking main to
+ * re-crawl, so search and the sidebar always agree on what exists (ADR-0008).
+ */
+async function searchFileContents(query: string) {
+	nextSearchRequestId += 1;
+	const { files } = workspaceStore.get();
+	const { results, truncated } = await desktopApi.searchFileContents({
+		requestId: nextSearchRequestId,
+		paths: files.map((file) => file.path),
+		query,
+	});
+	return { results, truncated };
+}
+
 function App() {
 	const state = useStoreValue(viewerStore);
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
 	const hasWorkspace = workspacePath !== null;
+	const { canGoBack: menuCanGoBack, canGoForward: menuCanGoForward } =
+		useHistoryNav();
 	const [scrollContainerEl, setScrollContainerEl] =
 		useState<HTMLDivElement | null>(null);
 	const [settingsOpen, setSettingsOpen] = useState(false);
@@ -113,18 +151,48 @@ function App() {
 		null,
 	);
 	const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
+	const [searchOpen, setSearchOpen] = useState(false);
+	const workspaceFiles = useStoreValue(workspaceStore).files;
+	const paletteFiles: PaletteFile[] = workspaceFiles.map((file) => ({
+		path: file.path,
+		relativePath: relativeWorkspacePath(file.path, workspacePath ?? null),
+		modifiedAt: file.modified_at,
+	}));
+	const lastSeenVersion = useStoreValue(lastSeenVersionStore);
 
 	const readyVersion =
 		updateState?.status === "ready"
 			? (updateState.availableVersion ?? "__unknown__")
 			: null;
-	const showUpdateCallout = readyVersion !== dismissedVersion;
+	const showReadyCallout =
+		readyVersion !== null && readyVersion !== dismissedVersion;
 
-	const openSettings = useCallback(() => {
-		setSettingsOpen(true);
-	}, []);
+	const currentVersion = updateState?.currentVersion ?? null;
+	// First launch after an update: the persisted version lags behind the
+	// running one until the callout is opened or dismissed.
+	const whatsNewVersion =
+		currentVersion !== null &&
+		lastSeenVersion !== null &&
+		lastSeenVersion !== currentVersion
+			? currentVersion
+			: null;
+	const markWhatsNewSeen = () => {
+		if (currentVersion) setLastSeenVersion(currentVersion);
+	};
 
-	const installUpdate = useCallback(async () => {
+	useEffect(() => {
+		// First install has no update to announce; just record the version.
+		if (currentVersion && lastSeenVersion === null) {
+			setLastSeenVersion(currentVersion);
+		}
+	}, [currentVersion, lastSeenVersion]);
+
+	const openWhatsNew = () => {
+		setSettingsOpen(false);
+		void openChangelog();
+	};
+
+	const installUpdate = async () => {
 		try {
 			await desktopApi.installUpdate();
 		} catch (error) {
@@ -132,20 +200,21 @@ function App() {
 				description: error instanceof Error ? error.message : String(error),
 			});
 		}
-	}, []);
+	};
 
-	const triggerPrimaryUpdateAction = useCallback(async () => {
+	const triggerPrimaryUpdateAction = async () => {
 		if (!updateState?.isSupported) return;
 		if (updateState.status === "ready") {
 			await installUpdate();
 			return;
 		}
 		await desktopApi.checkForUpdates();
-	}, [installUpdate, updateState]);
+	};
 
 	useEffect(() => {
 		const currentPath = state.currentPath;
-		if (!currentPath) return;
+		// The changelog note is virtual; there is no file to watch.
+		if (!currentPath || isChangelogPath(currentPath)) return;
 
 		let disposed = false;
 		let unwatch: null | (() => void) = null;
@@ -183,17 +252,6 @@ function App() {
 		};
 	}, [state.currentPath]);
 
-	const openFilePicker = useCallback(async () => {
-		const defaultPath =
-			viewerStore.get().currentPath ??
-			workspaceStore.get().workspacePath ??
-			undefined;
-		const selected = await desktopApi.openFilePicker({ defaultPath });
-		if (typeof selected === "string") {
-			await loadPath(selected);
-		}
-	}, []);
-
 	useEffect(() => {
 		const currentPath = state.currentPath;
 		void desktopApi.setMenuState({
@@ -201,8 +259,16 @@ function App() {
 			hasMarkdownNoteOpen:
 				typeof currentPath === "string" && hasMarkdownExtension(currentPath),
 			isSourceMode: state.viewMode === "source",
+			canGoBack: menuCanGoBack,
+			canGoForward: menuCanGoForward,
 		});
-	}, [hasWorkspace, state.currentPath, state.viewMode]);
+	}, [
+		hasWorkspace,
+		menuCanGoBack,
+		menuCanGoForward,
+		state.currentPath,
+		state.viewMode,
+	]);
 
 	useEffect(() => {
 		if (!sidebarOpen) setFocusedSidebarPath(null);
@@ -210,16 +276,29 @@ function App() {
 
 	useEffect(() => {
 		const onKeyDown = async (event: KeyboardEvent) => {
-			if (keymatch(event, "CmdOrCtrl+N")) {
+			if (keymatch(event, "CmdOrCtrl+[")) {
+				if (!canGoBack()) return;
+				event.preventDefault();
+				await goBack();
+			} else if (keymatch(event, "CmdOrCtrl+]")) {
+				if (!canGoForward()) return;
+				event.preventDefault();
+				await goForward();
+			} else if (keymatch(event, "CmdOrCtrl+N")) {
 				event.preventDefault();
 				await createMarkdownFile();
 			} else if (keymatch(event, "CmdOrCtrl+,")) {
 				event.preventDefault();
-				openSettings();
+				setSettingsOpen(true);
 			} else if (keymatch(event, "CmdOrCtrl+Shift+O")) {
 				if (!workspaceStore.get().workspacePath) return;
 				event.preventDefault();
 				setWorkspaceSwitcherOpen(true);
+			} else if (keymatch(event, "CmdOrCtrl+P")) {
+				if (!workspaceStore.get().workspacePath) return;
+				event.preventDefault();
+				// The File menu accelerator fires too, but opening is idempotent.
+				setSearchOpen(true);
 			} else if (keymatch(event, "CmdOrCtrl+Shift+N")) {
 				event.preventDefault();
 				await openWorkspaceWithSidebar();
@@ -228,12 +307,12 @@ function App() {
 				await openFilePicker();
 			} else if (keymatch(event, "CmdOrCtrl+Shift+C")) {
 				const path = focusedSidebarPath ?? viewerStore.get().currentPath;
-				if (!path) return;
+				if (!path || isChangelogPath(path)) return;
 				event.preventDefault();
 				await copyFilePath(path);
 			} else if (keymatch(event, "CmdOrCtrl+Alt+R")) {
 				const path = focusedSidebarPath ?? viewerStore.get().currentPath;
-				if (!path) return;
+				if (!path || isChangelogPath(path)) return;
 				event.preventDefault();
 				await revealPath(path);
 			} else if (keymatch(event, "CmdOrCtrl+Shift+J")) {
@@ -255,7 +334,7 @@ function App() {
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [focusedSidebarPath, openFilePicker, openSettings]);
+	}, [focusedSidebarPath]);
 
 	useEffect(() => {
 		let active = true;
@@ -286,15 +365,22 @@ function App() {
 			desktopApi.onMenuCreateHtmlFile(() => void createHtmlFile()),
 			desktopApi.onMenuOpenFile(() => void openFilePicker()),
 			desktopApi.onMenuOpenFolder(() => void openWorkspaceWithSidebar()),
-			desktopApi.onMenuOpenSettings(() => openSettings()),
+			desktopApi.onMenuOpenSettings(() => setSettingsOpen(true)),
+			desktopApi.onMenuOpenChangelog(() => {
+				setSettingsOpen(false);
+				void openChangelog();
+			}),
 			desktopApi.onMenuCopyAsMarkdown(() =>
 				setCopyAsMarkdownRequest((request) => request + 1),
 			),
 			desktopApi.onMenuShowWorkspaceSwitcher(() =>
 				setWorkspaceSwitcherOpen(true),
 			),
+			desktopApi.onMenuGoToFile(() => setSearchOpen(true)),
 			desktopApi.onMenuSyncWorkspace(() => void refreshFiles()),
 			desktopApi.onMenuToggleTerminal(() => toggleTerminal()),
+			desktopApi.onMenuGoBack(() => void goBack()),
+			desktopApi.onMenuGoForward(() => void goForward()),
 			desktopApi.onMenuToggleSourceMode(() => {
 				const current = viewerStore.get();
 				if (
@@ -309,7 +395,7 @@ function App() {
 		return () => {
 			for (const dispose of disposers) dispose();
 		};
-	}, [openFilePicker, openSettings]);
+	}, []);
 
 	useEffect(() => {
 		// Window focus can fire in bursts when switching apps, so debounce the
@@ -349,7 +435,8 @@ function App() {
 					? workspace.lastOpenedPaths[workspace.workspacePath]
 					: undefined);
 			if (lastPath) {
-				await loadPath(lastPath);
+				// Restore must stay quiet when the remembered file was deleted on disk.
+				await loadPath(lastPath, { missing: "silent" });
 			}
 		};
 		void init();
@@ -362,18 +449,46 @@ function App() {
 		<main className="flex h-dvh flex-col bg-background text-foreground">
 			<Toolbar
 				scrollContainer={scrollContainerEl}
-				showSidebarBadge={!sidebarOpen && showUpdateCallout}
+				showSidebarBadge={
+					!sidebarOpen && (showReadyCallout || whatsNewVersion !== null)
+				}
 			/>
 			<div className="flex min-h-0 flex-1 overflow-hidden">
 				<Sidebar
 					onFocusedPathChange={setFocusedSidebarPath}
 					footer={
-						updateState?.status === "ready" && showUpdateCallout ? (
-							<SidebarUpdateCallout
-								onInstall={installUpdate}
+						// A pending restart outranks the what's-new nudge.
+						showReadyCallout ? (
+							<SidebarCallout
+								message={
+									<>
+										<span className="font-semibold">A new version</span> is
+										ready to install.
+									</>
+								}
+								primaryLabel="Restart"
+								onPrimary={installUpdate}
 								onDismiss={() =>
 									setDismissedVersion(readyVersion ?? "__unknown__")
 								}
+							/>
+						) : whatsNewVersion !== null ? (
+							<SidebarCallout
+								message={
+									<>
+										<span className="font-semibold">Hubble updated</span> to{" "}
+										{whatsNewVersion}.
+									</>
+								}
+								primaryLabel="See what's new"
+								onPrimary={() => {
+									// Only consume the one-shot callout once the changelog is
+									// actually showing; openChangelog can bail on a conflict.
+									void openChangelog().then((opened) => {
+										if (opened) markWhatsNewSeen();
+									});
+								}}
+								onDismiss={markWhatsNewSeen}
 							/>
 						) : undefined
 					}
@@ -428,12 +543,20 @@ function App() {
 					<TerminalPanel />
 				</section>
 			</div>
+			<GlobalSearchPalette
+				open={searchOpen}
+				onOpenChange={setSearchOpen}
+				files={paletteFiles}
+				onSelectFile={(path) => void loadPath(path)}
+				searchContents={searchFileContents}
+			/>
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
 				<ChatAboutNoteSettingsSection />
 				{updateState ? (
 					<UpdatesSection
 						state={updateState}
 						onPrimaryAction={() => void triggerPrimaryUpdateAction()}
+						onViewChangelog={openWhatsNew}
 					/>
 				) : null}
 			</SettingsDialog>
@@ -604,44 +727,39 @@ function MarkdownEditor({
 			title: wikiDisplayNameForTarget(target),
 		};
 	});
-	const openExternalLink = useCallback(
-		async (href: string) => {
-			if (classifyHref(href) === "external") {
-				await desktopApi.openExternalUrl(href);
+	const openExternalLink = async (href: string) => {
+		if (classifyHref(href) === "external") {
+			await desktopApi.openExternalUrl(href);
+			return;
+		}
+		const resolved = resolveRelativeLinkPath({
+			href,
+			currentFilePath: path,
+			workspacePath: workspace.workspacePath,
+		});
+		try {
+			const result = await desktopApi.openPathFromLink(resolved);
+			if (result.kind === "markdown") await loadPath(result.path);
+		} catch (error) {
+			if (error instanceof Error && error.message.includes("Open cancelled")) {
 				return;
 			}
-			const resolved = resolveRelativeLinkPath({
-				href,
-				currentFilePath: path,
-				workspacePath: workspace.workspacePath,
-			});
-			try {
-				const result = await desktopApi.openPathFromLink(resolved);
-				if (result.kind === "markdown") await loadPath(result.path);
-			} catch (error) {
-				if (
-					error instanceof Error &&
-					error.message.includes("Open cancelled")
-				) {
-					return;
-				}
-				if (
-					hasMarkdownExtension(resolved) &&
-					error instanceof Error &&
-					error.message.includes("FILE_NOT_FOUND")
-				) {
-					toast.error(`File not found: ${href.split("#", 1)[0] ?? href}`);
-					return;
-				}
-				throw error;
+			if (
+				hasMarkdownExtension(resolved) &&
+				error instanceof Error &&
+				error.message.includes("FILE_NOT_FOUND")
+			) {
+				toast.error(`File not found: ${href.split("#", 1)[0] ?? href}`);
+				return;
 			}
-		},
-		[path, workspace.workspacePath],
-	);
+			throw error;
+		}
+	};
 	return (
 		<EditorView
 			path={path}
 			initialMarkdown={initialMarkdown}
+			editable={!isChangelogPath(path)}
 			wikiTargets={wikiTargets}
 			extensions={[
 				createImageExtension(path),

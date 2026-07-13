@@ -1,3 +1,4 @@
+export { ContextMenuSpellcheckExtension } from "./ContextMenuSpellcheckExtension";
 export { FakeSelectionExtension } from "./FakeSelectionExtension";
 export {
 	FindExtension,

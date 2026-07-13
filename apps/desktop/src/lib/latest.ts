@@ -3,7 +3,7 @@
  * result.  Earlier in-flight calls become "stale" and silently no-op.
  *
  * ```ts
- * const load = latest(async ({ isStale }, path: string) => {
+ * const { run: load } = latest(async ({ isStale }, path: string) => {
  *   const content = await readFile(path);
  *   if (isStale()) return;
  *   applyContent(content);
@@ -14,11 +14,17 @@
  */
 export function latest<Args extends unknown[]>(
 	fn: (signal: { isStale: () => boolean }, ...args: Args) => Promise<void>,
-): (...args: Args) => Promise<void> {
+) {
 	let token = 0;
 
-	return async (...args: Args) => {
+	const run = async (...args: Args) => {
 		const myToken = ++token;
 		await fn({ isStale: () => myToken !== token }, ...args);
+	};
+	return {
+		run,
+		invalidate: () => {
+			token += 1;
+		},
 	};
 }

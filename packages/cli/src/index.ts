@@ -289,6 +289,8 @@ function createSyncScheduler(
 				pending = false;
 				currentReason = pendingReason;
 			}
+		} catch (error) {
+			console.error("Cloud Sync failed:", error);
 		} finally {
 			running = false;
 		}
@@ -320,10 +322,13 @@ async function ensureSyncState(workspacePath: string) {
 
 function logResult(reason: string, result: SyncResult) {
 	const files = `files(+${result.pushed.length} -${result.deleted.length} ↓${result.pulled.length})`;
-	const assets = `assets(+${result.assetsPushed} -${result.assetsDeleted} ↓${result.assetsPulled})`;
+	const assets = `assets(+${result.assetsPushed} -${result.assetsDeleted} ↓${result.assetsPulled} failed:${result.assetsFailed.length})`;
 	console.log(`sync ${reason}: ${files} ${assets}`);
 	if (result.conflicts.length > 0) {
 		console.log(`  conflicts: ${result.conflicts.join(", ")}`);
+	}
+	if (result.assetsFailed.length > 0) {
+		console.log(`  asset failures: ${result.assetsFailed.join(", ")}`);
 	}
 }
 

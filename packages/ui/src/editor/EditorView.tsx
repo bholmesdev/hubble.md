@@ -1,4 +1,5 @@
 import {
+	ContextMenuSpellcheckExtension,
 	combineMarkdownFrontMatter,
 	FakeSelectionExtension,
 	FindExtension,
@@ -27,12 +28,17 @@ import {
 	useEditor,
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CODE_BLOCK_COPY_EVENT, HubbleCodeBlock } from "./CodeBlockExtension";
 import { copySelectionAsMarkdown } from "./copyAsMarkdown";
 import { LinkClickExtension } from "./LinkClickExtension";
 import { LinkCreationGhostExtension } from "./LinkCreationGhostExtension";
 import { LinkPopover, type WikiTarget } from "./LinkPopover";
+import {
+	flushPendingSave,
+	type PendingSave,
+	schedulePendingSave,
+} from "./pendingSave";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { SmartLinkExtension } from "./SmartLinkExtension";
 import { TableCellSelectionExtension } from "./TableCellSelectionExtension";
@@ -61,6 +67,7 @@ export type { WikiTarget };
 export type EditorViewProps = {
 	path: string;
 	initialMarkdown: string;
+	editable?: boolean;
 	wikiTargets?: WikiTarget[];
 	extensions?: EditorOptions["extensions"];
 	editorProps?: EditorOptions["editorProps"];
@@ -79,6 +86,7 @@ export type EditorViewProps = {
 export function EditorView({
 	path,
 	initialMarkdown,
+	editable = true,
 	wikiTargets = [],
 	extensions = [],
 	editorProps,
@@ -93,22 +101,17 @@ export function EditorView({
 	onOpenWikiLink,
 	onMessage,
 }: EditorViewProps) {
-	const initialFrontMatter = useMemo(
-		() => parseMarkdownFrontMatter(initialMarkdown),
-		[initialMarkdown],
-	);
+	const initialFrontMatter = parseMarkdownFrontMatter(initialMarkdown);
+	const initialFrontMatterRaw =
+		initialFrontMatter.type === "none" ? "" : initialFrontMatter.raw;
 	const partsRef = useRef({
 		body: initialFrontMatter.body,
-		frontMatter:
-			initialFrontMatter.type === "none" ? "" : initialFrontMatter.raw,
+		frontMatter: initialFrontMatterRaw,
 	});
 	const latestMarkdownRef = useRef(
-		combineMarkdownFrontMatter(
-			partsRef.current.frontMatter,
-			partsRef.current.body,
-		),
+		combineMarkdownFrontMatter(initialFrontMatterRaw, initialFrontMatter.body),
 	);
-	const saveTimerRef = useRef<number | null>(null);
+	const pendingSaveRef = useRef<PendingSave | null>(null);
 	const editorRootRef = useRef<HTMLDivElement | null>(null);
 	const editorViewportRef = useRef<HTMLDivElement | null>(null);
 	const lastCopyAsMarkdownRequestRef = useRef(copyAsMarkdownRequest);
@@ -122,35 +125,33 @@ export function EditorView({
 	);
 	const pathRef = useRef(path);
 	const editorRef = useRef<Editor | null>(null);
-	pathRef.current = path;
+	useLayoutEffect(() => {
+		pathRef.current = path;
+	}, [path]);
 
-	const setEditorViewport = useCallback(
-		(node: HTMLDivElement | null) => {
-			editorViewportRef.current = node;
-			setEditorViewportEl(node);
-			onScrollContainerChange?.(node);
-		},
-		[onScrollContainerChange],
-	);
+	const setEditorViewport = (node: HTMLDivElement | null) => {
+		editorViewportRef.current = node;
+		setEditorViewportEl(node);
+		onScrollContainerChange?.(node);
+	};
 
 	// Only used at editor creation. Later file loads sync through setContent.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: editor instance persists across file switches.
-	const initialDoc = useMemo(
-		() => markdownToTiptapDoc(initialFrontMatter.body),
-		[],
+	const [initialDoc] = useState(() =>
+		markdownToTiptapDoc(initialFrontMatter.body),
 	);
 
-	const scheduleSave = useCallback(() => {
-		const savePath = pathRef.current;
-		if (saveTimerRef.current !== null) {
-			window.clearTimeout(saveTimerRef.current);
-		}
-		saveTimerRef.current = window.setTimeout(() => {
-			void onSave(savePath, latestMarkdownRef.current);
-		}, saveDebounceMs);
-	}, [onSave, saveDebounceMs]);
+	const scheduleSave = () => {
+		schedulePendingSave({
+			delay: saveDebounceMs,
+			markdown: latestMarkdownRef.current,
+			path: pathRef.current,
+			ref: pendingSaveRef,
+			save: onSave,
+		});
+	};
 
 	const editor = useEditor({
+		editable,
 		extensions: [
 			StarterKit.configure({ code: false, codeBlock: false, listItem: false }),
 			InlineCodeExtension,
@@ -158,8 +159,13 @@ export function EditorView({
 			LinkExtension,
 			RichTextClipboardExtension,
 			SmartLinkExtension,
-			LinkClickExtension.configure({ onOpenExternalLink, onOpenWikiLink }),
+			LinkClickExtension.configure({
+				onOpenExternalLink,
+				onOpenWikiLink,
+				requireModifier: editable,
+			}),
 			LinkCreationGhostExtension,
+			ContextMenuSpellcheckExtension,
 			FakeSelectionExtension,
 			FindExtension,
 			HeadingExtension,
@@ -209,7 +215,9 @@ export function EditorView({
 			},
 		},
 	});
-	editorRef.current = editor;
+	useLayoutEffect(() => {
+		editorRef.current = editor;
+	}, [editor]);
 
 	useEffect(() => {
 		if (!editor || !editorViewportEl) return;
@@ -244,14 +252,12 @@ export function EditorView({
 	}, [editor, initialMarkdown]);
 
 	useEffect(() => {
+		// Path changes flush the pending edit before the next document takes over.
+		void path;
 		return () => {
-			if (saveTimerRef.current !== null) {
-				window.clearTimeout(saveTimerRef.current);
-				saveTimerRef.current = null;
-				void onSave(path, latestMarkdownRef.current);
-			}
+			flushPendingSave(pendingSaveRef);
 		};
-	}, [path, onSave]);
+	}, [path]);
 
 	useEffect(() => {
 		if (!onMessage) return;
@@ -287,21 +293,23 @@ export function EditorView({
 				className="editorViewport relative min-h-0 flex-1 overflow-auto overscroll-contain"
 				ref={setEditorViewport}
 			>
-				<FilePropertiesPanel
-					path={path}
-					state={frontMatterState}
-					onChange={(nextState, frontMatter) => {
-						setFrontMatterState(nextState);
-						partsRef.current = { ...partsRef.current, frontMatter };
-						const markdown = combineMarkdownFrontMatter(
-							frontMatter,
-							partsRef.current.body,
-						);
-						latestMarkdownRef.current = markdown;
-						onLocalChange(pathRef.current, markdown);
-						scheduleSave();
-					}}
-				/>
+				{editable && (
+					<FilePropertiesPanel
+						path={path}
+						state={frontMatterState}
+						onChange={(nextState, frontMatter) => {
+							setFrontMatterState(nextState);
+							partsRef.current = { ...partsRef.current, frontMatter };
+							const markdown = combineMarkdownFrontMatter(
+								frontMatter,
+								partsRef.current.body,
+							);
+							latestMarkdownRef.current = markdown;
+							onLocalChange(pathRef.current, markdown);
+							scheduleSave();
+						}}
+					/>
+				)}
 				<EditorContent editor={editor} />
 				<VirtualCursor
 					editor={editor}
@@ -309,30 +317,39 @@ export function EditorView({
 					viewportRef={editorViewportRef}
 					modeOverride={cursorModeOverride}
 				/>
-				<LinkPopover
-					editor={editor}
-					containerRef={editorRootRef}
-					viewportRef={editorViewportRef}
-					wikiTargets={wikiTargets}
-					onOpenExternalLink={onOpenExternalLink}
-					onOpenWikiLink={onOpenWikiLink}
-					onMessage={onMessage}
-					onCursorModeChange={setCursorModeOverride}
-				/>
-				<SlashCommandMenu editor={editor} viewportRef={editorViewportRef} />
-				<SelectionFormattingToolbar
-					editor={editor}
-					viewportRef={editorViewportRef}
-					onComment={() => setReviewCommentRequest((value) => value + 1)}
-				/>
-				<ReviewCommentPopover
-					editor={editor}
-					filePath={path}
-					viewportRef={editorViewportRef}
-					request={reviewCommentRequest}
-					onMessage={onMessage}
-				/>
-				<FormatCommandMenu editor={editor} viewportRef={editorViewportRef} />
+				{editable && (
+					<>
+						<LinkPopover
+							editor={editor}
+							containerRef={editorRootRef}
+							viewportRef={editorViewportRef}
+							wikiTargets={wikiTargets}
+							onOpenExternalLink={onOpenExternalLink}
+							onOpenWikiLink={onOpenWikiLink}
+							onMessage={onMessage}
+							onCursorModeChange={setCursorModeOverride}
+						/>
+						<SlashCommandMenu editor={editor} viewportRef={editorViewportRef} />
+						<SelectionFormattingToolbar
+							editor={editor}
+							viewportRef={editorViewportRef}
+							onComment={() =>
+								setReviewCommentRequest((value) => value + 1)
+							}
+						/>
+						<ReviewCommentPopover
+							editor={editor}
+							filePath={path}
+							viewportRef={editorViewportRef}
+							request={reviewCommentRequest}
+							onMessage={onMessage}
+						/>
+						<FormatCommandMenu
+							editor={editor}
+							viewportRef={editorViewportRef}
+						/>
+					</>
+				)}
 			</div>
 			<FindBar editor={editor} />
 			<FormattingStatusBar editor={editor} scrollContainer={editorViewportEl} />

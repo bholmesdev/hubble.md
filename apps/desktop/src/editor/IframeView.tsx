@@ -87,7 +87,7 @@ export function IframeView({
 	onHeightChange,
 }: IframeViewProps) {
 	const iframeRef = useRef<HTMLIFrameElement | null>(null);
-	const tokenRef = useRef(crypto.randomUUID());
+	const [token] = useState(() => crypto.randomUUID());
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -144,7 +144,7 @@ export function IframeView({
 		<iframe
 			ref={iframeRef}
 			className={className}
-			name={tokenRef.current}
+			name={token}
 			scrolling="auto"
 			title={title}
 			sandbox="allow-scripts allow-forms"

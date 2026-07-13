@@ -4,7 +4,6 @@ import { keymatch } from "keymatch";
 import {
 	type ComponentType,
 	type RefObject,
-	useCallback,
 	useEffect,
 	useRef,
 	useState,
@@ -188,15 +187,15 @@ export function FormatCommandMenu({
 	)
 		? selectedKind
 		: visibleCommands[0]?.kind;
-	const closeMenu = useCallback(() => {
+	const closeMenu = () => {
 		setOpen(false);
 		setQuery("");
 		setPosition(null);
 		// Drop the frozen highlight and restore the real selection so a chosen
 		// command formats the range the user was looking at.
 		editor?.commands.restoreSelection({ focus: false });
-	}, [editor]);
-	const openMenu = useCallback(() => {
+	};
+	const openMenu = () => {
 		const viewport = viewportRef.current;
 		if (!viewport) return;
 		// Focus moves to the menu input, which visually drops the editor
@@ -208,36 +207,47 @@ export function FormatCommandMenu({
 		setPosition(null);
 		setOpen(true);
 		requestAnimationFrame(() => inputRef.current?.focus());
-	}, [editor, viewportRef]);
+	};
 
-	useEffect(() => {
-		if (!editor) return;
+	useEffect(
+		() => {
+			if (!editor) return;
 
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (!keymatch(event, "CmdOrCtrl+/")) return;
-			if (!editor.isFocused && !open) return;
-			event.preventDefault();
-			if (open) {
-				closeMenu();
-				return;
-			}
-			openMenu();
-		};
+			const handleKeyDown = (event: KeyboardEvent) => {
+				if (!keymatch(event, "CmdOrCtrl+/")) return;
+				if (!editor.isFocused && !open) return;
+				event.preventDefault();
+				if (open) {
+					closeMenu();
+					return;
+				}
+				openMenu();
+			};
 
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [closeMenu, editor, open, openMenu]);
+			window.addEventListener("keydown", handleKeyDown);
+			return () => window.removeEventListener("keydown", handleKeyDown);
+		},
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
+		[closeMenu, editor, open, openMenu],
+	);
 
-	useEffect(() => {
-		if (!editor) return;
-		const handleOpenRequest = () => openMenu();
-		window.addEventListener(OPEN_FORMAT_COMMAND_MENU_EVENT, handleOpenRequest);
-		return () =>
-			window.removeEventListener(
+	useEffect(
+		() => {
+			if (!editor) return;
+			const handleOpenRequest = () => openMenu();
+			window.addEventListener(
 				OPEN_FORMAT_COMMAND_MENU_EVENT,
 				handleOpenRequest,
 			);
-	}, [editor, openMenu]);
+			return () =>
+				window.removeEventListener(
+					OPEN_FORMAT_COMMAND_MENU_EVENT,
+					handleOpenRequest,
+				);
+		},
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes the render-local callback.
+		[editor, openMenu],
+	);
 
 	useCommandMenuPosition({
 		editor,

@@ -26,6 +26,7 @@ import type {
 	DesktopUpdateState,
 	DirectoryListing,
 	MenuState,
+	SearchFileResult,
 	WorkspaceConfig,
 } from "../src/desktopApi/types";
 import {
@@ -35,6 +36,13 @@ import {
 	markdownAssetFolderPath,
 	withMarkdownExtension,
 } from "../src/lib/filePath";
+import {
+	findMatchesInContent,
+	SEARCH_CONCURRENCY,
+	SEARCH_MAX_FILE_BYTES,
+	SEARCH_MAX_RESULT_FILES,
+	SEARCH_MIN_QUERY_LENGTH,
+} from "../src/lib/searchContent";
 import { setupTerminalIpc } from "./terminal";
 import {
 	loadZoomFactor,
@@ -85,6 +93,8 @@ const appName = devAppName ?? "Hubble";
 const debugPort = process.env.HUBBLE_DESKTOP_DEBUG_PORT ?? "9222";
 const updateFeedUrl = process.env.HUBBLE_DESKTOP_UPDATE_URL;
 const supportsAutoUpdates = !isDev && process.platform === "darwin";
+const updateCheckErrorMessage =
+	"Couldn't check for updates. Try again shortly.";
 // Check every 4 hours after the initial packaged-app update check.
 const updateCheckIntervalMs = 4 * 60 * 60 * 1000;
 
@@ -134,6 +144,8 @@ let menuState: MenuState = {
 	hasWorkspace: false,
 	hasMarkdownNoteOpen: false,
 	isSourceMode: false,
+	canGoBack: false,
+	canGoForward: false,
 };
 let updateState: DesktopUpdateState = {
 	isSupported: supportsAutoUpdates,
@@ -150,6 +162,9 @@ const watchers = new Map<string, FSWatcher>();
 const grantedFiles = new Set<string>();
 const grantedRoots = new Set<string>();
 let grantsLoaded = false;
+// An AbortSignal cannot cross IPC, so a superseded search is abandoned by
+// comparing its id against the newest one between files.
+let latestSearchRequestId = 0;
 
 const ignoreConfigFiles = [".gitignore", ".ignore"];
 const ignoredWorkspaceDirs = new Set([".git", "dist", "node_modules"]);
@@ -702,8 +717,28 @@ function buildTextContextMenu(
 	webContents: Electron.WebContents,
 	params: Electron.ContextMenuParams,
 ) {
+	const spellingItems: Electron.MenuItemConstructorOptions[] =
+		params.misspelledWord.length > 0
+			? [
+					...(params.dictionarySuggestions.length > 0
+						? params.dictionarySuggestions.map((suggestion) => ({
+								label: suggestion,
+								click: () => webContents.replaceMisspelling(suggestion),
+							}))
+						: [{ label: "No Guesses Found", enabled: false }]),
+					{
+						label: "Add to Dictionary",
+						click: () =>
+							webContents.session.addWordToSpellCheckerDictionary(
+								params.misspelledWord,
+							),
+					},
+					{ type: "separator" },
+				]
+			: [];
+
 	// In source mode the text is already markdown, so plain copy covers it.
-	const template: Electron.MenuItemConstructorOptions[] = textContextMenuItems
+	const editItems: Electron.MenuItemConstructorOptions[] = textContextMenuItems
 		.filter(
 			(item) =>
 				!(
@@ -727,13 +762,17 @@ function buildTextContextMenu(
 					},
 		);
 
-	return Menu.buildFromTemplate(template);
+	return Menu.buildFromTemplate([...spellingItems, ...editItems]);
 }
 
 function registerTextContextMenu(window: BrowserWindow) {
 	window.webContents.on("context-menu", (_event, params) => {
 		if (!params.isEditable) return;
-		buildTextContextMenu(window.webContents, params).popup({ window });
+		buildTextContextMenu(window.webContents, params).popup({
+			window,
+			// macOS needs the originating frame to attach Writing Tools and text services.
+			frame: params.frame ?? undefined,
+		});
 	});
 }
 
@@ -775,6 +814,14 @@ function buildMenu() {
 				},
 				{ type: "separator" },
 				{
+					id: "go-to-file",
+					label: "Go to File...",
+					accelerator: "CmdOrCtrl+P",
+					enabled: menuState.hasWorkspace,
+					click: () => sendToRenderer("desktop:menu-go-to-file"),
+				},
+				{ type: "separator" },
+				{
 					id: "sync-workspace",
 					label: "Sync Workspace",
 					enabled: menuState.hasWorkspace,
@@ -806,6 +853,21 @@ function buildMenu() {
 		{
 			label: "View",
 			submenu: [
+				{
+					id: "go-back",
+					label: "Go Back",
+					accelerator: "CmdOrCtrl+[",
+					enabled: menuState.canGoBack,
+					click: () => sendToRenderer("desktop:menu-go-back"),
+				},
+				{
+					id: "go-forward",
+					label: "Go Forward",
+					accelerator: "CmdOrCtrl+]",
+					enabled: menuState.canGoForward,
+					click: () => sendToRenderer("desktop:menu-go-forward"),
+				},
+				{ type: "separator" },
 				{
 					id: "zoom-in",
 					label: "Zoom In",
@@ -848,6 +910,16 @@ function buildMenu() {
 							{ role: "toggleDevTools" },
 						] satisfies Electron.MenuItemConstructorOptions[])
 					: []),
+			],
+		},
+		{
+			label: "Help",
+			submenu: [
+				{
+					id: "whats-new",
+					label: "See what's new",
+					click: () => sendToRenderer("desktop:menu-open-changelog"),
+				},
 			],
 		},
 	];
@@ -919,9 +991,10 @@ async function checkForUpdates() {
 	try {
 		await autoUpdater.checkForUpdates();
 	} catch (error) {
+		console.error("Auto-update check failed", error);
 		patchUpdateState({
 			status: "error",
-			message: error instanceof Error ? error.message : String(error),
+			message: updateCheckErrorMessage,
 			lastCheckedAt: Date.now(),
 		});
 	}
@@ -975,7 +1048,7 @@ function configureAutoUpdates() {
 		console.error("Auto-update error", error);
 		patchUpdateState({
 			status: "error",
-			message: error.message,
+			message: updateCheckErrorMessage,
 			lastCheckedAt: Date.now(),
 		});
 	});
@@ -1255,6 +1328,71 @@ function registerIpc() {
 		async (_event, { path: filePath }) => {
 			const resolved = assertGranted(filePath);
 			return await fs.readFile(resolved, "utf8");
+		},
+	);
+
+	ipcMain.handle(
+		"desktop:search-file-contents",
+		async (_event, { requestId, paths, query }) => {
+			latestSearchRequestId = requestId;
+			const needle = String(query ?? "").trim();
+			const empty = { requestId, results: [], truncated: false };
+			if (needle.length < SEARCH_MIN_QUERY_LENGTH) return empty;
+
+			// The renderer hands us the sidebar snapshot's paths, so search sees
+			// exactly what the sidebar sees (ADR-0008) and main never re-walks.
+			const candidates = (paths as string[]).filter(hasMarkdownExtension);
+			const results: SearchFileResult[] = [];
+			const isStale = () => requestId !== latestSearchRequestId;
+			let cursor = 0;
+			let capped = false;
+
+			async function worker() {
+				while (true) {
+					if (isStale()) return;
+					if (results.length >= SEARCH_MAX_RESULT_FILES) {
+						capped = true;
+						return;
+					}
+					const index = cursor;
+					cursor += 1;
+					if (index >= candidates.length) return;
+
+					const candidate = candidates[index];
+					try {
+						const resolved = assertGranted(candidate);
+						const stat = await fs.stat(resolved);
+						if (!stat.isFile() || stat.size > SEARCH_MAX_FILE_BYTES) continue;
+						const content = await fs.readFile(resolved, "utf8");
+						const matches = findMatchesInContent(content, needle);
+						if (matches.length > 0) results.push({ path: candidate, matches });
+					} catch {}
+				}
+			}
+
+			await Promise.all(
+				Array.from(
+					{ length: Math.min(SEARCH_CONCURRENCY, candidates.length) },
+					worker,
+				),
+			);
+			if (isStale()) return empty;
+
+			return {
+				requestId,
+				// The worker pool finishes out of order; sort so equal-ranked results
+				// do not jitter between keystrokes.
+				results: results
+					.slice(0, SEARCH_MAX_RESULT_FILES)
+					.sort((a, b) => a.path.localeCompare(b.path)),
+				// Workers can push a few past the cap between awaits; the slice hides
+				// them, so they must count as truncation. `capped` alone is not
+				// enough of a signal in the other direction: a scan that finished
+				// with exactly the cap dropped nothing.
+				truncated:
+					(capped && cursor < candidates.length) ||
+					results.length > SEARCH_MAX_RESULT_FILES,
+			};
 		},
 	);
 
@@ -1577,6 +1715,8 @@ function registerIpc() {
 			hasWorkspace: state.hasWorkspace === true,
 			hasMarkdownNoteOpen: state.hasMarkdownNoteOpen === true,
 			isSourceMode: state.isSourceMode === true,
+			canGoBack: state.canGoBack === true,
+			canGoForward: state.canGoForward === true,
 		};
 		buildMenu();
 	});

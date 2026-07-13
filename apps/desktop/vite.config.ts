@@ -3,13 +3,18 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import icons from "unplugin-icons/vite";
 import { defineConfig } from "vite";
+import { reactCompilerPlugin } from "../../config/react-compiler-audit";
 
 const devPort = Number(process.env.PORT ?? 1420);
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
 	plugins: [
-		react(),
+		react({
+			babel: {
+				plugins: [reactCompilerPlugin("desktop")],
+			},
+		}),
 		icons({
 			compiler: "jsx",
 			jsx: "react",

@@ -39,8 +39,12 @@ function setModHeld(el: HTMLElement, held: boolean) {
 export const LinkClickExtension = Extension.create<{
 	onOpenExternalLink?: (href: string) => void | Promise<void>;
 	onOpenWikiLink?: (target: string) => void | Promise<void>;
+	requireModifier?: boolean;
 }>({
 	name: "linkClick",
+	addOptions() {
+		return { requireModifier: true };
+	},
 	addProseMirrorPlugins() {
 		const root = this.editor.view.dom;
 
@@ -52,20 +56,38 @@ export const LinkClickExtension = Extension.create<{
 		window.addEventListener("keyup", onKey);
 		window.addEventListener("blur", onBlur);
 
+		const openLink = (link: LinkPayload) => {
+			if (link.kind === "wiki") {
+				void this.options.onOpenWikiLink?.(link.target ?? link.href);
+				return;
+			}
+			void this.options.onOpenExternalLink?.(link.href);
+		};
+
 		return [
 			new Plugin({
 				props: {
 					handleDOMEvents: {
 						mousedown: (view, event) => {
+							if (this.options.requireModifier === false) return false;
 							if (!event.metaKey && !event.ctrlKey) return false;
 							const link = findLinkAtEvent(view, event);
 							if (!link) return false;
 							event.preventDefault();
-							if (link.kind === "wiki") {
-								void this.options.onOpenWikiLink?.(link.target ?? link.href);
-								return true;
-							}
-							void this.options.onOpenExternalLink?.(link.href);
+							openLink(link);
+							return true;
+						},
+						// Without a required modifier, open on click instead of
+						// mousedown so a drag-selection starting on a link still
+						// selects text rather than opening it.
+						click: (view, event) => {
+							if (this.options.requireModifier !== false) return false;
+							if (event.button !== 0) return false;
+							if (!view.state.selection.empty) return false;
+							const link = findLinkAtEvent(view, event);
+							if (!link) return false;
+							event.preventDefault();
+							openLink(link);
 							return true;
 						},
 					},

@@ -15,6 +15,7 @@ describe("formatShortcut", () => {
 		expect(formatShortcut("CmdOrCtrl+N")).toBe("⌘N");
 		expect(formatShortcut("CmdOrCtrl+Alt+R")).toBe("⌘⌥R");
 		expect(formatShortcut("CmdOrCtrl+Shift+C")).toBe("⌘⇧C");
+		expect(formatShortcut("CmdOrCtrl+Backspace")).toBe("⌘⌫");
 	});
 
 	it("renders +-joined words on Windows/Linux", () => {
@@ -22,6 +23,7 @@ describe("formatShortcut", () => {
 		expect(formatShortcut("CmdOrCtrl+N")).toBe("Ctrl+N");
 		expect(formatShortcut("CmdOrCtrl+Alt+R")).toBe("Ctrl+Alt+R");
 		expect(formatShortcut("CmdOrCtrl+Shift+C")).toBe("Ctrl+Shift+C");
+		expect(formatShortcut("CmdOrCtrl+Backspace")).toBe("Ctrl+Backspace");
 	});
 
 	it("uppercases bare letter keys and leaves other keys intact", () => {

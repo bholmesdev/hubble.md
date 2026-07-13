@@ -419,7 +419,7 @@ function setListItemType(
 		(node, pos) => {
 			const $pos = tr.doc.resolve(pos);
 			if ($pos.depth <= $nearestListPos.depth) return true;
-			hasChangedAny = itemType(node) !== type;
+			hasChangedAny ||= itemType(node) !== type;
 			tr.setNodeMarkup(pos, undefined, {
 				checked: type === "task" ? false : null,
 			});

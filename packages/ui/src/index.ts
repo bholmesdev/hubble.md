@@ -1,5 +1,13 @@
 export { AppShellFrame } from "./components/AppShellFrame";
 export {
+	GlobalSearchPalette,
+	type GlobalSearchPaletteProps,
+	type PaletteContentMatch,
+	type PaletteContentResult,
+	type PaletteFile,
+	type PaletteFileMatches,
+} from "./components/GlobalSearchPalette";
+export {
 	Sidebar,
 	type SidebarFile,
 	type SidebarFocusedItem,

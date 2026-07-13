@@ -36,6 +36,7 @@ export type SyncResult = {
 	assetsPushed: number;
 	assetsPulled: number;
 	assetsDeleted: number;
+	assetsFailed: string[];
 };
 
 export type RemoteFile = {

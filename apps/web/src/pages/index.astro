@@ -646,6 +646,8 @@ const ccLogo =
   </script>
 
   <script>
+    import { track } from "@plausible-analytics/tracker";
+
     // Smart download targets based on your OS. Unknown directs to the release page.
     (async () => {
       const btn = document.querySelector<HTMLAnchorElement>("[data-download]");
@@ -656,6 +658,9 @@ const ccLogo =
       const isWindows = /Windows/i.test(ua);
       // Android UA also contains "Linux"; exclude it so phones don't get an AppImage.
       const isLinux = /Linux|X11|CrOS/i.test(ua) && !/Android/i.test(ua);
+      const os = isMac ? "mac" : isWindows ? "windows" : isLinux ? "linux" : "unknown";
+      // Click-time, not resolution-time: fires even on the fallback path where href stays on the releases page.
+      btn.addEventListener("click", () => track("Download", { props: { os } }));
 
       if (!isMac && !isWindows && !isLinux) {
         btn.href = "https://github.com/bholmesdev/hubble.md/releases";

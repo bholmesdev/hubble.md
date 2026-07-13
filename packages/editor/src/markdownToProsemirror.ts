@@ -36,9 +36,8 @@ function normalizeBlockContent(children: Content[]): Content[] {
 function blockToPM(node: Content): JSONContent[] {
 	switch (node.type) {
 		case "paragraph": {
-			const [maybeImage] = node.children;
-			if (maybeImage?.type === "image") {
-				return imageToPM(maybeImage);
+			if (node.children.some((child) => child.type === "image")) {
+				return splitParagraphAroundImages(node.children);
 			}
 			const paragraphHtml = node.children.every(
 				(child) => child.type === "html",
@@ -240,6 +239,45 @@ function listItemToPM(li: ListItem, allowChecked: boolean): JSONContent[] {
 			content,
 		},
 	];
+}
+
+// Images are block nodes in the editor schema, so a paragraph mixing images
+// with other inline content becomes image blocks with paragraphs between them.
+function splitParagraphAroundImages(children: Content[]): JSONContent[] {
+	const blocks: JSONContent[] = [];
+	let run: Content[] = [];
+	const flushRun = () => {
+		const content = inlineToPM(trimInlineRun(run));
+		run = [];
+		if (content.length > 0) blocks.push({ type: "paragraph", content });
+	};
+	for (const child of children) {
+		if (child.type === "image") {
+			flushRun();
+			blocks.push(...imageToPM(child));
+		} else {
+			run.push(child);
+		}
+	}
+	flushRun();
+	return blocks;
+}
+
+function trimInlineRun(run: Content[]): Content[] {
+	const trimmed = [...run];
+	const first = trimmed[0];
+	if (first?.type === "text") {
+		const value = first.value.trimStart();
+		if (value) trimmed[0] = { ...first, value };
+		else trimmed.shift();
+	}
+	const last = trimmed[trimmed.length - 1];
+	if (last?.type === "text") {
+		const value = last.value.trimEnd();
+		if (value) trimmed[trimmed.length - 1] = { ...last, value };
+		else trimmed.pop();
+	}
+	return trimmed;
 }
 
 function imageToPM(imageNode: Image): JSONContent[] {

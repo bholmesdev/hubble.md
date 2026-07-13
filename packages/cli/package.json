@@ -20,7 +20,6 @@
 	],
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
-		"postbuild": "chmod +x dist/index.js",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"dev": "tsc -p tsconfig.json --watch --preserveWatchOutput"
 	},

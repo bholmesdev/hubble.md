@@ -13,6 +13,12 @@
 			"skillPath": "skills/productivity/handoff/SKILL.md",
 			"computedHash": "1a78d774f8a59db5daa6e65e20a6596872fa8cde769f9a6e3a09b678dd5ae8cc"
 		},
+		"review-pr": {
+			"source": "warpdotdev/common-skills",
+			"sourceType": "github",
+			"skillPath": ".agents/skills/review-pr/SKILL.md",
+			"computedHash": "f27bfc9743fa0d240763a26519b25112a0ad8652c9a2b2b52daeb7af2d2a862c"
+		},
 		"to-issues": {
 			"source": "mattpocock/skills",
 			"sourceType": "github",

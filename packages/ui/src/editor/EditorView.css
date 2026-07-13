@@ -14,9 +14,7 @@
 }
 
 [data-hubble-editor] .ProseMirror {
-	--editor-gap: 0.5em;
-	--editor-heading-gap: 0.35em;
-	--editor-section-gap: 0.9em;
+	--editor-gap: 0.75em;
 	--editor-list-gap: 0.25em;
 
 	inline-size: 100%;
@@ -36,7 +34,7 @@
 
 [data-hubble-editor]
 	.ProseMirror
-	:is(h1, h2, h3, h4, h5, h6, p, ul, ol, blockquote, pre, table) {
+	:where(h1, h2, h3, h4, h5, h6, p, ul, ol, blockquote, pre, table, hr) {
 	margin-block: 0;
 }
 
@@ -45,33 +43,21 @@
 	margin-block-start: var(--editor-gap);
 }
 
-[data-hubble-editor] .ProseMirror > .react-renderer.node-codeBlock {
-	margin-block: var(--editor-gap);
+[data-hubble-editor] .ProseMirror > * + :is(h1, h2, h3, h4, h5, h6) {
+	margin-block-start: 1.3em;
 }
 
-[data-hubble-editor] .ProseMirror > * + .react-renderer.node-codeBlock,
-[data-hubble-editor] .ProseMirror > .react-renderer.node-codeBlock + * {
+/* Restore flow inside containers whose child margins are reset above. */
+[data-hubble-editor]
+	.ProseMirror
+	:is(blockquote, li, td, th)
+	:is(p, ul, ol, blockquote, pre)
+	+ :is(p, ul, ol, blockquote, pre) {
 	margin-block-start: var(--editor-gap);
 }
 
-/*
- * Semantic gaps below override the default. All have equal specificity, so
- * source order resolves overlaps — keep section/list rules last.
- */
-
-/* A heading starts a new section: roomy above. */
-[data-hubble-editor] .ProseMirror > * + :is(h1, h2, h3, h4, h5, h6) {
-	margin-block-start: var(--editor-section-gap);
-}
-
-/* A heading introduces what follows: tight below. */
-[data-hubble-editor] .ProseMirror > :is(h1, h2, h3, h4, h5, h6) + * {
-	margin-block-start: var(--editor-heading-gap);
-}
-
-/* A list needs trailing breathing room before any following block. */
-[data-hubble-editor] .ProseMirror > :is(ul, ol) + * {
-	margin-block-start: var(--editor-section-gap);
+[data-hubble-editor] .ProseMirror > .react-renderer.node-codeBlock {
+	margin-block: var(--editor-gap);
 }
 
 [data-hubble-editor] .ProseMirror h1 {
@@ -99,6 +85,16 @@
 	color: color-mix(in oklab, var(--foreground) 75%, var(--muted-foreground));
 }
 
+[data-hubble-editor] .ProseMirror :is(h5, h6) {
+	font-size: 1rem;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+[data-hubble-editor] .ProseMirror h6 {
+	color: var(--muted-foreground);
+}
+
 [data-hubble-editor] .ProseMirror ul {
 	list-style-type: disc;
 }
@@ -109,6 +105,10 @@
 
 [data-hubble-editor] .ProseMirror :is(ul, ol) li {
 	margin-inline-start: 1.3rem;
+}
+
+[data-hubble-editor] .ProseMirror :is(ul, ol) li::marker {
+	color: var(--muted-foreground);
 }
 
 [data-hubble-editor] .ProseMirror li + li,
@@ -235,7 +235,12 @@
 	border-inline-start: 2px solid var(--border);
 	border-radius: 1px;
 	padding-inline-start: 1rem;
-	color: color-mix(in oklab, var(--foreground) 78%, white);
+	color: color-mix(in oklab, var(--foreground) 78%, var(--muted-foreground));
+}
+
+[data-hubble-editor] .ProseMirror hr {
+	border: 0;
+	border-block-start: 1px solid var(--border);
 }
 
 [data-hubble-editor] .pm-fake-selection {
@@ -581,6 +586,13 @@
 }
 
 [data-hubble-editor] .ProseMirror.mod-held span[data-link="true"] {
+	cursor: pointer;
+}
+
+/* Read-only notes open links on a plain click, so hint it everywhere. */
+[data-hubble-editor]
+	.ProseMirror[contenteditable="false"]
+	span[data-link="true"] {
 	cursor: pointer;
 }
 

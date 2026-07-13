@@ -3,7 +3,14 @@ import { useResizeSeparator } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import { type ReactNode, useEffect, useReducer, useRef, useState } from "react";
+import {
+	type ReactNode,
+	useEffect,
+	useLayoutEffect,
+	useReducer,
+	useRef,
+	useState,
+} from "react";
 import { desktopApi } from "../desktopApi";
 import { cn } from "../lib/utils";
 import {
@@ -31,6 +38,8 @@ type Session = {
 	id: string;
 	title: string;
 };
+
+type StartSessionOptions = { initialCommand?: string };
 
 type TerminalState = {
 	sessions: Session[];
@@ -135,6 +144,30 @@ function cssColorToRgba(color: string): string {
 	ctx.fillRect(0, 0, 1, 1);
 	const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
 	return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
+}
+
+async function startTerminalSession(
+	title: string,
+	options: StartSessionOptions,
+	onStart: (session: Session) => void,
+) {
+	while (true) {
+		const requestedWorkspacePath = workspacePathStore.get();
+		if (!requestedWorkspacePath) return;
+		const notePath = viewerStore.get().currentPath ?? undefined;
+		const sessionId = await desktopApi.terminalStart(requestedWorkspacePath, {
+			...(notePath ? { notePath } : {}),
+			...options,
+		});
+		if (workspacePathStore.get() === requestedWorkspacePath) {
+			onStart({ id: sessionId, title });
+			return;
+		}
+		// The workspace changed while this shell booted. Adopting it would
+		// show a shell cwd'd to the old workspace, so drop it and retry.
+		void desktopApi.terminalStop(sessionId);
+		if (!terminalOpenStore.get()) return;
+	}
 }
 
 const LIGHT_THEME = {
@@ -256,6 +289,23 @@ export function TerminalPanel() {
 		);
 	}, [sessions, workspacePath]);
 
+	const startSession = async (
+		title: string,
+		options: StartSessionOptions = {},
+	) => {
+		setStartError(null);
+		try {
+			await startTerminalSession(title, options, (session) => {
+				dispatch({ type: "add", session });
+			});
+		} catch (error) {
+			console.error("Failed to start terminal session:", error);
+			setStartError(
+				"Terminal unavailable. The bundled shell module failed to load.",
+			);
+		}
+	};
+
 	// Start sessions while the panel is open: a pending chat command gets its
 	// own tab; otherwise an empty panel boots a plain shell. sessions.length
 	// retries a chat launch that arrived while another session was starting.
@@ -265,59 +315,21 @@ export function TerminalPanel() {
 		if (!pendingTerminalCommand && sessions.length > 0) return;
 
 		isInitializingRef.current = true;
-		void (async () => {
-			try {
-				if (pendingTerminalCommand) {
-					await startSession(
-						pendingTerminalCommand.split(/\s+/, 1)[0] || "chat",
-						{ initialCommand: pendingTerminalCommand },
-					);
-					clearPendingTerminalCommand();
-				} else {
-					await startSession("bash");
-				}
-			} finally {
+		const sessionPromise = pendingTerminalCommand
+			? startSession(pendingTerminalCommand.split(/\s+/, 1)[0] || "chat", {
+					initialCommand: pendingTerminalCommand,
+				})
+			: startSession("bash");
+		void sessionPromise.then(
+			() => {
+				if (pendingTerminalCommand) clearPendingTerminalCommand();
 				isInitializingRef.current = false;
-			}
-		})();
+			},
+			() => {
+				isInitializingRef.current = false;
+			},
+		);
 	}, [isOpen, pendingTerminalCommand, workspacePath, sessions.length]);
-
-	const startSession = async (
-		title: string,
-		options: { initialCommand?: string } = {},
-	) => {
-		setStartError(null);
-		try {
-			while (true) {
-				const requestedWorkspacePath = workspacePathStore.get();
-				if (!requestedWorkspacePath) return;
-				const notePath = viewerStore.get().currentPath ?? undefined;
-				const sessionId = await desktopApi.terminalStart(
-					requestedWorkspacePath,
-					{
-						...(notePath ? { notePath } : {}),
-						...options,
-					},
-				);
-				if (workspacePathStore.get() === requestedWorkspacePath) {
-					dispatch({
-						type: "add",
-						session: { id: sessionId, title },
-					});
-					return;
-				}
-				// The workspace changed while this shell booted. Adopting it would
-				// show a shell cwd'd to the old workspace, so drop it and retry.
-				void desktopApi.terminalStop(sessionId);
-				if (!terminalOpenStore.get()) return;
-			}
-		} catch (error) {
-			console.error("Failed to start terminal session:", error);
-			setStartError(
-				"Terminal unavailable. The bundled shell module failed to load.",
-			);
-		}
-	};
 
 	const handleCloseSession = async (sessionId: string) => {
 		await desktopApi.terminalStop(sessionId);
@@ -567,9 +579,12 @@ function TerminalInstance({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const termRef = useRef<Terminal | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
-	// Read via ref so an unstable callback prop can never remount xterm.
+	// Sync before paint so xterm never sees a stale callback after a render;
+	// keeping it in a ref avoids remounting the terminal when the callback changes.
 	const onExitRef = useRef(onExit);
-	onExitRef.current = onExit;
+	useLayoutEffect(() => {
+		onExitRef.current = onExit;
+	}, [onExit]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional
 	useEffect(() => {
@@ -676,11 +691,18 @@ function TerminalInstance({
 			fitAddonRef.current &&
 			containerRef.current?.offsetParent !== null
 		) {
+			const fitAddon = fitAddonRef.current;
+			const term = termRef.current;
 			try {
-				fitAddonRef.current.fit();
-				termRef.current?.focus();
+				fitAddon.fit();
 			} catch {
-				//
+				// Layout may disappear while the debounced fit is running.
+			}
+			if (!term) return;
+			try {
+				term.focus();
+			} catch {
+				// The terminal may be disposed during panel teardown.
 			}
 		}
 	}, [isActive]);

@@ -66,6 +66,8 @@
 	"devDependencies": {
 		"@iconify-json/mingcute": "^1.2.7",
 		"@types/react": "^19.1.8",
+		"@vitejs/plugin-react": "^4.6.0",
+		"babel-plugin-react-compiler": "^1.0.0",
 		"happy-dom": "^20.10.3",
 		"typescript": "~5.8.3",
 		"unplugin-icons": "^23.0.1",

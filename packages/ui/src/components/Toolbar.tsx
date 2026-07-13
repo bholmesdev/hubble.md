@@ -17,15 +17,36 @@ const END_INSET = isMac()
 	? "0px"
 	: "calc(100vw - env(titlebar-area-width, calc(100vw - 138px)))";
 const ACTIONS_BASIS = "114px";
+const DEFAULT_SIDEBAR_WIDTH = "220px";
 const NO_DRAG_STYLE = {
 	WebkitAppRegion: "no-drag",
 } as CSSProperties;
 
-function ToolbarActions({ children }: { children?: React.ReactNode }) {
+// Clusters shrink from ACTIONS_BASIS by default; passing `width` pins them to
+// an exact size instead (used to match the sidebar seam).
+function ToolbarCluster({
+	children,
+	align = "start",
+	width,
+	platformInset = true,
+}: {
+	children?: React.ReactNode;
+	align?: "start" | "end";
+	width?: string;
+	platformInset?: boolean;
+}) {
 	return (
 		<div
-			className="px-2"
-			style={{ flex: `0 100 ${ACTIONS_BASIS}`, ...NO_DRAG_STYLE }}
+			className={`flex items-center gap-1 px-2 ${align === "end" ? "justify-end" : ""}`}
+			style={{
+				...(width
+					? { flex: "0 0 auto", inlineSize: width, maxInlineSize: width }
+					: { flex: `0 100 ${ACTIONS_BASIS}` }),
+				...(align === "start"
+					? { paddingInlineStart: platformInset ? START_INSET : 0 }
+					: { paddingInlineEnd: platformInset ? END_INSET : 0 }),
+				...NO_DRAG_STYLE,
+			}}
 		>
 			{children}
 		</div>
@@ -106,36 +127,44 @@ export function Toolbar({
 	return (
 		<div
 			{...rootProps}
-			className={`flex h-9 items-center ${borderClass} ${rootProps?.className ?? ""}`}
+			className={`flex h-9 select-none items-center ${borderClass} ${rootProps?.className ?? ""}`}
 		>
-			<ToolbarActions>
-				<div
-					className="flex items-center gap-1"
-					style={{ paddingInlineStart: platformInset ? START_INSET : 0 }}
-				>
-					{onToggleSidebar && (
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							className="relative"
-							onClick={onToggleSidebar}
-							aria-label="Toggle sidebar"
-							title={`Toggle sidebar (${formatShortcut("CmdOrCtrl+Shift+E")})`}
-						>
-							<MingcuteLayoutLeftLine className="size-4" />
-							{sidebarBadge ? (
-								<span className="absolute top-1 end-1 size-1.5 rounded-full bg-primary" />
-							) : null}
-						</Button>
-					)}
-					{leftSlot}
-				</div>
-			</ToolbarActions>
+			<ToolbarCluster
+				width={
+					sidebarOpen
+						? `var(--sidebar-width, ${DEFAULT_SIDEBAR_WIDTH})`
+						: undefined
+				}
+				platformInset={platformInset}
+			>
+				{onToggleSidebar && (
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="relative"
+						onClick={onToggleSidebar}
+						aria-label="Toggle sidebar"
+						title={`Toggle sidebar (${formatShortcut("CmdOrCtrl+Shift+E")})`}
+					>
+						<MingcuteLayoutLeftLine className="size-4" />
+						{sidebarBadge ? (
+							<span className="absolute top-1 end-1 size-1.5 rounded-full bg-primary" />
+						) : null}
+					</Button>
+				)}
+				{leftSlot ? (
+					sidebarOpen ? (
+						<div className="ms-auto flex items-center gap-1">{leftSlot}</div>
+					) : (
+						leftSlot
+					)
+				) : null}
+			</ToolbarCluster>
 			<div className="flex min-w-0 justify-center" style={{ flex: "1 1 auto" }}>
 				{editingTitle ? (
 					<input
 						ref={titleInputRef}
-						className="h-6 min-w-0 max-w-full rounded-sm bg-transparent px-1 text-center text-xs text-foreground outline-none focus-visible:outline-none focus-visible:ring-0"
+						className="h-6 min-w-0 max-w-full select-text rounded-sm bg-transparent px-1 text-center text-xs text-foreground outline-none focus-visible:outline-none focus-visible:ring-0"
 						style={NO_DRAG_STYLE}
 						value={draftTitle}
 						onBlur={() => void commitTitleEdit()}
@@ -162,14 +191,9 @@ export function Toolbar({
 					</button>
 				)}
 			</div>
-			<ToolbarActions>
-				<div
-					className="flex items-center justify-end"
-					style={{ paddingInlineEnd: platformInset ? END_INSET : 0 }}
-				>
-					{rightSlot}
-				</div>
-			</ToolbarActions>
+			<ToolbarCluster align="end" platformInset={platformInset}>
+				{rightSlot}
+			</ToolbarCluster>
 		</div>
 	);
 }

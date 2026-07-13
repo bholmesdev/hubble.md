@@ -77,6 +77,7 @@ export async function sync(
 		assetsPushed: 0,
 		assetsPulled: 0,
 		assetsDeleted: 0,
+		assetsFailed: [],
 	};
 	const nextFiles: Record<string, FileState> = { ...state.files };
 	const now = Date.now();
@@ -212,6 +213,9 @@ export async function sync(
 			headers: { "Content-Type": "application/octet-stream" },
 			body: data,
 		});
+		if (!res.ok) {
+			throw new Error(`Asset upload failed for ${path}: ${res.status}`);
+		}
 		const { storageId } = (await res.json()) as { storageId: string };
 		await backend.pushAsset({
 			workspaceId,
@@ -228,6 +232,11 @@ export async function sync(
 		const url = await backend.getAssetDownloadUrl(remote.storageId);
 		if (!url) return;
 		const res = await fetch(url);
+		if (!res.ok) {
+			throw new Error(
+				`Asset download failed for ${remote.path}: ${res.status}`,
+			);
+		}
 		const buf = new Uint8Array(await res.arrayBuffer());
 		await ensureParentDir(remote.path);
 		await fs.writeBinaryFile(`${workspacePath}/${remote.path}`, buf);
@@ -238,6 +247,22 @@ export async function sync(
 		result.assetsPulled++;
 	}
 
+	async function tryPushAsset(path: string, hash: string) {
+		try {
+			await pushAsset(path, hash);
+		} catch {
+			result.assetsFailed.push(path);
+		}
+	}
+
+	async function tryPullAsset(remote: RemoteAsset) {
+		try {
+			await pullAsset(remote);
+		} catch {
+			result.assetsFailed.push(remote.path);
+		}
+	}
+
 	// Process locally present assets
 	for (const local of localAssets) {
 		const prev = prevAssets[local.relativePath];
@@ -246,7 +271,7 @@ export async function sync(
 
 		if (remote?.deleted) {
 			if (prev && prev.hash !== local.hash) {
-				await pushAsset(local.relativePath, local.hash);
+				await tryPushAsset(local.relativePath, local.hash);
 			} else {
 				await fs.deleteFile(`${workspacePath}/${local.relativePath}`);
 				delete nextAssets[local.relativePath];
@@ -256,7 +281,7 @@ export async function sync(
 		}
 
 		if (!remote) {
-			await pushAsset(local.relativePath, local.hash);
+			await tryPushAsset(local.relativePath, local.hash);
 			continue;
 		}
 
@@ -265,9 +290,9 @@ export async function sync(
 
 		if (diverged) {
 			// Last-write-wins for binary assets — pull remote
-			await pullAsset(remote);
+			await tryPullAsset(remote);
 		} else if (localChanged) {
-			await pushAsset(local.relativePath, local.hash);
+			await tryPushAsset(local.relativePath, local.hash);
 		}
 	}
 
@@ -293,7 +318,7 @@ export async function sync(
 		if (remote.deleted) continue;
 		if (localAssetByPath.has(remote.path)) continue;
 		if (prevAssets[remote.path]) continue;
-		await pullAsset(remote);
+		await tryPullAsset(remote);
 	}
 
 	await writeSyncState(fs, workspacePath, {

@@ -25,6 +25,27 @@ describe("task list splitting", () => {
 			taskItem({ checked: false }),
 		]);
 	});
+
+	it("converts every item when toggling a mixed list to bullets", () => {
+		const editor = createEditor({
+			type: "doc",
+			content: [
+				{
+					type: "bulletList",
+					content: [
+						taskItem({ checked: true, text: "done" }),
+						taskItem({ checked: null, text: "plain" }),
+					],
+				},
+			],
+		});
+
+		expect(editor.commands.toggleParentBulletList()).toBe(true);
+		expect(listItems(editor)).toMatchObject([
+			taskItem({ checked: null, text: "done" }),
+			taskItem({ checked: null, text: "plain" }),
+		]);
+	});
 });
 
 function createEditor(content: JSONContent) {

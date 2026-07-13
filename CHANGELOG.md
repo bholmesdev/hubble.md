@@ -9,10 +9,34 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+### Changed
+
+- Editor blocks now use a consistent reading rhythm, with tighter list grouping and clearer heading separation. [f6c44a2](https://github.com/bholmesdev/hubble.md/commit/f6c44a2)
+
+### Fixed
+
+- Switching between notes now keeps navigation controls stable and saves pending edits to the correct file. [#167](https://github.com/bholmesdev/hubble.md/pull/167)
+
+## [0.1.20] - 2026-07-12
+
+### Added
+
+- Global search: press Cmd+P (or File → Go to File…) to find notes by name, by path, or by a phrase inside them. Results show a matching excerpt, and selecting one opens the note. Thanks [@zcuric](https://github.com/zcuric)! [#159](https://github.com/bholmesdev/hubble.md/pull/159)
+- Pin, unpin, or trash multiple sidebar items at once, including with Cmd+Delete. [#129](https://github.com/bholmesdev/hubble.md/pull/129)
+- Added a button to view the changelog after an update. Revisit the changelog anytime from Help or Settings. [#163](https://github.com/bholmesdev/hubble.md/pull/163)
+
+### Fixed
+
+- macOS text context menus now include Writing Tools, text services, and spelling suggestions. Thanks [@noahpatterson](https://github.com/noahpatterson) for the suggestion! [#164](https://github.com/bholmesdev/hubble.md/pull/164)
+- Update-check failures now show a concise, unobtrusive message instead of a raw error trace.
+
+## [0.1.19] - 2026-07-11
+
+### Added
+
 - Linux desktop builds now ship an RPM package alongside the existing AppImage and deb, for install on Fedora/RHEL/openSUSE and other RPM-based distros. Thanks [@ricardoraposo](https://github.com/ricardoraposo)! [#151](https://github.com/bholmesdev/hubble.md/pull/151)
 - Dark mode: the desktop app, editor (including code-block syntax highlighting), and embedded HTML apps now follow your system appearance. Thanks [@saucy-tech](https://github.com/saucy-tech)! [#110](https://github.com/bholmesdev/hubble.md/issues/110)
-
-### Changed
+- Go back and forward between recently opened files: use the toolbar arrows, Cmd+[ and Cmd+], or the View menu. History is kept per workspace and follows files through renames, moves, and deletes. [#154](https://github.com/bholmesdev/hubble.md/pull/154)
 
 ### Fixed
 

@@ -2,8 +2,13 @@ import type { Editor } from "@tiptap/core";
 import Document from "@tiptap/extension-document";
 import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { HubbleCodeBlock } from "./CodeBlockExtension";
+import {
+	flushPendingSave,
+	type PendingSave,
+	schedulePendingSave,
+} from "./pendingSave";
 import "./EditorView.css";
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 120;
@@ -28,25 +33,24 @@ export function MarkdownSourceEditor({
 }: MarkdownSourceEditorProps) {
 	const pathRef = useRef(path);
 	const latestMarkdownRef = useRef(initialMarkdown);
-	const saveTimerRef = useRef<number | null>(null);
-	pathRef.current = path;
+	const pendingSaveRef = useRef<PendingSave | null>(null);
+	useLayoutEffect(() => {
+		pathRef.current = path;
+	}, [path]);
 
-	const setEditorViewport = useCallback(
-		(node: HTMLDivElement | null) => {
-			onScrollContainerChange?.(node);
-		},
-		[onScrollContainerChange],
-	);
+	const setEditorViewport = (node: HTMLDivElement | null) => {
+		onScrollContainerChange?.(node);
+	};
 
-	const scheduleSave = useCallback(() => {
-		const savePath = pathRef.current;
-		if (saveTimerRef.current !== null) {
-			window.clearTimeout(saveTimerRef.current);
-		}
-		saveTimerRef.current = window.setTimeout(() => {
-			void onSave(savePath, latestMarkdownRef.current);
-		}, saveDebounceMs);
-	}, [onSave, saveDebounceMs]);
+	const scheduleSave = () => {
+		schedulePendingSave({
+			delay: saveDebounceMs,
+			markdown: latestMarkdownRef.current,
+			path: pathRef.current,
+			ref: pendingSaveRef,
+			save: onSave,
+		});
+	};
 
 	const editor = useEditor({
 		extensions: [
@@ -84,14 +88,12 @@ export function MarkdownSourceEditor({
 	}, [editor, initialMarkdown]);
 
 	useEffect(() => {
+		// Path changes flush the pending edit before the next document takes over.
+		void path;
 		return () => {
-			if (saveTimerRef.current !== null) {
-				window.clearTimeout(saveTimerRef.current);
-				saveTimerRef.current = null;
-				void onSave(path, latestMarkdownRef.current);
-			}
+			flushPendingSave(pendingSaveRef);
 		};
-	}, [path, onSave]);
+	}, [path]);
 
 	return (
 		<div

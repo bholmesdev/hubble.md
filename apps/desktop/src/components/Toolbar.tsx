@@ -7,22 +7,28 @@ import {
 import { useStoreValue } from "@simplestack/store/react";
 import { type CSSProperties, useEffect, useState } from "react";
 import { toast } from "sonner";
+import MingcuteArrowLeftLine from "~icons/mingcute/arrow-left-line";
+import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { desktopApi } from "../desktopApi";
+import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import { hasMarkdownExtension } from "../lib/filePath";
 import { revealFileLabel } from "../lib/revealFile";
 import {
+	goBack,
+	goForward,
 	renameCurrentMarkdownFile,
 	requestChatAboutNote,
 	setViewerMode,
 	toggleSidebar,
 	toggleTerminal,
 } from "../store/actions";
+import { useHistoryNav } from "../store/hooks";
 import {
 	currentPathStore,
 	sidebarOpenStore,
@@ -55,18 +61,24 @@ export function Toolbar({
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
 	const isFullScreen = useIsFullScreen();
+	// The changelog note is virtual: show a friendly title and disable the
+	// file actions (rename, reveal, copy path) that assume a file on disk.
+	const isChangelog = isChangelogPath(currentPath);
 
 	return (
 		<SharedToolbar
-			currentPath={currentPath ?? null}
+			currentPath={isChangelog ? "What's new" : (currentPath ?? null)}
 			sidebarOpen={sidebarOpen}
 			sidebarBadge={showSidebarBadge}
 			scrollContainer={scrollContainer}
 			platformInset={!isFullScreen}
 			rootProps={{ style: dragRegionStyle }}
 			onToggleSidebar={toggleSidebar}
-			onRenameCurrentPath={(nextName) =>
-				void renameCurrentMarkdownFile(nextName)
+			leftSlot={<NavigationControls />}
+			onRenameCurrentPath={
+				isChangelog
+					? undefined
+					: (nextName) => void renameCurrentMarkdownFile(nextName)
 			}
 			rightSlot={
 				<div className="flex items-center gap-1">
@@ -79,7 +91,7 @@ export function Toolbar({
 					>
 						<MingcuteTerminalLine className="size-3.5" />
 					</Button>
-					{currentPath && (
+					{currentPath && !isChangelog && (
 						<NoteActionsMenu
 							path={currentPath}
 							canChatAboutNote={workspacePath !== null}
@@ -88,6 +100,36 @@ export function Toolbar({
 				</div>
 			}
 		/>
+	);
+}
+
+function NavigationControls() {
+	const { canGoBack, canGoForward } = useHistoryNav();
+	const backLabel = `Go Back (${formatShortcut("CmdOrCtrl+[")})`;
+	const forwardLabel = `Go Forward (${formatShortcut("CmdOrCtrl+]")})`;
+	return (
+		<>
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				aria-label={backLabel}
+				title={backLabel}
+				disabled={!canGoBack}
+				onClick={() => void goBack()}
+			>
+				<MingcuteArrowLeftLine className="size-4" />
+			</Button>
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				aria-label={forwardLabel}
+				title={forwardLabel}
+				disabled={!canGoForward}
+				onClick={() => void goForward()}
+			>
+				<MingcuteArrowRightLine className="size-4" />
+			</Button>
+		</>
 	);
 }
 

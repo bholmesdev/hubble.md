@@ -1,6 +1,17 @@
 import type { Node as PMNode, ResolvedPos } from "@tiptap/pm/model";
 import type { Selection as PMSelection } from "@tiptap/pm/state";
 
+export function previousCodePointIndex(text: string, index: number) {
+	if (index <= 0) return 0;
+	const previous = text.charCodeAt(index - 1);
+	return previous >= 0xdc00 && previous <= 0xdfff ? index - 2 : index - 1;
+}
+
+export function nextCodePointIndex(text: string, index: number) {
+	const codePoint = text.codePointAt(index);
+	return index + (codePoint !== undefined && codePoint > 0xffff ? 2 : 1);
+}
+
 /**
  * Get the position of where the first text node starts in the given node.
  */

@@ -17,6 +17,35 @@ export type HtmlAppFileEntry = {
 	size: number;
 };
 
+export type SearchContentMatch = {
+	/** 1-indexed line number within the file. */
+	line: number;
+	/** Trimmed line, windowed around the match, with ellipses when clipped. */
+	excerpt: string;
+	matchStart: number;
+	matchEnd: number;
+};
+
+export type SearchFileResult = {
+	path: string;
+	matches: SearchContentMatch[];
+};
+
+export type SearchFileContentsInput = {
+	/** Monotonic per-renderer id. Main abandons a search once it is superseded. */
+	requestId: number;
+	/** Candidate paths, taken from the sidebar snapshot. Main never re-walks. */
+	paths: string[];
+	query: string;
+};
+
+export type SearchFileContentsOutput = {
+	requestId: number;
+	results: SearchFileResult[];
+	/** True when the file cap was hit before every candidate was scanned. */
+	truncated: boolean;
+};
+
 export type PersistPastedImageInput = {
 	filePath: string;
 	bytes: number[];
@@ -42,6 +71,8 @@ export type MenuState = {
 	hasWorkspace: boolean;
 	hasMarkdownNoteOpen: boolean;
 	isSourceMode: boolean;
+	canGoBack: boolean;
+	canGoForward: boolean;
 };
 
 export type DesktopUpdateStatus =
@@ -88,6 +119,9 @@ export type DesktopApi = {
 		config: WorkspaceConfig,
 	): Promise<void>;
 	readFileText(path: string): Promise<string>;
+	searchFileContents(
+		input: SearchFileContentsInput,
+	): Promise<SearchFileContentsOutput>;
 	detectHubbleSkills(workspacePath: string): Promise<boolean>;
 	writeFileText(path: string, content: string): Promise<void>;
 	createFolder(path: string): Promise<void>;
@@ -132,10 +166,14 @@ export type DesktopApi = {
 	onMenuOpenFile(callback: () => void): Unsubscribe;
 	onMenuOpenFolder(callback: () => void): Unsubscribe;
 	onMenuOpenSettings(callback: () => void): Unsubscribe;
+	onMenuOpenChangelog(callback: () => void): Unsubscribe;
 	onMenuCopyAsMarkdown(callback: () => void): Unsubscribe;
 	onMenuShowWorkspaceSwitcher(callback: () => void): Unsubscribe;
+	onMenuGoToFile(callback: () => void): Unsubscribe;
 	onMenuSyncWorkspace(callback: () => void): Unsubscribe;
 	onMenuToggleTerminal(callback: () => void): Unsubscribe;
+	onMenuGoBack(callback: () => void): Unsubscribe;
+	onMenuGoForward(callback: () => void): Unsubscribe;
 	onMenuToggleSourceMode(callback: () => void): Unsubscribe;
 	onWindowFocus(callback: () => void): Unsubscribe;
 	onFullScreenChange(callback: (isFullScreen: boolean) => void): Unsubscribe;

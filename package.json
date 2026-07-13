@@ -14,6 +14,7 @@
 	"bugs": "https://github.com/bholmesdev/hubble.md/issues",
 	"scripts": {
 		"check": "biome check .",
+		"check:react-compiler": "node scripts/audit-react-compiler.mjs",
 		"check:fix": "biome check . --write",
 		"test": "pnpm -r --if-present test",
 		"typecheck": "pnpm -r --if-present typecheck",

@@ -15,10 +15,8 @@ import { TextSelection } from "@tiptap/pm/state";
 import { keymatch } from "keymatch";
 import {
 	type RefObject,
-	useCallback,
 	useEffect,
 	useLayoutEffect,
-	useMemo,
 	useReducer,
 	useRef,
 	useState,
@@ -521,7 +519,7 @@ function usePreviewRevealAnimation({
 	const previousPopoverModeRef = useRef<PopoverMode>(mode);
 	const previousPreviewKeyRef = useRef<string | null>(activeKey);
 
-	const playPreviewReveal = useCallback(() => {
+	const playPreviewReveal = () => {
 		const previewButton = previewButtonRef.current;
 		if (!previewButton) return;
 		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -547,7 +545,7 @@ function usePreviewRevealAnimation({
 			},
 			{ once: true },
 		);
-	}, [positionUpdateRef]);
+	};
 
 	useEffect(() => {
 		return () => {
@@ -555,26 +553,30 @@ function usePreviewRevealAnimation({
 		};
 	}, []);
 
-	useEffect(() => {
-		const previousMode = previousPopoverModeRef.current;
-		const previousPreviewKey = previousPreviewKeyRef.current;
-		const shouldRevealFromHidden =
-			previousMode === "hidden" && mode === "preview";
-		const shouldReplayPreviewReveal =
-			previousMode === "preview" &&
-			mode === "preview" &&
-			inputMode === "pointer" &&
-			previousPreviewKey !== null &&
-			activeKey !== null &&
-			previousPreviewKey !== activeKey;
+	useEffect(
+		() => {
+			const previousMode = previousPopoverModeRef.current;
+			const previousPreviewKey = previousPreviewKeyRef.current;
+			const shouldRevealFromHidden =
+				previousMode === "hidden" && mode === "preview";
+			const shouldReplayPreviewReveal =
+				previousMode === "preview" &&
+				mode === "preview" &&
+				inputMode === "pointer" &&
+				previousPreviewKey !== null &&
+				activeKey !== null &&
+				previousPreviewKey !== activeKey;
 
-		if (shouldRevealFromHidden || shouldReplayPreviewReveal) {
-			playPreviewReveal();
-		}
+			if (shouldRevealFromHidden || shouldReplayPreviewReveal) {
+				playPreviewReveal();
+			}
 
-		previousPopoverModeRef.current = mode;
-		previousPreviewKeyRef.current = activeKey;
-	}, [mode, activeKey, inputMode, playPreviewReveal]);
+			previousPopoverModeRef.current = mode;
+			previousPreviewKeyRef.current = activeKey;
+		},
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes the render-local callback.
+		[mode, activeKey, inputMode, playPreviewReveal],
+	);
 
 	return previewButtonRef;
 }
@@ -583,27 +585,31 @@ function PreviewLabel({ text }: { text: string }) {
 	const textRef = useRef<HTMLSpanElement | null>(null);
 	const [overflows, setOverflows] = useState(false);
 
-	const measureOverflow = useCallback(() => {
+	const measureOverflow = () => {
 		const element = textRef.current;
 		setOverflows(
 			Boolean(element && element.scrollWidth > element.clientWidth + 1),
 		);
-	}, []);
+	};
 
-	useLayoutEffect(() => {
-		const element = textRef.current;
-		if (!element) {
-			setOverflows(false);
-			return;
-		}
-		measureOverflow();
-		// CSS cannot tell us whether the text is actually clipped. Measure overflow
-		// so the fade mask only appears when there is hidden text to fade out.
-		// Hover padding and reveal animation also change the available label width.
-		const observer = new ResizeObserver(measureOverflow);
-		observer.observe(element);
-		return () => observer.disconnect();
-	}, [measureOverflow]);
+	useLayoutEffect(
+		() => {
+			const element = textRef.current;
+			if (!element) {
+				setOverflows(false);
+				return;
+			}
+			measureOverflow();
+			// CSS cannot tell us whether the text is actually clipped. Measure overflow
+			// so the fade mask only appears when there is hidden text to fade out.
+			// Hover padding and reveal animation also change the available label width.
+			const observer = new ResizeObserver(measureOverflow);
+			observer.observe(element);
+			return () => observer.disconnect();
+		},
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes the render-local callback.
+		[measureOverflow],
+	);
 
 	return (
 		<span
@@ -680,17 +686,15 @@ export function LinkPopover({
 	const [creationHref, setCreationHref] = useState("");
 	const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
 	const wikiQuery = machineState.mode === "creating" ? creationHref : hrefValue;
-	const wikiSuggestions = useMemo(() => {
-		const query = normalizedSearchValue(wikiQuery);
-		return wikiTargets
-			.filter((file) => {
-				if (!query) return true;
-				const haystack = `${file.title} ${file.target}`.toLocaleLowerCase();
-				return haystack.includes(query);
-			})
-			.sort((a, b) => a.title.localeCompare(b.title))
-			.slice(0, 6);
-	}, [wikiQuery, wikiTargets]);
+	const wikiSuggestionQuery = normalizedSearchValue(wikiQuery);
+	const wikiSuggestions = wikiTargets
+		.filter((file) => {
+			if (!wikiSuggestionQuery) return true;
+			const haystack = `${file.title} ${file.target}`.toLocaleLowerCase();
+			return haystack.includes(wikiSuggestionQuery);
+		})
+		.sort((a, b) => a.title.localeCompare(b.title))
+		.slice(0, 6);
 	const boundedActiveSuggestionIndex =
 		wikiSuggestions.length === 0
 			? 0
@@ -711,20 +715,17 @@ export function LinkPopover({
 		positionUpdateRef.current?.("layout");
 	}, [machineState.mode]);
 
-	const dispatchMachineEvent = useCallback(
-		(event: MachineEvent) => {
-			const previousState = machineStateRef.current;
-			const nextState = machineReducer(previousState, event);
-			machineStateRef.current = nextState;
-			onCursorModeChange?.(getCursorModeForMachineState(nextState));
-			dispatch(event);
-		},
-		[onCursorModeChange],
-	);
-	const setAnchorState = useCallback((event: LinkAnchorEvent) => {
+	const dispatchMachineEvent = (event: MachineEvent) => {
+		const previousState = machineStateRef.current;
+		const nextState = machineReducer(previousState, event);
+		machineStateRef.current = nextState;
+		onCursorModeChange?.(getCursorModeForMachineState(nextState));
+		dispatch(event);
+	};
+	const setAnchorState = (event: LinkAnchorEvent) => {
 		anchorRef.current = linkAnchorReducer(anchorRef.current, event);
-	}, []);
-	const openCreationTitleInput = useCallback(() => {
+	};
+	const openCreationTitleInput = () => {
 		if (!editor || creationCursorPos === null) return;
 		clearGhostText(editor);
 		if (creationHref) {
@@ -732,108 +733,96 @@ export function LinkPopover({
 		}
 		dispatchMachineEvent({ type: "TITLE_INPUT_REQUESTED" });
 		editor.commands.focus(undefined, { scrollIntoView: false });
-	}, [editor, creationCursorPos, creationHref, dispatchMachineEvent]);
-	const applyWikiSuggestionToExistingLink = useCallback(
-		(suggestion: (typeof wikiSuggestions)[number]) => {
-			if (!editor || !activeLink) return;
-			const linkType = editor.state.schema.marks.link;
-			if (!linkType) return;
+	};
+	const applyWikiSuggestionToExistingLink = (
+		suggestion: (typeof wikiSuggestions)[number],
+	) => {
+		if (!editor || !activeLink) return;
+		const linkType = editor.state.schema.marks.link;
+		if (!linkType) return;
 
-			const nextLink = {
-				...activeLink,
-				href: suggestion.path,
-				kind: "wiki" as const,
-				target: suggestion.target,
-			};
-			const attrs = {
-				href: suggestion.path,
-				kind: "wiki",
-				target: suggestion.target,
-			};
-			if (activeLink.from === activeLink.to) {
-				const marks = (
-					editor.state.storedMarks ?? editor.state.selection.$from.marks()
-				).filter((mark) => mark.type !== linkType);
-				editor.view.dispatch(
-					editor.state.tr.setStoredMarks([...marks, linkType.create(attrs)]),
-				);
-			} else {
-				const currentText = editor.state.doc.textBetween(
+		const nextLink = {
+			...activeLink,
+			href: suggestion.path,
+			kind: "wiki" as const,
+			target: suggestion.target,
+		};
+		const attrs = {
+			href: suggestion.path,
+			kind: "wiki",
+			target: suggestion.target,
+		};
+		if (activeLink.from === activeLink.to) {
+			const marks = (
+				editor.state.storedMarks ?? editor.state.selection.$from.marks()
+			).filter((mark) => mark.type !== linkType);
+			editor.view.dispatch(
+				editor.state.tr.setStoredMarks([...marks, linkType.create(attrs)]),
+			);
+		} else {
+			const currentText = editor.state.doc.textBetween(
+				activeLink.from,
+				activeLink.to,
+				"",
+			);
+			// Update inline text only when it still matches the linked file name.
+			const oldTarget =
+				originalWikiTargetRef.current?.activeKey ===
+				machineStateRef.current.activeKey
+					? originalWikiTargetRef.current.target
+					: activeLink.target || activeLink.href;
+			const oldAutoTitle = wikiDisplayNameForTarget(oldTarget);
+			if (currentText === oldAutoTitle) {
+				const tr = editor.state.tr.replaceWith(
 					activeLink.from,
 					activeLink.to,
-					"",
+					editor.state.schema.text(suggestion.title, [linkType.create(attrs)]),
 				);
-				// Update inline text only when it still matches the linked file name.
-				const oldTarget =
-					originalWikiTargetRef.current?.activeKey ===
-					machineStateRef.current.activeKey
-						? originalWikiTargetRef.current.target
-						: activeLink.target || activeLink.href;
-				const oldAutoTitle = wikiDisplayNameForTarget(oldTarget);
-				if (currentText === oldAutoTitle) {
-					const tr = editor.state.tr.replaceWith(
-						activeLink.from,
-						activeLink.to,
-						editor.state.schema.text(suggestion.title, [
-							linkType.create(attrs),
-						]),
-					);
-					editor.view.dispatch(tr);
-				} else {
-					const tr = editor.state.tr.removeMark(
-						activeLink.from,
-						activeLink.to,
-						linkType,
-					);
-					tr.addMark(activeLink.from, activeLink.to, linkType.create(attrs));
-					editor.view.dispatch(tr);
-				}
-			}
-			// Edits can close before selection sync runs, so keep preview/open state
-			// aligned with the transaction we just dispatched.
-			setActiveLink(nextLink);
-			setHrefValue(suggestion.target);
-			dispatchMachineEvent({ type: "ESCAPE_REQUESTED" });
-		},
-		[editor, activeLink, dispatchMachineEvent],
-	);
-	const applyWikiSuggestion = useCallback(
-		(suggestion: (typeof wikiSuggestions)[number]) => {
-			if (!editor) return;
-			if (machineStateRef.current.mode === "creating") {
-				if (creationCursorPos === null) return;
-				clearGhostText(editor);
-				insertWikiLinkedText(
-					editor,
-					creationCursorPos,
-					suggestion.title,
-					suggestion.path,
-					suggestion.target,
+				editor.view.dispatch(tr);
+			} else {
+				const tr = editor.state.tr.removeMark(
+					activeLink.from,
+					activeLink.to,
+					linkType,
 				);
-				dispatchMachineEvent({ type: "CREATION_CONFIRMED" });
-				editor.commands.focus(undefined, { scrollIntoView: false });
-				return;
+				tr.addMark(activeLink.from, activeLink.to, linkType.create(attrs));
+				editor.view.dispatch(tr);
 			}
-			applyWikiSuggestionToExistingLink(suggestion);
-		},
-		[
-			editor,
-			creationCursorPos,
-			dispatchMachineEvent,
-			applyWikiSuggestionToExistingLink,
-		],
-	);
-	const moveSuggestion = useCallback(
-		(delta: 1 | -1) => {
-			const count = wikiSuggestions.length;
-			if (count === 0) return;
-			setActiveSuggestionIndex((index) => {
-				const boundedIndex = Math.min(index, count - 1);
-				return (boundedIndex + delta + count) % count;
-			});
-		},
-		[wikiSuggestions.length],
-	);
+		}
+		// Edits can close before selection sync runs, so keep preview/open state
+		// aligned with the transaction we just dispatched.
+		setActiveLink(nextLink);
+		setHrefValue(suggestion.target);
+		dispatchMachineEvent({ type: "ESCAPE_REQUESTED" });
+	};
+	const applyWikiSuggestion = (
+		suggestion: (typeof wikiSuggestions)[number],
+	) => {
+		if (!editor) return;
+		if (machineStateRef.current.mode === "creating") {
+			if (creationCursorPos === null) return;
+			clearGhostText(editor);
+			insertWikiLinkedText(
+				editor,
+				creationCursorPos,
+				suggestion.title,
+				suggestion.path,
+				suggestion.target,
+			);
+			dispatchMachineEvent({ type: "CREATION_CONFIRMED" });
+			editor.commands.focus(undefined, { scrollIntoView: false });
+			return;
+		}
+		applyWikiSuggestionToExistingLink(suggestion);
+	};
+	const moveSuggestion = (delta: 1 | -1) => {
+		const count = wikiSuggestions.length;
+		if (count === 0) return;
+		setActiveSuggestionIndex((index) => {
+			const boundedIndex = Math.min(index, count - 1);
+			return (boundedIndex + delta + count) % count;
+		});
+	};
 
 	// ── Link detection + positioning for existing links ─────────────
 	useEffect(() => {
@@ -937,64 +926,77 @@ export function LinkPopover({
 	}, [
 		editor,
 		viewportRef,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		dispatchMachineEvent,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		setAnchorState,
 		creationCursorPos,
 		inputMode,
 	]);
 
 	// ── Listen for FOCUS_LINK_POPOVER_EVENT (selection-based flow) ──
-	useEffect(() => {
-		const onFocusRequest = () => {
-			expandNextLinkSessionRef.current = true;
-			dispatchMachineEvent({ type: "EXPAND_REQUESTED" });
-			// SmartLinkExtension fires this right after dispatching a transaction
-			// that may create an empty link. Read the session after that state lands.
-			queueMicrotask(() => {
-				if (!editor) return;
-				const { link } = getLinkSession(editor);
-				if (!link || link.href) return;
-				void navigator.clipboard
-					.readText()
-					.then((clipboardValue) => {
-						const href = clipboardValue.trim();
-						if (!canAutofillLinkFromClipboard(href)) return;
-						updateLinkMark(editor, link, href);
-						setHrefValue(href);
-						setActiveLink({ ...link, ...linkAttrsForHref(href) });
-						dispatchMachineEvent({ type: "EXPAND_REQUESTED" });
-					})
-					.catch(() => {});
-			});
-		};
-		window.addEventListener(
-			FOCUS_LINK_POPOVER_EVENT,
-			onFocusRequest as EventListener,
-		);
-		return () => {
-			window.removeEventListener(
+	useEffect(
+		() => {
+			const onFocusRequest = () => {
+				expandNextLinkSessionRef.current = true;
+				dispatchMachineEvent({ type: "EXPAND_REQUESTED" });
+				// SmartLinkExtension fires this right after dispatching a transaction
+				// that may create an empty link. Read the session after that state lands.
+				queueMicrotask(() => {
+					if (!editor) return;
+					const { link } = getLinkSession(editor);
+					if (!link || link.href) return;
+					void navigator.clipboard
+						.readText()
+						.then((clipboardValue) => {
+							const href = clipboardValue.trim();
+							if (!canAutofillLinkFromClipboard(href)) return;
+							updateLinkMark(editor, link, href);
+							setHrefValue(href);
+							setActiveLink({ ...link, ...linkAttrsForHref(href) });
+							dispatchMachineEvent({ type: "EXPAND_REQUESTED" });
+						})
+						.catch(() => {});
+				});
+			};
+			window.addEventListener(
 				FOCUS_LINK_POPOVER_EVENT,
 				onFocusRequest as EventListener,
 			);
-		};
-	}, [editor, dispatchMachineEvent]);
+			return () => {
+				window.removeEventListener(
+					FOCUS_LINK_POPOVER_EVENT,
+					onFocusRequest as EventListener,
+				);
+			};
+		},
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes the render-local callback.
+		[editor, dispatchMachineEvent],
+	);
 
 	// ── Listen for LINK_CREATION_REQUESTED_EVENT (empty-selection Cmd+K) ──
-	useEffect(() => {
-		const onCreationRequested = (event: Event) => {
-			const pos = (event as CustomEvent<{ pos: number }>).detail.pos;
-			setCreationCursorPos(pos);
-			setCreationHref("");
-			dispatchMachineEvent({ type: "CREATION_REQUESTED" });
-		};
-		window.addEventListener(LINK_CREATION_REQUESTED_EVENT, onCreationRequested);
-		return () => {
-			window.removeEventListener(
+	useEffect(
+		() => {
+			const onCreationRequested = (event: Event) => {
+				const pos = (event as CustomEvent<{ pos: number }>).detail.pos;
+				setCreationCursorPos(pos);
+				setCreationHref("");
+				dispatchMachineEvent({ type: "CREATION_REQUESTED" });
+			};
+			window.addEventListener(
 				LINK_CREATION_REQUESTED_EVENT,
 				onCreationRequested,
 			);
-		};
-	}, [dispatchMachineEvent]);
+			return () => {
+				window.removeEventListener(
+					LINK_CREATION_REQUESTED_EVENT,
+					onCreationRequested,
+				);
+			};
+		},
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes the render-local callback.
+		[dispatchMachineEvent],
+	);
 
 	// ── Focus input when entering creating or actions mode ──────────
 	useEffect(() => {
@@ -1064,7 +1066,9 @@ export function LinkPopover({
 		editor,
 		machineState.mode,
 		creationCursorPos,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		openCreationTitleInput,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		dispatchMachineEvent,
 	]);
 
@@ -1130,9 +1134,13 @@ export function LinkPopover({
 		machineState.mode,
 		creationHref,
 		creationCursorPos,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		dispatchMachineEvent,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		openCreationTitleInput,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		applyWikiSuggestion,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		moveSuggestion,
 		wikiSuggestions,
 		boundedActiveSuggestionIndex,
@@ -1224,9 +1232,12 @@ export function LinkPopover({
 		activeLink,
 		machineState.mode,
 		machineState.pendingCreation,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		dispatchMachineEvent,
 		hrefValue,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		applyWikiSuggestion,
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		moveSuggestion,
 		wikiSuggestions,
 		boundedActiveSuggestionIndex,

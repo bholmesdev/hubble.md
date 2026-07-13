@@ -2,25 +2,24 @@ import { Button } from "@hubble.md/ui";
 import type { DesktopUpdateState } from "../desktopApi/types";
 import { SettingsSection } from "./SettingsDialog";
 
-export function SidebarUpdateCallout({
-	onInstall,
+export function SidebarCallout({
+	message,
+	primaryLabel,
+	onPrimary,
 	onDismiss,
 }: {
-	onInstall: () => void;
+	message: React.ReactNode;
+	primaryLabel: string;
+	onPrimary: () => void;
 	onDismiss: () => void;
 }) {
 	return (
 		<div className="rounded-md border border-primary/20 bg-primary/8 p-3">
 			<div className="flex flex-col gap-3">
-				<div className="flex flex-col gap-1">
-					<p className="text-[11px] text-foreground">
-						<span className="font-semibold">A new version</span> is ready to
-						install.
-					</p>
-				</div>
+				<p className="text-[11px] text-foreground">{message}</p>
 				<div className="flex flex-wrap gap-2">
-					<Button size="sm" onClick={onInstall}>
-						Restart
+					<Button size="sm" onClick={onPrimary}>
+						{primaryLabel}
 					</Button>
 					<Button
 						size="sm"
@@ -39,9 +38,11 @@ export function SidebarUpdateCallout({
 export function UpdatesSection({
 	state,
 	onPrimaryAction,
+	onViewChangelog,
 }: {
 	state: DesktopUpdateState;
 	onPrimaryAction: () => void;
+	onViewChangelog: () => void;
 }) {
 	const button = getPrimaryButton(state);
 	const secondaryText = getSecondaryText(state);
@@ -60,17 +61,22 @@ export function UpdatesSection({
 							</p>
 						) : null}
 					</div>
-					<Button
-						size="sm"
-						variant={button.variant}
-						disabled={button.disabled}
-						onClick={onPrimaryAction}
-					>
-						{button.label}
-					</Button>
+					<div className="flex flex-wrap gap-2">
+						<Button size="sm" variant="ghost" onClick={onViewChangelog}>
+							See what's new
+						</Button>
+						<Button
+							size="sm"
+							variant={button.variant}
+							disabled={button.disabled}
+							onClick={onPrimaryAction}
+						>
+							{button.label}
+						</Button>
+					</div>
 				</div>
 				{state.status === "error" && state.message ? (
-					<p className="text-xs text-destructive">{state.message}</p>
+					<p className="text-xs text-muted-foreground">{state.message}</p>
 				) : null}
 				{secondaryText ? (
 					<p className="text-xs text-muted-foreground">{secondaryText}</p>

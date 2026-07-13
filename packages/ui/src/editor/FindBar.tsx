@@ -5,13 +5,7 @@ import {
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import { keymatch } from "keymatch";
-import {
-	type ReactNode,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import MingcuteDownLine from "~icons/mingcute/down-line";
 import MingcuteSearchLine from "~icons/mingcute/search-line";
@@ -27,18 +21,18 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 	});
 	const inputRef = useRef<HTMLInputElement | null>(null);
 
-	const syncFindState = useCallback(() => {
+	const syncFindState = () => {
 		if (!editor) return;
 		setFindState(getFindState(editor.state));
-	}, [editor]);
+	};
 
-	const close = useCallback(() => {
+	const close = () => {
 		setOpen(false);
 		editor?.commands.clearFindQuery();
 		editor?.commands.focus(undefined, { scrollIntoView: false });
-	}, [editor]);
+	};
 
-	const openFind = useCallback(() => {
+	const openFind = () => {
 		if (!editor) return;
 		const selectedText = editor.state.selection.empty
 			? ""
@@ -53,32 +47,40 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 			inputRef.current?.focus();
 			inputRef.current?.select();
 		});
-	}, [editor]);
+	};
 
-	useEffect(() => {
-		if (!editor) return;
-		syncFindState();
-		editor.on("transaction", syncFindState);
-		return () => {
-			editor.off("transaction", syncFindState);
-		};
-	}, [editor, syncFindState]);
+	useEffect(
+		() => {
+			if (!editor) return;
+			syncFindState();
+			editor.on("transaction", syncFindState);
+			return () => {
+				editor.off("transaction", syncFindState);
+			};
+		},
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
+		[editor, syncFindState],
+	);
 
-	useEffect(() => {
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (open && event.key === "Escape") {
+	useEffect(
+		() => {
+			const handleKeyDown = (event: KeyboardEvent) => {
+				if (open && event.key === "Escape") {
+					event.preventDefault();
+					close();
+					return;
+				}
+				if (!keymatch(event, "CmdOrCtrl+f")) return;
+				if (!editor?.isFocused && !open) return;
 				event.preventDefault();
-				close();
-				return;
-			}
-			if (!keymatch(event, "CmdOrCtrl+f")) return;
-			if (!editor?.isFocused && !open) return;
-			event.preventDefault();
-			openFind();
-		};
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [close, editor, open, openFind]);
+				openFind();
+			};
+			window.addEventListener("keydown", handleKeyDown);
+			return () => window.removeEventListener("keydown", handleKeyDown);
+		},
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
+		[close, editor, open, openFind],
+	);
 
 	if (!editor || !open) return null;
 
