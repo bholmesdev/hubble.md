@@ -1,21 +1,19 @@
 ---
-name: ask-cc
+name: taste-review
 description: Ask Claude Code to make a taste-driven call on something ambiguous — UI polish, prose phrasing, naming, formatting. Use when you'd otherwise guess.
-argument-hint: "The question + any file paths to consider"
 ---
 
 You hit something fuzzy and need a judgment call. Shell out to the `claude` CLI to get one back, then apply it.
 
 Run from the repo root so `claude` can read files by relative path:
 
-Claude Code stores subscription OAuth credentials in macOS Keychain. Codex's
-filesystem sandbox cannot read them, so a sandboxed `claude auth status` may
-incorrectly report `loggedIn: false`. Run the `claude -p` command outside the
-sandbox, requesting approval for the reusable `claude -p` prefix. Only ask the
-user to log in if `claude auth status` also fails outside the sandbox.
+Run outside the sandbox when required, requesting reusable approval for the
+`claude -p` prefix. On macOS, use the optional long-lived subscription OAuth
+token from Keychain when present. Otherwise, fall back to that machine's normal
+Claude authentication.
 
 ```bash
-claude -p "$(cat <<'EOF'
+prompt="$(cat <<'EOF'
 <your question, stated plainly>
 
 Files to consider: <paths, if any>
@@ -25,4 +23,16 @@ Length is up to you — a design call may warrant several paragraphs;
 a naming call may not. Match the depth to the decision.
 EOF
 )"
+
+if [[ "$(uname)" == "Darwin" ]] &&
+  oauth_token="$(
+    security find-generic-password \
+      -a "$USER" \
+      -s "Claude Code skill OAuth" \
+      -w 2>/dev/null
+  )"; then
+  CLAUDE_CODE_OAUTH_TOKEN="$oauth_token" claude -p "$prompt"
+else
+  claude -p "$prompt"
+fi
 ```
