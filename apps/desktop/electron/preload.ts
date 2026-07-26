@@ -75,6 +75,8 @@ const desktopApi = {
 	},
 	openExternalUrl: (url) =>
 		ipcRenderer.invoke("desktop:open-external-url", { url }),
+	openAgentClient: (input) =>
+		ipcRenderer.invoke("desktop:open-agent-client", input),
 	openPathFromLink: (path) =>
 		ipcRenderer.invoke("desktop:open-path-from-link", { path }),
 	openPathInDefaultApp: (path) =>
