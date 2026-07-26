@@ -281,11 +281,18 @@
 	font-size: 0.9em;
 }
 
+/* Keep room for the gutter comment badges when the clamp would leave less. */
+[data-hubble-editor] .editorViewport[data-review-gutter] .ProseMirror {
+	padding-inline-end: max(var(--editor-content-padding-inline), 3.25rem);
+}
+
 [data-hubble-editor] .ProseMirror [data-review-type="reviewComment"],
 [data-hubble-editor] .ProseMirror [data-review-type="reviewHighlight"] {
-	background: color-mix(in oklab, var(--brand) 18%, transparent);
-	box-shadow: inset 0 -2px color-mix(in oklab, var(--brand) 48%, transparent);
+	background: color-mix(in oklab, var(--brand-accent) 24%, transparent);
+	box-shadow: inset 0 -2px
+		color-mix(in oklab, var(--brand-accent) 70%, transparent);
 	border-radius: 2px;
+	color: inherit;
 }
 
 [data-hubble-editor] .ProseMirror [data-review-type="reviewInsertion"] {

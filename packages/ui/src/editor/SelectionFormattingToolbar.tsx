@@ -17,7 +17,7 @@ import {
 	useState,
 } from "react";
 import MingcuteBoldLine from "~icons/mingcute/bold-line";
-import MingcuteCommentLine from "~icons/mingcute/comment-line";
+import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteHeading1Line from "~icons/mingcute/heading-1-line";
 import MingcuteHeading2Line from "~icons/mingcute/heading-2-line";
 import MingcuteHeading3Line from "~icons/mingcute/heading-3-line";
@@ -378,20 +378,6 @@ export function SelectionFormattingToolbar({
 			{INLINE_ACTIONS.map((action) => (
 				<ToolbarButton key={action.kind} editor={editor} action={action} />
 			))}
-			{onComment && (
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Comment"
-					title="Comment"
-					className="text-muted-foreground"
-					onMouseDown={(event) => event.preventDefault()}
-					onClick={onComment}
-				>
-					<MingcuteCommentLine className="size-4" />
-				</Button>
-			)}
 			<Separator orientation="vertical" className="mx-0.5" />
 			{HEADING_ACTIONS.map((action) => (
 				<ToolbarButton key={action.kind} editor={editor} action={action} />
@@ -400,6 +386,23 @@ export function SelectionFormattingToolbar({
 			{BLOCK_ACTIONS.map((action) => (
 				<ToolbarButton key={action.kind} editor={editor} action={action} />
 			))}
+			{onComment && (
+				<>
+					<Separator orientation="vertical" className="mx-0.5" />
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Comment"
+						title="Comment"
+						className="text-muted-foreground"
+						onMouseDown={(event) => event.preventDefault()}
+						onClick={onComment}
+					>
+						<MingcuteChat3Line className="size-4" />
+					</Button>
+				</>
+			)}
 			<Separator orientation="vertical" className="mx-0.5" />
 			<Button
 				type="button"
