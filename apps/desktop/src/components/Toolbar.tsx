@@ -16,12 +16,14 @@ import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { desktopApi } from "../desktopApi";
+import type { AgentClient } from "../desktopApi/types";
 import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
 	hasHtmlExtension,
 	hasTextExtension,
 	isEditableFile,
+	relativeWorkspacePath,
 	supportsSourceToggle,
 } from "../lib/filePath";
 import { revealFileLabel } from "../lib/revealFile";
@@ -42,6 +44,7 @@ import {
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
+import { ClaudeLogo, CodexLogo } from "./AgentLogos";
 
 const dragRegionStyle = {
 	WebkitAppRegion: "drag",
@@ -101,8 +104,10 @@ export function Toolbar({
 					{currentPath && !isChangelog && (
 						<NoteActionsMenu
 							path={currentPath}
-							canChatAboutNote={
-								workspacePath !== null && isEditableFile(currentPath)
+							workspacePath={
+								workspacePath && isEditableFile(currentPath)
+									? workspacePath
+									: null
 							}
 						/>
 					)}
@@ -144,10 +149,10 @@ function NavigationControls() {
 
 function NoteActionsMenu({
 	path,
-	canChatAboutNote,
+	workspacePath,
 }: {
 	path: string;
-	canChatAboutNote: boolean;
+	workspacePath: string | null;
 }) {
 	const { viewMode } = useStoreValue(viewerStore);
 	const isSourceMode = viewMode === "source";
@@ -172,6 +177,22 @@ function NoteActionsMenu({
 		await copyText(path, "File path");
 	}
 
+	async function openInAgent(client: AgentClient) {
+		if (!workspacePath) return;
+		const clientName = client === "codex" ? "Codex" : "Claude";
+		try {
+			await desktopApi.openAgentClient({
+				client,
+				prompt: `Read ${relativeWorkspacePath(path, workspacePath)} and...`,
+				workspacePath,
+			});
+		} catch (error) {
+			toast.error(`Failed to open ${clientName}`, {
+				description: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
 	return (
 		<Menu.Root>
 			<Menu.Trigger
@@ -194,15 +215,32 @@ function NoteActionsMenu({
 					className="isolate z-50"
 				>
 					<Menu.Popup className="z-50 w-52 origin-(--transform-origin) rounded-sm border border-border bg-popover p-1 text-[11px] text-popover-foreground outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-						{canChatAboutNote && (
-							<Menu.Item
-								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
-								onClick={requestChatAboutNote}
-							>
-								<MingcuteTerminalLine className="size-3 shrink-0" />
-								<span className="min-w-0 flex-1">Chat about this note</span>
-								<ShortcutHint spec="CmdOrCtrl+Shift+J" />
-							</Menu.Item>
+						{workspacePath && (
+							<>
+								<Menu.Item
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									onClick={requestChatAboutNote}
+								>
+									<MingcuteTerminalLine className="size-3 shrink-0" />
+									<span className="min-w-0 flex-1">Chat about this note</span>
+									<ShortcutHint spec="CmdOrCtrl+Shift+J" />
+								</Menu.Item>
+								<Menu.Item
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									onClick={() => void openInAgent("codex")}
+								>
+									<CodexLogo className="size-3 shrink-0" />
+									<span className="min-w-0 flex-1">Open in Codex</span>
+								</Menu.Item>
+								<Menu.Item
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									onClick={() => void openInAgent("claude")}
+								>
+									<ClaudeLogo className="size-3 shrink-0" />
+									<span className="min-w-0 flex-1">Open in Claude</span>
+								</Menu.Item>
+								<Menu.Separator className="my-1 h-px bg-border" />
+							</>
 						)}
 						{supportsSourceToggle(path) && (
 							<Menu.Item

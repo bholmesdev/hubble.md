@@ -206,6 +206,13 @@ const windowStateSchema = z.object({
 	isMaximized: z.boolean().optional(),
 	isFullScreen: z.boolean().optional(),
 });
+const openAgentClientSchema = z
+	.object({
+		client: z.enum(["codex", "claude"]),
+		prompt: z.string(),
+		workspacePath: z.string().trim().min(1),
+	})
+	.strict();
 const htmlAppHeadStyles = [
 	{ name: "hubble-theme", source: htmlAppTheme },
 ] as const;
@@ -1709,6 +1716,27 @@ function registerIpc() {
 			throw new Error("Only http(s) external URLs are allowed");
 		}
 		await shell.openExternal(url);
+	});
+
+	ipcMain.handle("desktop:open-agent-client", async (_event, input) => {
+		const { client, prompt, workspacePath } =
+			openAgentClientSchema.parse(input);
+		const resolvedWorkspacePath = assertGranted(workspacePath);
+		if (!(await fs.stat(resolvedWorkspacePath)).isDirectory()) {
+			throw new Error(`Not a directory: ${workspacePath}`);
+		}
+
+		// Build the custom-protocol URL here so the renderer cannot choose an
+		// arbitrary external scheme or workspace outside its granted scope.
+		const url = new URL(
+			client === "codex" ? "codex://threads/new" : "claude://code/new",
+		);
+		url.searchParams.set(client === "codex" ? "prompt" : "q", prompt);
+		url.searchParams.set(
+			client === "codex" ? "path" : "folder",
+			resolvedWorkspacePath,
+		);
+		await shell.openExternal(url.href);
 	});
 
 	ipcMain.handle("desktop:open-path-from-link", async (_event, { path }) => {

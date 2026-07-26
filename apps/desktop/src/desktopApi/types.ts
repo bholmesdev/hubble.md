@@ -67,6 +67,14 @@ export type OpenPathFromLinkResult =
 	| { kind: "file"; path: string }
 	| { kind: "opened" };
 
+export type AgentClient = "codex" | "claude";
+
+export type OpenAgentClientInput = {
+	client: AgentClient;
+	prompt: string;
+	workspacePath: string;
+};
+
 export type WatchOptions = {
 	recursive: boolean;
 };
@@ -154,6 +162,7 @@ export type DesktopApi = {
 		callback: (paths: string[]) => void,
 	): Promise<Unsubscribe>;
 	openExternalUrl(url: string): Promise<void>;
+	openAgentClient(input: OpenAgentClientInput): Promise<void>;
 	openPathFromLink(path: string): Promise<OpenPathFromLinkResult>;
 	openPathInDefaultApp(path: string): Promise<void>;
 	revealFile(path: string): Promise<void>;
