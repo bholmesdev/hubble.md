@@ -19,8 +19,8 @@ declare module "@tiptap/core" {
 }
 
 /**
- * Inline code keeps its normal Markdown behavior while allowing review marks
- * to annotate code selected together with surrounding text.
+ * Inline code keeps its normal Markdown behavior, but does not exclude other
+ * marks, so a review span can cover code and surrounding text together.
  */
 export const InlineCodeExtension = Mark.create({
 	name: "code",

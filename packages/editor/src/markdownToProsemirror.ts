@@ -12,6 +12,7 @@ import { type Plugin, unified } from "unified";
 import { visit } from "unist-util-visit";
 import { wikiDisplayNameForTarget } from "./markdownPath";
 import { parseReviewMetadata } from "./ReviewMark";
+import { unescapeReviewText } from "./reviewEscaping";
 
 // Convert Markdown (string) -> TipTap JSONContent (ProseMirror document)
 export function markdownToTiptapDoc(markdown: string): JSONContent {
@@ -305,28 +306,38 @@ function htmlToEmbed(raw: string | undefined): JSONContent | null {
 
 function inlineToPM(children: Content[]): JSONContent[] {
 	const out: JSONContent[] = [];
-	for (let index = 0; index < (children ?? []).length; index += 1) {
-		const child = children[index];
-		const reviewSpan = reviewSpanFromChildren(children, index);
+	// Mutable so that when a span's closer shares a text node with the next
+	// span's opener, that opener can be requeued as a synthetic sibling and
+	// still match its own closer. One array rather than a recursive call, so
+	// trailing metadata comments can scan back across every segment of `out`.
+	const items = [...(children ?? [])];
+	for (let index = 0; index < items.length; index += 1) {
+		const child = items[index];
+		const reviewSpan = reviewSpanFromChildren(items, index);
 		if (reviewSpan) {
 			if (reviewSpan.prefix) out.push(...textToPM(reviewSpan.prefix));
 			const content = inlineToPM(reviewSpan.content);
 			out.push(...applyMark(content, "reviewMark", reviewSpan.attrs));
-			if (reviewSpan.suffix) out.push(...textToPM(reviewSpan.suffix));
+			if (reviewSpan.suffix) {
+				items.splice(reviewSpan.endIndex + 1, 0, {
+					type: "text",
+					value: reviewSpan.suffix,
+				});
+			}
 			index = reviewSpan.endIndex;
 			continue;
 		}
 
 		const replacement = replacementFromGfmDelete(
-			children[index + 1],
+			items[index + 1],
 			child,
-			children[index + 2],
+			items[index + 2],
 		);
 		if (replacement) {
-			const next = children[index + 2];
+			const next = items[index + 2];
 			if (child.type === "text")
 				out.push(...textToPM(child.value.slice(0, -1)));
-			out.push(replacement.node);
+			out.push(...replacement.nodes);
 			if (next?.type === "text") {
 				out.push(...textToPM(next.value.slice(replacement.closeLength)));
 			}
@@ -394,17 +405,35 @@ function inlineToPM(children: Content[]): JSONContent[] {
 	return out;
 }
 
+const REVIEW_SPAN_PATTERN =
+	/\{==((?:\\[\s\S]|(?!==\})[\s\S])+?)==\}(?:\{>>((?:\\[\s\S]|(?!<<\})[\s\S])*)<<\})?(?:\{#([A-Za-z0-9_-]+)\})?|\{\+\+([\s\S]+?)\+\+\}(?:\{#([A-Za-z0-9_-]+)\})?|\{--([\s\S]+?)--\}(?:\{#([A-Za-z0-9_-]+)\})?|\{~~((?:\\[\s\S]|(?!~>)[\s\S])+?)~>([\s\S]+?)~~\}(?:\{#([A-Za-z0-9_-]+)\})?/g;
+
 function reviewSpanFromChildren(children: Content[], index: number) {
 	// remark parses emphasis inside a review wrapper as sibling mdast nodes;
 	// reconstruct the wrapper before recursively converting its formatted content.
 	const first = children[index];
 	if (first?.type !== "text") return null;
 
-	const opening = ["{==", "{++", "{--"].find(
-		(value) => first.value.endsWith(value) || first.value.startsWith(value),
-	);
+	// Spans with both delimiters in this text node are already handled by
+	// textToPM's regex, so only treat an opener as starting a cross-node span
+	// when no closer follows it here.
+	const selfContainedSpans = [...first.value.matchAll(REVIEW_SPAN_PATTERN)];
+	const searchStart =
+		selfContainedSpans.length > 0
+			? (selfContainedSpans[selfContainedSpans.length - 1]?.index ?? 0) +
+				(selfContainedSpans[selfContainedSpans.length - 1]?.[0]?.length ?? 0)
+			: 0;
+
+	let opening: string | null = null;
+	let openingIndex = -1;
+	for (const candidate of ["{==", "{++", "{--"]) {
+		const idx = first.value.indexOf(candidate, searchStart);
+		if (idx !== -1 && (openingIndex === -1 || idx < openingIndex)) {
+			opening = candidate;
+			openingIndex = idx;
+		}
+	}
 	if (!opening) return null;
-	const openingAtStart = first.value.startsWith(opening);
 
 	const baseType =
 		opening === "{=="
@@ -417,7 +446,7 @@ function reviewSpanFromChildren(children: Content[], index: number) {
 	for (let endIndex = index + 1; endIndex < children.length; endIndex += 1) {
 		const candidate = children[endIndex];
 		if (candidate?.type !== "text") continue;
-		const closeIndex = candidate.value.indexOf(closing);
+		const closeIndex = findUnescaped(candidate.value, closing);
 		if (closeIndex === -1) continue;
 
 		let suffix = candidate.value.slice(closeIndex + closing.length);
@@ -425,13 +454,13 @@ function reviewSpanFromChildren(children: Content[], index: number) {
 		let attrs: Record<string, unknown> = { type };
 		if (baseType === "reviewHighlight") {
 			const comment = suffix.match(
-				/^\{>>([\s\S]*?)<<\}(?:\{#([A-Za-z0-9_-]+)\})?/,
+				/^\{>>((?:\\[\s\S]|(?!<<\})[\s\S])*)<<\}(?:\{#([A-Za-z0-9_-]+)\})?/,
 			);
 			if (comment) {
 				type = "reviewComment";
 				attrs = {
 					type,
-					body: comment[1] ?? "",
+					body: unescapeReviewText(comment[1] ?? ""),
 					id: comment[2] ?? null,
 				};
 				suffix = suffix.slice(comment[0].length);
@@ -444,23 +473,17 @@ function reviewSpanFromChildren(children: Content[], index: number) {
 			}
 		}
 
-		const content: Content[] = openingAtStart
-			? [
-					...(first.value.slice(opening.length)
-						? [
-								{
-									type: "text" as const,
-									value: first.value.slice(opening.length),
-								},
-							]
-						: []),
-					...children.slice(index + 1, endIndex),
-				]
-			: children.slice(index + 1, endIndex);
-		const innerText = candidate.value.slice(0, closeIndex);
+		const remainder = unescapeReviewText(
+			first.value.slice(openingIndex + opening.length),
+		);
+		const content: Content[] = [
+			...(remainder ? [{ type: "text" as const, value: remainder }] : []),
+			...children.slice(index + 1, endIndex).map(unescapeReviewMdastText),
+		];
+		const innerText = unescapeReviewText(candidate.value.slice(0, closeIndex));
 		if (innerText) content.push({ type: "text", value: innerText });
 		return {
-			prefix: openingAtStart ? "" : first.value.slice(0, -opening.length),
+			prefix: first.value.slice(0, openingIndex),
 			content,
 			suffix,
 			endIndex,
@@ -475,26 +498,44 @@ function mergeReviewMetadata(nodes: JSONContent[], value: string | undefined) {
 	const metadata = parseReviewMetadata(value);
 	if (!metadata) return false;
 
+	// A comment span can parse into several text segments (inline code, links),
+	// so apply the metadata to every segment of the preceding comment. Applying
+	// it only to the nearest one makes the attrs diverge, and the span then
+	// renders and serializes as disjoint pieces.
+	let merged = false;
+	let targetId: unknown;
 	for (let index = nodes.length - 1; index >= 0; index -= 1) {
 		const node = nodes[index];
-		if (node.type !== "text") continue;
-		const reviewMarkIndex = node.marks?.findIndex(
-			(mark) =>
-				mark.type === "reviewMark" && mark.attrs?.type === "reviewComment",
-		);
-		if (reviewMarkIndex === undefined || reviewMarkIndex === -1) continue;
+		const reviewMarkIndex =
+			node.type === "text"
+				? node.marks?.findIndex(
+						(mark) =>
+							mark.type === "reviewMark" &&
+							mark.attrs?.type === "reviewComment",
+					)
+				: -1;
+		if (reviewMarkIndex === undefined || reviewMarkIndex === -1) {
+			if (merged) break;
+			continue;
+		}
 
 		const marks = [...(node.marks ?? [])];
 		const mark = marks[reviewMarkIndex];
+		if (!merged) {
+			targetId = mark.attrs?.id;
+		} else if (targetId == null || mark.attrs?.id !== targetId) {
+			break;
+		}
 		marks[reviewMarkIndex] = {
 			...mark,
 			attrs: { ...mark.attrs, ...metadata },
 		};
 		nodes[index] = { ...node, marks };
-		return true;
+		merged = true;
+		if (targetId == null) break;
 	}
 
-	return false;
+	return merged;
 }
 
 function replacementFromGfmDelete(
@@ -513,31 +554,98 @@ function replacementFromGfmDelete(
 		return null;
 	}
 
-	const deletedText = child.children
-		.filter((nested) => nested.type === "text")
-		.map((nested) => nested.value)
-		.join("");
-	const replacement = deletedText.match(/^([\s\S]+?)~>([\s\S]+)$/);
+	const split = splitReplacementChildren(child.children ?? []);
 	const closing = next.value.match(/^\}(?:\{#([A-Za-z0-9_-]+)\})?/);
-	if (!replacement || !closing) return null;
+	if (!split || !closing) return null;
+
+	const attrs = {
+		type: "reviewReplacement",
+		original: split.originalText,
+		id: closing[1] ?? null,
+	};
+	const newContent = inlineToPM(split.newChildren);
+	const nodes = applyMark(
+		newContent.length > 0 ? newContent : [{ type: "text", text: "" }],
+		"reviewMark",
+		attrs,
+	);
 
 	return {
-		node: {
-			type: "text",
-			text: replacement[2],
-			marks: [
-				{
-					type: "reviewMark",
-					attrs: {
-						type: "reviewReplacement",
-						original: replacement[1],
-						id: closing[1] ?? null,
-					},
-				},
-			],
-		},
+		nodes,
 		closeLength: closing[0].length,
 	};
+}
+
+/**
+ * Splits a GFM delete node at `~>`. The pre-arrow side keeps its inline
+ * Markdown as a string attribute; the new side is left for `inlineToPM`.
+ */
+function splitReplacementChildren(children: Content[]) {
+	const originalParts: string[] = [];
+	for (let index = 0; index < children.length; index += 1) {
+		const node = children[index];
+		if (node.type !== "text") {
+			const markdown = inlineMdastNodeToMarkdown(node);
+			if (markdown === null) return null;
+			originalParts.push(unescapeReviewText(markdown));
+			continue;
+		}
+		const arrowIndex = findUnescaped(node.value, "~>");
+		if (arrowIndex === -1) {
+			originalParts.push(node.value);
+			continue;
+		}
+		originalParts.push(unescapeReviewText(node.value.slice(0, arrowIndex)));
+		const after = node.value.slice(arrowIndex + 2);
+		const newChildren: Content[] = [
+			...(after ? [{ type: "text" as const, value: after }] : []),
+			...children.slice(index + 1),
+		];
+		return { originalText: originalParts.join(""), newChildren };
+	}
+	return null;
+}
+
+function inlineMdastNodeToMarkdown(node: Content): string | null {
+	const serializeChildren = (children: Content[]) => {
+		const parts = children.map(inlineMdastNodeToMarkdown);
+		return parts.some((part) => part === null) ? null : parts.join("");
+	};
+
+	switch (node.type) {
+		case "text":
+			return node.value;
+		case "strong": {
+			const content = serializeChildren(node.children);
+			return content === null ? null : `**${content}**`;
+		}
+		case "emphasis": {
+			const content = serializeChildren(node.children);
+			return content === null ? null : `*${content}*`;
+		}
+		case "delete": {
+			const content = serializeChildren(node.children);
+			return content === null ? null : `~~${content}~~`;
+		}
+		case "inlineCode":
+			return `\`${node.value.split("`").join("\\`")}\``;
+		case "link": {
+			const content = serializeChildren(node.children);
+			if (content === null) return null;
+			const title = node.title ? ` "${node.title.split('"').join('\\"')}"` : "";
+			return `[${content}](${node.url}${title})`;
+		}
+		case "image": {
+			const title = node.title ? ` "${node.title.split('"').join('\\"')}"` : "";
+			return `![${node.alt ?? ""}](${node.url}${title})`;
+		}
+		case "break":
+			return "\\\n";
+		case "html":
+			return node.value;
+		default:
+			return null;
+	}
 }
 
 function isHtmlLineBreak(value: string | undefined): boolean {
@@ -546,10 +654,8 @@ function isHtmlLineBreak(value: string | undefined): boolean {
 
 function textToPM(text: string): JSONContent[] {
 	const out: JSONContent[] = [];
-	const reviewPattern =
-		/\{==([\s\S]+?)==\}(?:\{>>([\s\S]*?)<<\})?(?:\{#([A-Za-z0-9_-]+)\})?|\{\+\+([\s\S]+?)\+\+\}(?:\{#([A-Za-z0-9_-]+)\})?|\{--([\s\S]+?)--\}(?:\{#([A-Za-z0-9_-]+)\})?|\{~~([\s\S]+?)~>([\s\S]+?)~~\}(?:\{#([A-Za-z0-9_-]+)\})?/g;
 	const wikiLinkPattern = /\[\[([^\]\n]+)\]\]/g;
-	const matches = [...text.matchAll(reviewPattern)];
+	const matches = [...text.matchAll(REVIEW_SPAN_PATTERN)];
 	if (matches.length > 0) {
 		let lastIndex = 0;
 		for (const match of matches) {
@@ -566,7 +672,7 @@ function textToPM(text: string): JSONContent[] {
 							type: "reviewMark",
 							attrs: {
 								type: "reviewComment",
-								body: commentText,
+								body: unescapeReviewText(commentText),
 								id: commentId,
 							},
 						}
@@ -596,7 +702,12 @@ function textToPM(text: string): JSONContent[] {
 											id: commentId,
 										},
 									};
-			const value = match[1] ?? match[4] ?? match[6] ?? match[9] ?? match[0];
+			if (mark.attrs?.type === "reviewReplacement") {
+				mark.attrs.original = unescapeReviewText(String(mark.attrs.original));
+			}
+			const value = unescapeReviewText(
+				match[1] ?? match[4] ?? match[6] ?? match[9] ?? match[0],
+			);
 			out.push({ type: "text", text: value, marks: [mark] });
 			lastIndex = index + match[0].length;
 		}
@@ -641,6 +752,38 @@ function textToPM(text: string): JSONContent[] {
 		out.push({ type: "text", text: text.slice(lastIndex) });
 	}
 	return out;
+}
+
+function findUnescaped(value: string, delimiter: string): number {
+	let index = value.indexOf(delimiter);
+	while (index !== -1) {
+		let backslashes = 0;
+		for (
+			let cursor = index - 1;
+			cursor >= 0 && value[cursor] === "\\";
+			cursor--
+		) {
+			backslashes += 1;
+		}
+		if (backslashes % 2 === 0) return index;
+		index = value.indexOf(delimiter, index + delimiter.length);
+	}
+	return -1;
+}
+
+function unescapeReviewMdastText(node: Content): Content {
+	if (node.type === "text") {
+		return { ...node, value: unescapeReviewText(node.value) };
+	}
+	if ("children" in node && Array.isArray(node.children)) {
+		return {
+			...node,
+			children: node.children.map((child) =>
+				unescapeReviewMdastText(child as Content),
+			),
+		} as Content;
+	}
+	return node;
 }
 
 function applyMark(

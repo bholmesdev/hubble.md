@@ -25,20 +25,24 @@ export type ReviewMarkAttrs = {
 };
 
 const REVIEW_METADATA_PATTERN = /^<!--\s*hubble-review:([\s\S]*?)-->\s*$/;
+const KNOWN_METADATA_KEYS = new Set(["v", "replies", "resolved"]);
 
 export function serializeReviewMetadata(attrs: ReviewMarkAttrs): string {
 	if (attrs.type !== "reviewComment") return "";
-	if (!attrs.resolved && (!attrs.replies || attrs.replies.length === 0)) {
+	const hasReplies = !!attrs.replies && attrs.replies.length > 0;
+	const hasUnknownMetadata = Object.keys(attrs.metadata ?? {}).some(
+		(key) => !KNOWN_METADATA_KEYS.has(key),
+	);
+	if (!attrs.resolved && !hasReplies && !hasUnknownMetadata) {
 		return "";
 	}
 
-	const metadata = encodeURIComponent(
-		JSON.stringify({
-			...(attrs.metadata ?? {}),
-			replies: attrs.replies ?? [],
-			resolved: attrs.resolved === true,
-		}),
-	);
+	const metadata = JSON.stringify({
+		...(attrs.metadata ?? {}),
+		v: 1,
+		replies: attrs.replies ?? [],
+		resolved: attrs.resolved === true,
+	}).replace(/--/g, "\\u002d\\u002d");
 	return `<!-- hubble-review:${metadata}-->`;
 }
 
@@ -50,13 +54,16 @@ export function parseReviewMetadata(
 	if (!match) return null;
 
 	try {
-		const parsed = JSON.parse(decodeURIComponent(match[1] ?? "")) as Record<
-			string,
-			unknown
-		> & {
+		const payload = match[1] ?? "";
+		let parsed: Record<string, unknown> & {
 			replies?: unknown;
 			resolved?: unknown;
 		};
+		try {
+			parsed = JSON.parse(payload) as typeof parsed;
+		} catch {
+			parsed = JSON.parse(decodeURIComponent(payload)) as typeof parsed;
+		}
 		const replies = Array.isArray(parsed.replies)
 			? parsed.replies.filter(isReviewReply)
 			: [];
@@ -77,9 +84,9 @@ function isReviewReply(value: unknown): value is ReviewReply {
 }
 
 /**
- * The Markdown parser stores review spans as marks so review state can move
- * with the selected text when the document is edited. The DOM attributes are
- * intentionally small; the Markdown serializer remains the source of truth.
+ * Review spans are stored as marks so review state moves with the text as the
+ * document is edited. DOM attributes are kept minimal; the Markdown serializer
+ * is the source of truth.
  */
 export const ReviewMarkExtension = Mark.create({
 	name: "reviewMark",

@@ -4,6 +4,7 @@ import type { Selection } from "@tiptap/pm/state";
 import type { LinkAttrs } from "./Link";
 import { wikiDisplayNameForTarget } from "./markdownPath";
 import { serializeReviewMetadata } from "./ReviewMark";
+import { escapeReviewBody, escapeReviewContent } from "./reviewEscaping";
 
 /**
  * Convert TipTap JSONContent (ProseMirror document) -> Markdown string
@@ -226,14 +227,6 @@ function inlineNodesToMarkdown(nodes: JSONContent[]): string {
 	for (let i = 0; i < nodes.length; ) {
 		const mark = getReviewMark(nodes[i]);
 		if (mark) {
-			if (mark.attrs?.type === "reviewReplacement") {
-				const replacement = nodeToMarkdown(removeMark(nodes[i], mark));
-				result += `{~~${mark.attrs?.original ?? ""}~>${replacement}~~}`;
-				if (mark.attrs?.id) result += `{#${mark.attrs.id}}`;
-				i += 1;
-				continue;
-			}
-
 			let j = i;
 			const grouped: JSONContent[] = [];
 			while (j < nodes.length) {
@@ -242,10 +235,17 @@ function inlineNodesToMarkdown(nodes: JSONContent[]): string {
 				grouped.push(removeMark(nodes[j], mark));
 				j += 1;
 			}
-			const content = inlineNodesToMarkdown(grouped);
+			// Recurse through the shared serializer, not nodeToMarkdown, so
+			// nested marks inside the span still get their delimiters.
+			// Every span's content is escaped, not just the commented one: text
+			// carrying its own closer (`has ++} inside`) would otherwise end the
+			// span early and spill the rest, plus the {#id}, into the document.
+			const content = escapeReviewContent(inlineNodesToMarkdown(grouped));
 			const type = mark.attrs?.type;
-			if (type === "reviewComment") {
-				result += `{==${content}==}{>>${mark.attrs?.body ?? ""}<<}`;
+			if (type === "reviewReplacement") {
+				result += `{~~${escapeReviewContent(mark.attrs?.original)}~>${content}~~}`;
+			} else if (type === "reviewComment") {
+				result += `{==${content}==}{>>${escapeReviewBody(mark.attrs?.body)}<<}`;
 			} else if (type === "reviewInsertion") {
 				result += `{++${content}++}`;
 			} else if (type === "reviewDeletion") {
