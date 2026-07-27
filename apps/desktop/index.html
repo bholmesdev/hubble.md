@@ -6,10 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hubble</title>
     <script>
-      // Apply the theme class before first paint so a cold launch into dark mode
-      // doesn't flash light. The live listener is attached in src/theme.ts.
+      // Apply the theme class before first paint so a cold launch doesn't flash
+      // the wrong scheme. Reads the same persisted key as src/store/persistence.ts;
+      // the live listener is attached in src/theme.ts.
       try {
-        if (matchMedia("(prefers-color-scheme: dark)").matches) {
+        const stored = localStorage.getItem("hubble-desktop-app");
+        const theme = stored ? JSON.parse(stored).settings?.theme : null;
+        if (
+          theme === "dark" ||
+          (theme !== "light" &&
+            matchMedia("(prefers-color-scheme: dark)").matches)
+        ) {
           document.documentElement.classList.add("dark");
         }
       } catch {}

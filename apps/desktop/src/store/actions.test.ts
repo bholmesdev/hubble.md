@@ -12,6 +12,7 @@ type MockDesktopApi = {
 	pathExists: ReturnType<typeof vi.fn>;
 	openPathFromLink: ReturnType<typeof vi.fn>;
 	openPathInDefaultApp: ReturnType<typeof vi.fn>;
+	setThemeSource: ReturnType<typeof vi.fn>;
 };
 
 function createDesktopApi(): MockDesktopApi {
@@ -27,6 +28,7 @@ function createDesktopApi(): MockDesktopApi {
 		pathExists: vi.fn(async () => false),
 		openPathFromLink: vi.fn(async () => ({ kind: "opened" })),
 		openPathInDefaultApp: vi.fn(async () => {}),
+		setThemeSource: vi.fn(async () => {}),
 	};
 }
 
@@ -74,6 +76,25 @@ describe("desktop savePathContent", () => {
 		expect(localStorage.setItem).toHaveBeenLastCalledWith(
 			STORAGE_KEY,
 			expect.stringContaining('"chatCommand":"codex exec"'),
+		);
+	});
+
+	it("mirrors the theme preference to the native theme source", async () => {
+		const api = createDesktopApi();
+		const classList = { toggle: vi.fn() };
+		vi.stubGlobal("document", { documentElement: { classList } });
+		const { setThemePreference, themePreferenceStore } =
+			await loadStoreActions(api);
+		const { STORAGE_KEY } = await import("./persistence");
+
+		expect(themePreferenceStore.get()).toBe("system");
+		setThemePreference("dark");
+
+		expect(classList.toggle).toHaveBeenLastCalledWith("dark", true);
+		expect(api.setThemeSource).toHaveBeenLastCalledWith("dark");
+		expect(localStorage.setItem).toHaveBeenLastCalledWith(
+			STORAGE_KEY,
+			expect.stringContaining('"theme":"dark"'),
 		);
 	});
 

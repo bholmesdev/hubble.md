@@ -75,6 +75,19 @@ describe("theme", () => {
 		expect(document.documentElement.classList.contains("dark")).toBe(true);
 	});
 
+	it("drops the previous OS listener when re-initialized", () => {
+		const first = mockMatchMedia(false);
+		initTheme("system");
+		const second = mockMatchMedia(false);
+		initTheme("system");
+
+		first.emit(true);
+		expect(document.documentElement.classList.contains("dark")).toBe(false);
+
+		second.emit(true);
+		expect(document.documentElement.classList.contains("dark")).toBe(true);
+	});
+
 	it("ignores OS changes when the preference is explicit", () => {
 		const { emit } = mockMatchMedia(false);
 		initTheme("dark");

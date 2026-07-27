@@ -34,6 +34,7 @@ import {
 } from "../lib/markdownLinkRewrite";
 import {
 	setThemePreference as applyThemePreference,
+	initTheme,
 	type ThemePreference,
 } from "../theme";
 import {
@@ -438,9 +439,22 @@ export function setLastSeenVersion(version: string) {
 	lastSeenVersionStore.set(version);
 }
 
+/**
+ * Applies the saved preference at boot. The `.dark` class only covers the
+ * renderer, so main mirrors the preference into `nativeTheme.themeSource` for
+ * the `prefers-color-scheme` consumers we don't control: native window chrome
+ * and sandboxed HTML apps.
+ */
+export function initThemePreference() {
+	const preference = themePreferenceStore.get();
+	initTheme(preference);
+	void desktopApi.setThemeSource(preference);
+}
+
 export function setThemePreference(preference: ThemePreference) {
 	themePreferenceStore.set(preference);
 	applyThemePreference(preference);
+	void desktopApi.setThemeSource(preference);
 }
 
 export function requestChatAboutNote() {

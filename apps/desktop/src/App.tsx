@@ -658,6 +658,7 @@ function GeneralSettingsSection() {
 		</SettingsSection>
 	);
 }
+
 function CodeFilesSettingsSection() {
 	const mode = useStoreValue(codeFileOpenModeStore);
 	return (

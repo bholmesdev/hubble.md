@@ -89,6 +89,8 @@ const desktopApi = {
 	getLaunchFilePath: () => ipcRenderer.invoke("desktop:get-launch-file-path"),
 	getLaunchWorkspacePath: () =>
 		ipcRenderer.invoke("desktop:get-launch-workspace-path"),
+	setThemeSource: (source) =>
+		ipcRenderer.invoke("desktop:set-theme-source", { source }),
 	setMenuState: (state) => ipcRenderer.invoke("desktop:set-menu-state", state),
 	getUpdateState: () => ipcRenderer.invoke("desktop:get-update-state"),
 	getTelemetryConsent: () =>

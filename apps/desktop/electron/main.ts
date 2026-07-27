@@ -46,6 +46,7 @@ import {
 	SEARCH_MAX_RESULT_FILES,
 	SEARCH_MIN_QUERY_LENGTH,
 } from "../src/lib/searchContent";
+import type { ThemePreference } from "../src/theme";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
 import {
@@ -102,8 +103,11 @@ const updateCheckErrorMessage =
 // Check every 4 hours after the initial packaged-app update check.
 const updateCheckIntervalMs = 4 * 60 * 60 * 1000;
 
-// Follow the OS appearance. The renderer mirrors this to a `.dark` class so the
-// class-based Tailwind dark variant and `.dark { … }` token block activate.
+// Follow the OS appearance until the renderer reports the saved preference. The
+// renderer mirrors this to a `.dark` class so the class-based Tailwind dark
+// variant and `.dark { … }` token block activate, while `themeSource` covers the
+// `prefers-color-scheme` consumers we don't control: native window chrome and
+// sandboxed HTML apps.
 nativeTheme.themeSource = "system";
 
 // Windows/Linux draw the min/max/close buttons as a native overlay whose colors
@@ -1810,6 +1814,14 @@ function registerIpc() {
 		}
 		autoUpdater.quitAndInstall(false, true);
 	});
+
+	ipcMain.handle(
+		"desktop:set-theme-source",
+		(_event, { source }: { source: ThemePreference }) => {
+			nativeTheme.themeSource =
+				source === "light" || source === "dark" ? source : "system";
+		},
+	);
 
 	ipcMain.handle("desktop:set-menu-state", (_event, state: MenuState) => {
 		menuState = {

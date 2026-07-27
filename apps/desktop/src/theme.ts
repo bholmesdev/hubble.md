@@ -16,12 +16,18 @@ export function setThemePreference(preference: ThemePreference): void {
 	applyTheme();
 }
 
+let detachSystemListener: (() => void) | null = null;
+
 export function initTheme(preference: ThemePreference): void {
+	// Replace any prior listener so a re-init (HMR) doesn't stack handlers.
+	detachSystemListener?.();
 	const query = window.matchMedia("(prefers-color-scheme: dark)");
-	systemPrefersDark = query.matches;
-	setThemePreference(preference);
-	query.addEventListener("change", (event) => {
+	const onChange = (event: MediaQueryListEvent) => {
 		systemPrefersDark = event.matches;
 		applyTheme();
-	});
+	};
+	query.addEventListener("change", onChange);
+	detachSystemListener = () => query.removeEventListener("change", onChange);
+	systemPrefersDark = query.matches;
+	setThemePreference(preference);
 }
