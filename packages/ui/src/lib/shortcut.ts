@@ -1,3 +1,4 @@
+import { type CommandId, getCommand } from "@hubble.md/editor";
 import { isMac } from "keymatch";
 
 // macOS renders modifiers as adjacent glyphs (⌘⌥R); Windows/Linux use
@@ -54,4 +55,8 @@ export function formatShortcut(spec: string): string {
 		return part.length === 1 ? part.toUpperCase() : part;
 	});
 	return mac ? rendered.join("") : rendered.join("+");
+}
+
+export function formatCommandShortcut(id: CommandId): string {
+	return formatShortcut(getCommand(id).defaultBinding);
 }

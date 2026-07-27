@@ -52,7 +52,7 @@ export {
 	type ResizePointerContext,
 	useResizeSeparator,
 } from "./hooks/useResizeSeparator";
-export { formatShortcut } from "./lib/shortcut";
+export { formatCommandShortcut, formatShortcut } from "./lib/shortcut";
 export { Button, buttonVariants } from "./primitives/button";
 export { Input } from "./primitives/input";
 export { Modal } from "./primitives/modal";

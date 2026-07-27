@@ -1,4 +1,16 @@
 export { ContextMenuSpellcheckExtension } from "./ContextMenuSpellcheckExtension";
+export {
+	type AppCommandId,
+	appCommandIds,
+	type CommandContext,
+	type CommandDefinition,
+	type CommandId,
+	commandRegistry,
+	type EditorCommandId,
+	editorCommandIds,
+	getCommand,
+	tiptapBinding,
+} from "./commandRegistry";
 export { FakeSelectionExtension } from "./FakeSelectionExtension";
 export {
 	FindExtension,
@@ -66,7 +78,6 @@ export {
 	RichTextClipboardExtension,
 } from "./RichTextClipboardExtension";
 export { StoredMarksDecorationExtension } from "./StoredMarksDecorationExtension";
-export { StrikethroughShortcutExtension } from "./StrikethroughShortcutExtension";
 export {
 	isSelectionAtStartOfNode,
 	nearestSharedParentOfType,

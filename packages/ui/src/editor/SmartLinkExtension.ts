@@ -57,11 +57,6 @@ export const SmartLinkExtension = Extension.create({
 			toggleLinkAtSelection: toggleLinkAtSelection(),
 		};
 	},
-	addKeyboardShortcuts() {
-		return {
-			"Mod-k": () => this.editor.commands.toggleLinkAtSelection(),
-		};
-	},
 	addProseMirrorPlugins() {
 		return [
 			new Plugin({

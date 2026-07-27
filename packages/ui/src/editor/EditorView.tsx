@@ -13,7 +13,6 @@ import {
 	ReviewMarkExtension,
 	RichTextClipboardExtension,
 	resetEditorHistory,
-	StrikethroughShortcutExtension,
 	tiptapDocToMarkdown,
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
@@ -45,6 +44,13 @@ import { SmartLinkExtension } from "./SmartLinkExtension";
 import { TableCellSelectionExtension } from "./TableCellSelectionExtension";
 import { VirtualCursor } from "./VirtualCursor";
 import "./EditorView.css";
+import {
+	EditorCommandShortcuts,
+	RegistryBlockquote,
+	RegistryBold,
+	RegistryHeading,
+	RegistryItalic,
+} from "./EditorCommandShortcuts";
 import {
 	FilePropertiesPanel,
 	frontMatterStateFromMarkdown,
@@ -159,7 +165,19 @@ export function EditorView({
 	const editor = useEditor({
 		editable,
 		extensions: [
-			StarterKit.configure({ code: false, codeBlock: false, listItem: false }),
+			StarterKit.configure({
+				blockquote: false,
+				bold: false,
+				code: false,
+				codeBlock: false,
+				heading: false,
+				italic: false,
+				listItem: false,
+			}),
+			RegistryBlockquote,
+			RegistryBold,
+			RegistryHeading,
+			RegistryItalic,
 			InlineCodeExtension,
 			HubbleCodeBlock,
 			LinkExtension,
@@ -177,7 +195,7 @@ export function EditorView({
 			HeadingExtension,
 			MarkdownRolloverExtension,
 			ReviewMarkExtension,
-			StrikethroughShortcutExtension,
+			EditorCommandShortcuts,
 			...listExtensions,
 			...extensions,
 			TaskItem.configure({ nested: true }),

@@ -206,9 +206,8 @@ export const ListToggleExtension = Extension.create({
 
 	addKeyboardShortcuts() {
 		return {
-			"Mod-Shift-7": () => this.editor.commands.toggleParentOrderedList(),
-			"Mod-Shift-8": () => this.editor.commands.toggleParentBulletList(),
-			"Mod-Shift-9": () => this.editor.commands.toggleParentTaskList(),
+			// Structural overrides stay fixed: their behavior depends on selection
+			// context rather than representing user-invoked commands.
 			Backspace: ({ editor }) => {
 				if (isSelectionAtStartOfNode(editor.view.state.selection)) {
 					return editor.commands.liftListItem("listItem");

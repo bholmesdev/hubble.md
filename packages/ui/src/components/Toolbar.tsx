@@ -9,7 +9,7 @@ import {
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteLayoutLeftLine from "~icons/mingcute/layout-left-line";
 import { fileNameFromPath } from "../lib/filePath";
-import { formatShortcut } from "../lib/shortcut";
+import { formatCommandShortcut } from "../lib/shortcut";
 import { Button } from "../primitives/button";
 
 const START_INSET = isMac() ? "var(--hubble-traffic-light-inset, 70px)" : "8px";
@@ -144,7 +144,7 @@ export function Toolbar({
 						className="relative"
 						onClick={onToggleSidebar}
 						aria-label="Toggle sidebar"
-						title={`Toggle sidebar (${formatShortcut("CmdOrCtrl+Shift+E")})`}
+						title={`Toggle sidebar (${formatCommandShortcut("app.toggle-sidebar")})`}
 					>
 						<MingcuteLayoutLeftLine className="size-4" />
 						{sidebarBadge ? (
@@ -205,7 +205,7 @@ export function NewNoteButton({ onClick }: { onClick: () => void }) {
 			size="icon-sm"
 			onClick={onClick}
 			aria-label="New Markdown File"
-			title={`New Markdown File (${formatShortcut("CmdOrCtrl+N")})`}
+			title={`New Markdown File (${formatCommandShortcut("app.new-file")})`}
 		>
 			<MingcuteAddLine className="size-4" />
 		</Button>
