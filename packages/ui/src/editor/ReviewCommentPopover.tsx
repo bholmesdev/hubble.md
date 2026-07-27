@@ -11,36 +11,35 @@ import type { Editor } from "@tiptap/core";
 import type { Mark } from "@tiptap/pm/model";
 import { TextSelection, type Transaction } from "@tiptap/pm/state";
 import {
-	type CSSProperties,
 	type RefObject,
-	useCallback,
 	useEffect,
 	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
 import MingcuteArrowUpLine from "~icons/mingcute/arrow-up-line";
-import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDelete2Line from "~icons/mingcute/delete-2-line";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
+import { ReviewCommentGutter, useLayoutChange } from "./ReviewCommentGutter";
 import {
 	buildReviewAgentPrompt,
+	copyAgentPrompt,
 	deleteComment,
+	REVIEW_THREAD_COMMAND_EVENT,
 	type ReviewComment,
+	type ReviewThread,
+	type ReviewThreadCommand,
 	setCommentResolved,
+	toReviewThread,
 	updateComment,
 } from "./reviewComments";
 
 type AnchorRange = { from: number; to: number };
 type PopoverMode = "new" | "thread";
-
-// How far the gutter hover zone reaches back into the text. Its outer edge is
-// the viewport edge, so the whole margin counts as gutter.
-const GUTTER_HOVER_TEXT_BUFFER_PX = 96;
 
 function formatRelativeTime(iso: string | undefined) {
 	if (!iso) return null;
@@ -87,7 +86,9 @@ function CommentComposer({
 		if (!el || !form || !send) return;
 		// Measure with a canvas rather than the live element, so the answer
 		// doesn't depend on the layout currently applied and oscillate.
-		measureRef.current ??= document.createElement("canvas");
+		if (!measureRef.current) {
+			measureRef.current = document.createElement("canvas");
+		}
 		const context = measureRef.current.getContext("2d");
 		if (!context) return;
 		const style = getComputedStyle(el);
@@ -197,20 +198,6 @@ function commentAtPosition(comments: ReviewComment[], position: number) {
 	);
 }
 
-/** The innermost textblock containing `pos`, for anchoring the hover "add
- * comment" button to the whole block. Code blocks are excluded: CriticMarkup
- * wrapping their content would corrupt the code (see docs/review-comments.md). */
-function textblockRangeAt(editor: Editor, pos: number): AnchorRange | null {
-	const $pos = editor.state.doc.resolve(pos);
-	for (let depth = $pos.depth; depth >= 0; depth -= 1) {
-		const node = $pos.node(depth);
-		if (!node.isTextblock) continue;
-		if (node.type.name === "codeBlock") return null;
-		return { from: $pos.start(depth), to: $pos.end(depth) };
-	}
-	return null;
-}
-
 /** All review concepts share one mark type, so commenting over an existing
  * insertion/deletion/replacement/highlight would silently replace it. Refuse
  * instead. An id-less comment mark counts as a conflict too: collectComments
@@ -284,20 +271,17 @@ export function ReviewCommentPopover({
 	filePath,
 	viewportRef,
 	request,
-	openRequest,
 	onMessage,
-	onCommentsChange,
+	onThreadsChange,
 }: {
 	editor: Editor | null;
 	filePath: string;
 	viewportRef: RefObject<HTMLDivElement | null>;
 	request: number;
-	/** Bumped by the status bar summary to open one thread by id. */
-	openRequest?: { id: string; nonce: number };
 	onMessage?: (message: string, type: "success" | "error") => void;
-	/** Publishes the document's threads so the status bar can summarize them
-	 * without walking the document a second time on every transaction. */
-	onCommentsChange?: (comments: ReviewComment[]) => void;
+	/** Publishes the document's threads as plain data, so the toolbar can list
+	 * them without walking the document again or holding the editor. */
+	onThreadsChange?: (threads: ReviewThread[]) => void;
 }) {
 	const [comments, setComments] = useState<ReviewComment[]>([]);
 	const [activeComment, setActiveComment] = useState<ReviewComment | null>(
@@ -312,70 +296,45 @@ export function ReviewCommentPopover({
 	const [popoverEl, setPopoverEl] = useState<HTMLDivElement | null>(null);
 	const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 	const requestRef = useRef(0);
-	const openRequestRef = useRef(0);
-	const [layoutRevision, setLayoutRevision] = useState(0);
-	const [hoveredBlock, setHoveredBlock] = useState<AnchorRange | null>(null);
-	// Kept mounted and faded via opacity rather than conditionally rendered, so
-	// the button fades out from its last position instead of vanishing.
-	const lastHoverButtonTopRef = useRef<number | null>(null);
 
-	const refreshComments = useCallback(
-		(event?: {
-			transaction: Transaction;
-			appendedTransactions: Transaction[];
-		}) => {
-			if (!editor) return;
-			const nextComments = collectComments(editor);
-			setComments(nextComments);
-			onCommentsChange?.(nextComments);
-			setActiveComment((current) => {
-				if (!current) return null;
-				let { from, to } = current;
-				for (const transaction of event
-					? [event.transaction, ...event.appendedTransactions]
-					: []) {
-					from = transaction.mapping.map(from, 1);
-					to = transaction.mapping.map(to, -1);
-				}
-				return (
-					nextComments.find(
-						(comment) =>
-							comment.id === current.id &&
-							comment.from === from &&
-							comment.to === to,
-					) ?? null
-				);
-			});
-		},
-		[editor, onCommentsChange],
-	);
+	const refreshComments = (event?: {
+		transaction: Transaction;
+		appendedTransactions: Transaction[];
+	}) => {
+		if (!editor) return;
+		const nextComments = collectComments(editor);
+		setComments(nextComments);
+		onThreadsChange?.(nextComments.map((c) => toReviewThread(editor, c)));
+		setActiveComment((current) => {
+			if (!current) return null;
+			let { from, to } = current;
+			for (const transaction of event
+				? [event.transaction, ...event.appendedTransactions]
+				: []) {
+				from = transaction.mapping.map(from, 1);
+				to = transaction.mapping.map(to, -1);
+			}
+			return (
+				nextComments.find(
+					(comment) =>
+						comment.id === current.id &&
+						comment.from === from &&
+						comment.to === to,
+				) ?? null
+			);
+		});
+	};
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	useEffect(() => {
 		if (!editor) return;
 		refreshComments();
 		editor.on("transaction", refreshComments);
 		return () => {
 			editor.off("transaction", refreshComments);
-			onCommentsChange?.([]);
+			onThreadsChange?.([]);
 		};
-	}, [editor, onCommentsChange, refreshComments]);
-
-	// Reserve gutter space so badges never sit on top of text. Forces a
-	// remeasure before paint so badge positions, computed in render from live
-	// layout, reflect the reflow. Keyed on comment count only: toggling this
-	// per hover would reflow text mid-hover and cause jitter.
-	useLayoutEffect(() => {
-		const viewport = viewportRef.current;
-		if (!viewport) return;
-		const hasComments = comments.length > 0;
-		const changed = viewport.hasAttribute("data-review-gutter") !== hasComments;
-		viewport.toggleAttribute("data-review-gutter", hasComments);
-		if (changed) {
-			void viewport.offsetHeight;
-			setLayoutRevision((value) => value + 1);
-		}
-		return () => viewport.removeAttribute("data-review-gutter");
-	}, [comments.length, viewportRef]);
+	}, [editor, onThreadsChange]);
 
 	useEffect(() => {
 		if (open && mode === "thread" && !activeComment) {
@@ -395,30 +354,15 @@ export function ReviewCommentPopover({
 		);
 	}, [activeComment, mode]);
 
-	useEffect(() => {
-		const viewport = viewportRef.current;
-		const refreshLayout = () => setLayoutRevision((value) => value + 1);
-		viewport?.addEventListener("scroll", refreshLayout, { passive: true });
-		window.addEventListener("resize", refreshLayout);
-		// Dragging a sidebar/panel splitter resizes the viewport via CSS layout
-		// alone, without firing a window resize event, so watch the element too.
-		const resizeObserver = viewport ? new ResizeObserver(refreshLayout) : null;
-		if (viewport) resizeObserver?.observe(viewport);
-		return () => {
-			viewport?.removeEventListener("scroll", refreshLayout);
-			window.removeEventListener("resize", refreshLayout);
-			resizeObserver?.disconnect();
-		};
-	}, [viewportRef]);
-
-	const openThread = useCallback((comment: ReviewComment) => {
+	const openThread = (comment: ReviewComment) => {
 		setActiveComment(comment);
 		setAnchorRange({ from: comment.from, to: comment.to });
 		setMode("thread");
 		setOpen(true);
 		setReplyDraft("");
-	}, []);
+	};
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	useEffect(() => {
 		if (!editor) return;
 		const handleClick = (event: MouseEvent) => {
@@ -434,131 +378,86 @@ export function ReviewCommentPopover({
 		};
 		editor.view.dom.addEventListener("click", handleClick);
 		return () => editor.view.dom.removeEventListener("click", handleClick);
-	}, [comments, editor, openThread]);
+	}, [comments, editor]);
 
 	// Shared by both entry points into the composer: the toolbar's Comment
 	// button (via `request`, below) and the hover gutter button, which has no
 	// text selection to anchor from.
-	const startNewCommentAt = useCallback(
-		(range: AnchorRange) => {
-			if (!editor) return;
-			const existing = comments.find(
-				(comment) => comment.from < range.to && range.from < comment.to,
-			);
-			if (existing) {
-				openThread(existing);
-				return;
-			}
-			if (findConflictingReviewMark(editor, range)) {
-				onMessage?.("Can't comment on an existing suggestion", "error");
-				return;
-			}
-			setActiveComment(null);
-			setAnchorRange(range);
-			setMode("new");
-			setDraft("");
-			setOpen(true);
-		},
-		[comments, editor, onMessage, openThread],
-	);
+	const startNewCommentAt = (range: AnchorRange) => {
+		if (!editor) return;
+		const existing = comments.find(
+			(comment) => comment.from < range.to && range.from < comment.to,
+		);
+		if (existing) {
+			openThread(existing);
+			return;
+		}
+		if (findConflictingReviewMark(editor, range)) {
+			onMessage?.("Can't comment on an existing suggestion", "error");
+			return;
+		}
+		setActiveComment(null);
+		setAnchorRange(range);
+		setMode("new");
+		setDraft("");
+		setOpen(true);
+	};
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	useEffect(() => {
 		if (!editor || request === 0 || requestRef.current === request) return;
 		requestRef.current = request;
 		const { selection } = editor.state;
 		if (!(selection instanceof TextSelection) || selection.empty) return;
 		startNewCommentAt({ from: selection.from, to: selection.to });
-	}, [editor, request, startNewCommentAt]);
+	}, [editor, request]);
 
-	// Opening a thread from the status bar summary can target a comment that is
-	// scrolled out of view, so put the caret on it and scroll before opening.
-	useEffect(() => {
-		if (
-			!editor ||
-			!openRequest ||
-			openRequestRef.current === openRequest.nonce
-		) {
-			return;
-		}
-		openRequestRef.current = openRequest.nonce;
-		const comment = comments.find((entry) => entry.id === openRequest.id);
-		if (!comment) return;
-		editor.view.dispatch(
-			editor.state.tr
-				.setSelection(TextSelection.create(editor.state.doc, comment.from))
-				.scrollIntoView(),
-		);
-		openThread(comment);
-	}, [comments, editor, openRequest, openThread]);
-
-	// Track which block the pointer is over so the gutter "add comment" button
-	// can be shown for it without requiring a text selection first.
-	useEffect(() => {
-		if (open) setHoveredBlock(null);
-	}, [open]);
-
+	// Commands arrive from the toolbar's list, which knows ids but not positions.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	useEffect(() => {
 		if (!editor) return;
-		const viewport = viewportRef.current;
-		if (!viewport) return;
-		const clearHover = () => setHoveredBlock(null);
-		const updateHover = (event: MouseEvent) => {
-			if (open || !editor.state.selection.empty) {
-				clearHover();
+		const handleCommand = (event: Event) => {
+			const { kind, id } = (event as CustomEvent<ReviewThreadCommand>).detail;
+			const comment = comments.find((entry) => entry.id === id);
+			if (!comment) return;
+			if (kind === "toggleResolved") {
+				setCommentResolved(editor, comment, comment.attrs.resolved !== true);
 				return;
 			}
-			const contentRect = editor.view.dom.getBoundingClientRect();
-			if (
-				event.clientY < contentRect.top ||
-				event.clientY > contentRect.bottom
-			) {
-				clearHover();
+			if (kind === "delete") {
+				deleteComment(editor, comment);
 				return;
 			}
-			// Trigger the hoverable comment button near the gutter only
-			const viewportRect = viewport.getBoundingClientRect();
-			const paddingInlineEnd =
-				Number.parseFloat(getComputedStyle(editor.view.dom).paddingInlineEnd) ||
-				0;
-			const textInlineEnd = contentRect.right - paddingInlineEnd;
-			if (
-				event.clientX < textInlineEnd - GUTTER_HOVER_TEXT_BUFFER_PX ||
-				event.clientX > viewportRect.right
-			) {
-				clearHover();
-				return;
-			}
-			const coords = editor.view.posAtCoords({
-				// Probe just inside the text box. ProseMirror cannot resolve a
-				// document position from the editor element's inline padding.
-				left: Math.min(event.clientX, textInlineEnd - 1),
-				top: event.clientY,
-			});
-			if (!coords) {
-				clearHover();
-				return;
-			}
-			const range = textblockRangeAt(editor, coords.pos);
-			setHoveredBlock((current) =>
-				range && current?.from === range.from && current?.to === range.to
-					? current
-					: range,
+			// The target is often off screen. Scroll the viewport directly rather
+			// than leaning on the transaction's scrollIntoView, which does the
+			// minimum move and would leave the thread against the bottom edge with
+			// its popover clipped. A third from the top leaves room for the popover.
+			editor.view.dispatch(
+				editor.state.tr.setSelection(
+					TextSelection.create(editor.state.doc, comment.from),
+				),
 			);
+			const viewport = viewportRef.current;
+			if (viewport) {
+				const coords = editor.view.coordsAtPos(comment.from);
+				const bounds = viewport.getBoundingClientRect();
+				viewport.scrollTo({
+					top: Math.max(
+						0,
+						viewport.scrollTop + (coords.top - bounds.top) - bounds.height / 3,
+					),
+				});
+			}
+			openThread(comment);
 		};
-		viewport.addEventListener("mousemove", updateHover);
-		viewport.addEventListener("mouseleave", clearHover);
-		viewport.addEventListener("scroll", clearHover, { passive: true });
-		return () => {
-			viewport.removeEventListener("mousemove", updateHover);
-			viewport.removeEventListener("mouseleave", clearHover);
-			viewport.removeEventListener("scroll", clearHover);
-		};
-	}, [editor, open, viewportRef]);
+		window.addEventListener(REVIEW_THREAD_COMMAND_EVENT, handleCommand);
+		return () =>
+			window.removeEventListener(REVIEW_THREAD_COMMAND_EVENT, handleCommand);
+	}, [comments, editor, viewportRef]);
 
-	useLayoutEffect(() => {
-		// The revision invalidates the position when the editor viewport scrolls;
-		// the thread and drafts do the same when new content grows the popover.
-		void layoutRevision;
+	// Anchored to the comment's live screen position, so it follows both the
+	// content growing under it and the viewport moving beneath it.
+	const reposition = () => {
 		void activeComment;
 		void draft;
 		void replyDraft;
@@ -587,17 +486,10 @@ export function ReviewCommentPopover({
 				}),
 			],
 		}).then(({ x, y }) => setPosition({ x, y }));
-	}, [
-		activeComment,
-		anchorRange,
-		draft,
-		editor,
-		layoutRevision,
-		open,
-		popoverEl,
-		replyDraft,
-		viewportRef,
-	]);
+	};
+	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
+	useLayoutEffect(reposition, [reposition]);
+	useLayoutChange(viewportRef, reposition);
 
 	// Only the new-comment composer grabs focus; opening an existing thread
 	// leaves the editor focused.
@@ -609,11 +501,12 @@ export function ReviewCommentPopover({
 		return () => window.cancelAnimationFrame(frame);
 	}, [mode, open]);
 
-	const close = useCallback(() => {
+	const close = () => {
 		setOpen(false);
 		setActiveComment(null);
-	}, []);
+	};
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	useEffect(() => {
 		if (!open) return;
 		const handlePointerDown = (event: PointerEvent) => {
@@ -639,9 +532,9 @@ export function ReviewCommentPopover({
 			document.removeEventListener("pointerdown", handlePointerDown);
 			document.removeEventListener("keydown", handleKeyDown);
 		};
-	}, [close, editor, open, popoverEl]);
+	}, [editor, open, popoverEl]);
 
-	const addComment = useCallback(() => {
+	const addComment = () => {
 		if (!editor || !anchorRange || !draft.trim()) return;
 		const markType = editor.state.schema.marks.reviewMark;
 		if (!markType) return;
@@ -674,9 +567,9 @@ export function ReviewCommentPopover({
 		// No toast: the thread appearing in place is its own confirmation.
 		setMode("thread");
 		setDraft("");
-	}, [anchorRange, close, draft, editor, onMessage]);
+	};
 
-	const addReply = useCallback(() => {
+	const addReply = () => {
 		if (!editor || !activeComment || !replyDraft.trim()) return;
 		const reply: ReviewReply = {
 			id: nextReplyId(activeComment.attrs.replies),
@@ -692,9 +585,9 @@ export function ReviewCommentPopover({
 		setActiveComment({ ...activeComment, attrs });
 		setReplyDraft("");
 		onMessage?.("Reply added", "success");
-	}, [activeComment, editor, onMessage, replyDraft]);
+	};
 
-	const toggleResolved = useCallback(() => {
+	const toggleResolved = () => {
 		if (!editor || !activeComment) return;
 		const attrs = setCommentResolved(
 			editor,
@@ -702,145 +595,34 @@ export function ReviewCommentPopover({
 			!activeComment.attrs.resolved,
 		);
 		setActiveComment({ ...activeComment, attrs });
-	}, [activeComment, editor]);
+	};
 
-	const removeComment = useCallback(() => {
+	const removeComment = () => {
 		if (!editor || !activeComment) return;
 		deleteComment(editor, activeComment);
 		close();
-	}, [activeComment, close, editor]);
+	};
 
-	const copyAgentPrompt = useCallback(async () => {
-		if (!editor || !activeComment) return;
-		const prompt = buildReviewAgentPrompt({
-			filePath,
-			commentId: activeComment.id,
-		});
-		try {
-			await navigator.clipboard.writeText(prompt);
-			onMessage?.("Agent prompt copied", "success");
-		} catch {
-			onMessage?.("Could not copy agent prompt", "error");
-		}
-	}, [activeComment, editor, filePath, onMessage]);
+	const copyThreadPrompt = () => {
+		if (!activeComment) return;
+		void copyAgentPrompt(
+			buildReviewAgentPrompt({ filePath, commentId: activeComment.id }),
+			onMessage,
+		);
+	};
 
 	if (!editor) return null;
 
-	// Indicators live in the gutter beside the content column so they never
-	// overlap text. Comments sharing a line collapse into one badge whose count
-	// totals that line's thread messages.
-	type GutterBadge = {
-		comment: ReviewComment;
-		count: number;
-		resolved: boolean;
-		blockStart: number;
-	};
-	const badges = new Map<number, GutterBadge>();
-	let gutterInlineEnd = 0;
-	let hoverButtonTop: number | null = null;
-	const viewport = viewportRef.current;
-	if (viewport) {
-		const viewportRect = viewport.getBoundingClientRect();
-		const contentEl = editor.view.dom;
-		// Right-align badges just inside the content column's end padding so they
-		// stay visible even when the window is narrower than the column.
-		gutterInlineEnd =
-			viewport.clientWidth -
-			(contentEl.getBoundingClientRect().right -
-				viewportRect.left +
-				viewport.scrollLeft) +
-			4;
-		// Centers a 20px gutter control on the line starting at `pos`.
-		const gutterTopAt = (pos: number) => {
-			const coords = editor.view.coordsAtPos(pos);
-			return {
-				lineKey: Math.round(coords.top),
-				top:
-					coords.top -
-					viewportRect.top +
-					viewport.scrollTop +
-					(coords.bottom - coords.top - 20) / 2,
-			};
-		};
-		for (const comment of comments) {
-			const { lineKey, top } = gutterTopAt(comment.from);
-			const count = 1 + (comment.attrs.replies?.length ?? 0);
-			const existing = badges.get(lineKey);
-			if (existing) {
-				existing.count += count;
-				existing.resolved =
-					existing.resolved && comment.attrs.resolved === true;
-			} else {
-				badges.set(lineKey, {
-					comment,
-					count,
-					resolved: comment.attrs.resolved === true,
-					blockStart: top,
-				});
-			}
-		}
-		if (hoveredBlock && !open) {
-			const { lineKey, top } = gutterTopAt(hoveredBlock.from);
-			// A block that already has a comment badge on its first line keeps
-			// just that one gutter affordance instead of stacking a second icon.
-			if (!badges.has(lineKey)) hoverButtonTop = top;
-		}
-	}
-	if (hoverButtonTop !== null) lastHoverButtonTopRef.current = hoverButtonTop;
-	const hoverButtonPosition = lastHoverButtonTopRef.current;
-
 	return (
 		<>
-			<div className="pointer-events-none absolute inset-0 z-[3]">
-				{[...badges.values()].map((badge) => (
-					<button
-						key={`${badge.comment.id}:${badge.comment.from}`}
-						type="button"
-						aria-label={`Open comment ${badge.comment.id}`}
-						data-review-comment-anchor
-						title={badge.resolved ? "Resolved comment" : "Open comments"}
-						className={cn(
-							"pointer-events-auto absolute flex h-5 items-center gap-1 rounded-md px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-							badge.resolved && "opacity-50",
-						)}
-						style={
-							{
-								insetInlineEnd: `${gutterInlineEnd}px`,
-								insetBlockStart: `${badge.blockStart}px`,
-							} satisfies CSSProperties
-						}
-						onMouseDown={(event) => event.preventDefault()}
-						onClick={() => openThread(badge.comment)}
-					>
-						<MingcuteChat3Line className="size-3.5" />
-						{badge.count}
-					</button>
-				))}
-				{hoverButtonPosition !== null && (
-					<button
-						type="button"
-						aria-label="Add comment"
-						data-review-comment-anchor
-						title="Add comment"
-						className={cn(
-							"absolute flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity duration-150 hover:bg-muted hover:text-foreground",
-							hoverButtonTop !== null
-								? "pointer-events-auto opacity-100"
-								: "pointer-events-none",
-						)}
-						style={
-							{
-								insetInlineEnd: `${gutterInlineEnd}px`,
-								insetBlockStart: `${hoverButtonPosition}px`,
-							} satisfies CSSProperties
-						}
-						onMouseDown={(event) => event.preventDefault()}
-						onClick={() => hoveredBlock && startNewCommentAt(hoveredBlock)}
-					>
-						<MingcuteChat3Line className="size-3.5" />
-					</button>
-				)}
-			</div>
+			<ReviewCommentGutter
+				editor={editor}
+				viewportRef={viewportRef}
+				comments={comments}
+				popoverOpen={open}
+				onOpenThread={openThread}
+				onAddComment={startNewCommentAt}
+			/>
 			{open && anchorRange && (mode === "new" || activeComment) && (
 				<div
 					ref={setPopoverEl}
@@ -902,7 +684,7 @@ export function ReviewCommentPopover({
 											data-review-copy-agent-prompt
 											aria-label="Copy agent prompt"
 											title="Copy a prompt asking an agent to address this comment"
-											onClick={() => void copyAgentPrompt()}
+											onClick={copyThreadPrompt}
 										>
 											<MingcuteCopy2Line />
 										</Button>

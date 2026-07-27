@@ -9,6 +9,7 @@ import { act, createElement, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReviewCommentPopover } from "./ReviewCommentPopover";
+import { commandReviewThread } from "./reviewComments";
 
 type Root = {
 	render(children: ReactNode): void;
@@ -131,7 +132,7 @@ describe("ReviewCommentPopover", () => {
 		);
 	});
 
-	it("publishes threads and opens one on request from the status bar", async () => {
+	it("publishes threads and acts on one by id", async () => {
 		const editor = new Editor({
 			element: document.createElement("div"),
 			extensions: [StarterKit, ReviewMarkExtension],
@@ -144,19 +145,37 @@ describe("ReviewCommentPopover", () => {
 		const viewport = document.createElement("div");
 		viewport.append(editor.view.dom);
 		document.body.append(viewport);
-		const onCommentsChange = vi.fn();
-		const render = renderPopover(editor, viewport, { onCommentsChange });
+		const onThreadsChange = vi.fn();
+		renderPopover(editor, viewport, { onThreadsChange });
 
-		expect(onCommentsChange).toHaveBeenCalled();
-		const published = onCommentsChange.mock.lastCall?.[0] as { id: string }[];
-		expect(published.map((comment) => comment.id)).toEqual(["c1", "c2"]);
+		// Published as plain data, so the toolbar never touches the editor.
+		expect(onThreadsChange).toHaveBeenCalled();
+		expect(onThreadsChange.mock.lastCall?.[0]).toEqual([
+			{ id: "c1", anchor: "first", body: "Note one", resolved: false },
+			{ id: "c2", anchor: "second", body: "Note two", resolved: false },
+		]);
+
+		// Opening scrolls the target into view: the list can name a thread that is
+		// nowhere near the current scroll position.
+		const scrollTo = vi.fn();
+		viewport.scrollTo = scrollTo;
+		await act(async () => {
+			commandReviewThread("open", "c2");
+		});
+		expect(
+			document.querySelector("[data-review-comment-popover]")?.textContent,
+		).toContain("Note two");
+		expect(scrollTo).toHaveBeenCalled();
 
 		await act(async () => {
-			render({ openRequest: { id: "c2", nonce: 1 } });
+			commandReviewThread("toggleResolved", "c1");
 		});
+		expect(reviewMarkAtText(editor, "first")?.attrs.resolved).toBe(true);
 
-		const popover = document.querySelector("[data-review-comment-popover]");
-		expect(popover?.textContent).toContain("Note two");
+		await act(async () => {
+			commandReviewThread("delete", "c2");
+		});
+		expect(reviewMarkAtText(editor, "second")).toBeUndefined();
 	});
 
 	it("deletes only the clicked occurrence when an id is reused", async () => {
