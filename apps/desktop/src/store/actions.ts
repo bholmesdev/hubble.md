@@ -33,6 +33,10 @@ import {
 	rewriteMovedLinks,
 } from "../lib/markdownLinkRewrite";
 import {
+	setThemePreference as applyThemePreference,
+	type ThemePreference,
+} from "../theme";
+import {
 	activeHistory,
 	canGoBack,
 	canGoForward,
@@ -64,6 +68,7 @@ import {
 	type SortMode,
 	sidebarOpenStore,
 	switcherOpenStore,
+	themePreferenceStore,
 	uiStore,
 	type ViewMode,
 	viewerStore,
@@ -431,6 +436,11 @@ export async function openPathInDefaultApp(path: string) {
 
 export function setLastSeenVersion(version: string) {
 	lastSeenVersionStore.set(version);
+}
+
+export function setThemePreference(preference: ThemePreference) {
+	themePreferenceStore.set(preference);
+	applyThemePreference(preference);
 }
 
 export function requestChatAboutNote() {

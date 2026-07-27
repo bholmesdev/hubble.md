@@ -1,11 +1,27 @@
-/**
- * Keeps the `dark` class on `<html>` in sync with the OS color scheme.
- */
-export function initSystemTheme(): void {
+export type ThemePreference = "light" | "dark" | "system";
+
+let systemPrefersDark = false;
+let themePreference: ThemePreference = "system";
+
+function applyTheme(): void {
+	document.documentElement.classList.toggle(
+		"dark",
+		themePreference === "dark" ||
+			(themePreference === "system" && systemPrefersDark),
+	);
+}
+
+export function setThemePreference(preference: ThemePreference): void {
+	themePreference = preference;
+	applyTheme();
+}
+
+export function initTheme(preference: ThemePreference): void {
 	const query = window.matchMedia("(prefers-color-scheme: dark)");
-	const apply = (isDark: boolean) => {
-		document.documentElement.classList.toggle("dark", isDark);
-	};
-	apply(query.matches);
-	query.addEventListener("change", (event) => apply(event.matches));
+	systemPrefersDark = query.matches;
+	setThemePreference(preference);
+	query.addEventListener("change", (event) => {
+		systemPrefersDark = event.matches;
+		applyTheme();
+	});
 }

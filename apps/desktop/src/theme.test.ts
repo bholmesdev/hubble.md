@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { initSystemTheme } from "./theme";
+import { initTheme, setThemePreference } from "./theme";
 
 type ChangeListener = (event: { matches: boolean }) => void;
 
 /**
  * Stubs `matchMedia` with a controllable MediaQueryList so a test can flip the
- * OS appearance via `emit()` and assert how `initSystemTheme` reacts.
+ * OS appearance via `emit()` and assert how the theme controller reacts.
  */
 function mockMatchMedia(initialMatches: boolean) {
 	let matches = initialMatches;
@@ -40,22 +40,22 @@ afterEach(() => {
 	document.documentElement.classList.remove("dark");
 });
 
-describe("initSystemTheme", () => {
+describe("theme", () => {
 	it("adds the dark class when the OS prefers dark", () => {
 		mockMatchMedia(true);
-		initSystemTheme();
+		initTheme("system");
 		expect(document.documentElement.classList.contains("dark")).toBe(true);
 	});
 
 	it("leaves the dark class off when the OS prefers light", () => {
 		mockMatchMedia(false);
-		initSystemTheme();
+		initTheme("system");
 		expect(document.documentElement.classList.contains("dark")).toBe(false);
 	});
 
 	it("reacts to the OS switching appearance at runtime", () => {
 		const { emit } = mockMatchMedia(false);
-		initSystemTheme();
+		initTheme("system");
 		expect(document.documentElement.classList.contains("dark")).toBe(false);
 
 		emit(true);
@@ -63,5 +63,24 @@ describe("initSystemTheme", () => {
 
 		emit(false);
 		expect(document.documentElement.classList.contains("dark")).toBe(false);
+	});
+
+	it("applies explicit light and dark preferences", () => {
+		const { emit } = mockMatchMedia(true);
+		initTheme("light");
+		expect(document.documentElement.classList.contains("dark")).toBe(false);
+
+		emit(false);
+		setThemePreference("dark");
+		expect(document.documentElement.classList.contains("dark")).toBe(true);
+	});
+
+	it("ignores OS changes when the preference is explicit", () => {
+		const { emit } = mockMatchMedia(false);
+		initTheme("dark");
+
+		emit(true);
+		emit(false);
+		expect(document.documentElement.classList.contains("dark")).toBe(true);
 	});
 });
