@@ -1,6 +1,7 @@
 import { Schema } from "@tiptap/pm/model";
+import { EditorState } from "@tiptap/pm/state";
 import { describe, expect, it } from "vitest";
-import { findMatches } from "./FindExtension";
+import { findMatches, replaceFindMatches } from "./FindExtension";
 
 const schema = new Schema({
 	nodes: {
@@ -61,3 +62,34 @@ describe("findMatches", () => {
 		expect(findMatches(doc, "")).toEqual([]);
 	});
 });
+
+describe("replacement commands", () => {
+	it("replaces one match", () => {
+		const state = createState("Alpha beta alpha alpha");
+		const matches = findMatches(state.doc, "alpha");
+		const tr = replaceFindMatches(state.tr, [matches[1]], "gamma");
+
+		expect(tr.doc.textContent).toBe("Alpha beta gamma alpha");
+		expect(findMatches(tr.doc, "alpha")).toEqual([
+			{ from: 1, to: 6 },
+			{ from: 18, to: 23 },
+		]);
+	});
+
+	it("replaces every match in one transaction", () => {
+		const state = createState("Alpha beta alpha");
+		const matches = findMatches(state.doc, "alpha");
+		const tr = replaceFindMatches(state.tr, matches, "gamma");
+
+		expect(tr.doc.textContent).toBe("gamma beta gamma");
+		expect(findMatches(tr.doc, "alpha")).toEqual([]);
+	});
+});
+
+function createState(content: string) {
+	return EditorState.create({
+		doc: schema.node("doc", null, [
+			schema.node("paragraph", null, schema.text(content)),
+		]),
+	});
+}
