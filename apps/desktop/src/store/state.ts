@@ -1,3 +1,4 @@
+import type { ReviewThread } from "@hubble.md/ui";
 import { store } from "@simplestack/store";
 import type { FileAction } from "../externalFileChange";
 import type { FileKind } from "../lib/filePath";
@@ -163,6 +164,9 @@ export const historyStore = store<HistoryState>({
 	byWorkspace: {},
 	isNavigating: false,
 });
+
+// Derived from the open document, so it stays out of the persisted app store
+export const reviewThreadsStore = store<ReviewThread[]>([]);
 
 export const workspaceStore = appStore.select("workspace");
 export const viewerStore = appStore.select("document");

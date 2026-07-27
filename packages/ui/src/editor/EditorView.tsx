@@ -4,11 +4,13 @@ import {
 	FakeSelectionExtension,
 	FindExtension,
 	HeadingExtension,
+	InlineCodeExtension,
 	LinkExtension,
 	listExtensions,
 	MarkdownRolloverExtension,
 	markdownToTiptapDoc,
 	parseMarkdownFrontMatter,
+	ReviewMarkExtension,
 	RichTextClipboardExtension,
 	StrikethroughShortcutExtension,
 	tiptapDocToMarkdown,
@@ -49,6 +51,8 @@ import {
 import { FindBar } from "./FindBar";
 import { FormatCommandMenu } from "./FormatCommandMenu";
 import { FormattingStatusBar } from "./FormattingStatusBar";
+import { ReviewCommentPopover } from "./ReviewCommentPopover";
+import type { ReviewThread } from "./reviewComments";
 import { SelectionFormattingToolbar } from "./SelectionFormattingToolbar";
 import type { VirtualCursorMode } from "./virtualCursorMode";
 
@@ -78,6 +82,9 @@ export type EditorViewProps = {
 	onOpenExternalLink: (href: string) => void | Promise<void>;
 	onOpenWikiLink: (target: string) => void | Promise<void>;
 	onMessage?: (message: string, type: "success" | "error") => void;
+	/** Review threads in the open document, republished on every edit, so an
+	 * app can list them in its own chrome. */
+	onReviewThreadsChange?: (threads: ReviewThread[]) => void;
 };
 
 export function EditorView({
@@ -97,6 +104,7 @@ export function EditorView({
 	onOpenExternalLink,
 	onOpenWikiLink,
 	onMessage,
+	onReviewThreadsChange,
 }: EditorViewProps) {
 	const initialFrontMatter = parseMarkdownFrontMatter(initialMarkdown);
 	const initialFrontMatterRaw =
@@ -116,6 +124,7 @@ export function EditorView({
 		useState<HTMLDivElement | null>(null);
 	const [cursorModeOverride, setCursorModeOverride] =
 		useState<VirtualCursorMode | null>(null);
+	const [reviewCommentRequest, setReviewCommentRequest] = useState(0);
 	const [frontMatterState, setFrontMatterState] = useState(() =>
 		frontMatterStateFromMarkdown(initialMarkdown),
 	);
@@ -149,7 +158,8 @@ export function EditorView({
 	const editor = useEditor({
 		editable,
 		extensions: [
-			StarterKit.configure({ codeBlock: false, listItem: false }),
+			StarterKit.configure({ code: false, codeBlock: false, listItem: false }),
+			InlineCodeExtension,
 			HubbleCodeBlock,
 			LinkExtension,
 			RichTextClipboardExtension,
@@ -165,6 +175,7 @@ export function EditorView({
 			FindExtension,
 			HeadingExtension,
 			MarkdownRolloverExtension,
+			ReviewMarkExtension,
 			StrikethroughShortcutExtension,
 			...listExtensions,
 			...extensions,
@@ -327,6 +338,15 @@ export function EditorView({
 						<SelectionFormattingToolbar
 							editor={editor}
 							viewportRef={editorViewportRef}
+							onComment={() => setReviewCommentRequest((value) => value + 1)}
+						/>
+						<ReviewCommentPopover
+							editor={editor}
+							filePath={path}
+							viewportRef={editorViewportRef}
+							request={reviewCommentRequest}
+							onMessage={onMessage}
+							onThreadsChange={onReviewThreadsChange}
 						/>
 						<FormatCommandMenu
 							editor={editor}

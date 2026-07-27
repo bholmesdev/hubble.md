@@ -110,9 +110,32 @@ describe("SelectionFormattingToolbar", () => {
 		window.removeEventListener("keydown", consumeEscape, true);
 		expect(toolbar.hasAttribute("data-open")).toBe(true);
 	});
+
+	it("offers a comment action when the editor provides one", async () => {
+		const editor = createEditor(docWithParagraph("hello world"));
+		const viewport = document.createElement("div");
+		viewport.append(editor.view.dom);
+		document.body.append(viewport);
+		const onComment = vi.fn();
+
+		selectText(editor, 1, 6);
+		renderToolbar(editor, viewport, onComment);
+		await waitForToolbarToShow();
+
+		const button = document.querySelector('[aria-label="Comment"]');
+		expect(button).toBeInstanceOf(HTMLButtonElement);
+		await act(async () => {
+			(button as HTMLButtonElement).click();
+		});
+		expect(onComment).toHaveBeenCalledOnce();
+	});
 });
 
-function renderToolbar(editor: Editor, viewport: HTMLDivElement) {
+function renderToolbar(
+	editor: Editor,
+	viewport: HTMLDivElement,
+	onComment?: () => void,
+) {
 	const rootEl = document.createElement("div");
 	viewport.append(rootEl);
 	const root = createRoot(rootEl);
@@ -122,6 +145,7 @@ function renderToolbar(editor: Editor, viewport: HTMLDivElement) {
 			<SelectionFormattingToolbar
 				editor={editor}
 				viewportRef={{ current: viewport }}
+				onComment={onComment}
 			/>,
 		);
 	});

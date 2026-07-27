@@ -11,6 +11,8 @@ import remarkParse from "remark-parse";
 import { type Plugin, unified } from "unified";
 import { visit } from "unist-util-visit";
 import { wikiDisplayNameForTarget } from "./markdownPath";
+import { parseReviewMetadata } from "./ReviewMark";
+import { unescapeReviewText } from "./reviewEscaping";
 
 // Convert Markdown (string) -> TipTap JSONContent (ProseMirror document)
 export function markdownToTiptapDoc(markdown: string): JSONContent {
@@ -304,7 +306,41 @@ function htmlToEmbed(raw: string | undefined): JSONContent | null {
 
 function inlineToPM(children: Content[]): JSONContent[] {
 	const out: JSONContent[] = [];
-	for (const child of children ?? []) {
+	const items = [...(children ?? [])];
+	for (let index = 0; index < items.length; index += 1) {
+		const child = items[index];
+		const reviewSpan = reviewSpanFromChildren(items, index);
+		if (reviewSpan) {
+			if (reviewSpan.prefix) out.push(...textToPM(reviewSpan.prefix));
+			const content = inlineToPM(reviewSpan.content);
+			out.push(...applyMark(content, "reviewMark", reviewSpan.attrs));
+			if (reviewSpan.suffix) {
+				items.splice(reviewSpan.endIndex + 1, 0, {
+					type: "text",
+					value: reviewSpan.suffix,
+				});
+			}
+			index = reviewSpan.endIndex;
+			continue;
+		}
+
+		const replacement = replacementFromGfmDelete(
+			items[index + 1],
+			child,
+			items[index + 2],
+		);
+		if (replacement) {
+			const next = items[index + 2];
+			if (child.type === "text")
+				out.push(...textToPM(child.value.slice(0, -1)));
+			out.push(...replacement.nodes);
+			if (next?.type === "text") {
+				out.push(...textToPM(next.value.slice(replacement.closeLength)));
+			}
+			index += 2;
+			continue;
+		}
+
 		switch (child.type) {
 			case "text":
 				if (child.value && child.value.length > 0) {
@@ -348,6 +384,9 @@ function inlineToPM(children: Content[]): JSONContent[] {
 				if (child.alt) out.push({ type: "text", text: child.alt });
 				break;
 			case "html":
+				if (mergeReviewMetadata(out, child.value)) {
+					break;
+				}
 				if (isHtmlLineBreak(child.value)) {
 					out.push({ type: "hardBreak" });
 				} else if (child.value) {
@@ -362,6 +401,242 @@ function inlineToPM(children: Content[]): JSONContent[] {
 	return out;
 }
 
+const REVIEW_SPAN_PATTERN =
+	/\{==((?:\\[\s\S]|(?!==\})[\s\S])+?)==\}(?:\{>>((?:\\[\s\S]|(?!<<\})[\s\S])*)<<\})?(?:\{#([A-Za-z0-9_-]+)\})?|\{\+\+([\s\S]+?)\+\+\}(?:\{#([A-Za-z0-9_-]+)\})?|\{--([\s\S]+?)--\}(?:\{#([A-Za-z0-9_-]+)\})?|\{~~((?:\\[\s\S]|(?!~>)[\s\S])+?)~>([\s\S]+?)~~\}(?:\{#([A-Za-z0-9_-]+)\})?/g;
+
+function reviewSpanFromChildren(children: Content[], index: number) {
+	const first = children[index];
+	if (first?.type !== "text") return null;
+
+	const selfContainedSpans = [...first.value.matchAll(REVIEW_SPAN_PATTERN)];
+	const searchStart =
+		selfContainedSpans.length > 0
+			? (selfContainedSpans[selfContainedSpans.length - 1]?.index ?? 0) +
+				(selfContainedSpans[selfContainedSpans.length - 1]?.[0]?.length ?? 0)
+			: 0;
+
+	let opening: string | null = null;
+	let openingIndex = -1;
+	for (const candidate of ["{==", "{++", "{--"]) {
+		const idx = first.value.indexOf(candidate, searchStart);
+		if (idx !== -1 && (openingIndex === -1 || idx < openingIndex)) {
+			opening = candidate;
+			openingIndex = idx;
+		}
+	}
+	if (!opening) return null;
+
+	const baseType =
+		opening === "{=="
+			? "reviewHighlight"
+			: opening === "{++"
+				? "reviewInsertion"
+				: "reviewDeletion";
+	const closing = opening === "{==" ? "==}" : opening === "{++" ? "++}" : "--}";
+
+	for (let endIndex = index + 1; endIndex < children.length; endIndex += 1) {
+		const candidate = children[endIndex];
+		if (candidate?.type !== "text") continue;
+		const closeIndex = findUnescaped(candidate.value, closing);
+		if (closeIndex === -1) continue;
+
+		let suffix = candidate.value.slice(closeIndex + closing.length);
+		let type = baseType;
+		let attrs: Record<string, unknown> = { type };
+		if (baseType === "reviewHighlight") {
+			// A highlight followed by a body is a comment, so `{==anchor==}` alone
+			// stays a highlight while `{==anchor==}{>>body<<}{#c1}` becomes one.
+			const comment = suffix.match(
+				/^\{>>((?:\\[\s\S]|(?!<<\})[\s\S])*)<<\}(?:\{#([A-Za-z0-9_-]+)\})?/,
+			);
+			if (comment) {
+				type = "reviewComment";
+				attrs = {
+					type,
+					body: unescapeReviewText(comment[1] ?? ""),
+					id: comment[2] ?? null,
+				};
+				suffix = suffix.slice(comment[0].length);
+			}
+		} else {
+			const id = suffix.match(/^\{#([A-Za-z0-9_-]+)\}/);
+			if (id) {
+				attrs = { type, id: id[1] };
+				suffix = suffix.slice(id[0].length);
+			}
+		}
+
+		const remainder = unescapeReviewText(
+			first.value.slice(openingIndex + opening.length),
+		);
+		const content: Content[] = [
+			...(remainder ? [{ type: "text" as const, value: remainder }] : []),
+			...children.slice(index + 1, endIndex).map(unescapeReviewMdastText),
+		];
+		const innerText = unescapeReviewText(candidate.value.slice(0, closeIndex));
+		if (innerText) content.push({ type: "text", value: innerText });
+		return {
+			prefix: first.value.slice(0, openingIndex),
+			content,
+			suffix,
+			endIndex,
+			attrs,
+		};
+	}
+
+	return null;
+}
+
+function mergeReviewMetadata(nodes: JSONContent[], value: string | undefined) {
+	const metadata = parseReviewMetadata(value);
+	if (!metadata) return false;
+
+	let merged = false;
+	let targetId: unknown;
+	for (let index = nodes.length - 1; index >= 0; index -= 1) {
+		const node = nodes[index];
+		const reviewMarkIndex =
+			node.type === "text"
+				? node.marks?.findIndex(
+						(mark) =>
+							mark.type === "reviewMark" &&
+							mark.attrs?.type === "reviewComment",
+					)
+				: -1;
+		if (reviewMarkIndex === undefined || reviewMarkIndex === -1) {
+			if (merged) break;
+			continue;
+		}
+
+		const marks = [...(node.marks ?? [])];
+		const mark = marks[reviewMarkIndex];
+		if (!merged) {
+			targetId = mark.attrs?.id;
+		} else if (targetId == null || mark.attrs?.id !== targetId) {
+			break;
+		}
+		marks[reviewMarkIndex] = {
+			...mark,
+			attrs: { ...mark.attrs, ...metadata },
+		};
+		nodes[index] = { ...node, marks };
+		merged = true;
+		if (targetId == null) break;
+	}
+
+	return merged;
+}
+
+function replacementFromGfmDelete(
+	child: Content | undefined,
+	previous: Content | undefined,
+	next: Content | undefined,
+) {
+	// remark-gfm parses the `~~...~~` inside a CriticMarkup replacement as a
+	// delete node, so recover the surrounding braces before normal inline parsing.
+	if (
+		child?.type !== "delete" ||
+		previous?.type !== "text" ||
+		next?.type !== "text" ||
+		!previous.value.endsWith("{")
+	) {
+		return null;
+	}
+
+	const split = splitReplacementChildren(child.children ?? []);
+	const closing = next.value.match(/^\}(?:\{#([A-Za-z0-9_-]+)\})?/);
+	if (!split || !closing) return null;
+
+	const attrs = {
+		type: "reviewReplacement",
+		original: split.originalText,
+		id: closing[1] ?? null,
+	};
+	const newContent = inlineToPM(split.newChildren);
+	const nodes = applyMark(
+		newContent.length > 0 ? newContent : [{ type: "text", text: "" }],
+		"reviewMark",
+		attrs,
+	);
+
+	return {
+		nodes,
+		closeLength: closing[0].length,
+	};
+}
+
+/**
+ * Splits a GFM delete node at `~>`. The pre-arrow side keeps its inline
+ * Markdown as a string attribute; the new side is left for `inlineToPM`.
+ */
+function splitReplacementChildren(children: Content[]) {
+	const originalParts: string[] = [];
+	for (let index = 0; index < children.length; index += 1) {
+		const node = children[index];
+		if (node.type !== "text") {
+			const markdown = inlineMdastNodeToMarkdown(node);
+			if (markdown === null) return null;
+			originalParts.push(unescapeReviewText(markdown));
+			continue;
+		}
+		const arrowIndex = findUnescaped(node.value, "~>");
+		if (arrowIndex === -1) {
+			originalParts.push(node.value);
+			continue;
+		}
+		originalParts.push(unescapeReviewText(node.value.slice(0, arrowIndex)));
+		const after = node.value.slice(arrowIndex + 2);
+		const newChildren: Content[] = [
+			...(after ? [{ type: "text" as const, value: after }] : []),
+			...children.slice(index + 1),
+		];
+		return { originalText: originalParts.join(""), newChildren };
+	}
+	return null;
+}
+
+function inlineMdastNodeToMarkdown(node: Content): string | null {
+	const serializeChildren = (children: Content[]) => {
+		const parts = children.map(inlineMdastNodeToMarkdown);
+		return parts.some((part) => part === null) ? null : parts.join("");
+	};
+
+	switch (node.type) {
+		case "text":
+			return node.value;
+		case "strong": {
+			const content = serializeChildren(node.children);
+			return content === null ? null : `**${content}**`;
+		}
+		case "emphasis": {
+			const content = serializeChildren(node.children);
+			return content === null ? null : `*${content}*`;
+		}
+		case "delete": {
+			const content = serializeChildren(node.children);
+			return content === null ? null : `~~${content}~~`;
+		}
+		case "inlineCode":
+			return `\`${node.value.split("`").join("\\`")}\``;
+		case "link": {
+			const content = serializeChildren(node.children);
+			if (content === null) return null;
+			const title = node.title ? ` "${node.title.split('"').join('\\"')}"` : "";
+			return `[${content}](${node.url}${title})`;
+		}
+		case "image": {
+			const title = node.title ? ` "${node.title.split('"').join('\\"')}"` : "";
+			return `![${node.alt ?? ""}](${node.url}${title})`;
+		}
+		case "break":
+			return "\\\n";
+		case "html":
+			return node.value;
+		default:
+			return null;
+	}
+}
+
 function isHtmlLineBreak(value: string | undefined): boolean {
 	return typeof value === "string" && /^<br\s*\/?>$/i.test(value.trim());
 }
@@ -369,6 +644,68 @@ function isHtmlLineBreak(value: string | undefined): boolean {
 function textToPM(text: string): JSONContent[] {
 	const out: JSONContent[] = [];
 	const wikiLinkPattern = /\[\[([^\]\n]+)\]\]/g;
+	const matches = [...text.matchAll(REVIEW_SPAN_PATTERN)];
+	if (matches.length > 0) {
+		let lastIndex = 0;
+		for (const match of matches) {
+			const index = match.index ?? 0;
+			if (index > lastIndex) {
+				out.push(...textToPM(text.slice(lastIndex, index)));
+			}
+
+			const commentText = match[2];
+			const commentId = match[3] ?? match[5] ?? match[7] ?? match[10] ?? null;
+			const mark =
+				commentText !== undefined
+					? {
+							type: "reviewMark",
+							attrs: {
+								type: "reviewComment",
+								body: unescapeReviewText(commentText),
+								id: commentId,
+							},
+						}
+					: match[1] !== undefined
+						? {
+								type: "reviewMark",
+								attrs: {
+									type: "reviewHighlight",
+									id: commentId,
+								},
+							}
+						: match[4] !== undefined
+							? {
+									type: "reviewMark",
+									attrs: { type: "reviewInsertion", id: commentId },
+								}
+							: match[6] !== undefined
+								? {
+										type: "reviewMark",
+										attrs: { type: "reviewDeletion", id: commentId },
+									}
+								: {
+										type: "reviewMark",
+										attrs: {
+											type: "reviewReplacement",
+											original: match[8] ?? "",
+											id: commentId,
+										},
+									};
+			if (mark.attrs?.type === "reviewReplacement") {
+				mark.attrs.original = unescapeReviewText(String(mark.attrs.original));
+			}
+			const value = unescapeReviewText(
+				match[1] ?? match[4] ?? match[6] ?? match[9] ?? match[0],
+			);
+			out.push({ type: "text", text: value, marks: [mark] });
+			lastIndex = index + match[0].length;
+		}
+		if (lastIndex < text.length) {
+			out.push(...textToPM(text.slice(lastIndex)));
+		}
+		return out;
+	}
+
 	let lastIndex = 0;
 	for (const match of text.matchAll(wikiLinkPattern)) {
 		const index = match.index ?? 0;
@@ -406,9 +743,41 @@ function textToPM(text: string): JSONContent[] {
 	return out;
 }
 
+function findUnescaped(value: string, delimiter: string): number {
+	let index = value.indexOf(delimiter);
+	while (index !== -1) {
+		let backslashes = 0;
+		for (
+			let cursor = index - 1;
+			cursor >= 0 && value[cursor] === "\\";
+			cursor--
+		) {
+			backslashes += 1;
+		}
+		if (backslashes % 2 === 0) return index;
+		index = value.indexOf(delimiter, index + delimiter.length);
+	}
+	return -1;
+}
+
+function unescapeReviewMdastText(node: Content): Content {
+	if (node.type === "text") {
+		return { ...node, value: unescapeReviewText(node.value) };
+	}
+	if ("children" in node && Array.isArray(node.children)) {
+		return {
+			...node,
+			children: node.children.map((child) =>
+				unescapeReviewMdastText(child as Content),
+			),
+		} as Content;
+	}
+	return node;
+}
+
 function applyMark(
 	nodes: JSONContent[],
-	markType: "bold" | "italic" | "strike" | "link",
+	markType: "bold" | "italic" | "strike" | "link" | "reviewMark",
 	attrs?: Record<string, unknown>,
 ): JSONContent[] {
 	return nodes.map((n) => {
