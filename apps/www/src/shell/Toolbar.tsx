@@ -1,10 +1,11 @@
 import {
+	commandReviewThread,
 	NewNoteButton,
-	ReviewCommentSlot,
+	ReviewCommentSummary,
 	Toolbar as SharedToolbar,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { currentPathStore } from "../store/state";
+import { currentPathStore, reviewThreadsStore } from "../store/state";
 
 type Props = {
 	onNewNote: () => void;
@@ -12,6 +13,7 @@ type Props = {
 
 export function Toolbar({ onNewNote }: Props) {
 	const currentPath = useStoreValue(currentPathStore);
+	const reviewThreads = useStoreValue(reviewThreadsStore);
 
 	return (
 		<SharedToolbar
@@ -20,7 +22,13 @@ export function Toolbar({ onNewNote }: Props) {
 			platformInset={false}
 			rightSlot={
 				<div className="flex items-center gap-1">
-					<ReviewCommentSlot />
+					{currentPath && (
+						<ReviewCommentSummary
+							filePath={currentPath}
+							threads={reviewThreads}
+							onCommand={commandReviewThread}
+						/>
+					)}
 					<NewNoteButton onClick={onNewNote} />
 				</div>
 			}

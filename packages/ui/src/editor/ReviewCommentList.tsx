@@ -3,7 +3,6 @@
 // The grid pattern is here for its keyboard model (one tab stop, arrows inside),
 // and table markup would fight every bit of the layout to get there.
 
-import type { Editor } from "@tiptap/core";
 import {
 	type ReactNode,
 	useCallback,
@@ -19,14 +18,14 @@ import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 import {
 	buildReviewAgentPrompt,
-	deleteComment,
-	type ReviewComment,
-	setCommentResolved,
+	copyAgentPrompt,
+	type ReviewThread,
+	type ReviewThreadCommand,
 } from "./reviewComments";
 
-// Open, resolve, copy, delete. Left/Right walks these; the order matches the
-// thread popover's header so the two surfaces build the same muscle memory.
-const COLUMNS = 4;
+/** Open, resolve, copy, delete. Left/Right walks these in the same order the
+ * thread popover shows them. */
+const LAST_COLUMN = 3;
 
 type Cell = { row: number; col: number };
 
@@ -40,40 +39,37 @@ function GridCell({ children }: { children: ReactNode }) {
 	);
 }
 
-/** The list is one composite widget rather than four tab stops per row: Tab
- * enters it once and moves on to the footer, arrows do the rest. */
+/** One composite widget rather than four tab stops per row: Tab enters it once
+ * and moves on, arrows do the rest. */
 export function ReviewCommentList({
-	editor,
 	filePath,
-	comments,
-	onOpenComment,
+	threads,
+	onCommand,
 	onMessage,
 }: {
-	editor: Editor;
 	filePath: string;
-	comments: ReviewComment[];
-	onOpenComment: (commentId: string) => void;
+	threads: ReviewThread[];
+	onCommand: (kind: ReviewThreadCommand["kind"], id: string) => void;
 	onMessage?: (message: string, type: "success" | "error") => void;
 }) {
 	const listRef = useRef<HTMLDivElement>(null);
 	const [cell, setCell] = useState<Cell>({ row: 0, col: 0 });
 	const [navigating, setNavigating] = useState(false);
 
-	// Resolving on the Unresolved tab drops the row out from under the caret, so
-	// hold the position and let it fall to the new last row.
-	const row = Math.min(cell.row, Math.max(0, comments.length - 1));
+	// Resolving drops the row out from under the caret on the Unresolved tab.
+	const row = Math.min(cell.row, Math.max(0, threads.length - 1));
 
 	useEffect(() => {
-		if (!navigating || comments.length === 0) return;
+		if (!navigating || threads.length === 0) return;
 		const target = listRef.current?.querySelector<HTMLElement>(
 			`[data-row="${row}"][data-col="${cell.col}"]`,
 		);
 		if (target && target !== document.activeElement) target.focus();
-	}, [cell.col, comments.length, navigating, row]);
+	}, [cell.col, threads.length, navigating, row]);
 
 	const onKeyDown = useCallback(
 		(event: React.KeyboardEvent) => {
-			const last = comments.length - 1;
+			const last = threads.length - 1;
 			const col = cell.col;
 			const next: Cell | undefined = {
 				ArrowDown: { row: row + 1, col },
@@ -88,10 +84,10 @@ export function ReviewCommentList({
 			setNavigating(true);
 			setCell({
 				row: clamp(next.row, last),
-				col: clamp(next.col, COLUMNS - 1),
+				col: clamp(next.col, LAST_COLUMN),
 			});
 		},
-		[cell.col, comments.length, row],
+		[cell.col, threads.length, row],
 	);
 
 	return (
@@ -99,11 +95,11 @@ export function ReviewCommentList({
 			ref={listRef}
 			role="grid"
 			aria-label="Comments"
-			aria-rowcount={comments.length}
+			aria-rowcount={threads.length}
 			className="max-h-72 space-y-1 overflow-y-auto p-1"
 			onKeyDown={onKeyDown}
 			onFocus={(event) => {
-				// Clicking a cell should also move the roving position there.
+				// Clicking a cell moves the roving position there too.
 				const target = event.target as HTMLElement;
 				const at = target.dataset.row;
 				if (at !== undefined) {
@@ -112,21 +108,20 @@ export function ReviewCommentList({
 				setNavigating(true);
 			}}
 			onBlur={(event) => {
-				// A null relatedTarget means the focused row was just removed; keep
-				// navigating so the effect can put focus back in the list.
+				// A null relatedTarget means the focused row was just removed; stay
+				// navigating so the effect can put focus back.
 				const next = event.relatedTarget as Node | null;
 				if (next && !listRef.current?.contains(next)) setNavigating(false);
 			}}
 		>
-			{comments.map((comment, index) => (
+			{threads.map((thread, index) => (
 				<Row
-					key={`${comment.id}:${comment.from}`}
-					editor={editor}
+					key={thread.id}
 					filePath={filePath}
-					comment={comment}
+					thread={thread}
 					index={index}
 					focusedCol={index === row ? cell.col : null}
-					onOpenComment={onOpenComment}
+					onCommand={onCommand}
 					onMessage={onMessage}
 				/>
 			))}
@@ -135,26 +130,23 @@ export function ReviewCommentList({
 }
 
 function Row({
-	editor,
 	filePath,
-	comment,
+	thread,
 	index,
 	focusedCol,
-	onOpenComment,
+	onCommand,
 	onMessage,
 }: {
-	editor: Editor;
 	filePath: string;
-	comment: ReviewComment;
+	thread: ReviewThread;
 	index: number;
 	/** Which column holds the single tab stop, when this is the active row. */
 	focusedCol: number | null;
-	onOpenComment: (commentId: string) => void;
+	onCommand: (kind: ReviewThreadCommand["kind"], id: string) => void;
 	onMessage?: (message: string, type: "success" | "error") => void;
 }) {
-	const resolved = comment.attrs.resolved === true;
+	const resolved = thread.resolved;
 
-	/** Identifies a control to the grid's roving tabindex. */
 	const cell = (col: number) => ({
 		"data-row": index,
 		"data-col": col,
@@ -167,17 +159,6 @@ function Row({
 		variant: "ghost" as const,
 		size: "icon-xs" as const,
 	});
-
-	const copyAgentPrompt = async () => {
-		try {
-			await navigator.clipboard.writeText(
-				buildReviewAgentPrompt({ filePath, commentId: comment.id }),
-			);
-			onMessage?.("Agent prompt copied", "success");
-		} catch {
-			onMessage?.("Could not copy agent prompt", "error");
-		}
-	};
 
 	return (
 		<div
@@ -194,7 +175,7 @@ function Row({
 					type="button"
 					{...cell(0)}
 					className="w-full cursor-pointer rounded-sm px-2 py-1.5 text-start outline-hidden focus-visible:ring-1 focus-visible:ring-ring/40"
-					onClick={() => onOpenComment(comment.id)}
+					onClick={() => onCommand("open", thread.id)}
 				>
 					<span
 						className={cn(
@@ -202,10 +183,10 @@ function Row({
 							resolved ? "border-muted-foreground/40" : "border-brand-accent",
 						)}
 					>
-						{editor.state.doc.textBetween(comment.from, comment.to, "\n")}
+						{thread.anchor}
 					</span>
 					<span className="mt-1 line-clamp-2 text-[0.8125rem] leading-snug">
-						{comment.attrs.body}
+						{thread.body}
 					</span>
 				</button>
 			</GridCell>
@@ -218,7 +199,7 @@ function Row({
 						{...action(1)}
 						aria-label={resolved ? "Reopen" : "Resolve"}
 						title={resolved ? "Reopen" : "Resolve"}
-						onClick={() => setCommentResolved(editor, comment, !resolved)}
+						onClick={() => onCommand("toggleResolved", thread.id)}
 					>
 						{resolved ? (
 							<MingcuteCheckCircleFill className="text-brand" />
@@ -233,7 +214,12 @@ function Row({
 						data-review-copy-agent-prompt
 						aria-label="Copy agent prompt"
 						title="Copy a prompt asking an agent to address this comment"
-						onClick={() => void copyAgentPrompt()}
+						onClick={() =>
+							void copyAgentPrompt(
+								buildReviewAgentPrompt({ filePath, commentId: thread.id }),
+								onMessage,
+							)
+						}
 					>
 						<MingcuteCopy2Line />
 					</Button>
@@ -244,7 +230,7 @@ function Row({
 						aria-label="Delete comment"
 						title="Delete comment"
 						className="hover:bg-destructive/10 hover:text-destructive"
-						onClick={() => deleteComment(editor, comment)}
+						onClick={() => onCommand("delete", thread.id)}
 					>
 						<MingcuteDelete2Line />
 					</Button>

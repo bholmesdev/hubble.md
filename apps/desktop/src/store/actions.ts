@@ -1,3 +1,4 @@
+import type { ReviewThread } from "@hubble.md/ui";
 import { toast } from "sonner";
 import changelogRaw from "../../../../CHANGELOG.md?raw";
 import { desktopApi } from "../desktopApi";
@@ -57,6 +58,7 @@ import {
 	lastSeenVersionStore,
 	MAX_RECENT,
 	pendingTerminalCommandStore,
+	reviewThreadsStore,
 	type SortMode,
 	sidebarOpenStore,
 	switcherOpenStore,
@@ -1252,4 +1254,8 @@ export async function togglePinnedNote(path: string) {
 		toast.error("Failed to update pinned notes", { description: message });
 		await loadPinnedNotes(workspacePath);
 	}
+}
+
+export function setReviewThreads(threads: ReviewThread[]) {
+	reviewThreadsStore.set(threads);
 }

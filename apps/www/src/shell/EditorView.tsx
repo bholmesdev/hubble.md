@@ -6,7 +6,7 @@ import {
 	savePathContent,
 	updateEditorContent,
 } from "../store/actions";
-import { filesStore } from "../store/state";
+import { filesStore, setReviewThreads } from "../store/state";
 import { handleImageDrop, handleImagePaste } from "./handleImageUpload";
 import { createWebImageExtension } from "./WebImageExtension";
 
@@ -37,6 +37,7 @@ export function EditorView({ path, initialMarkdown }: Props) {
 				window.open(href, "_blank", "noopener");
 			}}
 			onOpenWikiLink={(target) => void loadPath(target.split("#")[0] ?? target)}
+			onReviewThreadsChange={setReviewThreads}
 		/>
 	);
 }

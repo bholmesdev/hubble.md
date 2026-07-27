@@ -1,15 +1,16 @@
 import { Popover } from "@base-ui/react/popover";
 import { Tabs } from "@base-ui/react/tabs";
-import type { Editor } from "@tiptap/core";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import { Button } from "../primitives/button";
 import { ReviewCommentList } from "./ReviewCommentList";
 import {
 	buildReviewCommentsAgentPrompt,
-	type ReviewComment,
-	unresolvedComments,
+	copyAgentPrompt,
+	type ReviewThread,
+	type ReviewThreadCommand,
+	unresolvedThreads,
 } from "./reviewComments";
 
 type Filter = "unresolved" | "resolved" | "all";
@@ -27,46 +28,42 @@ const EMPTY_LABEL: Record<Filter, string> = {
 };
 
 export type ReviewCommentSummaryProps = {
-	editor: Editor | null;
 	filePath: string;
-	comments: ReviewComment[];
-	onOpenComment: (commentId: string) => void;
+	threads: ReviewThread[];
+	onCommand: (kind: ReviewThreadCommand["kind"], id: string) => void;
 	onMessage?: (message: string, type: "success" | "error") => void;
 };
 
 /** Toolbar entry point for the document's review threads. The gutter badges
  * only show comments on screen, so this is the one place that lists them all,
- * and the one place that hands the whole set to an agent. */
+ * and the one place that hands the whole set to an agent.
+ *
+ * Takes plain data and emits commands, so an app can render it in its own
+ * toolbar without holding the editor. */
 export function ReviewCommentSummary({
-	editor,
 	filePath,
-	comments,
-	onOpenComment,
+	threads,
+	onCommand,
 	onMessage,
 }: ReviewCommentSummaryProps) {
 	const [open, setOpen] = useState(false);
 	const [filter, setFilter] = useState<Filter>("unresolved");
-	const unresolved = unresolvedComments(comments);
+	const unresolved = unresolvedThreads(threads);
 	const visible =
 		filter === "all"
-			? comments
+			? threads
 			: filter === "unresolved"
 				? unresolved
-				: comments.filter((comment) => comment.attrs.resolved === true);
+				: threads.filter((thread) => thread.resolved);
 
-	const copyAgentPrompt = useCallback(async () => {
-		try {
-			await navigator.clipboard.writeText(
-				buildReviewCommentsAgentPrompt({ filePath }),
-			);
-			onMessage?.("Agent prompt copied", "success");
-			setOpen(false);
-		} catch {
-			onMessage?.("Could not copy agent prompt", "error");
-		}
-	}, [filePath, onMessage]);
-
-	if (!editor) return null;
+	const copyUnresolvedPrompt = async () => {
+		const copied = await copyAgentPrompt(
+			buildReviewCommentsAgentPrompt({ filePath }),
+			onMessage,
+		);
+		// Copying is the last thing you do here, so get out of the way.
+		if (copied) setOpen(false);
+	};
 
 	return (
 		<Popover.Root open={open} onOpenChange={setOpen}>
@@ -93,7 +90,7 @@ export function ReviewCommentSummary({
 						data-review-comment-summary
 						className="flex w-[min(20rem,calc(100vw-1rem))] origin-(--transform-origin) flex-col rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
 					>
-						{comments.length === 0 ? (
+						{threads.length === 0 ? (
 							<div className="px-4 py-5 text-center">
 								<p className="text-[0.8125rem] font-medium">No comments yet</p>
 								<p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
@@ -125,13 +122,14 @@ export function ReviewCommentSummary({
 											</p>
 										) : (
 											<ReviewCommentList
-												editor={editor}
 												filePath={filePath}
-												comments={visible}
+												threads={visible}
 												onMessage={onMessage}
-												onOpenComment={(id) => {
-													setOpen(false);
-													onOpenComment(id);
+												onCommand={(kind, id) => {
+													// Opening jumps to the thread in the document, so the
+													// list has done its job and gets out of the way.
+													if (kind === "open") setOpen(false);
+													onCommand(kind, id);
 												}}
 											/>
 										)}
@@ -146,7 +144,7 @@ export function ReviewCommentSummary({
 										className="w-full justify-start"
 										title="Copy a prompt covering every unresolved comment"
 										disabled={unresolved.length === 0}
-										onClick={() => void copyAgentPrompt()}
+										onClick={() => void copyUnresolvedPrompt()}
 									>
 										<MingcuteCopy2Line data-icon="inline-start" />
 										{unresolved.length === 0

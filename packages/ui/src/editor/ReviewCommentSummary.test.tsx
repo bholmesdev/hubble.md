@@ -1,26 +1,18 @@
 // @vitest-environment happy-dom
 
-import { markdownToTiptapDoc, ReviewMarkExtension } from "@hubble.md/editor";
-import { Editor } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import { act, createElement, Fragment, type ReactNode } from "react";
+import { act, createElement, type ReactNode } from "react";
 // @ts-expect-error This package does not ship @types/react-dom; the test only
 // needs createRoot's render/unmount surface.
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	ReviewCommentSlot,
-	usePublishReviewComments,
-} from "./ReviewCommentSlot";
-import type { ReviewCommentSummaryProps } from "./ReviewCommentSummary";
-import type { ReviewComment } from "./reviewComments";
+import { ReviewCommentSummary } from "./ReviewCommentSummary";
+import type { ReviewThread } from "./reviewComments";
 
 type Root = {
 	render(children: ReactNode): void;
 	unmount(): void;
 };
 
-const editors: Editor[] = [];
 const roots: Root[] = [];
 
 (
@@ -32,21 +24,26 @@ afterEach(() => {
 		for (const root of roots) root.unmount();
 	});
 	roots.length = 0;
-	for (const editor of editors) editor.destroy();
-	editors.length = 0;
 	document.body.replaceChildren();
 });
 
-describe("ReviewCommentSummary", () => {
-	it("renders nothing until an app provides a toolbar slot", () => {
-		const { editor } = setup("{==first==}{>>Note one<<}{#c1}");
-		render(editor, [], { withSlot: false });
-		expect(document.querySelector("button")).toBeNull();
-	});
+const OPEN: ReviewThread = {
+	id: "c1",
+	anchor: "first",
+	body: "Note one",
+	resolved: false,
+};
+const CLOSED: ReviewThread = {
+	id: "c2",
+	anchor: "second",
+	body: "Note two",
+	resolved: true,
+};
+const ALSO_OPEN: ReviewThread = { ...CLOSED, resolved: false };
 
+describe("ReviewCommentSummary", () => {
 	it("teaches the feature when the document has no comments", async () => {
-		const { editor } = setup("plain text");
-		render(editor, []);
+		render([]);
 
 		const trigger = document.querySelector("button");
 		expect(trigger?.getAttribute("aria-label")).toBe("Comments");
@@ -55,24 +52,19 @@ describe("ReviewCommentSummary", () => {
 			trigger?.click();
 		});
 
-		const panel = document.querySelector("[data-review-comment-summary]");
-		expect(panel?.textContent).toContain("No comments yet");
-		expect(panel?.textContent).toContain("Highlight any text");
+		expect(panelText()).toContain("No comments yet");
+		expect(panelText()).toContain("Highlight any text");
 		// Filters and the handoff would both be empty gestures here.
-		expect(panel?.querySelector('[role="tab"]')).toBeNull();
+		expect(
+			document.querySelector('[data-review-comment-summary] [role="tab"]'),
+		).toBeNull();
 		expect(findCopyButton()).toBeNull();
 	});
 
 	it("lists every thread and opens the one that is clicked", async () => {
-		const { editor, comments } = setup(
-			"{==first==}{>>Note one<<}{#c1}\n\n{==second==}{>>Note two<<}{#c2}",
-		);
-		const onOpenComment = vi.fn();
-		render(editor, comments, { onOpenComment });
-
-		await act(async () => {
-			document.querySelector("button")?.click();
-		});
+		const onCommand = vi.fn();
+		render([OPEN, ALSO_OPEN], { onCommand });
+		await open();
 
 		const rows = threadRows();
 		expect(rows).toHaveLength(2);
@@ -81,27 +73,22 @@ describe("ReviewCommentSummary", () => {
 			rows[1]?.click();
 		});
 
-		expect(onOpenComment).toHaveBeenCalledWith("c2");
+		expect(onCommand).toHaveBeenCalledWith("open", "c2");
 	});
 
 	it("filters the list through the unresolved, resolved, and all tabs", async () => {
-		const { editor, comments } = setup(
-			'{==first==}{>>Open note<<}{#c1}\n\n{==second==}{>>Closed note<<}{#c2}<!-- hubble-review:{"v":1,"replies":[],"resolved":true}-->',
-		);
-		render(editor, comments);
-		await act(async () => {
-			document.querySelector("button")?.click();
-		});
+		render([OPEN, CLOSED]);
+		await open();
 
 		expect(selectedTab()).toBe("Unresolved");
 		expect(threadRows()).toHaveLength(1);
-		expect(threadRows()[0]?.textContent).toContain("Open note");
+		expect(threadRows()[0]?.textContent).toContain("Note one");
 
 		await act(async () => {
 			tab("Resolved")?.click();
 		});
 		expect(threadRows()).toHaveLength(1);
-		expect(threadRows()[0]?.textContent).toContain("Closed note");
+		expect(threadRows()[0]?.textContent).toContain("Note two");
 
 		await act(async () => {
 			tab("All")?.click();
@@ -110,54 +97,32 @@ describe("ReviewCommentSummary", () => {
 	});
 
 	it("always opens on unresolved, even with nothing left to act on", async () => {
-		const { editor, comments } = setup(
-			'{==first==}{>>Closed note<<}{#c1}<!-- hubble-review:{"v":1,"replies":[],"resolved":true}-->',
-		);
-		render(editor, comments);
-		await act(async () => {
-			document.querySelector("button")?.click();
-		});
+		render([CLOSED]);
+		await open();
 
 		expect(selectedTab()).toBe("Unresolved");
 		expect(threadRows()).toHaveLength(0);
-		expect(
-			document.querySelector("[data-review-comment-summary]")?.textContent,
-		).toContain("No unresolved comments");
+		expect(panelText()).toContain("No unresolved comments");
 	});
 
 	it("says so when a tab has nothing to show", async () => {
-		const { editor, comments } = setup("{==first==}{>>Open note<<}{#c1}");
-		render(editor, comments);
-		await act(async () => {
-			document.querySelector("button")?.click();
-		});
+		render([OPEN]);
+		await open();
 		await act(async () => {
 			tab("Resolved")?.click();
 		});
 
 		expect(threadRows()).toHaveLength(0);
-		expect(
-			document.querySelector("[data-review-comment-summary]")?.textContent,
-		).toContain("No resolved comments");
+		expect(panelText()).toContain("No resolved comments");
 	});
 
 	it("copies one prompt covering every unresolved thread", async () => {
-		const { editor, comments } = setup(
-			"{==first==}{>>Note one<<}{#c1}\n\n{==second==}{>>Note two<<}{#c2}",
-		);
-		const writeText = vi.fn(async () => {});
-		Object.defineProperty(navigator, "clipboard", {
-			configurable: true,
-			value: { writeText },
-		});
-		render(editor, comments);
+		const writeText = stubClipboard();
+		render([OPEN]);
+		await open();
 
 		await act(async () => {
-			document.querySelector("button")?.click();
-		});
-		const copy = findCopyButton();
-		await act(async () => {
-			copy?.click();
+			findCopyButton()?.click();
 		});
 
 		expect(writeText).toHaveBeenCalledWith(
@@ -165,19 +130,18 @@ describe("ReviewCommentSummary", () => {
 		);
 	});
 
-	it("resolves, copies, and deletes a thread from its row", async () => {
-		const { editor, comments } = setup(
-			"{==first==}{>>Note one<<}{#c1}\n\n{==second==}{>>Note two<<}{#c2}",
-		);
-		const writeText = vi.fn(async () => {});
-		Object.defineProperty(navigator, "clipboard", {
-			configurable: true,
-			value: { writeText },
-		});
-		render(editor, comments);
-		await act(async () => {
-			document.querySelector("button")?.click();
-		});
+	it("disables the handoff once every thread is resolved", async () => {
+		render([CLOSED]);
+		await open();
+
+		expect(findCopyButton()?.disabled).toBe(true);
+	});
+
+	it("commands resolve and delete from a row, and copies its own prompt", async () => {
+		const writeText = stubClipboard();
+		const onCommand = vi.fn();
+		render([OPEN, ALSO_OPEN], { onCommand });
+		await open();
 
 		await act(async () => {
 			rowAction(0, "Copy agent prompt")?.click();
@@ -189,22 +153,17 @@ describe("ReviewCommentSummary", () => {
 		await act(async () => {
 			rowAction(0, "Resolve")?.click();
 		});
-		expect(markAttrs(editor, "c1")?.resolved).toBe(true);
+		expect(onCommand).toHaveBeenCalledWith("toggleResolved", "c1");
 
 		await act(async () => {
 			rowAction(1, "Delete comment")?.click();
 		});
-		expect(markAttrs(editor, "c2")).toBeUndefined();
+		expect(onCommand).toHaveBeenCalledWith("delete", "c2");
 	});
 
 	it("moves one tab stop into the grid and navigates it with arrows", async () => {
-		const { editor, comments } = setup(
-			"{==first==}{>>Note one<<}{#c1}\n\n{==second==}{>>Note two<<}{#c2}",
-		);
-		render(editor, comments);
-		await act(async () => {
-			document.querySelector("button")?.click();
-		});
+		render([OPEN, ALSO_OPEN]);
+		await open();
 
 		// Exactly one cell is reachable by Tab; arrows move the rest.
 		expect(tabbableCells()).toHaveLength(1);
@@ -237,21 +196,17 @@ describe("ReviewCommentSummary", () => {
 		});
 		expect(document.activeElement).toBe(rowAction(1, "Resolve"));
 	});
-
-	it("disables the handoff once every thread is resolved", async () => {
-		const { editor, comments } = setup(
-			'{==first==}{>>Note one<<}{#c1}<!-- hubble-review:{"v":1,"replies":[],"resolved":true}-->',
-		);
-		expect(comments[0]?.attrs.resolved).toBe(true);
-		render(editor, comments);
-
-		await act(async () => {
-			document.querySelector("button")?.click();
-		});
-
-		expect(findCopyButton()?.disabled).toBe(true);
-	});
 });
+
+function open() {
+	return act(async () => {
+		document.querySelector("button")?.click();
+	});
+}
+
+function panelText() {
+	return document.querySelector("[data-review-comment-summary]")?.textContent;
+}
 
 /** The button that opens each thread: column 0 of every grid row. */
 function threadRows() {
@@ -272,23 +227,15 @@ function press(target: Element | null, key: string) {
 	target?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 }
 
-function markAttrs(editor: Editor, id: string) {
-	let attrs: Record<string, unknown> | undefined;
-	editor.state.doc.descendants((node) => {
-		for (const mark of node.marks) {
-			if (mark.type.name === "reviewMark" && mark.attrs.id === id) {
-				attrs = mark.attrs;
-				return false;
-			}
-		}
-		return true;
-	});
-	return attrs;
-}
-
 function rowAction(row: number, label: string) {
 	return document.querySelector<HTMLButtonElement>(
 		`[data-review-comment-summary] [data-row="${row}"][aria-label="${label}"]`,
+	);
+}
+
+function findCopyButton() {
+	return document.querySelector<HTMLButtonElement>(
+		"[data-review-copy-all-prompt]",
 	);
 }
 
@@ -306,81 +253,28 @@ function selectedTab() {
 	)?.textContent;
 }
 
-function findCopyButton() {
-	return document.querySelector<HTMLButtonElement>(
-		"[data-review-copy-all-prompt]",
-	);
-}
-
-function setup(markdown: string) {
-	const editor = new Editor({
-		element: document.createElement("div"),
-		extensions: [StarterKit, ReviewMarkExtension],
-		content: markdownToTiptapDoc(markdown),
+function stubClipboard() {
+	const writeText = vi.fn(async () => {});
+	Object.defineProperty(navigator, "clipboard", {
+		configurable: true,
+		value: { writeText },
 	});
-	editors.push(editor);
-	return { editor, comments: collectComments(editor) };
+	return writeText;
 }
 
-/** Mirrors what the popover publishes, so the summary is exercised with the
- * same shape it receives in the app. */
-function collectComments(editor: Editor) {
-	const comments: ReviewComment[] = [];
-	editor.state.doc.descendants((node, pos) => {
-		if (!node.isText) return true;
-		const mark = node.marks.find(
-			(candidate) =>
-				candidate.type.name === "reviewMark" &&
-				candidate.attrs.type === "reviewComment" &&
-				typeof candidate.attrs.id === "string",
-		);
-		if (!mark) return false;
-		const last = comments[comments.length - 1];
-		if (last?.id === mark.attrs.id && last.to === pos) {
-			last.to = pos + node.nodeSize;
-			return false;
-		}
-		comments.push({
-			id: mark.attrs.id,
-			from: pos,
-			to: pos + node.nodeSize,
-			attrs: mark.attrs as ReviewComment["attrs"],
-		});
-		return false;
-	});
-	return comments;
-}
-
-/** Mirrors the app wiring: the editor publishes, and the toolbar slot renders
- * whatever was published. */
-function render(
-	editor: Editor,
-	comments: ReviewComment[],
-	{ withSlot = true, ...props }: Record<string, unknown> = {},
-) {
+function render(threads: ReviewThread[], props: Record<string, unknown> = {}) {
 	const rootEl = document.createElement("div");
 	document.body.append(rootEl);
 	const root = createRoot(rootEl);
 	roots.push(root);
 	act(() => {
 		root.render(
-			createElement(
-				Fragment,
-				null,
-				createElement(Publisher, {
-					editor,
-					filePath: "/notes/plan.md",
-					comments,
-					onOpenComment: () => {},
-					...props,
-				}),
-				withSlot ? createElement(ReviewCommentSlot) : null,
-			),
+			createElement(ReviewCommentSummary, {
+				filePath: "/notes/plan.md",
+				threads,
+				onCommand: () => {},
+				...props,
+			}),
 		);
 	});
-}
-
-function Publisher(props: ReviewCommentSummaryProps) {
-	usePublishReviewComments(props);
-	return null;
 }

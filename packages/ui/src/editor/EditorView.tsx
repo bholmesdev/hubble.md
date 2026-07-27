@@ -28,14 +28,7 @@ import {
 	useEditor,
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import {
-	useCallback,
-	useEffect,
-	useLayoutEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CODE_BLOCK_COPY_EVENT, HubbleCodeBlock } from "./CodeBlockExtension";
 import { copySelectionAsMarkdown } from "./copyAsMarkdown";
 import { LinkClickExtension } from "./LinkClickExtension";
@@ -59,8 +52,7 @@ import { FindBar } from "./FindBar";
 import { FormatCommandMenu } from "./FormatCommandMenu";
 import { FormattingStatusBar } from "./FormattingStatusBar";
 import { ReviewCommentPopover } from "./ReviewCommentPopover";
-import { usePublishReviewComments } from "./ReviewCommentSlot";
-import type { ReviewComment } from "./reviewComments";
+import type { ReviewThread } from "./reviewComments";
 import { SelectionFormattingToolbar } from "./SelectionFormattingToolbar";
 import type { VirtualCursorMode } from "./virtualCursorMode";
 
@@ -90,6 +82,9 @@ export type EditorViewProps = {
 	onOpenExternalLink: (href: string) => void | Promise<void>;
 	onOpenWikiLink: (target: string) => void | Promise<void>;
 	onMessage?: (message: string, type: "success" | "error") => void;
+	/** Review threads in the open document, republished on every edit, so an
+	 * app can list them in its own chrome. */
+	onReviewThreadsChange?: (threads: ReviewThread[]) => void;
 };
 
 export function EditorView({
@@ -109,6 +104,7 @@ export function EditorView({
 	onOpenExternalLink,
 	onOpenWikiLink,
 	onMessage,
+	onReviewThreadsChange,
 }: EditorViewProps) {
 	const initialFrontMatter = parseMarkdownFrontMatter(initialMarkdown);
 	const initialFrontMatterRaw =
@@ -129,11 +125,6 @@ export function EditorView({
 	const [cursorModeOverride, setCursorModeOverride] =
 		useState<VirtualCursorMode | null>(null);
 	const [reviewCommentRequest, setReviewCommentRequest] = useState(0);
-	const [reviewComments, setReviewComments] = useState<ReviewComment[]>([]);
-	const [openReviewComment, setOpenReviewComment] = useState<{
-		id: string;
-		nonce: number;
-	}>();
 	const [frontMatterState, setFrontMatterState] = useState(() =>
 		frontMatterStateFromMarkdown(initialMarkdown),
 	);
@@ -297,26 +288,6 @@ export function EditorView({
 		});
 	}, [copyAsMarkdownRequest, editor, onMessage]);
 
-	const openReviewCommentById = useCallback((id: string) => {
-		setOpenReviewComment((current) => ({
-			id,
-			nonce: (current?.nonce ?? 0) + 1,
-		}));
-	}, []);
-
-	// The comment button lives in the app toolbar, outside this subtree.
-	const reviewCommentProps = useMemo(
-		() => ({
-			editor: editable ? editor : null,
-			filePath: path,
-			comments: reviewComments,
-			onOpenComment: openReviewCommentById,
-			onMessage,
-		}),
-		[editable, editor, onMessage, openReviewCommentById, path, reviewComments],
-	);
-	usePublishReviewComments(reviewCommentProps);
-
 	return (
 		<div
 			className="relative flex h-full min-h-0 flex-col"
@@ -374,9 +345,8 @@ export function EditorView({
 							filePath={path}
 							viewportRef={editorViewportRef}
 							request={reviewCommentRequest}
-							openRequest={openReviewComment}
 							onMessage={onMessage}
-							onCommentsChange={setReviewComments}
+							onThreadsChange={onReviewThreadsChange}
 						/>
 						<FormatCommandMenu
 							editor={editor}
