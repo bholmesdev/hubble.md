@@ -232,4 +232,8 @@ jobs:
           .\wingetcreate.exe update BenHolmes.Hubble.md `
             --version $version `
             --urls "$x64Url|x64" "$arm64Url|arm64" `
-            --submit
+            --submit `
+            --no-open
+          if ($LASTEXITCODE -ne 0) {
+            throw "wingetcreate exited with code $LASTEXITCODE"
+          }
