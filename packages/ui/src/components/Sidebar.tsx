@@ -1422,7 +1422,7 @@ function FolderSegmentLabel({
 				<FolderSegment
 					active={isActiveSegmentDrop(dropTarget, segment.id)}
 					key={segment.id}
-					enabled={enabled}
+					enabled={enabled && row.segments.length > 1}
 					segment={segment}
 					separator={index > 0}
 				/>
