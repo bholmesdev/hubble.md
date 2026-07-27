@@ -229,7 +229,7 @@ jobs:
           $x64Url = "$releaseBase/hubble_${version}_x64.exe"
           $arm64Url = "$releaseBase/hubble_${version}_arm64.exe"
 
-          .\wingetcreate.exe update BenHolmes.Hubble `
+          .\wingetcreate.exe update BenHolmes.Hubble.md `
             --version $version `
             --urls "$x64Url|x64" "$arm64Url|arm64" `
             --submit

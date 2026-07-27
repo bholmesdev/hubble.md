@@ -1,6 +1,6 @@
 # WinGet publishing
 
-Hubble uses the package identifier `BenHolmes.Hubble`. The first manifest must
+Hubble uses the package identifier `BenHolmes.Hubble.md`. The first manifest must
 be submitted interactively. Later desktop releases submit updates from
 `.github/workflows/desktop-release.yml`.
 
@@ -30,7 +30,7 @@ On Windows:
 
 4. Use these values when prompted:
 
-   - Package identifier: `BenHolmes.Hubble`
+   - Package identifier: `BenHolmes.Hubble.md`
    - Publisher: `Ben Holmes`
    - Package name: `Hubble`
    - License: `MIT`
@@ -43,7 +43,7 @@ On Windows:
    then verify:
 
    ```powershell
-   winget show --id BenHolmes.Hubble --exact
+   winget show --id BenHolmes.Hubble.md --exact
    ```
 
 ## Release automation
