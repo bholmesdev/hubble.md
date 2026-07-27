@@ -51,18 +51,9 @@ not be modified.
 
 ## Agent handoff
 
-Hubble copies the prompt for an agent rather than sending it, so the handoff
-works with whichever agent you already have open. There are two entry points:
-
-| Surface | Where | Prompt |
-| --- | --- | --- |
-| Thread | Copy action on an open comment thread | Names the file and that comment's stable id |
-| Comment list | Foot of the comment panel in the toolbar | Names the file only, covering every unresolved thread, so it stays correct as threads resolve |
-
-The comment panel lists every thread in the document and filters between
-unresolved, resolved, and all.
-
-An agent addressing a comment should:
+Hubble copies a prompt naming the file rather than sending it, so the handoff
+works with whichever agent is already open. An agent addressing a comment
+should:
 
 1. Read the named Markdown file before editing.
 2. Locate the comment by its `{#id}` anchor and preserve its anchored text.
@@ -70,12 +61,12 @@ An agent addressing a comment should:
 4. Resolve the comment only after addressing it.
 5. Preserve CriticMarkup markers, unknown review metadata, and unrelated Markdown.
 
-Install the companion Hubble skills to give an agent a reusable workflow for
-this handoff:
+Install the companion skill to give an agent a reusable workflow for this
+handoff:
 
 ```bash
-npx skills add bholmesdev/hubble-skills
+npx skills add bholmesdev/hubble-skills --skill review-markdown-comments
 ```
 
-The `review-markdown-comments` skill handles the file-backed reply and resolve
-workflow described above.
+[`review-markdown-comments`](https://github.com/bholmesdev/hubble-skills/blob/main/skills/review-markdown-comments/SKILL.md)
+handles the file-backed reply and resolve workflow described above.

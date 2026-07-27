@@ -9,6 +9,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Leave review comments on a note: highlight text to start a thread, reply to it, and resolve it when it's handled. Comments live in the Markdown itself, so they travel with the file. Thanks [@hwong103](https://github.com/hwong103)! [#175](https://github.com/bholmesdev/hubble.md/pull/175)
+- Browse every comment in a note from the toolbar, filter by unresolved or resolved, and copy a prompt handing the open threads to your agent. For the best results, install the [review-markdown-comments skill](https://github.com/bholmesdev/hubble-skills/blob/main/skills/review-markdown-comments/SKILL.md) with `npx skills add bholmesdev/hubble-skills --skill review-markdown-comments`, so your agent knows how to reply and resolve them. Thanks [@hwong103](https://github.com/hwong103)! [#175](https://github.com/bholmesdev/hubble.md/pull/175)
+
 ### Changed
 
 - Editor blocks now use a consistent reading rhythm, with tighter list grouping and clearer heading separation. [f6c44a2](https://github.com/bholmesdev/hubble.md/commit/f6c44a2)
