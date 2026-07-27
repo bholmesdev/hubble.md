@@ -444,6 +444,8 @@ function reviewSpanFromChildren(children: Content[], index: number) {
 		let type = baseType;
 		let attrs: Record<string, unknown> = { type };
 		if (baseType === "reviewHighlight") {
+			// A highlight followed by a body is a comment, so `{==anchor==}` alone
+			// stays a highlight while `{==anchor==}{>>body<<}{#c1}` becomes one.
 			const comment = suffix.match(
 				/^\{>>((?:\\[\s\S]|(?!<<\})[\s\S])*)<<\}(?:\{#([A-Za-z0-9_-]+)\})?/,
 			);
