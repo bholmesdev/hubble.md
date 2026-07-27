@@ -18,6 +18,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Dragging files in the sidebar now shows what you're moving: a "Move 3 items" label for a selected group, the whole group dimmed as it travels, and a clearer highlight on the folder or workspace root you're dropping into. Thanks [@zcuric](https://github.com/zcuric)! [#198](https://github.com/bholmesdev/hubble.md/pull/198)
+
 ### Fixed
 
 ## [0.1.21] - 2026-07-18

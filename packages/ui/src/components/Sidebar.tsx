@@ -845,6 +845,7 @@ export function Sidebar({
 		>
 			<DroppableSidebarNav
 				ref={navRef}
+				active={isRootDropTarget(dropTarget)}
 				enabled={Boolean(onMoveItem)}
 				onKeyDown={handleTreeKeyDown}
 			>
@@ -933,6 +934,7 @@ export function Sidebar({
 									data-selected={isSelected ? "true" : undefined}
 									className={cn(
 										"group/sidebar-row relative flex w-full items-center text-sidebar-foreground",
+										"transition-[background-color,opacity,filter] duration-150 ease-out motion-reduce:transition-none",
 										!isActive &&
 											isSelected &&
 											"bg-selected text-selected-foreground",
@@ -959,10 +961,12 @@ export function Sidebar({
 												: "rounded-[var(--radius-row)]",
 										isRenaming && "relative z-30",
 										isPinnedSectionEnd && "mb-3",
+										// Fade the whole dragged group so a multi-row drag reads
+										// as one move, not just the row under the cursor
 										rowKey &&
 											activeDragKeys.has(rowKey) &&
 											!dropGroup &&
-											"grayscale",
+											"opacity-60 grayscale",
 										isDragging && "opacity-50",
 									)}
 									onPointerEnter={() => setFocusedIndex(index)}
@@ -1185,7 +1189,9 @@ export function Sidebar({
 			>
 				{activeDragLabel ? (
 					<div className="inline-flex w-max max-w-48 truncate rounded-sm border border-sidebar-border bg-sidebar px-1.5 py-0.5 text-[10px] text-sidebar-foreground shadow-overlay">
-						{fileNameFromPath(activeDragLabel)}
+						{activeDragKeys.size > 1
+							? `Move ${activeDragKeys.size} items`
+							: fileNameFromPath(activeDragLabel)}
 					</div>
 				) : null}
 			</DragOverlay>
@@ -1319,11 +1325,12 @@ function DraggableSidebarRow({
 const DroppableSidebarNav = forwardRef<
 	HTMLDivElement,
 	{
+		active: boolean;
 		children: ReactNode;
 		enabled: boolean;
 		onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 	}
->(function DroppableSidebarNav({ children, enabled, onKeyDown }, ref) {
+>(function DroppableSidebarNav({ active, children, enabled, onKeyDown }, ref) {
 	const { setNodeRef } = useDroppable({
 		id: "sidebar-drop:root",
 		data: { folderId: null } satisfies DropTargetData,
@@ -1338,7 +1345,11 @@ const DroppableSidebarNav = forwardRef<
 		<div
 			ref={setRefs}
 			role="tree"
-			className="flex-1 overflow-y-auto overscroll-contain px-1.5 py-1 outline-none"
+			className={cn(
+				"flex-1 overflow-y-auto overscroll-contain px-1.5 py-1 outline-none",
+				"rounded-[var(--radius-row)] inset-ring-1 inset-ring-transparent transition-[box-shadow] duration-150 ease-out motion-reduce:transition-none",
+				active && "inset-ring-sidebar-accent/70",
+			)}
 			tabIndex={0}
 			onKeyDown={onKeyDown}
 			data-sidebar-nav
@@ -1411,7 +1422,7 @@ function FolderSegmentLabel({
 				<FolderSegment
 					active={isActiveSegmentDrop(dropTarget, segment.id)}
 					key={segment.id}
-					enabled={enabled}
+					enabled={enabled && row.segments.length > 1}
 					segment={segment}
 					separator={index > 0}
 				/>
@@ -1461,7 +1472,7 @@ function FolderSegment({
 			<span
 				ref={setRefs}
 				className={cn(
-					"min-w-0 truncate rounded-sm",
+					"min-w-0 truncate rounded-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
 					active && "bg-sidebar-accent/70",
 				)}
 				{...attributes}
@@ -1471,6 +1482,11 @@ function FolderSegment({
 			</span>
 		</>
 	);
+}
+
+// Root drops have no folder to highlight, so the tree itself becomes the target
+function isRootDropTarget(target: DropTarget | null) {
+	return target !== null && target.folderId === null;
 }
 
 function isActiveSegmentDrop(target: DropTarget | null, segmentId: string) {
