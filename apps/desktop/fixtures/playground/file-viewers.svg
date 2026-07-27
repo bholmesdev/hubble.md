@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="280" viewBox="0 0 480 280" font-family="system-ui, sans-serif">
+  <rect width="480" height="280" rx="12" fill="#f4f1ea"/>
+  <text x="240" y="42" text-anchor="middle" font-size="20" font-weight="600" fill="#2f4536">Hubble file viewers</text>
+
+  <rect x="40" y="70" width="120" height="64" rx="8" fill="#2f4536"/>
+  <text x="100" y="98" text-anchor="middle" font-size="14" fill="#f4f1ea">Markdown</text>
+  <text x="100" y="118" text-anchor="middle" font-size="12" fill="#c9d4cb">rich editor</text>
+
+  <rect x="180" y="70" width="120" height="64" rx="8" fill="#5a7260"/>
+  <text x="240" y="98" text-anchor="middle" font-size="14" fill="#f4f1ea">Code + text</text>
+  <text x="240" y="118" text-anchor="middle" font-size="12" fill="#dbe3dc">source editor</text>
+
+  <rect x="320" y="70" width="120" height="64" rx="8" fill="#b98a2f"/>
+  <text x="380" y="98" text-anchor="middle" font-size="14" fill="#fdf9ef">PDF + images</text>
+  <text x="380" y="118" text-anchor="middle" font-size="12" fill="#f2e5c8">in-app viewer</text>
+
+  <rect x="180" y="176" width="120" height="64" rx="8" fill="none" stroke="#5a7260" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="240" y="204" text-anchor="middle" font-size="14" fill="#2f4536">Everything else</text>
+  <text x="240" y="224" text-anchor="middle" font-size="12" fill="#5a7260">default app</text>
+
+  <line x1="100" y1="134" x2="228" y2="176" stroke="#5a7260" stroke-width="2"/>
+  <line x1="240" y1="134" x2="240" y2="176" stroke="#5a7260" stroke-width="2"/>
+  <line x1="380" y1="134" x2="252" y2="176" stroke="#5a7260" stroke-width="2"/>
+</svg>

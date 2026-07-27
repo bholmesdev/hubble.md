@@ -3,7 +3,17 @@ import type { CSSProperties } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { z } from "zod/v4";
 import { desktopApi } from "../desktopApi";
-import { absoluteWorkspacePath, dirname, pathEquals } from "../lib/filePath";
+import {
+	absoluteWorkspacePath,
+	dirname,
+	normalizePath,
+	pathEquals,
+} from "../lib/filePath";
+import {
+	assertPathInWorkspace,
+	relativePathWithin,
+	resolveWorkspaceFilePath,
+} from "../lib/workspacePath";
 import {
 	deleteMarkdownFile,
 	loadPath,
@@ -28,6 +38,7 @@ type HtmlAppRequest = {
 type IframeViewProps = {
 	src: string;
 	title: string;
+	htmlAppPath: string;
 	workspacePath: string | null;
 	className: string;
 	style?: CSSProperties;
@@ -43,16 +54,19 @@ const propertyValueSchema = z.union([
 	z.null(),
 ]);
 const propertiesSchema = z.record(z.string(), propertyValueSchema);
-const workspacePathSchema = z
+const fileReferenceSchema = z
 	.string()
-	.refine(isSafeWorkspacePath, "File path must be workspace-relative.");
-const markdownPathSchema = workspacePathSchema.refine(
+	.refine(
+		isSafeFileReference,
+		"File path must be workspace-relative or start with ./ or ../.",
+	);
+const markdownPathSchema = fileReferenceSchema.refine(
 	hasMarkdownExtension,
 	"File path must point to a Markdown file.",
 );
 const createInputSchema = z
 	.object({
-		path: workspacePathSchema.transform(withMarkdownExtension),
+		path: fileReferenceSchema.transform(withMarkdownExtension),
 		body: z.string().optional().default(""),
 		properties: propertiesSchema.optional(),
 		open: z.boolean().optional(),
@@ -80,6 +94,7 @@ export const IFRAME_PADDING = 2;
 export function IframeView({
 	src,
 	title,
+	htmlAppPath,
 	workspacePath,
 	className,
 	style,
@@ -87,6 +102,7 @@ export function IframeView({
 	onHeightChange,
 }: IframeViewProps) {
 	const iframeRef = useRef<HTMLIFrameElement | null>(null);
+	const recordedUseRef = useRef(false);
 	const [token] = useState(() => crypto.randomUUID());
 	const [error, setError] = useState<string | null>(null);
 
@@ -95,10 +111,8 @@ export function IframeView({
 	}, [error, onError]);
 
 	useEffect(() => {
-		// Inline embeds need resize messages because their content sets a dynamic
-		// height in the Markdown document. Full-page HTML fills the panel and
-		// scrolls inside the iframe, so there is no host height to update.
-		if (!onHeightChange) return;
+		// Runtime height messages resize inline embeds. Full-page apps ignore the
+		// height but still use the message as proof that their runtime booted.
 		const onMessage = (event: MessageEvent) => {
 			const data = event.data as {
 				type?: unknown;
@@ -107,6 +121,13 @@ export function IframeView({
 			} | null;
 			if (!isMessageForHtmlApp(data, iframeRef.current)) return;
 			if (!data || data.type !== "hubble:html-app-height") return;
+			// This runtime message proves the injected HTML App booted. iframe load
+			// events alone also fire for browser error documents.
+			if (!recordedUseRef.current) {
+				recordedUseRef.current = true;
+				void desktopApi.recordTelemetryActivity({ usedHtmlApp: true });
+			}
+			if (!onHeightChange) return;
 			const height = Number(data.height);
 			if (!Number.isFinite(height)) return;
 			const clamped = Math.max(
@@ -125,18 +146,20 @@ export function IframeView({
 			const request = event.data as HtmlAppRequest | null;
 			if (!isMessageForHtmlApp(request, iframeRef.current)) return;
 			if (!request || request.type !== "hubble:request") return;
-			void handleHtmlAppRequest(request, workspacePath).then((response) => {
-				if (!isWindowProxy(event.source)) return;
-				event.source.postMessage(
-					{ ...response, id: request.id, type: "hubble:response" },
-					"*",
-				);
-			});
+			void handleHtmlAppRequest(request, workspacePath, htmlAppPath).then(
+				(response) => {
+					if (!isWindowProxy(event.source)) return;
+					event.source.postMessage(
+						{ ...response, id: request.id, type: "hubble:response" },
+						"*",
+					);
+				},
+			);
 		};
 
 		window.addEventListener("message", onMessage);
 		return () => window.removeEventListener("message", onMessage);
-	}, [workspacePath]);
+	}, [htmlAppPath, workspacePath]);
 
 	if (error) return null;
 
@@ -175,6 +198,7 @@ export function toAssetUrl(path: string): string {
 async function handleHtmlAppRequest(
 	request: HtmlAppRequest,
 	workspacePath: string | null,
+	htmlAppPath: string,
 ) {
 	try {
 		if (!workspacePath) {
@@ -184,22 +208,45 @@ async function handleHtmlAppRequest(
 			request.params && typeof request.params === "object"
 				? (request.params as Record<string, unknown>)
 				: {};
+		const resolveFilePath = (path: string, mustExist: boolean) => {
+			const basePath = isDotRelative(path)
+				? dirname(htmlAppPath)
+				: workspacePath;
+			if (!basePath) throw new Error("Could not resolve the HTML app folder.");
+			return resolveWorkspaceFilePath({
+				workspacePath,
+				basePath,
+				path,
+				mustExist,
+			});
+		};
 		if (request.method === "files.list") {
 			const glob = typeof params.glob === "string" ? params.glob : "**/*";
+			const workspaceGlob = await resolveHtmlAppGlob(
+				workspacePath,
+				htmlAppPath,
+				glob,
+			);
 			return {
 				ok: true,
-				value: await desktopApi.listHtmlAppFiles(workspacePath, glob),
+				value: await desktopApi.listHtmlAppFiles(workspacePath, workspaceGlob),
 			};
 		}
 		if (request.method === "files.read") {
-			const path = parseInput(markdownPathSchema, params.path);
+			const path = await resolveFilePath(
+				parseInput(markdownPathSchema, params.path),
+				true,
+			);
 			return {
 				ok: true,
 				value: await readMarkdownFile(workspacePath, path),
 			};
 		}
 		if (request.method === "files.open") {
-			const path = parseInput(markdownPathSchema, params.path);
+			const path = await resolveFilePath(
+				parseInput(markdownPathSchema, params.path),
+				true,
+			);
 			await openMarkdownFile(workspacePath, path);
 			return {
 				ok: true,
@@ -212,13 +259,20 @@ async function handleHtmlAppRequest(
 					? (params.input as Record<string, unknown>)
 					: params;
 			const createInput = parseInput(createInputSchema, input);
+			const path = await resolveFilePath(createInput.path, false);
 			return {
 				ok: true,
-				value: await createMarkdownFile(workspacePath, createInput),
+				value: await createMarkdownFile(workspacePath, {
+					...createInput,
+					path,
+				}),
 			};
 		}
 		if (request.method === "files.update") {
-			const path = parseInput(markdownPathSchema, params.path);
+			const path = await resolveFilePath(
+				parseInput(markdownPathSchema, params.path),
+				true,
+			);
 			const patch = parseInput(filePatchSchema, params.patch);
 			const absolutePath = await resolveWorkspaceFile(workspacePath, path, {
 				exists: true,
@@ -231,7 +285,10 @@ async function handleHtmlAppRequest(
 			};
 		}
 		if (request.method === "files.remove") {
-			const path = parseInput(markdownPathSchema, params.path);
+			const path = await resolveFilePath(
+				parseInput(markdownPathSchema, params.path),
+				true,
+			);
 			await removeMarkdownFile(workspacePath, path);
 			return {
 				ok: true,
@@ -249,6 +306,42 @@ async function handleHtmlAppRequest(
 			},
 		};
 	}
+}
+
+/** Converts app-relative globs to paths from the workspace root. */
+export async function resolveHtmlAppGlob(
+	workspacePath: string,
+	htmlAppPath: string,
+	glob: string,
+) {
+	if (!isDotRelative(glob)) return glob.replace(/\\/g, "/");
+	const appDirectory = dirname(htmlAppPath);
+	if (!appDirectory) throw new Error("Could not resolve the HTML app folder.");
+	const [absoluteWorkspace, absoluteAppDirectory] = await Promise.all([
+		desktopApi.resolvePath(workspacePath),
+		desktopApi.resolvePath(appDirectory),
+	]);
+	const appDirectoryPath = relativePathWithin(
+		absoluteWorkspace,
+		absoluteAppDirectory,
+	);
+	if (appDirectoryPath === null) {
+		throw new Error("File path must stay inside the workspace.");
+	}
+	await assertPathInWorkspace(workspacePath, absoluteAppDirectory, {
+		mustExist: true,
+	});
+	const workspaceGlob = normalizePath(
+		`${appDirectoryPath ? `${appDirectoryPath}/` : ""}${glob}`,
+	);
+	if (
+		!workspaceGlob ||
+		workspaceGlob === ".." ||
+		workspaceGlob.startsWith("../")
+	) {
+		throw new Error("File path must stay inside the workspace.");
+	}
+	return workspaceGlob;
 }
 
 /**
@@ -383,40 +476,10 @@ async function resolveWorkspaceFile(
 	const absolutePath = await desktopApi.resolvePath(
 		absoluteWorkspacePath(path, workspacePath),
 	);
-	await assertRealWorkspacePath(workspacePath, absolutePath, options);
+	await assertPathInWorkspace(workspacePath, absolutePath, {
+		mustExist: options.exists,
+	});
 	return absolutePath;
-}
-
-async function assertRealWorkspacePath(
-	workspacePath: string,
-	absolutePath: string,
-	options: { exists: boolean },
-) {
-	const parentPath = dirname(absolutePath);
-	const targetPath = options.exists
-		? absolutePath
-		: await nearestExistingAncestor(parentPath);
-	if (!targetPath) {
-		throw new Error("File path must stay inside the workspace.");
-	}
-	const [realWorkspacePath, realTargetPath] = await Promise.all([
-		desktopApi.realPath(workspacePath),
-		desktopApi.realPath(targetPath),
-	]);
-	if (!isPathWithin(realWorkspacePath, realTargetPath)) {
-		throw new Error("File path must stay inside the workspace.");
-	}
-}
-
-async function nearestExistingAncestor(path: string | null) {
-	let current = path;
-	while (current) {
-		if (await desktopApi.pathExists(current)) return current;
-		const parent = dirname(current);
-		if (parent === current) return null;
-		current = parent;
-	}
-	return null;
 }
 
 function isWindowProxy(source: MessageEventSource | null): source is Window {
@@ -434,7 +497,7 @@ function hasOwn(object: object, key: string) {
 	return Object.keys(object).includes(key);
 }
 
-function isSafeWorkspacePath(path: string): boolean {
+function isSafeFileReference(path: string): boolean {
 	if (
 		!path ||
 		path.startsWith("/") ||
@@ -443,18 +506,15 @@ function isSafeWorkspacePath(path: string): boolean {
 	) {
 		return false;
 	}
+	if (isDotRelative(path)) {
+		const normalized = normalizePath(path);
+		return normalized !== "" && normalized !== "." && normalized !== "..";
+	}
 	return !path
 		.split(/[\\/]+/)
 		.some((part) => part === "" || part === "." || part === "..");
 }
 
-function isPathWithin(rootPath: string, path: string): boolean {
-	const root = normalizePath(rootPath);
-	const candidate = normalizePath(path);
-	return candidate === root || candidate.startsWith(`${root}/`);
-}
-
-function normalizePath(path: string): string {
-	const normalized = path.split("\\").join("/").replace(/\/+$/, "");
-	return normalized || "/";
+function isDotRelative(path: string) {
+	return /^(?:\.\.?)[\\/]/.test(path);
 }

@@ -370,6 +370,10 @@
 	caret-color: var(--brand-accent);
 }
 
+[data-hubble-plain-text-editor] .ProseMirror > * + * {
+	margin-block-start: 0;
+}
+
 [data-hubble-source-editor] .ProseMirror > .react-renderer.node-codeBlock {
 	display: flex;
 	flex: 1;

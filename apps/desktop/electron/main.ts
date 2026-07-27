@@ -17,6 +17,7 @@ import {
 	nativeTheme,
 	protocol,
 	screen,
+	session,
 	shell,
 } from "electron";
 import electronUpdater from "electron-updater";
@@ -30,9 +31,11 @@ import type {
 	WorkspaceConfig,
 } from "../src/desktopApi/types";
 import {
-	hasDocumentExtension,
+	fileKindForPath,
 	hasMarkdownExtension,
+	isEditableFile,
 	isHiddenSidebarFolderName,
+	isVisibleSidebarFileName,
 	markdownAssetFolderPath,
 	withMarkdownExtension,
 } from "../src/lib/filePath";
@@ -43,6 +46,7 @@ import {
 	SEARCH_MAX_RESULT_FILES,
 	SEARCH_MIN_QUERY_LENGTH,
 } from "../src/lib/searchContent";
+import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
 import {
 	loadZoomFactor,
@@ -115,6 +119,15 @@ app.setName(appName);
 if (devAppName) {
 	app.setPath("userData", path.join(app.getPath("appData"), devAppName));
 }
+const telemetry = new TelemetryManager({
+	statePath: path.join(app.getPath("userData"), "telemetry.json"),
+	endpoint:
+		process.env.HUBBLE_PLAUSIBLE_ENDPOINT ?? "https://plausible.io/api/event",
+	domain: process.env.HUBBLE_PLAUSIBLE_DOMAIN ?? "hubble.md",
+	canSend: app.isPackaged && process.env.HUBBLE_TELEMETRY_DISABLED !== "1",
+	version: app.getVersion(),
+	userAgent: () => session.defaultSession.getUserAgent(),
+});
 
 if (isDev && process.env.HUBBLE_DESKTOP_ENABLE_CDP === "1") {
 	app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
@@ -142,7 +155,7 @@ const launchWorkspacePath =
 		: null;
 let menuState: MenuState = {
 	hasWorkspace: false,
-	hasMarkdownNoteOpen: false,
+	hasSourceViewOpen: false,
 	isSourceMode: false,
 	canGoBack: false,
 	canGoForward: false,
@@ -193,6 +206,13 @@ const windowStateSchema = z.object({
 	isMaximized: z.boolean().optional(),
 	isFullScreen: z.boolean().optional(),
 });
+const openAgentClientSchema = z
+	.object({
+		client: z.enum(["codex", "claude"]),
+		prompt: z.string(),
+		workspacePath: z.string().trim().min(1),
+	})
+	.strict();
 const htmlAppHeadStyles = [
 	{ name: "hubble-theme", source: htmlAppTheme },
 ] as const;
@@ -473,10 +493,6 @@ function isIgnoredByRules(candidatePath: string, rules: IgnoreRule[]) {
 	return ignored;
 }
 
-function isDocumentPath(candidatePath: string): boolean {
-	return hasDocumentExtension(candidatePath);
-}
-
 function isMissingPathError(error: unknown): boolean {
 	return (
 		typeof error === "object" &&
@@ -622,6 +638,7 @@ function assetContentType(filePath: string): string {
 	switch (path.extname(filePath).toLowerCase()) {
 		case ".css":
 			return "text/css; charset=utf-8";
+		case ".htm":
 		case ".html":
 			return "text/html; charset=utf-8";
 		case ".js":
@@ -634,10 +651,20 @@ function assetContentType(filePath: string): string {
 		case ".jpg":
 		case ".jpeg":
 			return "image/jpeg";
+		case ".avif":
+			return "image/avif";
+		case ".bmp":
+			return "image/bmp";
+		case ".gif":
+			return "image/gif";
+		case ".ico":
+			return "image/x-icon";
 		case ".png":
 			return "image/png";
 		case ".webp":
 			return "image/webp";
+		case ".pdf":
+			return "application/pdf";
 		default:
 			return "application/octet-stream";
 	}
@@ -672,14 +699,24 @@ function injectHtmlAppRuntime(html: string): string {
 
 function responseForAsset(filePath: string) {
 	const contentType = assetContentType(filePath);
-	const body = contentType.startsWith("text/html")
+	const isHtml = contentType.startsWith("text/html");
+	const body = isHtml
 		? injectHtmlAppRuntime(fsSync.readFileSync(filePath, "utf8"))
 		: fsSync.readFileSync(filePath);
+
+	// Keep scriptable documents sandboxed even when a frame (e.g. the PDF
+	// viewer) navigates to them directly. <img> SVG rendering is unaffected.
+	const cspSandbox = isHtml
+		? "sandbox allow-scripts allow-forms"
+		: contentType === "image/svg+xml"
+			? "sandbox"
+			: null;
 
 	return new Response(body, {
 		headers: {
 			"cache-control": "no-store",
 			"content-type": contentType,
+			...(cspSandbox ? { "content-security-policy": cspSandbox } : {}),
 		},
 	});
 }
@@ -898,7 +935,7 @@ function buildMenu() {
 					id: "toggle-source-mode",
 					label: "Toggle Source Mode",
 					accelerator: "Alt+CmdOrCtrl+U",
-					enabled: menuState.hasMarkdownNoteOpen,
+					enabled: menuState.hasSourceViewOpen,
 					click: () => sendToRenderer("desktop:menu-toggle-source-mode"),
 				},
 				...(isDev
@@ -1101,7 +1138,7 @@ function fileAssetsDir(filePath: string): string {
 	return assetsDir;
 }
 
-async function collectDocumentFiles(
+async function collectSidebarFiles(
 	dir: string,
 	out: DirectoryListing,
 	inheritedRules: IgnoreRule[] = [],
@@ -1118,12 +1155,13 @@ async function collectDocumentFiles(
 				path: toRendererPath(entryPath),
 				modified_at: Math.floor(stat.mtimeMs / 1000),
 			});
-			await collectDocumentFiles(entryPath, out, rules);
-		} else if (isDocumentPath(entry.name)) {
+			await collectSidebarFiles(entryPath, out, rules);
+		} else if (entry.isFile() && isVisibleSidebarFileName(entry.name)) {
 			const stat = await fs.stat(entryPath);
 			out.files.push({
 				path: toRendererPath(entryPath),
 				modified_at: Math.floor(stat.mtimeMs / 1000),
+				kind: fileKindForPath(entry.name),
 			});
 		}
 	}
@@ -1203,11 +1241,31 @@ async function createWindow() {
 		webPreferences: {
 			contextIsolation: true,
 			nodeIntegration: false,
+			plugins: true,
 			preload: path.join(__dirname, "../preload/preload.mjs"),
 			sandbox: false,
 		},
 	});
 	mainWindow = window;
+	// Viewer content must never navigate the window or open new ones; external
+	// links go through shell IPC. Unlike will-navigate, this covers subframes.
+	window.webContents.on("will-frame-navigate", (details) => {
+		if (details.isMainFrame) {
+			// Same-URL navigations are dev HMR reloads.
+			if (details.url !== window.webContents.getURL()) details.preventDefault();
+			return;
+		}
+		// Subframes load app assets only; chrome-extension is Chromium's
+		// internal PDF viewer taking over the frame.
+		if (
+			!details.url.startsWith("hubble-asset://") &&
+			!details.url.startsWith("chrome-extension://") &&
+			details.url !== "about:blank"
+		) {
+			details.preventDefault();
+		}
+	});
+	window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 	registerTextContextMenu(window);
 	if (windowState.isFullScreen) {
 		window.setFullScreen(true);
@@ -1271,7 +1329,7 @@ function registerIpc() {
 			const stat = await fs.stat(root);
 			if (!stat.isDirectory()) throw new Error(`Not a directory: ${dirPath}`);
 			const listing: DirectoryListing = { files: [], folders: [] };
-			await collectDocumentFiles(root, listing);
+			await collectSidebarFiles(root, listing);
 			return listing;
 		},
 	);
@@ -1537,10 +1595,12 @@ function registerIpc() {
 				typeof options.defaultPath === "string"
 					? options.defaultPath
 					: undefined,
-			title: "Open Markdown file",
+			title: "Open file",
 			filters: [
 				{ name: "Documents", extensions: ["md", "markdown", "mdown", "html"] },
 				{ name: "Text", extensions: ["txt", "text"] },
+				{ name: "PDF", extensions: ["pdf"] },
+				{ name: "All Files", extensions: ["*"] },
 			],
 		});
 		const selected = result.filePaths[0] ?? null;
@@ -1624,7 +1684,7 @@ function registerIpc() {
 					depth: 0,
 				});
 				const emitFile = (changedPath: string) => {
-					if (isDocumentPath(changedPath)) {
+					if (isEditableFile(changedPath)) {
 						emit(changedPath);
 					}
 				};
@@ -1658,17 +1718,48 @@ function registerIpc() {
 		await shell.openExternal(url);
 	});
 
+	ipcMain.handle("desktop:open-agent-client", async (_event, input) => {
+		const { client, prompt, workspacePath } =
+			openAgentClientSchema.parse(input);
+		const resolvedWorkspacePath = assertGranted(workspacePath);
+		if (!(await fs.stat(resolvedWorkspacePath)).isDirectory()) {
+			throw new Error(`Not a directory: ${workspacePath}`);
+		}
+
+		// Build the custom-protocol URL here so the renderer cannot choose an
+		// arbitrary external scheme or workspace outside its granted scope.
+		const url = new URL(
+			client === "codex" ? "codex://threads/new" : "claude://code/new",
+		);
+		url.searchParams.set(client === "codex" ? "prompt" : "q", prompt);
+		url.searchParams.set(
+			client === "codex" ? "path" : "folder",
+			resolvedWorkspacePath,
+		);
+		await shell.openExternal(url.href);
+	});
+
 	ipcMain.handle("desktop:open-path-from-link", async (_event, { path }) => {
 		const resolved = await assertGrantedOrConfirmFile(path);
-		if (hasMarkdownExtension(resolved)) {
+		if (fileKindForPath(resolved) !== "external") {
 			if (!(await pathExistsAsFile(resolved))) {
 				throw new Error("FILE_NOT_FOUND");
 			}
-			return { kind: "markdown", path: toRendererPath(resolved) };
+			return { kind: "file", path: toRendererPath(resolved) };
 		}
-		await shell.openPath(resolved);
+		const openError = await shell.openPath(resolved);
+		if (openError) throw new Error(openError);
 		return { kind: "opened" };
 	});
+
+	ipcMain.handle(
+		"desktop:open-path-in-default-app",
+		async (_event, { path }) => {
+			const resolved = assertGranted(path);
+			const error = await shell.openPath(resolved);
+			if (error) throw new Error(error);
+		},
+	);
 
 	ipcMain.handle("desktop:reveal-file", (_event, { path: filePath }) => {
 		shell.showItemInFolder(assertGranted(filePath));
@@ -1693,6 +1784,16 @@ function registerIpc() {
 	);
 
 	ipcMain.handle("desktop:get-update-state", () => updateState);
+	ipcMain.handle("desktop:get-telemetry-consent", () => telemetry.getConsent());
+	ipcMain.handle("desktop:set-telemetry-consent", (_event, { consent }) => {
+		if (consent !== "enabled" && consent !== "declined") {
+			throw new Error("Invalid telemetry consent");
+		}
+		return telemetry.setConsent(consent);
+	});
+	ipcMain.handle("desktop:record-telemetry-activity", (_event, input) =>
+		telemetry.recordActivity(input?.usedHtmlApp === true),
+	);
 
 	ipcMain.handle(
 		"desktop:get-fullscreen",
@@ -1713,7 +1814,7 @@ function registerIpc() {
 	ipcMain.handle("desktop:set-menu-state", (_event, state: MenuState) => {
 		menuState = {
 			hasWorkspace: state.hasWorkspace === true,
-			hasMarkdownNoteOpen: state.hasMarkdownNoteOpen === true,
+			hasSourceViewOpen: state.hasSourceViewOpen === true,
 			isSourceMode: state.isSourceMode === true,
 			canGoBack: state.canGoBack === true,
 			canGoForward: state.canGoForward === true,
@@ -1757,7 +1858,13 @@ if (!singleInstanceLock) {
 		sendToRenderer("desktop:open-file", toRendererPath(resolved));
 	});
 
+	// "Desktop Active" means the app was used that day (TELEMETRY.md): launch
+	// covers the first day, focus covers sessions left open across midnight.
+	app.on("browser-window-focus", () => void telemetry.recordActivity(false));
+
 	app.whenReady().then(async () => {
+		await telemetry.load();
+		void telemetry.recordActivity(false);
 		await loadGrants();
 		if (launchWorkspacePath) grantRoot(launchWorkspacePath);
 		await saveGrants();

@@ -1,0 +1,7 @@
+Reading list
+
+How to Take Smart Notes - Sonke Ahrens
+The Shape of Design - Frank Chimero
+Working in Public - Nadia Eghbal
+
+Lent to Sam: A Philosophy of Software Design

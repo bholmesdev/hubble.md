@@ -1,0 +1,6 @@
+Notes from Tuesday sync
+
+Plain text stays plain: characters like # heading and **bold** should
+render literally here, not as formatting.
+
+Follow up with the team about the Q3 roadmap doc.

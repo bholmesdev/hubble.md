@@ -32,6 +32,10 @@ export {
 	type MarkdownSourceEditorProps,
 } from "./editor/MarkdownSourceEditor";
 export { ReviewCommentSlot } from "./editor/ReviewCommentSlot";
+export {
+	PlainTextEditor,
+	type PlainTextEditorProps,
+} from "./editor/PlainTextEditor";
 export { SmartLinkExtension } from "./editor/SmartLinkExtension";
 export { VirtualCursor } from "./editor/VirtualCursor";
 export type { VirtualCursorMode } from "./editor/virtualCursorMode";
@@ -45,3 +49,4 @@ export { Button, buttonVariants } from "./primitives/button";
 export { Input } from "./primitives/input";
 export { Modal } from "./primitives/modal";
 export { Separator } from "./primitives/separator";
+export { Switch } from "./primitives/switch";

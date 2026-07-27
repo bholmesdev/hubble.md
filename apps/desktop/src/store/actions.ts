@@ -7,12 +7,16 @@ import {
 	isChangelogPath,
 	prepareChangelogMarkdown,
 } from "../lib/changelogNote";
+import { takeLatest } from "../lib/concurrency";
 import {
 	absoluteWorkspacePath,
 	basename,
 	dirname,
 	extname,
+	fileKindForPath,
 	hasMarkdownExtension,
+	isCodeFile,
+	isEditableFile,
 	joinPath,
 	markdownAssetFolderPath,
 	normalizePath,
@@ -21,7 +25,6 @@ import {
 	relativeWorkspacePath,
 	replacePathPrefix,
 } from "../lib/filePath";
-import { latest } from "../lib/latest";
 import {
 	indexMovedFiles,
 	type MovedFile,
@@ -40,13 +43,14 @@ import {
 	rewriteHistory,
 	setHistory,
 } from "./history";
-import type { TerminalPosition } from "./persistence";
+import type { CodeFileOpenMode, TerminalPosition } from "./persistence";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
 import {
 	applyFileAction,
 	appStore,
 	chatCommandStore,
 	cleanFileState,
+	codeFileOpenModeStore,
 	emptyDoc,
 	type FileEntry,
 	type FolderEntry,
@@ -367,6 +371,8 @@ const pendingRenames = new Map<string, string>();
 type LoadPathOptions = {
 	history?: "push" | "none";
 	missing?: "toast" | "silent";
+	/** `false` keeps code files in Hubble regardless of the default-app preference. */
+	launchExternal?: boolean;
 };
 
 export function getPendingRenameTarget(path: string) {
@@ -407,6 +413,20 @@ export function setTerminalPosition(position: TerminalPosition) {
 
 export function setChatCommand(command: string) {
 	chatCommandStore.set(command);
+}
+
+export function setCodeFileOpenMode(mode: CodeFileOpenMode) {
+	codeFileOpenModeStore.set(mode);
+}
+
+export async function openPathInDefaultApp(path: string) {
+	try {
+		await desktopApi.openPathInDefaultApp(path);
+	} catch (err) {
+		toast.error("Failed to open file", {
+			description: handleFileError(err),
+		});
+	}
 }
 
 export function setLastSeenVersion(version: string) {
@@ -472,7 +492,7 @@ export async function openWorkspace(path?: string) {
 
 	const lastFile = workspaceStore.get().lastOpenedPaths[nextPath];
 	if (lastFile) {
-		await loadPath(lastFile, { missing: "silent" });
+		await loadPath(lastFile, { missing: "silent", launchExternal: false });
 		return;
 	}
 
@@ -515,8 +535,8 @@ export async function savePathContent(
 	content: string,
 	options?: { force?: boolean },
 ) {
-	// The changelog note is virtual and read-only; nothing to write.
-	if (isChangelogPath(path)) return;
+	// Binary viewers, external files, and the virtual changelog never enter text saves.
+	if (isChangelogPath(path) || !isEditableFile(path)) return;
 	const current = viewerStore.get();
 	const force = options?.force === true;
 	if (current.currentPath !== path) return;
@@ -607,9 +627,13 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 	if (!parent) return;
 
 	const currentExt = extname(path);
-	const nextNameWithExt = /\.[^/.\\]+$/.test(trimmedName)
-		? trimmedName
-		: `${trimmedName}${currentExt}`;
+	const proposedExt = extname(trimmedName);
+	const proposedStem =
+		proposedExt.length > 0 &&
+		proposedExt.toLocaleLowerCase() === currentExt.toLocaleLowerCase()
+			? trimmedName.slice(0, -proposedExt.length)
+			: trimmedName;
+	const nextNameWithExt = `${proposedStem}${currentExt}`;
 	// Slash paths are relative to the current file's folder, matching sidebar
 	// rename behavior for nested notes.
 	const nextPath = normalizePath(joinPath(parent, nextNameWithExt));
@@ -617,7 +641,7 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 	if (nextPath === path) return;
 
 	try {
-		if (isCurrentFile) {
+		if (isCurrentFile && isEditableFile(path)) {
 			await savePathContent(path, current.content, { force: true });
 		}
 		pendingRenames.set(path, nextPath);
@@ -662,7 +686,7 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 		await refreshFiles();
 		if (isCurrentFile) {
 			// Path rewrite already updated history; reload content without a new visit.
-			await loadPath(nextPath, { history: "none" });
+			await loadPath(nextPath, { history: "none", launchExternal: false });
 		}
 	} catch (err) {
 		pendingRenames.delete(path);
@@ -741,7 +765,7 @@ export async function renameFolder(
 	);
 
 	try {
-		if (currentAffected && currentPath) {
+		if (currentAffected && currentPath && isEditableFile(currentPath)) {
 			await savePathContent(currentPath, current.content, { force: true });
 		}
 		await desktopApi.renameFile(path, nextPath);
@@ -849,7 +873,7 @@ export async function moveSidebarItem(
 	);
 
 	try {
-		if (currentAffected && currentPath) {
+		if (currentAffected && currentPath && isEditableFile(currentPath)) {
 			await savePathContent(currentPath, current.content, { force: true });
 		}
 		await desktopApi.renameFile(sourcePath, nextPath);
@@ -923,7 +947,10 @@ async function createEmptyFileInFolder(
 		const modified_at = Math.floor(Date.now() / 1000);
 		workspaceStore.set((state) => ({
 			...state,
-			files: [...state.files, { path, modified_at }],
+			files: [
+				...state.files,
+				{ path, modified_at, kind: fileKindForPath(path) },
+			],
 		}));
 		await loadPath(path);
 		await refreshFiles();
@@ -1100,10 +1127,11 @@ export async function forceKeepLocalEdits() {
 	await savePathContent(current.currentPath, current.content, { force: true });
 }
 
-const { run: loadPath, invalidate: invalidateLoadPath } = latest(
+const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 	async ({ isStale }, path: string, options?: LoadPathOptions) => {
 		const historyMode = options?.history ?? "push";
 		const missingMode = options?.missing ?? "toast";
+		const fileKind = fileKindForPath(path);
 		const timer = window.setTimeout(() => {
 			if (isStale()) return;
 			viewerStore.set((state) => ({
@@ -1114,7 +1142,12 @@ const { run: loadPath, invalidate: invalidateLoadPath } = latest(
 		}, LOADING_DELAY_MS);
 
 		try {
-			const content = await desktopApi.readFileText(path);
+			let content = "";
+			if (fileKind === "viewer") {
+				if (!(await desktopApi.pathExists(path))) throw new Error("ENOENT");
+			} else {
+				content = await desktopApi.readFileText(path);
+			}
 			if (isStale()) return;
 			appStore.set((state) => withOpenedDoc(state, path, content));
 			if (historyMode === "push") pushHistory(path);
@@ -1153,7 +1186,28 @@ const { run: loadPath, invalidate: invalidateLoadPath } = latest(
 		}
 	},
 );
-export { loadPath };
+
+export async function loadPath(path: string, options?: LoadPathOptions) {
+	if (
+		isCodeFile(path) &&
+		codeFileOpenModeStore.get() === "default-app" &&
+		options?.launchExternal !== false
+	) {
+		await openPathInDefaultApp(path);
+		return;
+	}
+	if (fileKindForPath(path) !== "external") {
+		await loadInternalPath(path, options);
+		return;
+	}
+	try {
+		await desktopApi.openPathFromLink(path);
+	} catch (err) {
+		toast.error("Failed to open file", {
+			description: handleFileError(err),
+		});
+	}
+}
 
 /**
  * Opens the app changelog as an ephemeral note. It never touches disk or
@@ -1206,7 +1260,11 @@ async function navigateHistory(delta: -1 | 1) {
 			const target = working.entries[nextIndex];
 			if (await desktopApi.pathExists(target)) {
 				setHistory({ entries: working.entries, index: nextIndex });
-				await loadPath(target, { history: "none", missing: "silent" });
+				await loadPath(target, {
+					history: "none",
+					missing: "silent",
+					launchExternal: false,
+				});
 				return;
 			}
 			const entries = working.entries.filter((entry) => entry !== target);

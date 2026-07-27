@@ -15,6 +15,7 @@
 			"!**/coverage",
 			"!**/.claude/skills",
 			"!**/.astro",
+			"!apps/desktop/fixtures/playground",
 			"!**/*.tsbuildinfo",
 			"!**/convex/_generated"
 		]

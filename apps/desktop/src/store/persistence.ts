@@ -1,13 +1,18 @@
 import { DEFAULT_CHAT_COMMAND } from "./settings";
-import { emptyDoc, type SortMode } from "./state";
+import {
+	emptyDoc,
+	type FileEntry,
+	type FolderEntry,
+	type SortMode,
+} from "./state";
 
 type WorkspaceState = {
 	workspacePath: string | null;
 	recentWorkspaces: string[];
 	lastOpenedPaths: Record<string, string>;
 	sortMode: SortMode;
-	files: { path: string; modified_at: number }[];
-	folders: { path: string; modified_at: number }[];
+	files: FileEntry[];
+	folders: FolderEntry[];
 	pinnedNotes: string[];
 };
 
@@ -25,8 +30,11 @@ type UiState = {
 
 type SettingsState = {
 	chatCommand: string;
+	codeFileOpenMode: CodeFileOpenMode;
 	lastSeenVersion: string | null;
 };
+
+export type CodeFileOpenMode = "hubble" | "default-app";
 
 export type DesktopState = {
 	workspace: WorkspaceState;
@@ -48,7 +56,11 @@ type Persisted = {
 		isTerminalOpen?: boolean;
 		terminalPosition?: TerminalPosition;
 	};
-	settings?: { chatCommand?: string; lastSeenVersion?: string | null };
+	settings?: {
+		chatCommand?: string;
+		codeFileOpenMode?: CodeFileOpenMode;
+		lastSeenVersion?: string | null;
+	};
 };
 
 export const STORAGE_KEY = "hubble-desktop-app";
@@ -102,6 +114,10 @@ export function getInitialState(): DesktopState {
 				typeof p?.settings?.chatCommand === "string"
 					? p.settings.chatCommand
 					: DEFAULT_CHAT_COMMAND,
+			codeFileOpenMode:
+				p?.settings?.codeFileOpenMode === "default-app"
+					? "default-app"
+					: "hubble",
 			// A missing field on an existing install means the user updated from
 			// a release that predates version tracking: treat the running version
 			// as news. Only a truly fresh install starts at null (no callout).
@@ -133,6 +149,7 @@ export function serialize(state: DesktopState): Persisted {
 		},
 		settings: {
 			chatCommand: state.settings.chatCommand,
+			codeFileOpenMode: state.settings.codeFileOpenMode,
 			lastSeenVersion: state.settings.lastSeenVersion,
 		},
 	};
