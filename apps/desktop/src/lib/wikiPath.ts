@@ -17,6 +17,9 @@ export function resolveWikiPath({
 	const path = target.split("#")[0];
 	const pathWithExtension = withMarkdownExtension(path);
 	if (pathWithExtension.startsWith("/")) return pathWithExtension;
+	const directPath = workspacePath ? joinPath(workspacePath, path) : path;
+	const directMatch = files.find((file) => file.path === directPath);
+	if (directMatch) return directMatch.path;
 
 	const exactPath = workspacePath
 		? joinPath(workspacePath, pathWithExtension)

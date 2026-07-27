@@ -17,6 +17,7 @@ import {
 	deleteMarkdownFile,
 	loadPath,
 	moveSidebarItems,
+	openPathInDefaultApp,
 	openWorkspace,
 	renameFolder,
 	renameMarkdownFile,
@@ -104,6 +105,7 @@ export function Sidebar({
 			onCollapse={collapseSidebar}
 			onSortModeChange={setSortMode}
 			onSelectFile={(path) => void loadPath(path)}
+			onOpenFileInDefaultApp={(path) => void openPathInDefaultApp(path)}
 			onRevealFile={(path) => void desktopApi.revealFile(path)}
 			onCopyFilePath={(path) => void copyFilePath(path)}
 			onRevealFolder={(folderId) =>

@@ -34,6 +34,21 @@ describe("MarkdownSourceEditor document helpers", () => {
 		});
 	});
 
+	it("stores HTML with HTML syntax highlighting", () => {
+		const html = "<!doctype html>\n<title>Test</title>";
+
+		expect(sourceDocFromMarkdown(html, "html")).toEqual({
+			type: "doc",
+			content: [
+				{
+					type: "codeBlock",
+					attrs: { language: "html" },
+					content: [{ type: "text", text: html }],
+				},
+			],
+		});
+	});
+
 	it("reads the whole markdown file back from the code block", () => {
 		const markdown = "---\ntitle: Test\n---\n\n# Hello\n\nBody";
 		const editor = new Editor({

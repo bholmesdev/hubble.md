@@ -134,6 +134,7 @@ function IframeEmbedNodeView({
 			) : (
 				<IframeView
 					className="hubble-iframe-embed"
+					htmlAppPath={resolvedEmbed?.path ?? ""}
 					onError={setError}
 					onHeightChange={(nextHeight) =>
 						setHeight((current) =>

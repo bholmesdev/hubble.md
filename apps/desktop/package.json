@@ -1,7 +1,7 @@
 {
 	"name": "@hubble.md/desktop",
 	"private": true,
-	"version": "0.1.20",
+	"version": "0.1.21",
 	"description": "Desktop app for Hubble.md",
 	"license": "MIT",
 	"author": "Ben Holmes <hey@bholmes.dev>",

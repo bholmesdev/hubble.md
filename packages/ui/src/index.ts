@@ -32,6 +32,10 @@ export {
 	type MarkdownSourceEditorProps,
 } from "./editor/MarkdownSourceEditor";
 export {
+	PlainTextEditor,
+	type PlainTextEditorProps,
+} from "./editor/PlainTextEditor";
+export {
 	ReviewCommentSummary,
 	type ReviewCommentSummaryProps,
 } from "./editor/ReviewCommentSummary";
@@ -53,3 +57,4 @@ export { Button, buttonVariants } from "./primitives/button";
 export { Input } from "./primitives/input";
 export { Modal } from "./primitives/modal";
 export { Separator } from "./primitives/separator";
+export { Switch } from "./primitives/switch";

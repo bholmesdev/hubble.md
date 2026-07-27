@@ -8,7 +8,6 @@ import {
 import {
 	getActiveLinkRange,
 	wikiDisplayNameForTarget,
-	withMarkdownExtension,
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
@@ -360,7 +359,7 @@ function updateLinkMark(editor: Editor, link: ActiveLink, href: string) {
 	editor.view.dispatch(tr);
 }
 
-async function visitActiveLink(
+export async function visitActiveLink(
 	link: { href: string; kind: "url" | "wiki"; target: string | null },
 	onOpenExternalLink: (href: string) => void | Promise<void>,
 	onOpenWikiLink: (target: string) => void | Promise<void>,
@@ -372,7 +371,7 @@ async function visitActiveLink(
 			onMessage?.("Cannot open wiki link without a target", "error");
 			return;
 		}
-		await onOpenWikiLink(withMarkdownExtension(link.target));
+		await onOpenWikiLink(link.target);
 		return;
 	}
 	await visitLink(link.href, onOpenExternalLink, onMessage);

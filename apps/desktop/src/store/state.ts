@@ -1,6 +1,7 @@
 import type { ReviewThread } from "@hubble.md/ui";
 import { store } from "@simplestack/store";
 import type { FileAction } from "../externalFileChange";
+import type { FileKind } from "../lib/filePath";
 import { localStoragePersist } from "../lib/localStoragePersist";
 import {
 	type DesktopState,
@@ -14,9 +15,13 @@ export type SortMode = "alpha" | "recent";
 export type FileEntry = {
 	path: string;
 	modified_at: number;
+	kind?: FileKind;
 };
 
-export type FolderEntry = FileEntry;
+export type FolderEntry = {
+	path: string;
+	modified_at: number;
+};
 
 type ViewerStatus = "idle" | "loading" | "ready" | "error";
 export type ViewMode = "rich" | "source";
@@ -180,6 +185,9 @@ export const pendingTerminalCommandStore = uiStore.select(
 export const chatCommandStore = appStore
 	.select("settings")
 	.select("chatCommand");
+export const codeFileOpenModeStore = appStore
+	.select("settings")
+	.select("codeFileOpenMode");
 export const lastSeenVersionStore = appStore
 	.select("settings")
 	.select("lastSeenVersion");
