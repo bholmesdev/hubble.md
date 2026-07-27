@@ -9,6 +9,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.1.22] - 2026-07-27
+
+### Added
+
 - Recent folders can be removed from the workspace switcher without affecting their files. Hover a folder and click the x, or press Delete while it's highlighted. Thanks [@saucy-tech](https://github.com/saucy-tech)! [#196](https://github.com/bholmesdev/hubble.md/pull/196)
 - Open the current note in Codex or Claude from the note actions menu, with the workspace and note path already filled in. [#188](https://github.com/bholmesdev/hubble.md/pull/188)
 - Browse every workspace file, edit plain text and code, view PDFs and images in Hubble, and open any file in its default app. Thanks [@zcuric](https://github.com/zcuric) for the suggestion! [#183](https://github.com/bholmesdev/hubble.md/pull/183)
@@ -19,8 +27,6 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Changed
 
 - Dragging files in the sidebar now shows what you're moving: a "Move 3 items" label for a selected group, the whole group dimmed as it travels, and a clearer highlight on the folder or workspace root you're dropping into. Thanks [@zcuric](https://github.com/zcuric)! [#198](https://github.com/bholmesdev/hubble.md/pull/198)
-
-### Fixed
 
 ## [0.1.21] - 2026-07-18
 
