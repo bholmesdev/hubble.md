@@ -235,11 +235,6 @@ function inlineNodesToMarkdown(nodes: JSONContent[]): string {
 				grouped.push(removeMark(nodes[j], mark));
 				j += 1;
 			}
-			// Recurse through the shared serializer, not nodeToMarkdown, so
-			// nested marks inside the span still get their delimiters.
-			// Every span's content is escaped, not just the commented one: text
-			// carrying its own closer (`has ++} inside`) would otherwise end the
-			// span early and spill the rest, plus the {#id}, into the document.
 			const content = escapeReviewContent(inlineNodesToMarkdown(grouped));
 			const type = mark.attrs?.type;
 			if (type === "reviewReplacement") {

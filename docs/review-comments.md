@@ -51,8 +51,18 @@ not be modified.
 
 ## Agent handoff
 
-The thread popover's **Copy agent prompt** action copies a short request naming
-the file and the comment's stable id. An agent addressing it should:
+Hubble copies the prompt for an agent rather than sending it, so the handoff
+works with whichever agent you already have open. There are two entry points:
+
+| Surface | Where | Prompt |
+| --- | --- | --- |
+| Thread | Copy action on an open comment thread | Names the file and that comment's stable id |
+| Comment list | Foot of the comment panel in the toolbar | Names the file only, covering every unresolved thread, so it stays correct as threads resolve |
+
+The comment panel lists every thread in the document and filters between
+unresolved, resolved, and all.
+
+An agent addressing a comment should:
 
 1. Read the named Markdown file before editing.
 2. Locate the comment by its `{#id}` anchor and preserve its anchored text.

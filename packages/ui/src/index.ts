@@ -31,6 +31,7 @@ export {
 	MarkdownSourceEditor,
 	type MarkdownSourceEditorProps,
 } from "./editor/MarkdownSourceEditor";
+export { ReviewCommentSlot } from "./editor/ReviewCommentSlot";
 export { SmartLinkExtension } from "./editor/SmartLinkExtension";
 export { VirtualCursor } from "./editor/VirtualCursor";
 export type { VirtualCursorMode } from "./editor/virtualCursorMode";

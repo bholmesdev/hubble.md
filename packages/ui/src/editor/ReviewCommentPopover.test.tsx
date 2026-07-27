@@ -97,6 +97,68 @@ describe("ReviewCommentPopover", () => {
 		expect(document.querySelector("[data-review-comment-popover]")).toBeNull();
 	});
 
+	it("offers the agent prompt on the thread itself, not behind a menu", async () => {
+		const editor = new Editor({
+			element: document.createElement("div"),
+			extensions: [StarterKit, ReviewMarkExtension],
+			content: markdownToTiptapDoc("{==commented==}{>>A note<<}{#c1}"),
+		});
+		editors.push(editor);
+
+		const viewport = document.createElement("div");
+		viewport.append(editor.view.dom);
+		document.body.append(viewport);
+		renderPopover(editor, viewport);
+
+		const writeText = stubClipboard();
+		const mark = editor.view.dom.querySelector(
+			'[data-review-type="reviewComment"]',
+		);
+		await act(async () => {
+			mark?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		const copy = document.querySelector<HTMLButtonElement>(
+			"[data-review-comment-popover] [data-review-copy-agent-prompt]",
+		);
+		expect(copy).toBeInstanceOf(HTMLButtonElement);
+		await act(async () => {
+			copy?.click();
+		});
+
+		expect(writeText).toHaveBeenCalledWith(
+			"Address comment c1 in /notes/plan.md",
+		);
+	});
+
+	it("publishes threads and opens one on request from the status bar", async () => {
+		const editor = new Editor({
+			element: document.createElement("div"),
+			extensions: [StarterKit, ReviewMarkExtension],
+			content: markdownToTiptapDoc(
+				"{==first==}{>>Note one<<}{#c1}\n\n{==second==}{>>Note two<<}{#c2}",
+			),
+		});
+		editors.push(editor);
+
+		const viewport = document.createElement("div");
+		viewport.append(editor.view.dom);
+		document.body.append(viewport);
+		const onCommentsChange = vi.fn();
+		const render = renderPopover(editor, viewport, { onCommentsChange });
+
+		expect(onCommentsChange).toHaveBeenCalled();
+		const published = onCommentsChange.mock.lastCall?.[0] as { id: string }[];
+		expect(published.map((comment) => comment.id)).toEqual(["c1", "c2"]);
+
+		await act(async () => {
+			render({ openRequest: { id: "c2", nonce: 1 } });
+		});
+
+		const popover = document.querySelector("[data-review-comment-popover]");
+		expect(popover?.textContent).toContain("Note two");
+	});
+
 	it("deletes only the clicked occurrence when an id is reused", async () => {
 		const editor = new Editor({
 			element: document.createElement("div"),
@@ -120,14 +182,9 @@ describe("ReviewCommentPopover", () => {
 			marks[0]?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 
-		await act(async () => {
-			document
-				.querySelector<HTMLButtonElement>('[aria-label="More actions"]')
-				?.click();
-		});
-		const trash = [
-			...document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
-		].find((item) => item.textContent?.includes("Delete comment"));
+		const trash = document.querySelector<HTMLButtonElement>(
+			'[data-review-comment-popover] [aria-label="Delete comment"]',
+		);
 		await act(async () => {
 			trash?.click();
 		});
@@ -463,6 +520,15 @@ function renderPopover(
 	};
 	act(() => render());
 	return render;
+}
+
+function stubClipboard() {
+	const writeText = vi.fn(async () => {});
+	Object.defineProperty(navigator, "clipboard", {
+		configurable: true,
+		value: { writeText },
+	});
+	return writeText;
 }
 
 function findTextPosition(editor: Editor, text: string) {

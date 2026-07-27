@@ -1,4 +1,3 @@
-import { Menu } from "@base-ui/react/menu";
 import {
 	computePosition,
 	flip,
@@ -26,16 +25,15 @@ import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDelete2Line from "~icons/mingcute/delete-2-line";
-import MingcuteMore1Line from "~icons/mingcute/more-1-line";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
-
-type ReviewComment = {
-	id: string;
-	from: number;
-	to: number;
-	attrs: ReviewMarkAttrs;
-};
+import {
+	buildReviewAgentPrompt,
+	deleteComment,
+	type ReviewComment,
+	setCommentResolved,
+	updateComment,
+} from "./reviewComments";
 
 type AnchorRange = { from: number; to: number };
 type PopoverMode = "new" | "thread";
@@ -43,16 +41,6 @@ type PopoverMode = "new" | "thread";
 // How far the gutter hover zone reaches back into the text. Its outer edge is
 // the viewport edge, so the whole margin counts as gutter.
 const GUTTER_HOVER_TEXT_BUFFER_PX = 96;
-
-export function buildReviewAgentPrompt({
-	filePath,
-	commentId,
-}: {
-	filePath: string;
-	commentId: string;
-}) {
-	return `Address comment ${commentId} in ${filePath}`;
-}
 
 function formatRelativeTime(iso: string | undefined) {
 	if (!iso) return null;
@@ -261,22 +249,6 @@ function nextReplyId(replies: ReviewReply[] | null | undefined) {
 	return `r${highest + 1}`;
 }
 
-function updateComment(
-	editor: Editor,
-	comment: ReviewComment,
-	attrs: ReviewMarkAttrs,
-) {
-	const markType = editor.state.schema.marks.reviewMark;
-	if (!markType) return;
-	const transaction = editor.state.tr.removeMark(
-		comment.from,
-		comment.to,
-		markType,
-	);
-	transaction.addMark(comment.from, comment.to, markType.create(attrs));
-	editor.view.dispatch(transaction);
-}
-
 function selectionReference(
 	editor: Editor,
 	range: AnchorRange,
@@ -312,13 +284,20 @@ export function ReviewCommentPopover({
 	filePath,
 	viewportRef,
 	request,
+	openRequest,
 	onMessage,
+	onCommentsChange,
 }: {
 	editor: Editor | null;
 	filePath: string;
 	viewportRef: RefObject<HTMLDivElement | null>;
 	request: number;
+	/** Bumped by the status bar summary to open one thread by id. */
+	openRequest?: { id: string; nonce: number };
 	onMessage?: (message: string, type: "success" | "error") => void;
+	/** Publishes the document's threads so the status bar can summarize them
+	 * without walking the document a second time on every transaction. */
+	onCommentsChange?: (comments: ReviewComment[]) => void;
 }) {
 	const [comments, setComments] = useState<ReviewComment[]>([]);
 	const [activeComment, setActiveComment] = useState<ReviewComment | null>(
@@ -333,6 +312,7 @@ export function ReviewCommentPopover({
 	const [popoverEl, setPopoverEl] = useState<HTMLDivElement | null>(null);
 	const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 	const requestRef = useRef(0);
+	const openRequestRef = useRef(0);
 	const [layoutRevision, setLayoutRevision] = useState(0);
 	const [hoveredBlock, setHoveredBlock] = useState<AnchorRange | null>(null);
 	// Kept mounted and faded via opacity rather than conditionally rendered, so
@@ -347,6 +327,7 @@ export function ReviewCommentPopover({
 			if (!editor) return;
 			const nextComments = collectComments(editor);
 			setComments(nextComments);
+			onCommentsChange?.(nextComments);
 			setActiveComment((current) => {
 				if (!current) return null;
 				let { from, to } = current;
@@ -366,7 +347,7 @@ export function ReviewCommentPopover({
 				);
 			});
 		},
-		[editor],
+		[editor, onCommentsChange],
 	);
 
 	useEffect(() => {
@@ -375,8 +356,9 @@ export function ReviewCommentPopover({
 		editor.on("transaction", refreshComments);
 		return () => {
 			editor.off("transaction", refreshComments);
+			onCommentsChange?.([]);
 		};
-	}, [editor, refreshComments]);
+	}, [editor, onCommentsChange, refreshComments]);
 
 	// Reserve gutter space so badges never sit on top of text. Forces a
 	// remeasure before paint so badge positions, computed in render from live
@@ -488,6 +470,27 @@ export function ReviewCommentPopover({
 		startNewCommentAt({ from: selection.from, to: selection.to });
 	}, [editor, request, startNewCommentAt]);
 
+	// Opening a thread from the status bar summary can target a comment that is
+	// scrolled out of view, so put the caret on it and scroll before opening.
+	useEffect(() => {
+		if (
+			!editor ||
+			!openRequest ||
+			openRequestRef.current === openRequest.nonce
+		) {
+			return;
+		}
+		openRequestRef.current = openRequest.nonce;
+		const comment = comments.find((entry) => entry.id === openRequest.id);
+		if (!comment) return;
+		editor.view.dispatch(
+			editor.state.tr
+				.setSelection(TextSelection.create(editor.state.doc, comment.from))
+				.scrollIntoView(),
+		);
+		openThread(comment);
+	}, [comments, editor, openRequest, openThread]);
+
 	// Track which block the pointer is over so the gutter "add comment" button
 	// can be shown for it without requiring a text selection first.
 	useEffect(() => {
@@ -512,10 +515,7 @@ export function ReviewCommentPopover({
 				clearHover();
 				return;
 			}
-			// Trigger near the gutter only. A full-line zone flickers as the
-			// pointer crosses the text/button boundary and fights normal text
-			// hovering. The zone runs out to the viewport edge so there's no
-			// dead patch between the text and the button.
+			// Trigger the hoverable comment button near the gutter only
 			const viewportRect = viewport.getBoundingClientRect();
 			const paddingInlineEnd =
 				Number.parseFloat(getComputedStyle(editor.view.dom).paddingInlineEnd) ||
@@ -620,12 +620,9 @@ export function ReviewCommentPopover({
 			const target = event.target;
 			if (!(target instanceof Node)) return;
 			if (popoverEl?.contains(target)) return;
-			// The thread overflow menu renders in a portal outside the popover.
 			if (
 				target instanceof Element &&
-				target.closest(
-					"[data-review-comment-anchor], [data-review-thread-menu]",
-				)
+				target.closest("[data-review-comment-anchor]")
 			) {
 				return;
 			}
@@ -633,8 +630,6 @@ export function ReviewCommentPopover({
 		};
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key !== "Escape") return;
-			// Let an open overflow menu consume the first Escape.
-			if (document.querySelector("[data-review-thread-menu]")) return;
 			close();
 			editor?.commands.focus();
 		};
@@ -676,9 +671,9 @@ export function ReviewCommentPopover({
 			to: anchorRange.to,
 			attrs,
 		});
+		// No toast: the thread appearing in place is its own confirmation.
 		setMode("thread");
 		setDraft("");
-		onMessage?.("Comment added", "success");
 	}, [anchorRange, close, draft, editor, onMessage]);
 
 	const addReply = useCallback(() => {
@@ -701,25 +696,17 @@ export function ReviewCommentPopover({
 
 	const toggleResolved = useCallback(() => {
 		if (!editor || !activeComment) return;
-		const attrs: ReviewMarkAttrs = {
-			...activeComment.attrs,
-			resolved: !activeComment.attrs.resolved,
-		};
-		updateComment(editor, activeComment, attrs);
+		const attrs = setCommentResolved(
+			editor,
+			activeComment,
+			!activeComment.attrs.resolved,
+		);
 		setActiveComment({ ...activeComment, attrs });
 	}, [activeComment, editor]);
 
-	const deleteComment = useCallback(() => {
+	const removeComment = useCallback(() => {
 		if (!editor || !activeComment) return;
-		const markType = editor.state.schema.marks.reviewMark;
-		if (!markType) return;
-		editor.view.dispatch(
-			editor.state.tr.removeMark(
-				activeComment.from,
-				activeComment.to,
-				markType,
-			),
-		);
+		deleteComment(editor, activeComment);
 		close();
 	}, [activeComment, close, editor]);
 
@@ -861,8 +848,8 @@ export function ReviewCommentPopover({
 					aria-label={mode === "new" ? "Add comment" : "Comment thread"}
 					data-review-comment-popover
 					className={cn(
-						"absolute z-[5] w-[min(21rem,calc(100vw-1rem))] overflow-y-auto rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay",
-						mode === "new" ? "px-2 py-1.5" : "p-3",
+						"absolute z-[5] flex w-[min(21rem,calc(100vw-1rem))] flex-col rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay",
+						mode === "new" && "px-2 py-1.5",
 					)}
 					style={{
 						insetInlineStart: `${position.x}px`,
@@ -879,117 +866,95 @@ export function ReviewCommentPopover({
 							ariaLabel="Comment text"
 						/>
 					) : activeComment ? (
-						<div className="group/thread">
-							<div className="flex h-6 items-center gap-2">
-								<span className="text-xs font-semibold">
-									{authorLabel(
-										activeComment.attrs.metadata?.author === "agent"
-											? "agent"
-											: "human",
-									)}
-								</span>
-								<div
-									className={cn(
-										"ms-auto flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within/thread:opacity-100 group-hover/thread:opacity-100 has-[[aria-expanded='true']]:opacity-100",
-										activeComment.attrs.resolved && "opacity-100",
-									)}
-								>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon-xs"
-										aria-label={
-											activeComment.attrs.resolved ? "Reopen" : "Resolve"
-										}
-										title={activeComment.attrs.resolved ? "Reopen" : "Resolve"}
-										onClick={toggleResolved}
-									>
-										{activeComment.attrs.resolved ? (
-											<MingcuteCheckCircleFill className="text-brand" />
-										) : (
-											<MingcuteCheckLine />
+						<div className="group/thread flex min-h-0 flex-1 flex-col">
+							<div className="min-h-0 flex-1 overflow-y-auto p-3">
+								<div className="flex h-6 items-center gap-2">
+									<span className="text-xs font-semibold">
+										{authorLabel(
+											activeComment.attrs.metadata?.author === "agent"
+												? "agent"
+												: "human",
 										)}
-									</Button>
-									<Menu.Root>
-										<Menu.Trigger
-											render={
-												<Button
-													type="button"
-													variant="ghost"
-													size="icon-xs"
-													aria-label="More actions"
-													title="More actions"
-												/>
+									</span>
+									<div className="ms-auto flex items-center gap-0.5">
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon-xs"
+											aria-label={
+												activeComment.attrs.resolved ? "Reopen" : "Resolve"
 											}
+											title={
+												activeComment.attrs.resolved ? "Reopen" : "Resolve"
+											}
+											onClick={toggleResolved}
 										>
-											<MingcuteMore1Line />
-										</Menu.Trigger>
-										<Menu.Portal>
-											<Menu.Positioner
-												align="end"
-												side="bottom"
-												sideOffset={4}
-												className="isolate z-50"
-											>
-												<Menu.Popup
-													data-review-thread-menu
-													className="z-50 min-w-44 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
-												>
-													<Menu.Item
-														className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start outline-hidden select-none data-highlighted:bg-accent"
-														onClick={() => void copyAgentPrompt()}
-													>
-														<MingcuteCopy2Line className="size-3.5 shrink-0 text-muted-foreground" />
-														Copy agent prompt
-													</Menu.Item>
-													<Menu.Item
-														className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-destructive outline-hidden select-none data-highlighted:bg-destructive/10"
-														onClick={deleteComment}
-													>
-														<MingcuteDelete2Line className="size-3.5 shrink-0" />
-														Delete comment
-													</Menu.Item>
-												</Menu.Popup>
-											</Menu.Positioner>
-										</Menu.Portal>
-									</Menu.Root>
-								</div>
-							</div>
-							<blockquote className="mt-1 line-clamp-2 border-s-2 border-brand-accent ps-2 text-xs leading-snug text-muted-foreground">
-								{editor.state.doc.textBetween(
-									activeComment.from,
-									activeComment.to,
-									"\n",
-								)}
-							</blockquote>
-							<p className="mt-1.5 whitespace-pre-wrap text-[0.8125rem] leading-relaxed">
-								{activeComment.attrs.body}
-							</p>
-							{(activeComment.attrs.replies ?? []).map((reply) => (
-								<div key={reply.id} className="mt-2.5">
-									<div className="flex items-baseline gap-2">
-										<span className="text-xs font-semibold">
-											{authorLabel(reply.author)}
-										</span>
-										{formatRelativeTime(reply.createdAt) && (
-											<span className="text-[11px] text-muted-foreground">
-												{formatRelativeTime(reply.createdAt)}
-											</span>
-										)}
+											{activeComment.attrs.resolved ? (
+												<MingcuteCheckCircleFill className="text-brand" />
+											) : (
+												<MingcuteCheckLine />
+											)}
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon-xs"
+											data-review-copy-agent-prompt
+											aria-label="Copy agent prompt"
+											title="Copy a prompt asking an agent to address this comment"
+											onClick={() => void copyAgentPrompt()}
+										>
+											<MingcuteCopy2Line />
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon-xs"
+											aria-label="Delete comment"
+											title="Delete comment"
+											className="hover:bg-destructive/10 hover:text-destructive"
+											onClick={removeComment}
+										>
+											<MingcuteDelete2Line />
+										</Button>
 									</div>
-									<p className="mt-0.5 whitespace-pre-wrap text-[0.8125rem] leading-relaxed">
-										{reply.body}
-									</p>
 								</div>
-							))}
-							<div className="mt-2.5">
-								<CommentComposer
-									value={replyDraft}
-									onChange={setReplyDraft}
-									onSubmit={addReply}
-									placeholder="Reply…"
-									ariaLabel="Reply text"
-								/>
+								<blockquote className="mt-1 line-clamp-2 border-s-2 border-brand-accent ps-2 text-xs leading-snug text-muted-foreground">
+									{editor.state.doc.textBetween(
+										activeComment.from,
+										activeComment.to,
+										"\n",
+									)}
+								</blockquote>
+								<p className="mt-1.5 whitespace-pre-wrap text-[0.8125rem] leading-relaxed">
+									{activeComment.attrs.body}
+								</p>
+								{(activeComment.attrs.replies ?? []).map((reply) => (
+									<div key={reply.id} className="mt-2.5">
+										<div className="flex items-baseline gap-2">
+											<span className="text-xs font-semibold">
+												{authorLabel(reply.author)}
+											</span>
+											{formatRelativeTime(reply.createdAt) && (
+												<span className="text-[11px] text-muted-foreground">
+													{formatRelativeTime(reply.createdAt)}
+												</span>
+											)}
+										</div>
+										<p className="mt-0.5 whitespace-pre-wrap text-[0.8125rem] leading-relaxed">
+											{reply.body}
+										</p>
+									</div>
+								))}
+								<div className="mt-2.5">
+									<CommentComposer
+										value={replyDraft}
+										onChange={setReplyDraft}
+										onSubmit={addReply}
+										placeholder="Reply…"
+										ariaLabel="Reply text"
+									/>
+								</div>
 							</div>
 						</div>
 					) : null}

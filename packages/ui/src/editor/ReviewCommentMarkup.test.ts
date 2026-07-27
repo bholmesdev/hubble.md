@@ -19,10 +19,6 @@ afterEach(() => {
 });
 
 describe("review comment marking", () => {
-	// Runs against a real Editor, so it is the only guard on InlineCodeExtension
-	// keeping `excludes: ""`. Restoring tiptap's default drops the review mark
-	// from the code segments and splits the span; the editor package's
-	// equivalent test builds JSON by hand and cannot catch that.
 	it("keeps one comment span across inline code and wiki links", () => {
 		const body =
 			"Open `file-index.html` or `todo-demo.html` from the sidebar to try full-screen HTML Apps. See [[samples/interview-prep]] for prompts.";

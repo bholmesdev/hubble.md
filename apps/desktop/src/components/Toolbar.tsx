@@ -2,6 +2,7 @@ import { Menu } from "@base-ui/react/menu";
 import {
 	Button,
 	formatShortcut,
+	ReviewCommentSlot,
 	Toolbar as SharedToolbar,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
@@ -91,6 +92,7 @@ export function Toolbar({
 					>
 						<MingcuteTerminalLine className="size-3.5" />
 					</Button>
+					<ReviewCommentSlot />
 					{currentPath && !isChangelog && (
 						<NoteActionsMenu
 							path={currentPath}

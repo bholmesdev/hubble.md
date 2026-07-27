@@ -306,10 +306,6 @@ function htmlToEmbed(raw: string | undefined): JSONContent | null {
 
 function inlineToPM(children: Content[]): JSONContent[] {
 	const out: JSONContent[] = [];
-	// Mutable so that when a span's closer shares a text node with the next
-	// span's opener, that opener can be requeued as a synthetic sibling and
-	// still match its own closer. One array rather than a recursive call, so
-	// trailing metadata comments can scan back across every segment of `out`.
 	const items = [...(children ?? [])];
 	for (let index = 0; index < items.length; index += 1) {
 		const child = items[index];
@@ -409,14 +405,9 @@ const REVIEW_SPAN_PATTERN =
 	/\{==((?:\\[\s\S]|(?!==\})[\s\S])+?)==\}(?:\{>>((?:\\[\s\S]|(?!<<\})[\s\S])*)<<\})?(?:\{#([A-Za-z0-9_-]+)\})?|\{\+\+([\s\S]+?)\+\+\}(?:\{#([A-Za-z0-9_-]+)\})?|\{--([\s\S]+?)--\}(?:\{#([A-Za-z0-9_-]+)\})?|\{~~((?:\\[\s\S]|(?!~>)[\s\S])+?)~>([\s\S]+?)~~\}(?:\{#([A-Za-z0-9_-]+)\})?/g;
 
 function reviewSpanFromChildren(children: Content[], index: number) {
-	// remark parses emphasis inside a review wrapper as sibling mdast nodes;
-	// reconstruct the wrapper before recursively converting its formatted content.
 	const first = children[index];
 	if (first?.type !== "text") return null;
 
-	// Spans with both delimiters in this text node are already handled by
-	// textToPM's regex, so only treat an opener as starting a cross-node span
-	// when no closer follows it here.
 	const selfContainedSpans = [...first.value.matchAll(REVIEW_SPAN_PATTERN)];
 	const searchStart =
 		selfContainedSpans.length > 0
@@ -498,10 +489,6 @@ function mergeReviewMetadata(nodes: JSONContent[], value: string | undefined) {
 	const metadata = parseReviewMetadata(value);
 	if (!metadata) return false;
 
-	// A comment span can parse into several text segments (inline code, links),
-	// so apply the metadata to every segment of the preceding comment. Applying
-	// it only to the nearest one makes the attrs diverge, and the span then
-	// renders and serializes as disjoint pieces.
 	let merged = false;
 	let targetId: unknown;
 	for (let index = nodes.length - 1; index >= 0; index -= 1) {

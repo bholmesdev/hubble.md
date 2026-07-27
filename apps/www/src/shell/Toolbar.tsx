@@ -1,4 +1,8 @@
-import { NewNoteButton, Toolbar as SharedToolbar } from "@hubble.md/ui";
+import {
+	NewNoteButton,
+	ReviewCommentSlot,
+	Toolbar as SharedToolbar,
+} from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { currentPathStore } from "../store/state";
 
@@ -14,7 +18,12 @@ export function Toolbar({ onNewNote }: Props) {
 			currentPath={currentPath ?? null}
 			sidebarOpen
 			platformInset={false}
-			rightSlot={<NewNoteButton onClick={onNewNote} />}
+			rightSlot={
+				<div className="flex items-center gap-1">
+					<ReviewCommentSlot />
+					<NewNoteButton onClick={onNewNote} />
+				</div>
+			}
 		/>
 	);
 }
