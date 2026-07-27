@@ -143,16 +143,6 @@ describe("CriticMarkup review conversion", () => {
 		]);
 	});
 
-	it("parses legacy percent-encoded thread metadata", () => {
-		const legacy =
-			"<!-- hubble-review:%7B%22replies%22%3A%5B%7B%22id%22%3A%22r1%22%2C%22body%22%3A%22Reply%22%7D%5D%2C%22resolved%22%3Atrue%7D-->";
-
-		expect(parseReviewMetadata(legacy)).toMatchObject({
-			replies: [{ id: "r1", body: "Reply" }],
-			resolved: true,
-		});
-	});
-
 	it("round-trips comments around formatted text", () => {
 		const markdown = "Use {==**bold text**==}{>>A note<<}{#c1}";
 		const doc = markdownToTiptapDoc(markdown);
@@ -381,18 +371,6 @@ describe("CriticMarkup review conversion", () => {
 			expect(mark?.attrs?.resolved).toBe(true);
 		}
 		expect(tiptapDocToMarkdown(doc)).toBe(markdown);
-	});
-
-	it("re-unifies adjacent same-id comment spans on round-trip", () => {
-		// Older serializations could split one comment into adjacent spans with
-		// the metadata trailing only the last one.
-		const markdown =
-			"{==A `code`==}{>>note<<}{#c4}{== B==}{>>note<<}{#c4}<!-- hubble-review:%7B%22replies%22%3A%5B%5D%2C%22resolved%22%3Atrue%7D-->";
-		const doc = markdownToTiptapDoc(markdown);
-
-		expect(tiptapDocToMarkdown(doc)).toBe(
-			'{==A `code` B==}{>>note<<}{#c4}<!-- hubble-review:{"replies":[],"resolved":true,"v":1}-->',
-		);
 	});
 
 	it("loads comment metadata without exposing CriticMarkup as text", () => {

@@ -54,16 +54,10 @@ export function parseReviewMetadata(
 	if (!match) return null;
 
 	try {
-		const payload = match[1] ?? "";
-		let parsed: Record<string, unknown> & {
+		const parsed = JSON.parse(match[1] ?? "") as Record<string, unknown> & {
 			replies?: unknown;
 			resolved?: unknown;
 		};
-		try {
-			parsed = JSON.parse(payload) as typeof parsed;
-		} catch {
-			parsed = JSON.parse(decodeURIComponent(payload)) as typeof parsed;
-		}
 		const replies = Array.isArray(parsed.replies)
 			? parsed.replies.filter(isReviewReply)
 			: [];
