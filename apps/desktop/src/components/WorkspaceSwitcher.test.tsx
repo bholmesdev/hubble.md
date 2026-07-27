@@ -73,18 +73,21 @@ describe("WorkspaceSwitcher", () => {
 			await flush();
 		});
 
-		const removeItems = Array.from(
-			document.body.querySelectorAll<HTMLElement>(
-				'[role="menuitem"][aria-label="Remove from list"]',
-			),
+		const removeButtons = Array.from(
+			document.body.querySelectorAll<HTMLElement>("[data-remove-workspace]"),
 		);
-		expect(removeItems).toHaveLength(2);
+		expect(removeButtons).toHaveLength(2);
+		for (const button of removeButtons) {
+			expect(button.getAttribute("role")).toBeNull();
+			expect(button.getAttribute("aria-hidden")).toBe("true");
+			expect(button.tabIndex).toBe(-1);
+		}
 		expect(
 			document.body.querySelector('[role="menuitem"][title="/workspace-a"]'),
 		).not.toBeNull();
 
 		await act(async () => {
-			removeItems[0]?.dispatchEvent(
+			removeButtons[0]?.dispatchEvent(
 				new MouseEvent("click", { bubbles: true, cancelable: true }),
 			);
 			await flush();
@@ -99,16 +102,14 @@ describe("WorkspaceSwitcher", () => {
 		});
 		expect(document.body.querySelector('[role="menu"]')).not.toBeNull();
 		expect(
-			document.body.querySelectorAll(
-				'[role="menuitem"][aria-label="Remove from list"]',
-			),
+			document.body.querySelectorAll("[data-remove-workspace]"),
 		).toHaveLength(1);
 		expect(document.activeElement).toBe(
 			document.body.querySelector('[role="menuitem"][title="/workspace-c"]'),
 		);
 	});
 
-	it("moves focus to the previous folder after removing the final folder", async () => {
+	it("removes the highlighted folder with Delete", async () => {
 		const { appStore, WorkspaceSwitcher, workspaceStore } =
 			await loadWorkspaceSwitcher();
 
@@ -130,16 +131,19 @@ describe("WorkspaceSwitcher", () => {
 			await flush();
 		});
 
-		const removeItem = document.body.querySelector<HTMLElement>(
-			'[role="menuitem"][aria-label="Remove from list"]',
+		const folderItem = document.body.querySelector<HTMLElement>(
+			'[role="menuitem"][title="/workspace-b"]',
 		);
-		if (!removeItem) throw new Error("Missing remove action");
+		if (!folderItem) throw new Error("Missing folder item");
+		expect(folderItem.getAttribute("aria-keyshortcuts")).toBe(
+			"Delete Backspace",
+		);
 
 		await act(async () => {
-			removeItem.focus();
-			removeItem.dispatchEvent(
+			folderItem.focus();
+			folderItem.dispatchEvent(
 				new KeyboardEvent("keydown", {
-					key: "Enter",
+					key: "Delete",
 					bubbles: true,
 					cancelable: true,
 				}),
