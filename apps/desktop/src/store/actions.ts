@@ -468,6 +468,24 @@ export async function createWorkspaceWithSidebar() {
 	}
 }
 
+/** Forgets an inactive folder from recents without changing its saved file state. */
+export function removeRecentWorkspace(path: string) {
+	workspaceStore.set((state) => {
+		if (
+			state.workspacePath === path ||
+			!state.recentWorkspaces.includes(path)
+		) {
+			return state;
+		}
+		return {
+			...state,
+			recentWorkspaces: state.recentWorkspaces.filter(
+				(recentPath) => recentPath !== path,
+			),
+		};
+	});
+}
+
 /** Opens a workspace by path. If no path given, shows a folder picker first. */
 export async function openWorkspace(path?: string) {
 	let nextPath = path;

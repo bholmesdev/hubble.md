@@ -1,9 +1,14 @@
 import { formatShortcut, WorkspaceSwitcherMenu } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import MingcuteAddLine from "~icons/mingcute/add-line";
+import MingcuteCloseLine from "~icons/mingcute/close-line";
 import { basename, dirname, duplicateBasenames } from "../lib/filePath";
 import { tildePath } from "../lib/tildePath";
-import { openWorkspace, setWorkspaceSwitcherOpen } from "../store/actions";
+import {
+	openWorkspace,
+	removeRecentWorkspace,
+	setWorkspaceSwitcherOpen,
+} from "../store/actions";
 import {
 	recentWorkspacesStore,
 	switcherOpenStore,
@@ -26,25 +31,57 @@ export function WorkspaceSwitcher() {
 			open={open}
 			onOpenChange={setWorkspaceSwitcherOpen}
 		>
-			<WorkspaceSwitcherMenu.Item selected title={tildePath(workspacePath)}>
+			<WorkspaceSwitcherMenu.Item
+				selected
+				title={tildePath(workspacePath)}
+				data-workspace-path={workspacePath}
+			>
 				<span className="truncate">{workspaceName}</span>
 			</WorkspaceSwitcherMenu.Item>
 			{others.map((path) => {
 				const name = basename(path);
 				const parent = duplicateNames.has(name) ? dirname(path) : null;
 				return (
-					<WorkspaceSwitcherMenu.Item
-						key={path}
-						title={tildePath(path)}
-						onClick={() => void openWorkspace(path)}
-					>
-						<span className="min-w-0 shrink truncate">{name}</span>
-						{parent && (
-							<span className="ms-auto min-w-0 flex-1 truncate text-start text-muted-foreground [direction:rtl]">
-								<bdi dir="ltr">{tildePath(parent)}</bdi>
-							</span>
-						)}
-					</WorkspaceSwitcherMenu.Item>
+					<div key={path} role="none" className="group relative flex min-w-0">
+						<WorkspaceSwitcherMenu.Item
+							title={tildePath(path)}
+							data-workspace-path={path}
+							className="min-w-0 flex-1 pe-7"
+							onClick={() => void openWorkspace(path)}
+						>
+							<span className="min-w-0 shrink truncate">{name}</span>
+							{parent && (
+								<span className="ms-auto min-w-0 flex-1 truncate text-start text-muted-foreground [direction:rtl]">
+									<bdi dir="ltr">{tildePath(parent)}</bdi>
+								</span>
+							)}
+						</WorkspaceSwitcherMenu.Item>
+						<WorkspaceSwitcherMenu.Action
+							aria-label="Remove from list"
+							label="Remove from list"
+							title="Remove from list"
+							className="pointer-events-none absolute -translate-y-1/2 opacity-0 transition-opacity [inset-block-start:50%] [inset-inline-end:0.25rem] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus:pointer-events-auto focus:opacity-100 data-highlighted:pointer-events-auto data-highlighted:opacity-100"
+							onClick={(event) => {
+								const folderItems = Array.from(
+									event.currentTarget
+										.closest('[role="menu"]')
+										?.querySelectorAll<HTMLElement>("[data-workspace-path]") ??
+										[],
+								);
+								const index = folderItems.findIndex(
+									(item) => item.dataset.workspacePath === path,
+								);
+								const nextItem =
+									folderItems[index + 1] ?? folderItems[index - 1];
+								removeRecentWorkspace(path);
+								// The focused menu item is about to unmount. Move focus only
+								// after React has rendered the shorter list.
+								queueMicrotask(() => nextItem?.focus());
+							}}
+						>
+							<MingcuteCloseLine aria-hidden="true" className="size-3" />
+						</WorkspaceSwitcherMenu.Action>
+					</div>
 				);
 			})}
 			<WorkspaceSwitcherMenu.Item

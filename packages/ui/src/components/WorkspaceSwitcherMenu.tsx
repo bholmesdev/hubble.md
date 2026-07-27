@@ -35,6 +35,19 @@ function Separator() {
 	return <Menu.Separator className="my-1 h-px bg-border" />;
 }
 
+function Action({ className, ...props }: Menu.Item.Props) {
+	return (
+		<Menu.Item
+			{...props}
+			closeOnClick={false}
+			className={cn(
+				"flex cursor-pointer items-center justify-center rounded-sm p-1 text-muted-foreground outline-hidden select-none hover:bg-accent hover:text-sidebar-foreground data-highlighted:bg-accent data-highlighted:text-sidebar-foreground",
+				className,
+			)}
+		/>
+	);
+}
+
 export function WorkspaceSwitcherMenu({
 	label,
 	title,
@@ -76,4 +89,5 @@ export function WorkspaceSwitcherMenu({
 }
 
 WorkspaceSwitcherMenu.Item = Item;
+WorkspaceSwitcherMenu.Action = Action;
 WorkspaceSwitcherMenu.Separator = Separator;
