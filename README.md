@@ -87,6 +87,18 @@ pnpm typecheck        # typecheck all packages
 - [`CONTEXT.md`](./CONTEXT.md) is the shared glossary for project terms (Workspace, HTML App, Embed, and more).
 - [`apps/desktop/README.md`](./apps/desktop/README.md) covers desktop build, dev, and packaging.
 
+## Powered by Warp
+
+Hubble's repository automation runs on [Warp Factory agents](https://www.warp.dev/oz). When you open an issue or a pull request, an agent handles it:
+
+- **Triage.** New issues get a readiness label and a comment explaining the decision.
+- **Implementation.** Issues labeled `ready-to-implement` get a draft pull request.
+- **Review.** Pull requests get a code review before a human looks at them.
+
+Every comment, review, and pull request an agent produces is signed with a link back to Warp, so it is always clear what a person wrote and what an agent wrote. The workflows live in [`.github/workflows`](./.github/workflows).
+
+If you want to set up your own software factory, [try Warp's setup guide](https://www.warp.dev/blog/software-factory-build-guide).
+
 ## Contributing
 
 Contributions of any size are welcome. Open an issue before substantial work so we can agree on the approach together. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full flow.

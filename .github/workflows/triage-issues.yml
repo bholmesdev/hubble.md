@@ -1,7 +1,7 @@
 name: Triage New Issues
 
 # Guarantees every newly opened issue carries a readiness label, then triages
-# it with an Oz cloud agent when possible.
+# it with a Warp Factory agent when possible.
 #
 # Flow:
 # 1. `seed` always applies `needs-triage` if the issue has no readiness label.
@@ -12,7 +12,7 @@ name: Triage New Issues
 #    the triage comment. If triage/apply fail, the seeded `needs-triage` remains.
 # 4. `implement` starts Implement Ready Issues when the applied label is ready-to-implement.
 #
-# Setup: the WARP_API_KEY repository secret must be set (the Oz API key).
+# Setup: the WARP_API_KEY repository secret must be set (the Warp API key).
 
 on:
   issues:
@@ -79,7 +79,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Triage with Oz agent
+      - name: Triage with Warp Factory agent
         uses: warpdotdev/oz-agent-action@v1
         id: triage
         env:
@@ -196,9 +196,11 @@ jobs:
           # Apply the chosen triage-state label to the triggering issue only.
           gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "$LABEL"
 
-          # Post the triage comment to the triggering issue only.
+          # Post the triage comment to the triggering issue only, signed so it
+          # is clear the decision came from a Warp Factory agent.
           jq -r '.comment // ""' triage_result.json > comment.md
           if [ -s comment.md ]; then
+            printf '\n---\n\n_Triaged by a [Warp Factory agent](https://www.warp.dev/oz)._\n' >> comment.md
             gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file comment.md
           else
             echo "No comment body provided by triage result; skipping comment."

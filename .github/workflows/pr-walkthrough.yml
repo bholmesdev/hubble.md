@@ -46,7 +46,7 @@ jobs:
           ref: refs/pull/${{ steps.pr.outputs.number }}/head
           fetch-depth: 0
 
-      - name: Generate PR walkthrough with Oz
+      - name: Generate PR walkthrough with Warp Factory agent
         uses: warpdotdev/oz-agent-action@main
         with:
           skill: warpdotdev/common-skills:pr-walkthrough

@@ -1,6 +1,6 @@
 name: Review Pull Requests
 
-# A read-only Oz agent reviews same-repository PRs. A separate publication job
+# A read-only Warp Factory agent reviews same-repository PRs. A separate publication job
 # validates its artifact against a freshly fetched diff before publishing it.
 
 on:
@@ -130,7 +130,7 @@ jobs:
       - name: Clear untrusted review artifact
         run: rm -f review.json
 
-      - name: Review with Grok 4.5
+      - name: Review with Warp Factory agent (Grok 4.5)
         uses: warpdotdev/oz-agent-action@v1
         with:
           model: grok-4-5-high
@@ -302,8 +302,14 @@ jobs:
                       raise SystemExit(f"Comment {index} has an inverted range")
               normalized.append(item)
 
+          # Sign the review so it is clear a Warp Factory agent produced it.
+          attribution = (
+              "\n\n---\n\n"
+              "_Reviewed by a [Warp Factory agent](https://www.warp.dev/oz)._"
+          )
+
           payload = {
-              "body": body,
+              "body": body + attribution,
               "commit_id": os.environ["EXPECTED_HEAD_SHA"],
               "event": "COMMENT",
               "comments": normalized,

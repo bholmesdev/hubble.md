@@ -23,7 +23,7 @@ For GitHub Issues, post a short status comment before doing implementation work 
 
 Use the authenticated `gh` CLI when available. Include:
 
-- That automated Oz implementation has started.
+- That automated implementation by a [Warp Factory agent](https://www.warp.dev/oz) has started.
 - The issue identifier being implemented.
 - A follow-along link to the Oz run or Oz session.
 
@@ -99,7 +99,7 @@ Create a descriptive branch for the implementation, such as `fix/issue-123-short
 
 Commit only the intended changes. Use a clear commit message. When committing, include:
 
-`Co-Authored-By: Oz <oz-agent@warp.dev>`
+`Co-Authored-By: Warp Factory Agent <oz-agent@warp.dev>`
 
 Push the branch and open a GitHub pull request against the repository's default branch using the authenticated `gh` CLI. Capture the PR URL returned by `gh pr create`; this URL is required before posting final success back to the issue.
 

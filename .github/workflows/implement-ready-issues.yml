@@ -1,6 +1,6 @@
 name: Implement Ready Issues
 
-# Gives an Oz agent read-only GitHub access when an issue is ready to implement,
+# Gives a Warp Factory agent read-only GitHub access when an issue is ready to implement,
 # then publishes its local changes from a separate privileged job.
 
 on:
@@ -53,7 +53,7 @@ jobs:
             --json number,title,body,labels,comments \
             > issue-context.json
 
-      - name: Implement issue with Oz agent
+      - name: Implement issue with Warp Factory agent
         uses: warpdotdev/oz-agent-action@v1
         with:
           model: gpt-5-6-sol-low
@@ -149,12 +149,15 @@ jobs:
           BRANCH="agent/issue-${ISSUE_NUMBER}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           TITLE="$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json title --jq '.title')"
 
-          git config user.name "Oz Agent"
+          git config user.name "Warp Factory Agent"
           git config user.email "oz-agent@warp.dev"
           git switch -c "$BRANCH"
           git commit -m "Implement issue #${ISSUE_NUMBER}" \
-            --trailer "Co-Authored-By: Oz <oz-agent@warp.dev>"
+            --trailer "Co-Authored-By: Warp Factory Agent <oz-agent@warp.dev>"
           git push origin "$BRANCH"
+
+          # Sign the PR body so reviewers see which agent wrote the change.
+          printf '\n---\n\n_Implemented by a [Warp Factory agent](https://www.warp.dev/oz)._\n' >> pr-body.md
 
           gh pr create \
             --repo "$REPO" \
