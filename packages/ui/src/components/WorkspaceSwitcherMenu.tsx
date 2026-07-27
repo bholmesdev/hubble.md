@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
 import MingcuteSelectorVerticalLine from "~icons/mingcute/selector-vertical-line";
 import { cn } from "../lib/utils";
@@ -33,6 +33,27 @@ function Item({
 
 function Separator() {
 	return <Menu.Separator className="my-1 h-px bg-border" />;
+}
+
+function Action({ className, ...props }: ComponentProps<"button">) {
+	return (
+		<button
+			type="button"
+			tabIndex={-1}
+			aria-hidden="true"
+			// Keep focus and selection on the menu item this sits inside.
+			onMouseDown={(event) => {
+				event.preventDefault();
+				event.stopPropagation();
+			}}
+			onPointerDown={(event) => event.stopPropagation()}
+			{...props}
+			className={cn(
+				"flex cursor-pointer items-center justify-center rounded-sm p-1 text-muted-foreground outline-hidden select-none hover:text-sidebar-foreground",
+				className,
+			)}
+		/>
+	);
 }
 
 export function WorkspaceSwitcherMenu({
@@ -76,4 +97,5 @@ export function WorkspaceSwitcherMenu({
 }
 
 WorkspaceSwitcherMenu.Item = Item;
+WorkspaceSwitcherMenu.Action = Action;
 WorkspaceSwitcherMenu.Separator = Separator;

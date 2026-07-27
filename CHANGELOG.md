@@ -9,6 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Recent folders can be removed from the workspace switcher without affecting their files. Hover a folder and click the x, or press Delete while it's highlighted. Thanks [@saucy-tech](https://github.com/saucy-tech)! [#196](https://github.com/bholmesdev/hubble.md/pull/196)
 - Open the current note in Codex or Claude from the note actions menu, with the workspace and note path already filled in. [#188](https://github.com/bholmesdev/hubble.md/pull/188)
 - Browse every workspace file, edit plain text and code, view PDFs and images in Hubble, and open any file in its default app. Thanks [@zcuric](https://github.com/zcuric) for the suggestion! [#183](https://github.com/bholmesdev/hubble.md/pull/183)
 - Hubble now collects anonymous usage data to help improve the app, with a clear notice and a Settings toggle to opt out. See [TELEMETRY.md](https://github.com/bholmesdev/hubble.md/blob/main/TELEMETRY.md) for what's collected. [#182](https://github.com/bholmesdev/hubble.md/pull/182)
