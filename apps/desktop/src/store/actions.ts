@@ -442,24 +442,29 @@ export function setLastSeenVersion(version: string) {
 export function initThemePreference() {
 	const preference = themePreferenceStore.get();
 	initTheme(preference);
-	void desktopApi.setThemeSource(preference);
+	syncNativeTheme(preference);
 }
 
 export function setThemePreference(preference: ThemePreference) {
 	themePreferenceStore.set(preference);
-	if (preference === "system") {
-		// An active override is still what `prefers-color-scheme` reports, so hold
-		// the current theme until main releases it, and skip if a newer explicit
-		// pick already applied itself while this was in flight.
-		void desktopApi.setThemeSource(preference).then(() => {
-			if (themePreferenceStore.get() === "system") {
-				applyThemePreference("system");
-			}
-		});
-		return;
-	}
-	applyThemePreference(preference);
-	void desktopApi.setThemeSource(preference);
+	if (preference !== "system") applyThemePreference(preference);
+	syncNativeTheme(preference);
+}
+
+/**
+ * An active override is still what `prefers-color-scheme` reports, so `"system"`
+ * can only be read once main has released it. Main may not emit a media change
+ * on release, so re-apply here instead of waiting for one.
+ */
+function syncNativeTheme(preference: ThemePreference) {
+	const released = desktopApi.setThemeSource(preference);
+	if (preference !== "system") return;
+	void released.then(() => {
+		// A newer explicit pick already applied itself while this was in flight.
+		if (themePreferenceStore.get() === "system") {
+			applyThemePreference("system");
+		}
+	});
 }
 
 export function requestChatAboutNote() {

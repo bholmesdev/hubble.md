@@ -49,6 +49,11 @@ async function loadStoreActions(
 		desktopApi: api,
 		setTimeout,
 		clearTimeout,
+		matchMedia: () => ({
+			matches: false,
+			addEventListener() {},
+			removeEventListener() {},
+		}),
 	});
 
 	const actions = await import("./actions");
@@ -119,6 +124,29 @@ describe("desktop savePathContent", () => {
 		releaseOverride?.();
 		await vi.waitFor(() =>
 			expect(classList.toggle).toHaveBeenLastCalledWith("dark", false),
+		);
+	});
+
+	it("re-applies a saved system preference once main releases the override", async () => {
+		const api = createDesktopApi();
+		const classList = { toggle: vi.fn() };
+		vi.stubGlobal("document", { documentElement: { classList } });
+		let releaseOverride: (() => void) | undefined;
+		api.setThemeSource.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					releaseOverride = resolve;
+				}),
+		);
+		const { initThemePreference } = await loadStoreActions(api);
+
+		initThemePreference();
+		expect(api.setThemeSource).toHaveBeenLastCalledWith("system");
+		const appliedAtBoot = classList.toggle.mock.calls.length;
+
+		releaseOverride?.();
+		await vi.waitFor(() =>
+			expect(classList.toggle.mock.calls.length).toBeGreaterThan(appliedAtBoot),
 		);
 	});
 
