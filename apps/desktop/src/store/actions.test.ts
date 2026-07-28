@@ -446,6 +446,40 @@ describe("desktop refreshFiles", () => {
 		expect(viewerStore.get().diskContent).toBe("updated");
 	});
 
+	it("reconciles when a full refresh joins a snapshot-only refresh", async () => {
+		const api = createDesktopApi();
+		let finishListing: (() => void) | undefined;
+		api.listDirectory.mockImplementation(
+			() =>
+				new Promise<{ files: []; folders: [] }>((resolve) => {
+					finishListing = () => resolve({ files: [], folders: [] });
+				}),
+		);
+		api.readFileText.mockResolvedValue("updated");
+		const { appStore, refreshFiles, viewerStore } = await loadStoreActions(api);
+		const path = "/workspace/note.md";
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace" },
+			document: {
+				...current.document,
+				currentPath: path,
+				content: "before",
+				diskContent: "before",
+				status: "ready",
+			},
+		}));
+
+		const snapshot = refreshFiles("/workspace", { reconcileActive: false });
+		const full = refreshFiles();
+		finishListing?.();
+		await Promise.all([snapshot, full]);
+
+		expect(api.listDirectory).toHaveBeenCalledTimes(1);
+		expect(api.readFileText).toHaveBeenCalledTimes(1);
+		expect(viewerStore.get().content).toBe("updated");
+	});
+
 	it("preserves local edits when the active note changed on disk", async () => {
 		const api = createDesktopApi();
 		api.readFileText.mockResolvedValue("external");

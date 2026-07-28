@@ -20,6 +20,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Refresh open folders from the toolbar after external changes such as Git pulls, without restarting Hubble. Thanks [@Mamdouh66](https://github.com/Mamdouh66) for the suggestion! [#202](https://github.com/bholmesdev/hubble.md/pull/202)
 - Recent folders can be removed from the workspace switcher without affecting their files. Hover a folder and click the x, or press Delete while it's highlighted. Thanks [@saucy-tech](https://github.com/saucy-tech)! [#196](https://github.com/bholmesdev/hubble.md/pull/196)
 - Open the current note in Codex or Claude from the note actions menu, with the workspace and note path already filled in. [#188](https://github.com/bholmesdev/hubble.md/pull/188)
 - Browse every workspace file, edit plain text and code, view PDFs and images in Hubble, and open any file in its default app. Thanks [@zcuric](https://github.com/zcuric) for the suggestion! [#183](https://github.com/bholmesdev/hubble.md/pull/183)

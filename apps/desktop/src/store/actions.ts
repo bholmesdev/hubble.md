@@ -83,7 +83,13 @@ const REFRESH_FILES_DEBOUNCE_MS = 250;
 const SELF_SAVE_TTL_MS = 5000;
 const missingPathErrorPattern = /\bENOENT\b|\bENOTDIR\b/;
 let refreshFilesTimer: ReturnType<typeof setTimeout> | null = null;
-const refreshFilesInFlight = new Map<string, Promise<void>>();
+const refreshFilesInFlight = new Map<
+	string,
+	{
+		intent: { reconcileActive: boolean };
+		promise: Promise<void>;
+	}
+>();
 // The active-file watcher also sees Hubble's own writes. If save A reaches disk
 // after the editor already has draft B, that watcher event is not an external
 // conflict; it is just the disk baseline catching up to a save we started.
@@ -98,9 +104,15 @@ export async function refreshFiles(
 	options?: { reconcileActive?: boolean },
 ) {
 	if (!path) return;
+	const reconcileActive = options?.reconcileActive !== false;
 	const pending = refreshFilesInFlight.get(path);
-	if (pending) return pending;
+	if (pending) {
+		// A user refresh must not lose reconciliation by joining a snapshot-only scan.
+		pending.intent.reconcileActive ||= reconcileActive;
+		return pending.promise;
+	}
 
+	const intent = { reconcileActive };
 	const refresh = (async () => {
 		try {
 			const listing = await desktopApi.listDirectory(path);
@@ -111,7 +123,7 @@ export async function refreshFiles(
 
 			const currentPath = viewerStore.get().currentPath;
 			if (
-				options?.reconcileActive === false ||
+				!intent.reconcileActive ||
 				!currentPath ||
 				isChangelogPath(currentPath) ||
 				!isEditableFile(currentPath) ||
@@ -127,7 +139,7 @@ export async function refreshFiles(
 			});
 		}
 	})();
-	refreshFilesInFlight.set(path, refresh);
+	refreshFilesInFlight.set(path, { intent, promise: refresh });
 	try {
 		await refresh;
 	} finally {
