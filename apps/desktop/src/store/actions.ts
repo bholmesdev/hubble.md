@@ -34,6 +34,11 @@ import {
 	rewriteMovedLinks,
 } from "../lib/markdownLinkRewrite";
 import {
+	setThemePreference as applyThemePreference,
+	initTheme,
+	type ThemePreference,
+} from "../theme";
+import {
 	activeHistory,
 	canGoBack,
 	canGoForward,
@@ -66,6 +71,7 @@ import {
 	type SortMode,
 	sidebarOpenStore,
 	switcherOpenStore,
+	themePreferenceStore,
 	uiStore,
 	type ViewMode,
 	viewerStore,
@@ -433,6 +439,39 @@ export async function openPathInDefaultApp(path: string) {
 
 export function setLastSeenVersion(version: string) {
 	lastSeenVersionStore.set(version);
+}
+
+export function initThemePreference() {
+	const preference = themePreferenceStore.get();
+	initTheme(preference);
+	syncNativeTheme(preference);
+}
+
+export function setThemePreference(preference: ThemePreference) {
+	themePreferenceStore.set(preference);
+	if (preference !== "system") applyThemePreference(preference);
+	syncNativeTheme(preference);
+}
+
+/**
+ * Hands the preference to the Electron main process, which forces it through
+ * `nativeTheme.themeSource` so native window chrome and sandboxed HTML apps
+ * follow it too.
+ *
+ * While a Light or Dark override is in force, Chromium reports that override to
+ * `prefers-color-scheme` instead of the real OS appearance. So the OS value is
+ * only readable after the main process drops the override, and dropping it fires
+ * no `change` event. That is why `"system"` waits and then applies itself.
+ */
+function syncNativeTheme(preference: ThemePreference) {
+	const updated = desktopApi.setThemeSource(preference);
+	if (preference !== "system") return;
+	void updated.then(() => {
+		// A newer explicit pick already applied itself while this was in flight.
+		if (themePreferenceStore.get() === "system") {
+			applyThemePreference("system");
+		}
+	});
 }
 
 export function requestChatAboutNote() {

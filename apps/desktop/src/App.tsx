@@ -75,6 +75,7 @@ import {
 	setLastSeenVersion,
 	setReviewThreads,
 	setSidebarOpen,
+	setThemePreference,
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
 	toggleTerminal,
@@ -88,6 +89,7 @@ import {
 	lastSeenVersionStore,
 	sidebarOpenStore,
 	terminalPositionStore,
+	themePreferenceStore,
 	uiStore,
 	type ViewMode,
 	viewerStore,
@@ -613,6 +615,7 @@ function App() {
 				searchContents={searchFileContents}
 			/>
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+				<GeneralSettingsSection />
 				<CodeFilesSettingsSection />
 				<ChatAboutNoteSettingsSection />
 				{telemetryConsent ? (
@@ -630,6 +633,29 @@ function App() {
 				) : null}
 			</SettingsDialog>
 		</main>
+	);
+}
+
+function GeneralSettingsSection() {
+	const theme = useStoreValue(themePreferenceStore);
+	return (
+		<SettingsSection title="General" description="Choose the app appearance.">
+			<div className="flex items-center gap-2">
+				{(["light", "dark", "system"] as const).map((preference) => (
+					<Button
+						key={preference}
+						size="sm"
+						variant={theme === preference ? "secondary" : "outline"}
+						aria-pressed={theme === preference}
+						onClick={() => setThemePreference(preference)}
+					>
+						{preference === "system"
+							? "System default"
+							: `${preference[0].toUpperCase()}${preference.slice(1)}`}
+					</Button>
+				))}
+			</div>
+		</SettingsSection>
 	);
 }
 

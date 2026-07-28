@@ -46,6 +46,7 @@ import {
 	SEARCH_MAX_RESULT_FILES,
 	SEARCH_MIN_QUERY_LENGTH,
 } from "../src/lib/searchContent";
+import type { ThemePreference } from "../src/theme";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
 import {
@@ -102,10 +103,6 @@ const updateCheckErrorMessage =
 // Check every 4 hours after the initial packaged-app update check.
 const updateCheckIntervalMs = 4 * 60 * 60 * 1000;
 
-// Follow the OS appearance. The renderer mirrors this to a `.dark` class so the
-// class-based Tailwind dark variant and `.dark { … }` token block activate.
-nativeTheme.themeSource = "system";
-
 // Windows/Linux draw the min/max/close buttons as a native overlay whose colors
 // are static unless we update them. Mirror the app palette so the button strip
 // follows the OS appearance instead of staying light in dark mode.
@@ -119,6 +116,11 @@ app.setName(appName);
 if (devAppName) {
 	app.setPath("userData", path.join(app.getPath("appData"), devAppName));
 }
+
+// The renderer owns the preference and mirrors it to a `.dark` class, but native
+// chrome and sandboxed HTML apps read `themeSource`. Restore it before the window
+// exists so those are right on the first frame, after the userData override above.
+nativeTheme.themeSource = loadThemeSource();
 const telemetry = new TelemetryManager({
 	statePath: path.join(app.getPath("userData"), "telemetry.json"),
 	endpoint:
@@ -231,6 +233,37 @@ function grantsPath(): string {
 
 function windowStatePath(): string {
 	return path.join(app.getPath("userData"), "window-size.json");
+}
+
+function themeSourcePath(): string {
+	return path.join(app.getPath("userData"), "theme.json");
+}
+
+function isThemePreference(value: unknown): value is ThemePreference {
+	return value === "light" || value === "dark" || value === "system";
+}
+
+function loadThemeSource(): ThemePreference {
+	try {
+		const raw = fsSync.readFileSync(themeSourcePath(), "utf8");
+		const source = JSON.parse(raw).source;
+		if (isThemePreference(source)) return source;
+	} catch {
+		// Missing or malformed theme state just means following the OS.
+	}
+	return "system";
+}
+
+function saveThemeSource(source: ThemePreference) {
+	try {
+		fsSync.mkdirSync(path.dirname(themeSourcePath()), { recursive: true });
+		fsSync.writeFileSync(
+			themeSourcePath(),
+			JSON.stringify({ source }, null, 2),
+		);
+	} catch {
+		// Best-effort cache; the renderer resends the preference on every launch.
+	}
 }
 
 function workspaceConfigPath(workspacePath: string): string {
@@ -1810,6 +1843,14 @@ function registerIpc() {
 		}
 		autoUpdater.quitAndInstall(false, true);
 	});
+
+	ipcMain.handle(
+		"desktop:set-theme-source",
+		(_event, { source }: { source: ThemePreference }) => {
+			nativeTheme.themeSource = isThemePreference(source) ? source : "system";
+			saveThemeSource(nativeTheme.themeSource);
+		},
+	);
 
 	ipcMain.handle("desktop:set-menu-state", (_event, state: MenuState) => {
 		menuState = {

@@ -191,3 +191,4 @@ export const codeFileOpenModeStore = appStore
 export const lastSeenVersionStore = appStore
 	.select("settings")
 	.select("lastSeenVersion");
+export const themePreferenceStore = appStore.select("settings").select("theme");

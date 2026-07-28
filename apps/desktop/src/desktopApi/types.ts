@@ -1,4 +1,5 @@
 import type { FileKind } from "../lib/filePath";
+import type { ThemePreference } from "../theme";
 
 export type FileEntry = {
 	path: string;
@@ -171,6 +172,7 @@ export type DesktopApi = {
 	toAssetUrl(path: string): string;
 	getLaunchFilePath(): Promise<string | null>;
 	getLaunchWorkspacePath(): Promise<string | null>;
+	setThemeSource(source: ThemePreference): Promise<void>;
 	setMenuState(state: MenuState): Promise<void>;
 	getUpdateState(): Promise<DesktopUpdateState>;
 	getTelemetryConsent(): Promise<TelemetryConsent>;
