@@ -407,6 +407,22 @@ describe("desktop savePathContent", () => {
 });
 
 describe("desktop refreshFiles", () => {
+	async function setupActiveNote(api: MockDesktopApi, content = "before") {
+		const stores = await loadStoreActions(api);
+		stores.appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace" },
+			document: {
+				...current.document,
+				currentPath: "/workspace/note.md",
+				content,
+				diskContent: "before",
+				status: "ready",
+			},
+		}));
+		return stores;
+	}
+
 	beforeEach(() => {
 		vi.unstubAllGlobals();
 	});
@@ -421,19 +437,7 @@ describe("desktop refreshFiles", () => {
 				}),
 		);
 		api.readFileText.mockResolvedValue("updated");
-		const { appStore, refreshFiles, viewerStore } = await loadStoreActions(api);
-		const path = "/workspace/note.md";
-		appStore.set((current) => ({
-			...current,
-			workspace: { ...current.workspace, workspacePath: "/workspace" },
-			document: {
-				...current.document,
-				currentPath: path,
-				content: "before",
-				diskContent: "before",
-				status: "ready",
-			},
-		}));
+		const { refreshFiles, viewerStore } = await setupActiveNote(api);
 
 		const first = refreshFiles();
 		const second = refreshFiles();
@@ -456,19 +460,7 @@ describe("desktop refreshFiles", () => {
 				}),
 		);
 		api.readFileText.mockResolvedValue("updated");
-		const { appStore, refreshFiles, viewerStore } = await loadStoreActions(api);
-		const path = "/workspace/note.md";
-		appStore.set((current) => ({
-			...current,
-			workspace: { ...current.workspace, workspacePath: "/workspace" },
-			document: {
-				...current.document,
-				currentPath: path,
-				content: "before",
-				diskContent: "before",
-				status: "ready",
-			},
-		}));
+		const { refreshFiles, viewerStore } = await setupActiveNote(api);
 
 		const snapshot = refreshFiles("/workspace", { reconcileActive: false });
 		const full = refreshFiles();
@@ -483,19 +475,10 @@ describe("desktop refreshFiles", () => {
 	it("preserves local edits when the active note changed on disk", async () => {
 		const api = createDesktopApi();
 		api.readFileText.mockResolvedValue("external");
-		const { appStore, refreshFiles, viewerStore } = await loadStoreActions(api);
-		const path = "/workspace/note.md";
-		appStore.set((current) => ({
-			...current,
-			workspace: { ...current.workspace, workspacePath: "/workspace" },
-			document: {
-				...current.document,
-				currentPath: path,
-				content: "local edit",
-				diskContent: "before",
-				status: "ready",
-			},
-		}));
+		const { refreshFiles, viewerStore } = await setupActiveNote(
+			api,
+			"local edit",
+		);
 
 		await refreshFiles();
 

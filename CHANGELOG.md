@@ -9,6 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Refresh open folders from the toolbar after external changes such as Git pulls, without restarting Hubble. Thanks [@Mamdouh66](https://github.com/Mamdouh66) for the suggestion! [#202](https://github.com/bholmesdev/hubble.md/pull/202)
 - Replace text from the find bar: swap the current match or every match at once. Press Cmd+Alt+F to open replace, and Cmd+Z to take back one replacement at a time. Thanks [@Mamdouh66](https://github.com/Mamdouh66) for the suggestion! [#200](https://github.com/bholmesdev/hubble.md/pull/200)
 - Choose a Light, Dark, or System default appearance in the new General settings section. The choice sticks across launches and only follows the operating system when System default is picked. Thanks [@camilom](https://github.com/camilom) for the suggestion! [#197](https://github.com/bholmesdev/hubble.md/pull/197)
 
@@ -20,7 +21,6 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Refresh open folders from the toolbar after external changes such as Git pulls, without restarting Hubble. Thanks [@Mamdouh66](https://github.com/Mamdouh66) for the suggestion! [#202](https://github.com/bholmesdev/hubble.md/pull/202)
 - Recent folders can be removed from the workspace switcher without affecting their files. Hover a folder and click the x, or press Delete while it's highlighted. Thanks [@saucy-tech](https://github.com/saucy-tech)! [#196](https://github.com/bholmesdev/hubble.md/pull/196)
 - Open the current note in Codex or Claude from the note actions menu, with the workspace and note path already filled in. [#188](https://github.com/bholmesdev/hubble.md/pull/188)
 - Browse every workspace file, edit plain text and code, view PDFs and images in Hubble, and open any file in its default app. Thanks [@zcuric](https://github.com/zcuric) for the suggestion! [#183](https://github.com/bholmesdev/hubble.md/pull/183)

@@ -105,6 +105,7 @@ export function Toolbar({
 							size="icon-sm"
 							aria-label="Refresh Folder"
 							title="Refresh Folder"
+							onMouseDown={(event) => event.preventDefault()}
 							onClick={() => void refreshFiles()}
 						>
 							<MingcuteRefresh2Line className="size-3.5" />
