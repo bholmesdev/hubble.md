@@ -893,7 +893,7 @@ function buildMenu() {
 				{ type: "separator" },
 				{
 					id: "sync-workspace",
-					label: "Sync Workspace",
+					label: "Refresh Folder",
 					enabled: menuState.hasWorkspace,
 					click: () => sendToRenderer("desktop:menu-sync-workspace"),
 				},

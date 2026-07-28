@@ -406,6 +406,97 @@ describe("desktop savePathContent", () => {
 	});
 });
 
+describe("desktop refreshFiles", () => {
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("coalesces refreshes and reconciles a clean active note", async () => {
+		const api = createDesktopApi();
+		let finishListing: (() => void) | undefined;
+		api.listDirectory.mockImplementation(
+			() =>
+				new Promise<{ files: []; folders: [] }>((resolve) => {
+					finishListing = () => resolve({ files: [], folders: [] });
+				}),
+		);
+		api.readFileText.mockResolvedValue("updated");
+		const { appStore, refreshFiles, viewerStore } = await loadStoreActions(api);
+		const path = "/workspace/note.md";
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace" },
+			document: {
+				...current.document,
+				currentPath: path,
+				content: "before",
+				diskContent: "before",
+				status: "ready",
+			},
+		}));
+
+		const first = refreshFiles();
+		const second = refreshFiles();
+		expect(api.listDirectory).toHaveBeenCalledTimes(1);
+		finishListing?.();
+		await Promise.all([first, second]);
+
+		expect(api.readFileText).toHaveBeenCalledTimes(1);
+		expect(viewerStore.get().content).toBe("updated");
+		expect(viewerStore.get().diskContent).toBe("updated");
+	});
+
+	it("preserves local edits when the active note changed on disk", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("external");
+		const { appStore, refreshFiles, viewerStore } = await loadStoreActions(api);
+		const path = "/workspace/note.md";
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace" },
+			document: {
+				...current.document,
+				currentPath: path,
+				content: "local edit",
+				diskContent: "before",
+				status: "ready",
+			},
+		}));
+
+		await refreshFiles();
+
+		expect(viewerStore.get().content).toBe("local edit");
+		expect(viewerStore.get().externalChange).toEqual({
+			kind: "conflict",
+			diskContent: "external",
+		});
+	});
+
+	it("keeps the previous snapshot and reports listing failures", async () => {
+		const api = createDesktopApi();
+		api.listDirectory.mockRejectedValue(new Error("Permission denied"));
+		const toastError = vi.fn();
+		vi.doMock("sonner", () => ({ toast: { error: toastError } }));
+		const { appStore, refreshFiles, workspaceStore } =
+			await loadStoreActions(api);
+		const files = [{ path: "/workspace/note.md", modified_at: 1 }];
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files,
+			},
+		}));
+
+		await refreshFiles();
+
+		expect(workspaceStore.get().files).toEqual(files);
+		expect(toastError).toHaveBeenCalledWith("Failed to refresh folder", {
+			description: "Permission denied",
+		});
+	});
+});
 describe("desktop renameMarkdownFile", () => {
 	beforeEach(() => {
 		vi.unstubAllGlobals();

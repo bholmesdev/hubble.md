@@ -16,6 +16,7 @@ import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
+import MingcuteRefresh2Line from "~icons/mingcute/refresh-2-line";
 import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { desktopApi } from "../desktopApi";
 import type { AgentClient } from "../desktopApi/types";
@@ -34,6 +35,7 @@ import {
 	goBack,
 	goForward,
 	openPathInDefaultApp,
+	refreshFiles,
 	renameCurrentMarkdownFile,
 	requestChatAboutNote,
 	setViewerMode,
@@ -97,6 +99,17 @@ export function Toolbar({
 			}
 			rightSlot={
 				<div className="flex items-center gap-1">
+					{workspacePath && (
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label="Refresh Folder"
+							title="Refresh Folder"
+							onClick={() => void refreshFiles()}
+						>
+							<MingcuteRefresh2Line className="size-3.5" />
+						</Button>
+					)}
 					<Button
 						variant="ghost"
 						size="icon-sm"
