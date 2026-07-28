@@ -17,6 +17,7 @@ import MingcuteCornerDownLeftLine from "~icons/mingcute/corner-down-left-line";
 import MingcuteDownLine from "~icons/mingcute/down-line";
 import MingcuteRightLine from "~icons/mingcute/right-line";
 import MingcuteUpLine from "~icons/mingcute/up-line";
+import { formatShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 
@@ -30,6 +31,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 		matches: [],
 	});
 	const inputRef = useRef<HTMLInputElement | null>(null);
+	const replaceInputRef = useRef<HTMLInputElement | null>(null);
 
 	const syncFindState = () => {
 		if (!editor) return;
@@ -72,12 +74,36 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 		[editor, syncFindState],
 	);
 
+	/**
+	 * Collapsing unmounts the replace field, so focus moves back to the find
+	 * field rather than falling out of the bar entirely.
+	 */
+	const toggleReplace = (focusField: boolean) => {
+		const nextReplaceOpen = !replaceOpen;
+		setReplaceOpen(nextReplaceOpen);
+		if (!focusField && nextReplaceOpen) return;
+		requestAnimationFrame(() => {
+			const field = nextReplaceOpen ? replaceInputRef : inputRef;
+			field.current?.focus();
+		});
+	};
+
 	useEffect(
 		() => {
 			const handleKeyDown = (event: KeyboardEvent) => {
 				if (open && event.key === "Escape") {
 					event.preventDefault();
 					close();
+					return;
+				}
+				if (keymatch(event, "CmdOrCtrl+Alt+f")) {
+					if (!editor?.isFocused && !open) return;
+					event.preventDefault();
+					if (open) toggleReplace(true);
+					else {
+						setReplaceOpen(true);
+						openFind();
+					}
 					return;
 				}
 				if (!keymatch(event, "CmdOrCtrl+f")) return;
@@ -89,7 +115,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 			return () => window.removeEventListener("keydown", handleKeyDown);
 		},
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-		[close, editor, open, openFind],
+		[close, editor, open, openFind, toggleReplace],
 	);
 
 	if (!editor || !open) return null;
@@ -153,7 +179,8 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 		>
 			<FindButton
 				label={replaceOpen ? "Hide replace" : "Show replace"}
-				onClick={() => setReplaceOpen(!replaceOpen)}
+				shortcut="CmdOrCtrl+Alt+F"
+				onClick={() => toggleReplace(false)}
 			>
 				<MingcuteRightLine
 					className={cn(
@@ -192,6 +219,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 			<div className="flex items-center gap-1 justify-self-end">
 				<FindButton
 					label="Previous match"
+					shortcut="Shift+Enter"
 					disabled={matchCount === 0}
 					onClick={() => goToMatch(-1)}
 				>
@@ -199,12 +227,13 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 				</FindButton>
 				<FindButton
 					label="Next match"
+					shortcut="Enter"
 					disabled={matchCount === 0}
 					onClick={() => goToMatch(1)}
 				>
 					<MingcuteDownLine className="size-3.5" />
 				</FindButton>
-				<FindButton label="Close find" onClick={close}>
+				<FindButton label="Close find" shortcut="Esc" onClick={close}>
 					<MingcuteCloseLine className="size-3.5" />
 				</FindButton>
 			</div>
@@ -212,6 +241,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 				<>
 					<div className="col-span-3 -mx-1 border-border border-t" />
 					<input
+						ref={replaceInputRef}
 						value={replacement}
 						onChange={(event) => setReplacement(event.target.value)}
 						onKeyDown={(event) => {
@@ -237,6 +267,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 							variant="ghost"
 							size="sm"
 							aria-label="Replace all matches"
+							title={`Replace all matches (${formatShortcut("CmdOrCtrl+Enter")})`}
 							disabled={matchCount === 0}
 							onMouseDown={(event) => event.preventDefault()}
 							onClick={() => editor.commands.replaceAllFindMatches(replacement)}
@@ -246,6 +277,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 						<Button
 							size="sm"
 							aria-label="Replace current match"
+							title={`Replace current match (${formatShortcut("Enter")})`}
 							disabled={matchCount === 0}
 							onMouseDown={(event) => event.preventDefault()}
 							onClick={replaceCurrent}
@@ -265,17 +297,19 @@ function FindButton({
 	disabled,
 	label,
 	onClick,
+	shortcut,
 }: {
 	children: ReactNode;
 	disabled?: boolean;
 	label: string;
 	onClick: () => void;
+	shortcut?: string;
 }) {
 	return (
 		<button
 			type="button"
 			aria-label={label}
-			title={label}
+			title={shortcut ? `${label} (${formatShortcut(shortcut)})` : label}
 			disabled={disabled}
 			onMouseDown={(event) => event.preventDefault()}
 			onClick={onClick}
