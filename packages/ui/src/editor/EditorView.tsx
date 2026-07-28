@@ -261,6 +261,15 @@ export function EditorView({
 	}, [editor, initialMarkdown]);
 
 	useEffect(() => {
+		// Undo history describes one document, so a new path starts a new stack.
+		// Keyed on the path rather than the content: two files can hold the same
+		// markdown, and undo must still never replay one file's edits into another.
+		void path;
+		if (!editor) return;
+		resetEditorHistory(editor);
+	}, [editor, path]);
+
+	useEffect(() => {
 		// Path changes flush the pending edit before the next document takes over.
 		void path;
 		return () => {
