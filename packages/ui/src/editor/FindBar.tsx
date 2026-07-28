@@ -251,12 +251,13 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 								close();
 								return;
 							}
-							if (event.key !== "Enter") return;
-							event.preventDefault();
-							if (event.metaKey || event.ctrlKey || event.altKey) {
+							if (keymatch(event.nativeEvent, "CmdOrCtrl+Enter")) {
+								event.preventDefault();
 								editor.commands.replaceAllFindMatches(replacement);
 								return;
 							}
+							if (event.key !== "Enter") return;
+							event.preventDefault();
 							replaceCurrent();
 						}}
 						placeholder="Replace with..."
