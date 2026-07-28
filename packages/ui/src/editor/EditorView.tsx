@@ -12,6 +12,7 @@ import {
 	parseMarkdownFrontMatter,
 	ReviewMarkExtension,
 	RichTextClipboardExtension,
+	resetEditorHistory,
 	StrikethroughShortcutExtension,
 	tiptapDocToMarkdown,
 } from "@hubble.md/editor";
@@ -250,11 +251,22 @@ export function EditorView({
 		setFrontMatterState(frontMatterStateFromMarkdown(initialMarkdown));
 		const currentBody = tiptapDocToMarkdown(editor.getJSON() as JSONContent);
 		if (currentBody !== parsed.body) {
-			editor.commands.setContent(markdownToTiptapDoc(parsed.body), {
-				emitUpdate: false,
-			});
+			editor
+				.chain()
+				.setMeta("addToHistory", false)
+				.setContent(markdownToTiptapDoc(parsed.body), { emitUpdate: false })
+				.run();
+			resetEditorHistory(editor);
 		}
 	}, [editor, initialMarkdown]);
+
+	useEffect(() => {
+		// One editor instance serves every file, so each new path starts its own
+		// undo stack. Otherwise undo replays the last file's edits into this one.
+		void path;
+		if (!editor) return;
+		resetEditorHistory(editor);
+	}, [editor, path]);
 
 	useEffect(() => {
 		// Path changes flush the pending edit before the next document takes over.

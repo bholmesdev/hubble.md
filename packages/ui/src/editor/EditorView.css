@@ -249,13 +249,15 @@
 }
 
 [data-hubble-editor] .pm-find-match {
-	background: color-mix(in oklab, var(--brand) 22%, transparent);
+	--pm-find-tint: color-mix(in oklab, var(--brand) 48%, var(--foreground));
+	background: color-mix(in oklab, var(--pm-find-tint) 36%, transparent);
 	border-radius: 2px;
 }
 
 [data-hubble-editor] .pm-find-match-current {
-	background: color-mix(in oklab, var(--brand) 38%, transparent);
-	box-shadow: 0 0 0 1px color-mix(in oklab, var(--brand) 45%, transparent);
+	background: color-mix(in oklab, var(--pm-find-tint) 68%, transparent);
+	box-shadow: 0 0 0 1px
+		color-mix(in oklab, var(--pm-find-tint) 75%, transparent);
 }
 
 [data-hubble-editor]

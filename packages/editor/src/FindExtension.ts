@@ -1,4 +1,5 @@
 import { Extension } from "@tiptap/core";
+import { closeHistory } from "@tiptap/pm/history";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
@@ -52,6 +53,41 @@ export const FindExtension = Extension.create({
 							type: "setActiveIndex",
 							activeIndex,
 						}),
+					);
+					return true;
+				},
+			replaceFindMatch:
+				(replacement: string) =>
+				({ editor, state, dispatch }) => {
+					if (!editor.isEditable) return false;
+					const findState = getFindState(state);
+					const match = findState.matches[findState.activeIndex];
+					if (!match) return false;
+					if (!dispatch) return true;
+					const tr = replaceFindMatches(state.tr, [match], replacement);
+					const matches = findMatches(tr.doc, findState.query);
+					const replacementEnd = match.from + replacement.length;
+					const activeIndex = Math.max(
+						0,
+						matches.findIndex((candidate) => candidate.from >= replacementEnd),
+					);
+					dispatch(
+						tr.setMeta(findPluginKey, {
+							type: "setActiveIndex",
+							activeIndex,
+						}),
+					);
+					return true;
+				},
+			replaceAllFindMatches:
+				(replacement: string) =>
+				({ editor, state, dispatch }) => {
+					if (!editor.isEditable) return false;
+					const findState = getFindState(state);
+					if (findState.matches.length === 0) return false;
+					if (!dispatch) return true;
+					dispatch(
+						replaceFindMatches(state.tr, findState.matches, replacement),
 					);
 					return true;
 				},
@@ -112,6 +148,25 @@ export const FindExtension = Extension.create({
 
 export function getFindState(state: EditorState) {
 	return findPluginKey.getState(state) ?? emptyFindState();
+}
+/**
+ * Rewrites matches back to front so earlier positions stay valid.
+ *
+ * The transaction closes the previous history event, so every replacement is
+ * its own undo step even when they land faster than the history plugin's
+ * grouping delay. Replace all stays a single transaction, so one undo takes
+ * back the whole sweep.
+ */
+export function replaceFindMatches(
+	tr: Transaction,
+	matches: FindMatch[],
+	replacement: string,
+) {
+	closeHistory(tr);
+	for (const match of [...matches].reverse()) {
+		tr.insertText(replacement, match.from, match.to);
+	}
+	return tr;
 }
 
 export function selectFindMatch(editor: {
@@ -248,6 +303,8 @@ declare module "@tiptap/core" {
 		find: {
 			setFindQuery: (query: string) => ReturnType;
 			setFindActiveIndex: (activeIndex: number) => ReturnType;
+			replaceFindMatch: (replacement: string) => ReturnType;
+			replaceAllFindMatches: (replacement: string) => ReturnType;
 			clearFindQuery: () => ReturnType;
 		};
 	}
