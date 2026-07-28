@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
 export function SettingsDialog({
 	open,
 	onOpenChange,
+	className,
 	children,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	className?: string;
 	children: ReactNode;
 }) {
 	return (
@@ -15,7 +17,7 @@ export function SettingsDialog({
 			open={open}
 			onOpenChange={onOpenChange}
 			title="Settings"
-			className="max-w-xl"
+			className={className ?? "max-w-xl"}
 		>
 			<div className="flex flex-col divide-y divide-border">{children}</div>
 		</Modal>

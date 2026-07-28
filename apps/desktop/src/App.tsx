@@ -29,6 +29,10 @@ import {
 import { buildAppCommands } from "./commands/useAppCommands";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
+import {
+	hasShortcutsPrototypeQuery,
+	ShortcutsSettingsPrototype,
+} from "./components/ShortcutsSettingsPrototype";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
 import { SpellcheckSettingsSection } from "./components/SpellcheckSection";
 import {
@@ -214,7 +218,7 @@ function App() {
 		useHistoryNav();
 	const [scrollContainerEl, setScrollContainerEl] =
 		useState<HTMLDivElement | null>(null);
-	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [settingsOpen, setSettingsOpen] = useState(hasShortcutsPrototypeQuery);
 	const [copyAsMarkdownRequest, setCopyAsMarkdownRequest] = useState(0);
 	const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(
 		null,
@@ -699,6 +703,34 @@ function App() {
 		};
 	}, []);
 
+	const settingsSections = (
+		<>
+			{updateState ? (
+				<UpdatesSection
+					state={updateState}
+					onPrimaryAction={() => void triggerPrimaryUpdateAction()}
+					onViewChangelog={openWhatsNew}
+				/>
+			) : null}
+			<GeneralSettingsSection />
+			{spellcheck ? (
+				<SpellcheckSettingsSection
+					state={spellcheck}
+					onEnabledChange={changeSpellcheckEnabled}
+					onLanguagesChange={changeSpellcheckLanguages}
+				/>
+			) : null}
+			<CodeFilesSettingsSection />
+			<ChatAboutNoteSettingsSection />
+			{telemetryConsent ? (
+				<TelemetrySettingsSection
+					consent={telemetryConsent}
+					onChoose={(choice) => void chooseTelemetry(choice)}
+				/>
+			) : null}
+		</>
+	);
+
 	return (
 		<main
 			className="flex h-dvh flex-col bg-background text-foreground"
@@ -846,30 +878,16 @@ function App() {
 				recentCommandIds={recentCommandIds}
 				onRunCommand={recordRecentCommand}
 			/>
-			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-				{updateState ? (
-					<UpdatesSection
-						state={updateState}
-						onPrimaryAction={() => void triggerPrimaryUpdateAction()}
-						onViewChangelog={openWhatsNew}
-					/>
-				) : null}
-				<GeneralSettingsSection />
-				{spellcheck ? (
-					<SpellcheckSettingsSection
-						state={spellcheck}
-						onEnabledChange={changeSpellcheckEnabled}
-						onLanguagesChange={changeSpellcheckLanguages}
-					/>
-				) : null}
-				<CodeFilesSettingsSection />
-				<ChatAboutNoteSettingsSection />
-				{telemetryConsent ? (
-					<TelemetrySettingsSection
-						consent={telemetryConsent}
-						onChoose={(choice) => void chooseTelemetry(choice)}
-					/>
-				) : null}
+			<SettingsDialog
+				open={settingsOpen}
+				onOpenChange={setSettingsOpen}
+				className={import.meta.env.DEV ? "max-w-4xl" : undefined}
+			>
+				{import.meta.env.DEV ? (
+					<ShortcutsSettingsPrototype general={settingsSections} />
+				) : (
+					settingsSections
+				)}
 			</SettingsDialog>
 		</main>
 	);
