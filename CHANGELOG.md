@@ -9,7 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Choose a Light, Dark, or System default appearance in the new General settings section. The choice sticks across launches and only follows the operating system when System default is picked. [#197](https://github.com/bholmesdev/hubble.md/pull/197)
+- Choose a Light, Dark, or System default appearance in the new General settings section. The choice sticks across launches and only follows the operating system when System default is picked. Thanks [@camilom](https://github.com/camilom) for the suggestion! [#197](https://github.com/bholmesdev/hubble.md/pull/197)
 - Open the current note in Codex or Claude from the note actions menu, with the workspace and note path already filled in. [#188](https://github.com/bholmesdev/hubble.md/pull/188)
 - Browse every workspace file, edit plain text and code, view PDFs and images in Hubble, and open any file in its default app. Thanks [@zcuric](https://github.com/zcuric) for the suggestion! [#183](https://github.com/bholmesdev/hubble.md/pull/183)
 - Hubble now collects anonymous usage data to help improve the app, with a clear notice and a Settings toggle to opt out. See [TELEMETRY.md](https://github.com/bholmesdev/hubble.md/blob/main/TELEMETRY.md) for what's collected. [#182](https://github.com/bholmesdev/hubble.md/pull/182)
