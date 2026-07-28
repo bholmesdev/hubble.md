@@ -281,6 +281,44 @@
 	font-size: 0.9em;
 }
 
+/* Keep room for the gutter comment badges when the clamp would leave less. */
+[data-hubble-editor] .editorViewport[data-review-gutter] .ProseMirror {
+	padding-inline-end: max(var(--editor-content-padding-inline), 3.25rem);
+}
+
+[data-hubble-editor] .ProseMirror [data-review-type="reviewComment"],
+[data-hubble-editor] .ProseMirror [data-review-type="reviewHighlight"] {
+	background: color-mix(in oklab, var(--brand-accent) 24%, transparent);
+	box-shadow: inset 0 -2px
+		color-mix(in oklab, var(--brand-accent) 70%, transparent);
+	border-radius: 2px;
+	color: inherit;
+}
+
+[data-hubble-editor] .ProseMirror [data-review-type="reviewInsertion"] {
+	background: color-mix(in oklab, #2f9e44 18%, transparent);
+	box-shadow: inset 0 -2px color-mix(in oklab, #2f9e44 48%, transparent);
+}
+
+[data-hubble-editor] .ProseMirror [data-review-type="reviewDeletion"] {
+	background: color-mix(in oklab, #d94841 14%, transparent);
+	text-decoration: line-through;
+	text-decoration-color: color-mix(in oklab, #d94841 70%, currentColor);
+}
+
+[data-hubble-editor] .ProseMirror [data-review-type="reviewReplacement"] {
+	background: color-mix(in oklab, #e67700 16%, transparent);
+	box-shadow: inset 0 -2px color-mix(in oklab, #e67700 48%, transparent);
+}
+
+[data-hubble-editor]
+	.ProseMirror
+	[data-review-type="reviewComment"][data-review-resolved] {
+	background: color-mix(in oklab, var(--muted-foreground) 10%, transparent);
+	box-shadow: none;
+	opacity: 0.72;
+}
+
 [data-hubble-editor] .ProseMirror pre {
 	background: var(--muted);
 	padding-block: 1.5rem;

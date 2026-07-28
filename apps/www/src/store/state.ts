@@ -1,3 +1,4 @@
+import type { ReviewThread } from "@hubble.md/ui";
 import { store } from "@simplestack/store";
 import { localStoragePersist } from "../lib/localStoragePersist";
 import { readLastOpenedPaths, STORAGE_KEY, serialize } from "./persistence";
@@ -94,4 +95,11 @@ export const pendingPathStore = viewerStore.select("pendingPath");
 
 export function resetState(): void {
 	appStore.set(getInitialState(appStore.get().workspace.lastOpenedPaths));
+}
+
+// Derived from the open document, so it sits outside the app store
+export const reviewThreadsStore = store<ReviewThread[]>([]);
+
+export function setReviewThreads(threads: ReviewThread[]) {
+	reviewThreadsStore.set(threads);
 }

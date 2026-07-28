@@ -3,6 +3,8 @@ import type { Fragment } from "@tiptap/pm/model";
 import type { Selection } from "@tiptap/pm/state";
 import type { LinkAttrs } from "./Link";
 import { wikiDisplayNameForTarget } from "./markdownPath";
+import { serializeReviewMetadata } from "./ReviewMark";
+import { escapeReviewBody, escapeReviewContent } from "./reviewEscaping";
 
 /**
  * Convert TipTap JSONContent (ProseMirror document) -> Markdown string
@@ -223,6 +225,37 @@ function inlineToMarkdown(nodes: JSONContent[]): string {
 function inlineNodesToMarkdown(nodes: JSONContent[]): string {
 	let result = "";
 	for (let i = 0; i < nodes.length; ) {
+		const mark = getReviewMark(nodes[i]);
+		if (mark) {
+			let j = i;
+			const grouped: JSONContent[] = [];
+			while (j < nodes.length) {
+				const nextReviewMark = getReviewMark(nodes[j]);
+				if (!nextReviewMark || !isSameMark(nextReviewMark, mark)) break;
+				grouped.push(removeMark(nodes[j], mark));
+				j += 1;
+			}
+			const content = escapeReviewContent(inlineNodesToMarkdown(grouped));
+			const type = mark.attrs?.type;
+			if (type === "reviewReplacement") {
+				result += `{~~${escapeReviewContent(mark.attrs?.original)}~>${content}~~}`;
+			} else if (type === "reviewComment") {
+				result += `{==${content}==}{>>${escapeReviewBody(mark.attrs?.body)}<<}`;
+			} else if (type === "reviewInsertion") {
+				result += `{++${content}++}`;
+			} else if (type === "reviewDeletion") {
+				result += `{--${content}--}`;
+			} else {
+				result += `{==${content}==}`;
+			}
+			if (mark.attrs?.id) result += `{#${mark.attrs.id}}`;
+			if (type === "reviewComment") {
+				result += serializeReviewMetadata(mark.attrs ?? {});
+			}
+			i = j;
+			continue;
+		}
+
 		const node = nodes[i];
 		const delimitedMark = getDelimitedMark(node, nodes[i + 1]);
 		if (delimitedMark) {
@@ -266,6 +299,12 @@ function inlineNodesToMarkdown(nodes: JSONContent[]): string {
 		i = j;
 	}
 	return result;
+}
+
+function getReviewMark(node: JSONContent | undefined) {
+	return (
+		node?.marks?.find((candidate) => candidate.type === "reviewMark") ?? null
+	);
 }
 
 const BOUNDARY_SENSITIVE_MARKS = new Set(["bold", "italic", "strike", "link"]);

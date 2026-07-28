@@ -10,13 +10,25 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Added
 
 - Choose a Light, Dark, or System default appearance in the new General settings section. The choice sticks across launches and only follows the operating system when System default is picked. Thanks [@camilom](https://github.com/camilom) for the suggestion! [#197](https://github.com/bholmesdev/hubble.md/pull/197)
-- Open the current note in Codex or Claude from the note actions menu, with the workspace and note path already filled in. [#188](https://github.com/bholmesdev/hubble.md/pull/188)
-- Browse every workspace file, edit plain text and code, view PDFs and images in Hubble, and open any file in its default app. Thanks [@zcuric](https://github.com/zcuric) for the suggestion! [#183](https://github.com/bholmesdev/hubble.md/pull/183)
-- Hubble now collects anonymous usage data to help improve the app, with a clear notice and a Settings toggle to opt out. See [TELEMETRY.md](https://github.com/bholmesdev/hubble.md/blob/main/TELEMETRY.md) for what's collected. [#182](https://github.com/bholmesdev/hubble.md/pull/182)
 
 ### Changed
 
 ### Fixed
+
+## [0.1.22] - 2026-07-27
+
+### Added
+
+- Recent folders can be removed from the workspace switcher without affecting their files. Hover a folder and click the x, or press Delete while it's highlighted. Thanks [@saucy-tech](https://github.com/saucy-tech)! [#196](https://github.com/bholmesdev/hubble.md/pull/196)
+- Open the current note in Codex or Claude from the note actions menu, with the workspace and note path already filled in. [#188](https://github.com/bholmesdev/hubble.md/pull/188)
+- Browse every workspace file, edit plain text and code, view PDFs and images in Hubble, and open any file in its default app. Thanks [@zcuric](https://github.com/zcuric) for the suggestion! [#183](https://github.com/bholmesdev/hubble.md/pull/183)
+- Hubble now collects anonymous usage data to help improve the app, with a clear notice and a Settings toggle to opt out. See [TELEMETRY.md](https://github.com/bholmesdev/hubble.md/blob/main/TELEMETRY.md) for what's collected. [#182](https://github.com/bholmesdev/hubble.md/pull/182)
+- Leave review comments on a note: highlight text to start a thread, reply to it, and resolve it when it's handled. Comments live in the Markdown itself, so they travel with the file. Thanks [@hwong103](https://github.com/hwong103)! [#175](https://github.com/bholmesdev/hubble.md/pull/175)
+- Browse every comment in a note from the toolbar, filter by unresolved or resolved, and copy a prompt handing the open threads to your agent. For the best results, install the [review-markdown-comments skill](https://github.com/bholmesdev/hubble-skills/blob/main/skills/review-markdown-comments/SKILL.md) with `npx skills add bholmesdev/hubble-skills --skill review-markdown-comments`, so your agent knows how to reply and resolve them. Thanks [@hwong103](https://github.com/hwong103)! [#175](https://github.com/bholmesdev/hubble.md/pull/175)
+
+### Changed
+
+- Dragging files in the sidebar now shows what you're moving: a "Move 3 items" label for a selected group, the whole group dimmed as it travels, and a clearer highlight on the folder or workspace root you're dropping into. Thanks [@zcuric](https://github.com/zcuric)! [#198](https://github.com/bholmesdev/hubble.md/pull/198)
 
 ## [0.1.21] - 2026-07-18
 

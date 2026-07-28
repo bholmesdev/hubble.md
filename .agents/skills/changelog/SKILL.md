@@ -20,11 +20,19 @@ the entry now while the change is fresh.
    - Describe the effect, not the implementation or file paths.
    - Skip internal-only churn (refactors, deps, CI, tests) unless it changes
      what the user experiences.
-4. Link the PR for every entry (not the issue). Check the PR author: if it's
-   not `bholmesdev`, put `Thanks [@handle](https://github.com/handle)!` before
-   the link. If `bholmesdev` landed someone else's suggestion, put
-   `Thanks [@handle](https://github.com/handle) for the suggestion!` before the
-   link. Never thank `bholmesdev`.
+4. Link the PR for every entry (not the issue).
+5. Credit the contributor. Every entry from someone other than `bholmesdev`
+   gets a thank you, including when you are that contributor writing your own
+   entry.
+
+   Find the handle:
+   - PR already open: `gh pr view --json author --jq .author.login`.
+   - No PR yet: `gh api user --jq .login`, the account that will open it.
+
+   Then, unless the handle is `bholmesdev`, put one of these before the link:
+   - `Thanks [@handle](https://github.com/handle)!` for their own work.
+   - `Thanks [@handle](https://github.com/handle) for the suggestion!` when
+     `bholmesdev` landed someone else's issue.
 
 Create a subhead only if it has at least one entry. Leave the empty scaffold
 subheads as-is for the next entry.

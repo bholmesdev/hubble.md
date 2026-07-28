@@ -73,6 +73,7 @@ import {
 	setChatCommand,
 	setCodeFileOpenMode,
 	setLastSeenVersion,
+	setReviewThreads,
 	setSidebarOpen,
 	setThemePreference,
 	setViewerMode,
@@ -517,7 +518,6 @@ function App() {
 				<Sidebar
 					onFocusedPathChange={setFocusedSidebarPath}
 					footer={
-						// A pending restart outranks the what's-new nudge.
 						showReadyCallout ? (
 							<SidebarCallout
 								message={
@@ -968,6 +968,7 @@ function MarkdownEditor({
 			onMessage={(message, kind) =>
 				kind === "success" ? toast.success(message) : toast.error(message)
 			}
+			onReviewThreadsChange={setReviewThreads}
 		/>
 	);
 }

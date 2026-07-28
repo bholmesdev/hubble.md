@@ -1,3 +1,4 @@
+import type { ReviewThread } from "@hubble.md/ui";
 import { toast } from "sonner";
 import changelogRaw from "../../../../CHANGELOG.md?raw";
 import { desktopApi } from "../desktopApi";
@@ -66,6 +67,7 @@ import {
 	lastSeenVersionStore,
 	MAX_RECENT,
 	pendingTerminalCommandStore,
+	reviewThreadsStore,
 	type SortMode,
 	sidebarOpenStore,
 	switcherOpenStore,
@@ -505,6 +507,24 @@ export async function createWorkspaceWithSidebar() {
 	if (workspaceStore.get().workspacePath !== null) {
 		sidebarOpenStore.set(true);
 	}
+}
+
+/** Forgets an inactive folder from recents without changing its saved file state. */
+export function removeRecentWorkspace(path: string) {
+	workspaceStore.set((state) => {
+		if (
+			state.workspacePath === path ||
+			!state.recentWorkspaces.includes(path)
+		) {
+			return state;
+		}
+		return {
+			...state,
+			recentWorkspaces: state.recentWorkspaces.filter(
+				(recentPath) => recentPath !== path,
+			),
+		};
+	});
 }
 
 /** Opens a workspace by path. If no path given, shows a folder picker first. */
@@ -1349,4 +1369,8 @@ export async function togglePinnedNote(path: string) {
 		toast.error("Failed to update pinned notes", { description: message });
 		await loadPinnedNotes(workspacePath);
 	}
+}
+
+export function setReviewThreads(threads: ReviewThread[]) {
+	reviewThreadsStore.set(threads);
 }

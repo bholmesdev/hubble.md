@@ -1,7 +1,9 @@
 import { Menu } from "@base-ui/react/menu";
 import {
 	Button,
+	commandReviewThread,
 	formatShortcut,
+	ReviewCommentSummary,
 	Toolbar as SharedToolbar,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
@@ -21,6 +23,7 @@ import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
 	hasHtmlExtension,
+	hasMarkdownExtension,
 	hasTextExtension,
 	isEditableFile,
 	relativeWorkspacePath,
@@ -40,6 +43,7 @@ import {
 import { useHistoryNav } from "../store/hooks";
 import {
 	currentPathStore,
+	reviewThreadsStore,
 	sidebarOpenStore,
 	viewerStore,
 	workspacePathStore,
@@ -70,6 +74,7 @@ export function Toolbar({
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
+	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const isFullScreen = useIsFullScreen();
 	// The changelog note is virtual: show a friendly title and disable the
 	// file actions (rename, reveal, copy path) that assume a file on disk.
@@ -101,6 +106,18 @@ export function Toolbar({
 					>
 						<MingcuteTerminalLine className="size-3.5" />
 					</Button>
+					{currentPath && hasMarkdownExtension(currentPath) && (
+						<ReviewCommentSummary
+							filePath={currentPath}
+							threads={reviewThreads}
+							onCommand={commandReviewThread}
+							onMessage={(message, kind) =>
+								kind === "success"
+									? toast.success(message)
+									: toast.error(message)
+							}
+						/>
+					)}
 					{currentPath && !isChangelog && (
 						<NoteActionsMenu
 							path={currentPath}
