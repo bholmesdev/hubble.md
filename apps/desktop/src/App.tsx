@@ -29,10 +29,7 @@ import {
 import { buildAppCommands } from "./commands/useAppCommands";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
-import {
-	hasShortcutsPrototypeQuery,
-	ShortcutsSettingsPrototype,
-} from "./components/ShortcutsSettingsPrototype";
+import { ShortcutsSettingsPrototype } from "./components/ShortcutsSettingsPrototype";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
 import { SpellcheckSettingsSection } from "./components/SpellcheckSection";
 import {
@@ -205,6 +202,12 @@ async function searchFileContents(query: string) {
 		query,
 	});
 	return { results, truncated };
+}
+
+function hasShortcutsPrototypeQuery() {
+	if (!import.meta.env.DEV) return false;
+	const variant = new URLSearchParams(window.location.search).get("variant");
+	return variant === "sidebar" || variant === "tabs" || variant === "table";
 }
 
 function App() {

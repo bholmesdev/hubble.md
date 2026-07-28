@@ -1,4 +1,5 @@
 import { Button, formatShortcut, Input } from "@hubble.md/ui";
+import { isMac } from "keymatch";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 // PROTOTYPE — three variants of the Shortcuts settings page, switchable via
@@ -36,7 +37,7 @@ const commands: Command[] = [
 	{
 		id: "app.add-folder",
 		label: "Add Folder",
-		description: "Create and open a new folder.",
+		description: "Choose a folder to add as a workspace.",
 		area: "App",
 		defaultBinding: "CmdOrCtrl+Shift+N",
 	},
@@ -208,16 +209,48 @@ const commands: Command[] = [
 		area: "Editor",
 		defaultBinding: "CmdOrCtrl+E",
 	},
-	...Array.from({ length: 6 }, (_, index): Command => {
-		const level = index + 1;
-		return {
-			id: `editor.heading-${level}`,
-			label: `Heading ${level}`,
-			description: `Convert the current block to heading ${level}.`,
-			area: "Editor",
-			defaultBinding: `CmdOrCtrl+Alt+${level}`,
-		};
-	}),
+	{
+		id: "editor.heading-1",
+		label: "Heading 1",
+		description: "Convert the current block to heading 1.",
+		area: "Editor",
+		defaultBinding: "CmdOrCtrl+Alt+1",
+	},
+	{
+		id: "editor.heading-2",
+		label: "Heading 2",
+		description: "Convert the current block to heading 2.",
+		area: "Editor",
+		defaultBinding: "CmdOrCtrl+Alt+2",
+	},
+	{
+		id: "editor.heading-3",
+		label: "Heading 3",
+		description: "Convert the current block to heading 3.",
+		area: "Editor",
+		defaultBinding: "CmdOrCtrl+Alt+3",
+	},
+	{
+		id: "editor.heading-4",
+		label: "Heading 4",
+		description: "Convert the current block to heading 4.",
+		area: "Editor",
+		defaultBinding: "CmdOrCtrl+Alt+4",
+	},
+	{
+		id: "editor.heading-5",
+		label: "Heading 5",
+		description: "Convert the current block to heading 5.",
+		area: "Editor",
+		defaultBinding: "CmdOrCtrl+Alt+5",
+	},
+	{
+		id: "editor.heading-6",
+		label: "Heading 6",
+		description: "Convert the current block to heading 6.",
+		area: "Editor",
+		defaultBinding: "CmdOrCtrl+Alt+6",
+	},
 	{
 		id: "editor.blockquote",
 		label: "Quote",
@@ -227,13 +260,74 @@ const commands: Command[] = [
 	},
 ];
 
-const reservedBindings = new Set([
-	"CmdOrCtrl+C",
-	"CmdOrCtrl+Q",
-	"CmdOrCtrl+V",
-	"CmdOrCtrl+X",
-	"CmdOrCtrl+Z",
-]);
+const modifierOrder = ["CmdOrCtrl", "Ctrl", "Alt", "Shift", "Super"] as const;
+const modifierSet = new Set<string>(modifierOrder);
+
+function normalizeBinding(binding: string) {
+	const parts = binding.split("+");
+	const modifiers = modifierOrder.filter((modifier) =>
+		parts.includes(modifier),
+	);
+	const keys = parts.filter((part) => !modifierSet.has(part));
+	return [...modifiers, ...keys].join("+");
+}
+
+function defaultBinding(command: Command) {
+	return normalizeBinding(command.defaultBinding);
+}
+
+const fixedBindings = new Set(
+	[
+		"CmdOrCtrl+A",
+		"CmdOrCtrl+C",
+		"CmdOrCtrl+=",
+		"CmdOrCtrl+-",
+		"CmdOrCtrl+0",
+		"CmdOrCtrl+Q",
+		"CmdOrCtrl+V",
+		"CmdOrCtrl+X",
+		"CmdOrCtrl+Y",
+		"CmdOrCtrl+Z",
+		"CmdOrCtrl+Shift+Z",
+	].map(normalizeBinding),
+);
+
+const unavailableBindings = new Set(
+	(isMac() ? ["CmdOrCtrl+Space", "CmdOrCtrl+Tab"] : ["Alt+F4", "Alt+Tab"]).map(
+		normalizeBinding,
+	),
+);
+
+function validateBinding(
+	commandId: string,
+	binding: string,
+	bindings: Bindings,
+) {
+	const parts = binding.split("+");
+	if (parts.some((part) => part.length === 0)) {
+		return "That key cannot be used in a Hubble shortcut.";
+	}
+	if (parts.includes("Super")) {
+		return "The system key is not available for app shortcuts.";
+	}
+	if (
+		!parts.some(
+			(part) => part === "CmdOrCtrl" || part === "Ctrl" || part === "Alt",
+		)
+	) {
+		return "Add Command, Control, or Alt to create a shortcut.";
+	}
+	if (unavailableBindings.has(binding)) {
+		return `${formatShortcut(binding)} is unavailable on this operating system.`;
+	}
+	if (fixedBindings.has(binding)) {
+		return `${formatShortcut(binding)} stays fixed in Hubble.`;
+	}
+	const duplicate = commands.find(
+		(command) => command.id !== commandId && bindings[command.id] === binding,
+	);
+	return duplicate ? `Already assigned to ${duplicate.label}.` : undefined;
+}
 
 function variantFromUrl(): Variant | null {
 	const requested = new URLSearchParams(window.location.search).get("variant");
@@ -242,13 +336,9 @@ function variantFromUrl(): Variant | null {
 		: null;
 }
 
-export function hasShortcutsPrototypeQuery() {
-	return import.meta.env.DEV && variantFromUrl() !== null;
-}
-
 function initialBindings(): Bindings {
 	return Object.fromEntries(
-		commands.map((command) => [command.id, command.defaultBinding]),
+		commands.map((command) => [command.id, defaultBinding(command)]),
 	);
 }
 
@@ -260,15 +350,23 @@ function eventBinding(event: KeyboardEvent): string | null {
 		ArrowRight: "Right",
 		ArrowUp: "Up",
 	};
-	const key = keyAliases[event.key] ?? event.key;
+	const key =
+		// Match keymatch's physical semantics for letters and digits, including
+		// when Alt or Shift composition reports punctuation or a dead key.
+		/^Key[A-Z]$/.test(event.code)
+			? event.code.slice(3)
+			: /^Digit[0-9]$/.test(event.code)
+				? event.code.slice(5)
+				: (keyAliases[event.key] ?? event.key);
 	if (["Alt", "Control", "Meta", "Shift"].includes(key)) return null;
 
 	const parts: string[] = [];
-	if (event.metaKey || event.ctrlKey) parts.push("CmdOrCtrl");
+	if (event.ctrlKey) parts.push(isMac() ? "Ctrl" : "CmdOrCtrl");
+	if (event.metaKey) parts.push(isMac() ? "CmdOrCtrl" : "Super");
 	if (event.altKey) parts.push("Alt");
 	if (event.shiftKey) parts.push("Shift");
 	parts.push(key.length === 1 ? key.toUpperCase() : key);
-	return parts.join("+");
+	return normalizeBinding(parts.join("+"));
 }
 
 function isTypingTarget(target: EventTarget | null) {
@@ -317,21 +415,11 @@ function usePrototypeState() {
 
 			const binding = eventBinding(event);
 			if (!binding) return;
-			if (reservedBindings.has(binding)) {
+			const error = validateBinding(recordingId, binding, bindings);
+			if (error) {
 				setErrors((current) => ({
 					...current,
-					[recordingId]: `${formatShortcut(binding)} is reserved by the system.`,
-				}));
-				return;
-			}
-			const duplicate = commands.find(
-				(command) =>
-					command.id !== recordingId && bindings[command.id] === binding,
-			);
-			if (duplicate) {
-				setErrors((current) => ({
-					...current,
-					[recordingId]: `Already assigned to ${duplicate.label}.`,
+					[recordingId]: error,
 				}));
 				return;
 			}
@@ -342,13 +430,31 @@ function usePrototypeState() {
 		};
 
 		window.addEventListener("keydown", record, true);
-		return () => window.removeEventListener("keydown", record, true);
+		const onWindowBlur = () => {
+			setErrors((current) => ({
+				...current,
+				[recordingId]:
+					"The operating system may have intercepted that shortcut. Press another combination or Escape.",
+			}));
+		};
+		window.addEventListener("blur", onWindowBlur);
+		return () => {
+			window.removeEventListener("keydown", record, true);
+			window.removeEventListener("blur", onWindowBlur);
+		};
 	}, [bindings, recordingId]);
 
 	const reset = (command: Command) => {
+		const binding = defaultBinding(command);
+		const error = validateBinding(command.id, binding, bindings);
+		if (error) {
+			setErrors((current) => ({ ...current, [command.id]: error }));
+			if (recordingId === command.id) setRecordingId(null);
+			return;
+		}
 		setBindings((current) => ({
 			...current,
-			[command.id]: command.defaultBinding,
+			[command.id]: binding,
 		}));
 		setErrors((current) => ({ ...current, [command.id]: undefined }));
 		if (recordingId === command.id) setRecordingId(null);
@@ -447,7 +553,7 @@ export function ShortcutsSettingsPrototype({
 
 function SidebarVariant({ general, page, setPage, state }: PrototypeProps) {
 	return (
-		<div className="flex min-h-[30rem] overflow-hidden rounded-sm border border-border bg-card">
+		<div className="flex h-[calc(100dvh-9rem)] max-h-[38rem] min-h-0 overflow-hidden rounded-sm border border-border bg-card">
 			<nav className="flex w-40 shrink-0 flex-col gap-1 border-r border-border bg-muted/30 p-2">
 				<p className="px-2 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
 					Settings
@@ -471,7 +577,7 @@ function SidebarVariant({ general, page, setPage, state }: PrototypeProps) {
 					Navigation scales as more settings pages are added.
 				</div>
 			</nav>
-			<div className="min-w-0 flex-1">
+			<div className="min-w-0 flex-1 overflow-y-auto">
 				{page === "general" ? (
 					<GeneralPane>{general}</GeneralPane>
 				) : (
@@ -485,7 +591,7 @@ function SidebarVariant({ general, page, setPage, state }: PrototypeProps) {
 function TabsVariant({ general, page, setPage, state }: PrototypeProps) {
 	const filtered = filteredCommands(state.query);
 	return (
-		<div className="min-h-[30rem] rounded-sm border border-border bg-card">
+		<div className="flex h-[calc(100dvh-9rem)] max-h-[38rem] min-h-0 flex-col overflow-hidden rounded-sm border border-border bg-card">
 			<div className="border-b border-border px-4 pt-2">
 				<div className="flex gap-5">
 					<TabButton
@@ -503,9 +609,11 @@ function TabsVariant({ general, page, setPage, state }: PrototypeProps) {
 				</div>
 			</div>
 			{page === "general" ? (
-				<GeneralPane>{general}</GeneralPane>
+				<div className="min-h-0 flex-1 overflow-y-auto">
+					<GeneralPane>{general}</GeneralPane>
+				</div>
 			) : (
-				<div className="p-4">
+				<div className="min-h-0 flex-1 overflow-y-auto p-4">
 					<ShortcutHeader state={state} />
 					<div className="mt-4 grid gap-4 md:grid-cols-2">
 						{(["App", "Editor"] as const).map((area) => (
@@ -542,7 +650,7 @@ function TabsVariant({ general, page, setPage, state }: PrototypeProps) {
 function TableVariant({ general, page, setPage, state }: PrototypeProps) {
 	const filtered = filteredCommands(state.query);
 	return (
-		<div className="min-h-[30rem] overflow-hidden rounded-sm border border-border bg-card">
+		<div className="flex h-[calc(100dvh-9rem)] max-h-[38rem] min-h-0 flex-col overflow-hidden rounded-sm border border-border bg-card">
 			<header className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-3 py-2">
 				<div className="flex rounded-sm border border-border bg-background p-0.5">
 					<SegmentButton
@@ -573,9 +681,11 @@ function TableVariant({ general, page, setPage, state }: PrototypeProps) {
 				) : null}
 			</header>
 			{page === "general" ? (
-				<GeneralPane>{general}</GeneralPane>
+				<div className="min-h-0 flex-1 overflow-y-auto">
+					<GeneralPane>{general}</GeneralPane>
+				</div>
 			) : (
-				<div>
+				<div className="min-h-0 flex-1 overflow-y-auto">
 					<div className="grid grid-cols-[5rem_minmax(10rem,1fr)_11rem_5rem] border-b border-border bg-muted/30 px-3 py-1.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
 						<span>Area</span>
 						<span>Command</span>
@@ -664,7 +774,7 @@ function ListCommandRow({
 	state: PrototypeState;
 }) {
 	const binding = state.bindings[command.id];
-	const customized = binding !== command.defaultBinding;
+	const customized = binding !== defaultBinding(command);
 	return (
 		<div className="grid grid-cols-[minmax(0,1fr)_12rem] gap-4 px-3 py-2.5">
 			<div className="min-w-0">
@@ -726,13 +836,13 @@ function CardCommandRow({
 					<p className="text-[10px] text-muted-foreground">
 						{binding === null
 							? "Disabled"
-							: binding === command.defaultBinding
+							: binding === defaultBinding(command)
 								? "Default"
 								: "Customized"}
 					</p>
 				)}
 				<div className="ml-auto flex gap-1">
-					{binding !== command.defaultBinding ? (
+					{binding !== defaultBinding(command) ? (
 						<Button
 							variant="link"
 							size="xs"
@@ -767,12 +877,12 @@ function TableCommandRow({
 				<div className="min-w-0">
 					<p className="truncate text-[11px] font-medium">{command.label}</p>
 					<p className="truncate text-[9px] text-muted-foreground">
-						{command.id}
+						{command.description}
 					</p>
 				</div>
 				<BindingButton command={command} state={state} />
 				<div className="flex justify-end">
-					{binding !== command.defaultBinding ? (
+					{binding !== defaultBinding(command) ? (
 						<Button
 							variant="ghost"
 							size="icon-xs"
@@ -974,9 +1084,14 @@ function PrototypeSwitcher({
 			>
 				←
 			</button>
-			<div className="min-w-40 text-center text-[10px]">
-				<span className="font-semibold uppercase">{currentVariant.id}</span>
-				<span className="text-white/60"> — {currentVariant.label}</span>
+			<div className="min-w-44 text-center text-[10px] leading-tight">
+				<div>
+					<span className="font-semibold uppercase">{currentVariant.id}</span>
+					<span className="text-white/60"> — {currentVariant.label}</span>
+				</div>
+				<div className="mt-0.5 text-[9px] text-white/45">
+					Mock data · resets on reload
+				</div>
 			</div>
 			<button
 				type="button"
