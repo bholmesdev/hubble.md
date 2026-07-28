@@ -58,7 +58,8 @@ export const FindExtension = Extension.create({
 				},
 			replaceFindMatch:
 				(replacement: string) =>
-				({ state, dispatch }) => {
+				({ editor, state, dispatch }) => {
+					if (!editor.isEditable) return false;
 					const findState = getFindState(state);
 					const match = findState.matches[findState.activeIndex];
 					if (!match) return false;
@@ -80,7 +81,8 @@ export const FindExtension = Extension.create({
 				},
 			replaceAllFindMatches:
 				(replacement: string) =>
-				({ state, dispatch }) => {
+				({ editor, state, dispatch }) => {
+					if (!editor.isEditable) return false;
 					const findState = getFindState(state);
 					if (findState.matches.length === 0) return false;
 					if (!dispatch) return true;
