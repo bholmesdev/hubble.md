@@ -32,6 +32,10 @@ function mockMatchMedia(initialMatches: boolean) {
 			matches = next;
 			for (const listener of listeners) listener({ matches: next });
 		},
+		/** Changes the reported scheme without notifying, as a missed event would. */
+		set(next: boolean) {
+			matches = next;
+		},
 	};
 }
 
@@ -73,6 +77,18 @@ describe("theme", () => {
 		emit(false);
 		setThemePreference("dark");
 		expect(document.documentElement.classList.contains("dark")).toBe(true);
+	});
+
+	it("re-reads the OS appearance when switching back to system", () => {
+		// Electron reports a forced override through `prefers-color-scheme`, so the
+		// cached value is the override until main releases `themeSource`.
+		const { set } = mockMatchMedia(true);
+		initTheme("dark");
+		expect(document.documentElement.classList.contains("dark")).toBe(true);
+
+		set(false);
+		setThemePreference("system");
+		expect(document.documentElement.classList.contains("dark")).toBe(false);
 	});
 
 	it("drops the previous OS listener when re-initialized", () => {

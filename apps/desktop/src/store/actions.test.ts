@@ -98,6 +98,30 @@ describe("desktop savePathContent", () => {
 		);
 	});
 
+	it("holds the current theme until main releases the native override", async () => {
+		const api = createDesktopApi();
+		const classList = { toggle: vi.fn() };
+		vi.stubGlobal("document", { documentElement: { classList } });
+		let releaseOverride: (() => void) | undefined;
+		api.setThemeSource.mockImplementation(
+			() =>
+				new Promise<void>((resolve) => {
+					releaseOverride = resolve;
+				}),
+		);
+		const { setThemePreference } = await loadStoreActions(api);
+
+		setThemePreference("system");
+
+		expect(api.setThemeSource).toHaveBeenLastCalledWith("system");
+		expect(classList.toggle).not.toHaveBeenCalled();
+
+		releaseOverride?.();
+		await vi.waitFor(() =>
+			expect(classList.toggle).toHaveBeenLastCalledWith("dark", false),
+		);
+	});
+
 	it("defaults code files to Hubble and persists the external-app preference", async () => {
 		const api = createDesktopApi();
 		const { codeFileOpenModeStore, setCodeFileOpenMode } =
