@@ -1,5 +1,6 @@
+import { history, undo } from "@tiptap/pm/history";
 import { Schema } from "@tiptap/pm/model";
-import { EditorState } from "@tiptap/pm/state";
+import { EditorState, type Transaction } from "@tiptap/pm/state";
 import { describe, expect, it } from "vitest";
 import { findMatches, replaceFindMatches } from "./FindExtension";
 
@@ -86,10 +87,51 @@ describe("replacement commands", () => {
 	});
 });
 
-function createState(content: string) {
+describe("replacement history", () => {
+	// Touching matches are the case history grouping would otherwise collapse:
+	// the second replacement lands on the range the first one just wrote.
+	it("undoes back-to-back replacements one at a time", () => {
+		let state = createState("Alphaalpha", { history: true });
+		const apply = (tr: Transaction) => {
+			state = state.apply(tr);
+		};
+
+		apply(
+			replaceFindMatches(state.tr, [findMatches(state.doc, "alpha")[0]], "one"),
+		);
+		apply(
+			replaceFindMatches(state.tr, [findMatches(state.doc, "alpha")[0]], "two"),
+		);
+		expect(state.doc.textContent).toBe("onetwo");
+
+		undo(state, apply);
+		expect(state.doc.textContent).toBe("onealpha");
+
+		undo(state, apply);
+		expect(state.doc.textContent).toBe("Alphaalpha");
+	});
+
+	it("undoes a replace all sweep in one step", () => {
+		let state = createState("Alpha beta alpha", { history: true });
+		const apply = (tr: Transaction) => {
+			state = state.apply(tr);
+		};
+
+		apply(
+			replaceFindMatches(state.tr, findMatches(state.doc, "alpha"), "gamma"),
+		);
+		expect(state.doc.textContent).toBe("gamma beta gamma");
+
+		undo(state, apply);
+		expect(state.doc.textContent).toBe("Alpha beta alpha");
+	});
+});
+
+function createState(content: string, options?: { history?: boolean }) {
 	return EditorState.create({
 		doc: schema.node("doc", null, [
 			schema.node("paragraph", null, schema.text(content)),
 		]),
+		plugins: options?.history ? [history()] : [],
 	});
 }

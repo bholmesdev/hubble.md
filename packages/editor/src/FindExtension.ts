@@ -1,4 +1,5 @@
 import { Extension } from "@tiptap/core";
+import { closeHistory } from "@tiptap/pm/history";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
@@ -146,11 +147,20 @@ export const FindExtension = Extension.create({
 export function getFindState(state: EditorState) {
 	return findPluginKey.getState(state) ?? emptyFindState();
 }
+/**
+ * Rewrites matches back to front so earlier positions stay valid.
+ *
+ * The transaction closes the previous history event, so every replacement is
+ * its own undo step even when they land faster than the history plugin's
+ * grouping delay. Replace all stays a single transaction, so one undo takes
+ * back the whole sweep.
+ */
 export function replaceFindMatches(
 	tr: Transaction,
 	matches: FindMatch[],
 	replacement: string,
 ) {
+	closeHistory(tr);
 	for (const match of [...matches].reverse()) {
 		tr.insertText(replacement, match.from, match.to);
 	}

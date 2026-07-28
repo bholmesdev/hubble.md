@@ -22,6 +22,7 @@ export {
 	setMarkdownFrontMatter,
 } from "./frontMatter";
 export { HeadingExtension } from "./Heading";
+export { resetEditorHistory } from "./history";
 export { InlineCodeExtension } from "./InlineCode";
 export {
 	createLinkMark,

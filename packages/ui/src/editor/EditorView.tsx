@@ -12,6 +12,7 @@ import {
 	parseMarkdownFrontMatter,
 	ReviewMarkExtension,
 	RichTextClipboardExtension,
+	resetEditorHistory,
 	StrikethroughShortcutExtension,
 	tiptapDocToMarkdown,
 } from "@hubble.md/editor";
@@ -250,9 +251,12 @@ export function EditorView({
 		setFrontMatterState(frontMatterStateFromMarkdown(initialMarkdown));
 		const currentBody = tiptapDocToMarkdown(editor.getJSON() as JSONContent);
 		if (currentBody !== parsed.body) {
-			editor.commands.setContent(markdownToTiptapDoc(parsed.body), {
-				emitUpdate: false,
-			});
+			editor
+				.chain()
+				.setMeta("addToHistory", false)
+				.setContent(markdownToTiptapDoc(parsed.body), { emitUpdate: false })
+				.run();
+			resetEditorHistory(editor);
 		}
 	}, [editor, initialMarkdown]);
 

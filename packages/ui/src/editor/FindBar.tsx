@@ -5,7 +5,13 @@ import {
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import { keymatch } from "keymatch";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+	type KeyboardEvent as ReactKeyboardEvent,
+	type ReactNode,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import MingcuteCornerDownLeftLine from "~icons/mingcute/corner-down-left-line";
 import MingcuteDownLine from "~icons/mingcute/down-line";
@@ -107,6 +113,39 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 		requestAnimationFrame(() => selectFindMatch(editor));
 	};
 
+	// Undo restores the selection it was recorded with, so the text that came
+	// back is at or just after the caret. Make it the active match and scroll
+	// there, since focus stays in the find bar and the editor is not visible.
+	const revealHistoryChange = () => {
+		const { from } = editor.state.selection;
+		const matches = getFindState(editor.state).matches;
+		const index = matches.findIndex((match) => match.to >= from);
+		if (index === -1) {
+			editor.view.dispatch(editor.state.tr.scrollIntoView());
+			return;
+		}
+		editor.commands.setFindActiveIndex(index);
+		requestAnimationFrame(() => selectFindMatch(editor));
+	};
+
+	/**
+	 * Sends undo and redo to the document while the find bar holds focus.
+	 * Without this the browser undoes typing in the find input instead, which
+	 * leaves replacements stranded.
+	 */
+	const handleHistoryKeys = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+		const isUndo = keymatch(event.nativeEvent, "CmdOrCtrl+z");
+		const isRedo =
+			keymatch(event.nativeEvent, "CmdOrCtrl+Shift+z") ||
+			keymatch(event.nativeEvent, "CmdOrCtrl+y");
+		if (!isUndo && !isRedo) return false;
+		event.preventDefault();
+		if (isUndo ? editor.commands.undo() : editor.commands.redo()) {
+			requestAnimationFrame(revealHistoryChange);
+		}
+		return true;
+	};
+
 	return (
 		<div
 			className="absolute z-[6] grid w-[min(22rem,calc(100%-1rem))] origin-(--transform-origin) grid-cols-[auto_1fr_auto] items-center gap-x-1 gap-y-1.5 rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 [--transform-origin:top_right] [inset-block-start:0.5rem] [inset-inline-end:0.5rem]"
@@ -132,6 +171,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 						requestAnimationFrame(() => selectFindMatch(editor));
 					}}
 					onKeyDown={(event) => {
+						if (handleHistoryKeys(event)) return;
 						if (event.key === "Escape") {
 							event.preventDefault();
 							close();
@@ -175,6 +215,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 						value={replacement}
 						onChange={(event) => setReplacement(event.target.value)}
 						onKeyDown={(event) => {
+							if (handleHistoryKeys(event)) return;
 							if (event.key === "Escape") {
 								event.preventDefault();
 								close();
