@@ -452,14 +452,19 @@ export function setThemePreference(preference: ThemePreference) {
 }
 
 /**
- * An active override is still what `prefers-color-scheme` reports, so `"system"`
- * can only be read once main has released it. Main may not emit a media change
- * on release, so re-apply here instead of waiting for one.
+ * Hands the preference to the Electron main process, which forces it through
+ * `nativeTheme.themeSource` so native window chrome and sandboxed HTML apps
+ * follow it too.
+ *
+ * While a Light or Dark override is in force, Chromium reports that override to
+ * `prefers-color-scheme` instead of the real OS appearance. So the OS value is
+ * only readable after the main process drops the override, and dropping it fires
+ * no `change` event. That is why `"system"` waits and then applies itself.
  */
 function syncNativeTheme(preference: ThemePreference) {
-	const released = desktopApi.setThemeSource(preference);
+	const updated = desktopApi.setThemeSource(preference);
 	if (preference !== "system") return;
-	void released.then(() => {
+	void updated.then(() => {
 		// A newer explicit pick already applied itself while this was in flight.
 		if (themePreferenceStore.get() === "system") {
 			applyThemePreference("system");

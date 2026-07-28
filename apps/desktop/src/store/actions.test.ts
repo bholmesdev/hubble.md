@@ -64,7 +64,7 @@ async function loadStoreActions(
 	return { ...actions, ...history, ...state };
 }
 
-/** What the stubbed `matchMedia` reports, which under a forced `themeSource` is the override rather than the OS. */
+/** What the stubbed `matchMedia` reports. Under a forced `themeSource` that is the override, not the OS. */
 let systemPrefersDark = false;
 
 function stubThemeDom() {
@@ -74,8 +74,8 @@ function stubThemeDom() {
 }
 
 /**
- * Leaves `setThemeSource` pending so a test decides when main releases the
- * override, which is the point at which `prefers-color-scheme` becomes readable.
+ * Leaves `setThemeSource` pending so a test decides when the main process drops
+ * the override, the point at which the real OS appearance becomes readable.
  */
 function deferThemeSource(api: MockDesktopApi) {
 	let release: (() => void) | undefined;
@@ -129,7 +129,7 @@ describe("desktop savePathContent", () => {
 		);
 	});
 
-	it("holds the current theme until main releases the native override", async () => {
+	it("holds the current theme until the main process drops the override", async () => {
 		const api = createDesktopApi();
 		const classList = stubThemeDom();
 		const release = deferThemeSource(api);
@@ -146,7 +146,7 @@ describe("desktop savePathContent", () => {
 		);
 	});
 
-	it("re-applies a saved system preference once main releases the override", async () => {
+	it("re-applies a saved system preference once the override is dropped", async () => {
 		const api = createDesktopApi();
 		const classList = stubThemeDom();
 		const release = deferThemeSource(api);
@@ -156,8 +156,8 @@ describe("desktop savePathContent", () => {
 		expect(api.setThemeSource).toHaveBeenLastCalledWith("system");
 		expect(classList.toggle).toHaveBeenLastCalledWith("dark", false);
 
-		// A stale override was forcing light; the OS value only reads back once
-		// main releases it, and no media change event announces that.
+		// A stale override was forcing light. The real OS value only reads back once
+		// the main process drops it, and no media change event announces that.
 		systemPrefersDark = true;
 		release();
 		await vi.waitFor(() =>

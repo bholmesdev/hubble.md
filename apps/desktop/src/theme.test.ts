@@ -27,7 +27,6 @@ function mockMatchMedia(initialMatches: boolean) {
 		"matchMedia",
 		vi.fn(() => mql),
 	);
-	/** Changes the reported scheme without notifying, as a missed event would. */
 	function set(next: boolean) {
 		matches = next;
 	}
@@ -75,8 +74,8 @@ describe("theme", () => {
 	});
 
 	it("re-reads the OS appearance when switching back to system", () => {
-		// Electron reports the forced override until main releases `themeSource`,
-		// which lands without a change event here.
+		// Chromium reports the forced override until the main process drops it,
+		// which happens here without any change event.
 		const { set } = mockMatchMedia(true);
 		initTheme("dark");
 		expect(document.documentElement.classList.contains("dark")).toBe(true);

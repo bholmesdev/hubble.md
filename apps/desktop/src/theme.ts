@@ -12,8 +12,9 @@ function applyTheme(): void {
 }
 
 /**
- * Pass `"system"` only once main has released `nativeTheme.themeSource`, since
- * Electron reports a forced override through `prefers-color-scheme`.
+ * Pass `"system"` only after the Electron main process has dropped any forced
+ * `nativeTheme.themeSource`, since Chromium reports that override to
+ * `prefers-color-scheme` instead of the real OS appearance.
  */
 export function setThemePreference(next: ThemePreference): void {
 	preference = next;
