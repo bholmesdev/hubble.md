@@ -513,6 +513,25 @@ describe("desktop refreshFiles", () => {
 			description: "Permission denied",
 		});
 	});
+
+	it("keeps a successful snapshot when the active note cannot be read", async () => {
+		const api = createDesktopApi();
+		const files = [{ path: "/workspace/other.md", modified_at: 1 }];
+		api.listDirectory.mockResolvedValue({ files, folders: [] });
+		api.readFileText.mockRejectedValue(new Error("File disappeared"));
+		const toastError = vi.fn();
+		vi.doMock("sonner", () => ({ toast: { error: toastError } }));
+		const { refreshFiles, viewerStore, workspaceStore } =
+			await setupActiveNote(api);
+
+		await refreshFiles();
+
+		expect(workspaceStore.get().files).toEqual(files);
+		expect(viewerStore.get().content).toBe("before");
+		expect(toastError).toHaveBeenCalledWith("Failed to refresh active note", {
+			description: "File disappeared",
+		});
+	});
 });
 describe("desktop renameMarkdownFile", () => {
 	beforeEach(() => {

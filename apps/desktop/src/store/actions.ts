@@ -114,27 +114,36 @@ export async function refreshFiles(
 
 	const intent = { reconcileActive };
 	const refresh = (async () => {
+		let listing: { files: FileEntry[]; folders: FolderEntry[] };
 		try {
-			const listing = await desktopApi.listDirectory(path);
-			workspaceStore.set((state) => {
-				if (state.workspacePath !== path) return state;
-				return { ...state, files: listing.files, folders: listing.folders };
+			listing = await desktopApi.listDirectory(path);
+		} catch (err) {
+			toast.error("Failed to refresh folder", {
+				description: errorMessage(err),
 			});
+			return;
+		}
+		workspaceStore.set((state) => {
+			if (state.workspacePath !== path) return state;
+			return { ...state, files: listing.files, folders: listing.folders };
+		});
 
-			const currentPath = viewerStore.get().currentPath;
-			if (
-				!intent.reconcileActive ||
-				!currentPath ||
-				isChangelogPath(currentPath) ||
-				!isEditableFile(currentPath) ||
-				!isInWorkspace(currentPath, path)
-			) {
-				return;
-			}
+		const currentPath = viewerStore.get().currentPath;
+		if (
+			!intent.reconcileActive ||
+			workspaceStore.get().workspacePath !== path ||
+			!currentPath ||
+			isChangelogPath(currentPath) ||
+			!isEditableFile(currentPath) ||
+			!isInWorkspace(currentPath, path)
+		) {
+			return;
+		}
+		try {
 			const nextContent = await desktopApi.readFileText(currentPath);
 			handleExternalFileChange(currentPath, nextContent);
 		} catch (err) {
-			toast.error("Failed to refresh folder", {
+			toast.error("Failed to refresh active note", {
 				description: errorMessage(err),
 			});
 		}
