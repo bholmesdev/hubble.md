@@ -117,11 +117,9 @@ if (devAppName) {
 	app.setPath("userData", path.join(app.getPath("appData"), devAppName));
 }
 
-// The renderer owns the theme preference and mirrors it to a `.dark` class, but
-// `themeSource` is what the `prefers-color-scheme` consumers we don't control
-// read: native window chrome and sandboxed HTML apps. Restore it from the cache
-// before the window exists so those are right on the first frame instead of
-// after the renderer's IPC lands. Must run after the userData override above.
+// The renderer owns the preference and mirrors it to a `.dark` class, but native
+// chrome and sandboxed HTML apps read `themeSource`. Restore it before the window
+// exists so those are right on the first frame, after the userData override above.
 nativeTheme.themeSource = loadThemeSource();
 const telemetry = new TelemetryManager({
 	statePath: path.join(app.getPath("userData"), "telemetry.json"),
@@ -1849,9 +1847,8 @@ function registerIpc() {
 	ipcMain.handle(
 		"desktop:set-theme-source",
 		(_event, { source }: { source: ThemePreference }) => {
-			const next = isThemePreference(source) ? source : "system";
-			nativeTheme.themeSource = next;
-			saveThemeSource(next);
+			nativeTheme.themeSource = isThemePreference(source) ? source : "system";
+			saveThemeSource(nativeTheme.themeSource);
 		},
 	);
 

@@ -172,7 +172,6 @@ export type DesktopApi = {
 	toAssetUrl(path: string): string;
 	getLaunchFilePath(): Promise<string | null>;
 	getLaunchWorkspacePath(): Promise<string | null>;
-	/** Drives `nativeTheme.themeSource`, which native chrome and sandboxed HTML apps read as `prefers-color-scheme`. */
 	setThemeSource(source: ThemePreference): Promise<void>;
 	setMenuState(state: MenuState): Promise<void>;
 	getUpdateState(): Promise<DesktopUpdateState>;

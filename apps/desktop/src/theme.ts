@@ -1,47 +1,29 @@
 export type ThemePreference = "light" | "dark" | "system";
 
 let systemQuery: MediaQueryList | null = null;
-let systemPrefersDark = false;
-let themePreference: ThemePreference = "system";
+let preference: ThemePreference = "system";
 
 function applyTheme(): void {
 	document.documentElement.classList.toggle(
 		"dark",
-		themePreference === "dark" ||
-			(themePreference === "system" && systemPrefersDark),
+		preference === "dark" ||
+			(preference === "system" && systemQuery?.matches === true),
 	);
 }
 
 /**
- * Applies a preference to the `dark` class on `<html>`.
- *
- * Callers must only pass `"system"` once main has released
- * `nativeTheme.themeSource`, because Electron reports a forced override through
- * `prefers-color-scheme` while one is active.
+ * Pass `"system"` only once main has released `nativeTheme.themeSource`, since
+ * Electron reports a forced override through `prefers-color-scheme`.
  */
-export function setThemePreference(preference: ThemePreference): void {
-	themePreference = preference;
-	// Re-read instead of trusting the cache: it holds whatever the override was
-	// reporting, and a missed change event would leave it pinned there.
-	if (preference === "system" && systemQuery) {
-		systemPrefersDark = systemQuery.matches;
-	}
+export function setThemePreference(next: ThemePreference): void {
+	preference = next;
 	applyTheme();
 }
 
-let detachSystemListener: (() => void) | null = null;
-
-export function initTheme(preference: ThemePreference): void {
+export function initTheme(next: ThemePreference): void {
 	// Replace any prior listener so a re-init (HMR) doesn't stack handlers.
-	detachSystemListener?.();
-	const query = window.matchMedia("(prefers-color-scheme: dark)");
-	const onChange = (event: MediaQueryListEvent) => {
-		systemPrefersDark = event.matches;
-		applyTheme();
-	};
-	query.addEventListener("change", onChange);
-	detachSystemListener = () => query.removeEventListener("change", onChange);
-	systemQuery = query;
-	systemPrefersDark = query.matches;
-	setThemePreference(preference);
+	systemQuery?.removeEventListener("change", applyTheme);
+	systemQuery = window.matchMedia("(prefers-color-scheme: dark)");
+	systemQuery.addEventListener("change", applyTheme);
+	setThemePreference(next);
 }

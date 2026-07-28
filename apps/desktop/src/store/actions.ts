@@ -439,12 +439,6 @@ export function setLastSeenVersion(version: string) {
 	lastSeenVersionStore.set(version);
 }
 
-/**
- * Applies the saved preference at boot. The `.dark` class only covers the
- * renderer, so main mirrors the preference into `nativeTheme.themeSource` for
- * the `prefers-color-scheme` consumers we don't control: native window chrome
- * and sandboxed HTML apps.
- */
 export function initThemePreference() {
 	const preference = themePreferenceStore.get();
 	initTheme(preference);
@@ -455,11 +449,12 @@ export function setThemePreference(preference: ThemePreference) {
 	themePreferenceStore.set(preference);
 	if (preference === "system") {
 		// An active override is still what `prefers-color-scheme` reports, so hold
-		// the previous theme until main releases it and the OS value is readable.
+		// the current theme until main releases it, and skip if a newer explicit
+		// pick already applied itself while this was in flight.
 		void desktopApi.setThemeSource(preference).then(() => {
-			// A newer explicit pick already applied itself while this was in flight.
-			if (themePreferenceStore.get() !== "system") return;
-			applyThemePreference("system");
+			if (themePreferenceStore.get() === "system") {
+				applyThemePreference("system");
+			}
 		});
 		return;
 	}

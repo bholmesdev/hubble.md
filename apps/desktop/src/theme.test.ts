@@ -80,8 +80,8 @@ describe("theme", () => {
 	});
 
 	it("re-reads the OS appearance when switching back to system", () => {
-		// Electron reports a forced override through `prefers-color-scheme`, so the
-		// cached value is the override until main releases `themeSource`.
+		// Electron reports the forced override until main releases `themeSource`,
+		// which lands without a change event here.
 		const { set } = mockMatchMedia(true);
 		initTheme("dark");
 		expect(document.documentElement.classList.contains("dark")).toBe(true);

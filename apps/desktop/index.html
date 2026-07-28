@@ -7,8 +7,7 @@
     <title>Hubble</title>
     <script>
       // Apply the theme class before first paint so a cold launch doesn't flash
-      // the wrong scheme. Reads the same persisted key as src/store/persistence.ts;
-      // the live listener is attached in src/theme.ts.
+      // the wrong scheme. Same persisted key as src/store/persistence.ts.
       try {
         const stored = localStorage.getItem("hubble-desktop-app");
         const theme = stored ? JSON.parse(stored).settings?.theme : null;
