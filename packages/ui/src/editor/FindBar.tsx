@@ -7,11 +7,12 @@ import type { Editor } from "@tiptap/core";
 import { keymatch } from "keymatch";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
+import MingcuteCornerDownLeftLine from "~icons/mingcute/corner-down-left-line";
 import MingcuteDownLine from "~icons/mingcute/down-line";
 import MingcuteRightLine from "~icons/mingcute/right-line";
-import MingcuteSearchLine from "~icons/mingcute/search-line";
 import MingcuteUpLine from "~icons/mingcute/up-line";
 import { cn } from "../lib/utils";
+import { Button } from "../primitives/button";
 
 export function FindBar({ editor }: { editor: Editor | null }) {
 	const [open, setOpen] = useState(false);
@@ -101,24 +102,28 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 		requestAnimationFrame(() => selectFindMatch(editor));
 	};
 
+	const replaceCurrent = () => {
+		editor.commands.replaceFindMatch(replacement);
+		requestAnimationFrame(() => selectFindMatch(editor));
+	};
+
 	return (
 		<div
-			className="absolute z-[6] flex w-[min(28rem,calc(100%-1rem))] origin-(--transform-origin) flex-col gap-1 rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 [--transform-origin:top_right] [inset-block-start:0.5rem] [inset-inline-end:0.5rem]"
+			className="absolute z-[6] grid w-[min(22rem,calc(100%-1rem))] origin-(--transform-origin) grid-cols-[auto_1fr_auto] items-center gap-x-1 gap-y-1.5 rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 [--transform-origin:top_right] [inset-block-start:0.5rem] [inset-inline-end:0.5rem]"
 			data-open
 		>
-			<div className="flex w-full items-center gap-1">
-				<FindButton
-					label={replaceOpen ? "Hide replace" : "Show replace"}
-					onClick={() => setReplaceOpen(!replaceOpen)}
-				>
-					<MingcuteRightLine
-						className={cn(
-							"size-3.5 transition-transform",
-							replaceOpen && "rotate-90",
-						)}
-					/>
-				</FindButton>
-				<MingcuteSearchLine className="size-3.5 shrink-0 text-muted-foreground" />
+			<FindButton
+				label={replaceOpen ? "Hide replace" : "Show replace"}
+				onClick={() => setReplaceOpen(!replaceOpen)}
+			>
+				<MingcuteRightLine
+					className={cn(
+						"size-3.5 transition-transform",
+						replaceOpen && "rotate-90",
+					)}
+				/>
+			</FindButton>
+			<div className="flex h-7 min-w-0 items-center gap-1.5">
 				<input
 					ref={inputRef}
 					value={findState.query}
@@ -138,11 +143,13 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 						}
 					}}
 					placeholder="Find"
-					className="h-6 min-w-0 flex-1 border-0 bg-transparent px-1 text-[11px] text-foreground outline-hidden placeholder:text-muted-foreground"
+					className="h-full min-w-0 flex-1 border-0 bg-transparent text-[11px] text-foreground outline-hidden placeholder:text-muted-foreground"
 				/>
 				<span className="shrink-0 tabular-nums text-muted-foreground">
 					{activeLabel}
 				</span>
+			</div>
+			<div className="flex items-center gap-1 justify-self-end">
 				<FindButton
 					label="Previous match"
 					disabled={matchCount === 0}
@@ -162,65 +169,53 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 				</FindButton>
 			</div>
 			{replaceOpen && (
-				<div className="flex w-full items-center gap-1 pl-7">
+				<>
+					<div className="col-span-3 -mx-1 border-border border-t" />
 					<input
 						value={replacement}
 						onChange={(event) => setReplacement(event.target.value)}
 						onKeyDown={(event) => {
+							if (event.key === "Escape") {
+								event.preventDefault();
+								close();
+								return;
+							}
 							if (event.key !== "Enter") return;
 							event.preventDefault();
-							editor.commands.replaceFindMatch(replacement);
-							requestAnimationFrame(() => selectFindMatch(editor));
+							if (event.metaKey || event.ctrlKey || event.altKey) {
+								editor.commands.replaceAllFindMatches(replacement);
+								return;
+							}
+							replaceCurrent();
 						}}
-						placeholder="Replace"
-						className="h-6 min-w-0 flex-1 border-0 bg-transparent px-1 text-[11px] text-foreground outline-hidden placeholder:text-muted-foreground"
+						placeholder="Replace with..."
+						className="col-start-2 col-end-4 h-7 min-w-0 border-0 bg-transparent text-[11px] text-foreground outline-hidden placeholder:text-muted-foreground"
 					/>
-					<FindTextButton
-						label="Replace current match"
-						disabled={matchCount === 0}
-						onClick={() => {
-							editor.commands.replaceFindMatch(replacement);
-							requestAnimationFrame(() => selectFindMatch(editor));
-						}}
-					>
-						Replace
-					</FindTextButton>
-					<FindTextButton
-						label="Replace all matches"
-						disabled={matchCount === 0}
-						onClick={() => editor.commands.replaceAllFindMatches(replacement)}
-					>
-						All
-					</FindTextButton>
-				</div>
+					<div className="col-start-2 col-end-4 flex items-center justify-end gap-1 pr-1 pb-1">
+						<Button
+							variant="ghost"
+							size="sm"
+							aria-label="Replace all matches"
+							disabled={matchCount === 0}
+							onMouseDown={(event) => event.preventDefault()}
+							onClick={() => editor.commands.replaceAllFindMatches(replacement)}
+						>
+							Replace all
+						</Button>
+						<Button
+							size="sm"
+							aria-label="Replace current match"
+							disabled={matchCount === 0}
+							onMouseDown={(event) => event.preventDefault()}
+							onClick={replaceCurrent}
+						>
+							Replace
+							<MingcuteCornerDownLeftLine data-icon="inline-end" />
+						</Button>
+					</div>
+				</>
 			)}
 		</div>
-	);
-}
-
-function FindTextButton({
-	children,
-	disabled,
-	label,
-	onClick,
-}: {
-	children: ReactNode;
-	disabled?: boolean;
-	label: string;
-	onClick: () => void;
-}) {
-	return (
-		<button
-			type="button"
-			aria-label={label}
-			title={label}
-			disabled={disabled}
-			onMouseDown={(event) => event.preventDefault()}
-			onClick={onClick}
-			className="inline-flex h-6 shrink-0 items-center justify-center rounded-[var(--radius-inner)] px-2 text-muted-foreground outline-hidden hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-40"
-		>
-			{children}
-		</button>
 	);
 }
 
@@ -244,7 +239,7 @@ function FindButton({
 			onMouseDown={(event) => event.preventDefault()}
 			onClick={onClick}
 			className={cn(
-				"inline-flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-inner)] text-muted-foreground outline-hidden hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/40",
+				"inline-flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-inner)] text-muted-foreground outline-hidden transition-[background-color,color,box-shadow] duration-[var(--default-transition-duration)] ease-snappy hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/40",
 				"disabled:pointer-events-none disabled:opacity-40",
 			)}
 		>
