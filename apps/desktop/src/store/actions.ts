@@ -456,9 +456,11 @@ export function setThemePreference(preference: ThemePreference) {
 	if (preference === "system") {
 		// An active override is still what `prefers-color-scheme` reports, so hold
 		// the previous theme until main releases it and the OS value is readable.
-		void desktopApi
-			.setThemeSource(preference)
-			.then(() => applyThemePreference(preference));
+		void desktopApi.setThemeSource(preference).then(() => {
+			// A newer explicit pick already applied itself while this was in flight.
+			if (themePreferenceStore.get() !== "system") return;
+			applyThemePreference("system");
+		});
 		return;
 	}
 	applyThemePreference(preference);

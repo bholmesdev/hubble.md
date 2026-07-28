@@ -122,6 +122,31 @@ describe("desktop savePathContent", () => {
 		);
 	});
 
+	it("drops a pending system apply when an explicit theme is picked first", async () => {
+		const api = createDesktopApi();
+		const classList = { toggle: vi.fn() };
+		vi.stubGlobal("document", { documentElement: { classList } });
+		let releaseOverride: (() => void) | undefined;
+		api.setThemeSource.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					releaseOverride = resolve;
+				}),
+		);
+		const { setThemePreference, themePreferenceStore } =
+			await loadStoreActions(api);
+
+		setThemePreference("system");
+		setThemePreference("dark");
+		expect(classList.toggle).toHaveBeenLastCalledWith("dark", true);
+
+		releaseOverride?.();
+		await vi.waitFor(() => expect(api.setThemeSource).toHaveBeenCalledTimes(2));
+
+		expect(themePreferenceStore.get()).toBe("dark");
+		expect(classList.toggle).toHaveBeenLastCalledWith("dark", true);
+	});
+
 	it("defaults code files to Hubble and persists the external-app preference", async () => {
 		const api = createDesktopApi();
 		const { codeFileOpenModeStore, setCodeFileOpenMode } =
