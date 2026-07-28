@@ -6,7 +6,7 @@ type ChangeListener = (event: { matches: boolean }) => void;
 
 /**
  * Stubs `matchMedia` with a controllable MediaQueryList so a test can flip the
- * OS appearance via `emit()` and assert how the theme controller reacts.
+ * OS appearance via `emit()` and assert how this module reacts.
  */
 function mockMatchMedia(initialMatches: boolean) {
 	let matches = initialMatches;
@@ -27,14 +27,15 @@ function mockMatchMedia(initialMatches: boolean) {
 		"matchMedia",
 		vi.fn(() => mql),
 	);
+	/** Changes the reported scheme without notifying, as a missed event would. */
+	function set(next: boolean) {
+		matches = next;
+	}
 	return {
+		set,
 		emit(next: boolean) {
-			matches = next;
+			set(next);
 			for (const listener of listeners) listener({ matches: next });
-		},
-		/** Changes the reported scheme without notifying, as a missed event would. */
-		set(next: boolean) {
-			matches = next;
 		},
 	};
 }
@@ -49,12 +50,6 @@ describe("theme", () => {
 		mockMatchMedia(true);
 		initTheme("system");
 		expect(document.documentElement.classList.contains("dark")).toBe(true);
-	});
-
-	it("leaves the dark class off when the OS prefers light", () => {
-		mockMatchMedia(false);
-		initTheme("system");
-		expect(document.documentElement.classList.contains("dark")).toBe(false);
 	});
 
 	it("reacts to the OS switching appearance at runtime", () => {

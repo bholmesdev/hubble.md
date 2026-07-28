@@ -50,7 +50,9 @@ async function loadStoreActions(
 		setTimeout,
 		clearTimeout,
 		matchMedia: () => ({
-			matches: false,
+			get matches() {
+				return systemPrefersDark;
+			},
 			addEventListener() {},
 			removeEventListener() {},
 		}),
@@ -62,9 +64,34 @@ async function loadStoreActions(
 	return { ...actions, ...history, ...state };
 }
 
+/** What the stubbed `matchMedia` reports, which under a forced `themeSource` is the override rather than the OS. */
+let systemPrefersDark = false;
+
+function stubThemeDom() {
+	const classList = { toggle: vi.fn() };
+	vi.stubGlobal("document", { documentElement: { classList } });
+	return classList;
+}
+
+/**
+ * Leaves `setThemeSource` pending so a test decides when main releases the
+ * override, which is the point at which `prefers-color-scheme` becomes readable.
+ */
+function deferThemeSource(api: MockDesktopApi) {
+	let release: (() => void) | undefined;
+	api.setThemeSource.mockImplementationOnce(
+		() =>
+			new Promise<void>((resolve) => {
+				release = resolve;
+			}),
+	);
+	return () => release?.();
+}
+
 describe("desktop savePathContent", () => {
 	beforeEach(() => {
 		vi.unstubAllGlobals();
+		systemPrefersDark = false;
 	});
 
 	it("hydrates the default chat command and persists edits", async () => {
@@ -86,8 +113,7 @@ describe("desktop savePathContent", () => {
 
 	it("mirrors the theme preference to the native theme source", async () => {
 		const api = createDesktopApi();
-		const classList = { toggle: vi.fn() };
-		vi.stubGlobal("document", { documentElement: { classList } });
+		const classList = stubThemeDom();
 		const { setThemePreference, themePreferenceStore } =
 			await loadStoreActions(api);
 		const { STORAGE_KEY } = await import("./persistence");
@@ -105,15 +131,8 @@ describe("desktop savePathContent", () => {
 
 	it("holds the current theme until main releases the native override", async () => {
 		const api = createDesktopApi();
-		const classList = { toggle: vi.fn() };
-		vi.stubGlobal("document", { documentElement: { classList } });
-		let releaseOverride: (() => void) | undefined;
-		api.setThemeSource.mockImplementation(
-			() =>
-				new Promise<void>((resolve) => {
-					releaseOverride = resolve;
-				}),
-		);
+		const classList = stubThemeDom();
+		const release = deferThemeSource(api);
 		const { setThemePreference } = await loadStoreActions(api);
 
 		setThemePreference("system");
@@ -121,7 +140,7 @@ describe("desktop savePathContent", () => {
 		expect(api.setThemeSource).toHaveBeenLastCalledWith("system");
 		expect(classList.toggle).not.toHaveBeenCalled();
 
-		releaseOverride?.();
+		release();
 		await vi.waitFor(() =>
 			expect(classList.toggle).toHaveBeenLastCalledWith("dark", false),
 		);
@@ -129,38 +148,27 @@ describe("desktop savePathContent", () => {
 
 	it("re-applies a saved system preference once main releases the override", async () => {
 		const api = createDesktopApi();
-		const classList = { toggle: vi.fn() };
-		vi.stubGlobal("document", { documentElement: { classList } });
-		let releaseOverride: (() => void) | undefined;
-		api.setThemeSource.mockImplementationOnce(
-			() =>
-				new Promise<void>((resolve) => {
-					releaseOverride = resolve;
-				}),
-		);
+		const classList = stubThemeDom();
+		const release = deferThemeSource(api);
 		const { initThemePreference } = await loadStoreActions(api);
 
 		initThemePreference();
 		expect(api.setThemeSource).toHaveBeenLastCalledWith("system");
-		const appliedAtBoot = classList.toggle.mock.calls.length;
+		expect(classList.toggle).toHaveBeenLastCalledWith("dark", false);
 
-		releaseOverride?.();
+		// A stale override was forcing light; the OS value only reads back once
+		// main releases it, and no media change event announces that.
+		systemPrefersDark = true;
+		release();
 		await vi.waitFor(() =>
-			expect(classList.toggle.mock.calls.length).toBeGreaterThan(appliedAtBoot),
+			expect(classList.toggle).toHaveBeenLastCalledWith("dark", true),
 		);
 	});
 
 	it("drops a pending system apply when an explicit theme is picked first", async () => {
 		const api = createDesktopApi();
-		const classList = { toggle: vi.fn() };
-		vi.stubGlobal("document", { documentElement: { classList } });
-		let releaseOverride: (() => void) | undefined;
-		api.setThemeSource.mockImplementationOnce(
-			() =>
-				new Promise<void>((resolve) => {
-					releaseOverride = resolve;
-				}),
-		);
+		const classList = stubThemeDom();
+		const release = deferThemeSource(api);
 		const { setThemePreference, themePreferenceStore } =
 			await loadStoreActions(api);
 
@@ -168,7 +176,7 @@ describe("desktop savePathContent", () => {
 		setThemePreference("dark");
 		expect(classList.toggle).toHaveBeenLastCalledWith("dark", true);
 
-		releaseOverride?.();
+		release();
 		await vi.waitFor(() => expect(api.setThemeSource).toHaveBeenCalledTimes(2));
 
 		expect(themePreferenceStore.get()).toBe("dark");
