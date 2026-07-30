@@ -28,6 +28,7 @@ import {
 	useEditor,
 } from "@tiptap/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { clearActiveEditor, setActiveEditor } from "./activeEditor";
 import { CODE_BLOCK_COPY_EVENT, HubbleCodeBlock } from "./CodeBlockExtension";
 import { copySelectionAsMarkdown } from "./copyAsMarkdown";
 import { LinkClickExtension } from "./LinkClickExtension";
@@ -229,6 +230,8 @@ export function EditorView({
 	});
 	useLayoutEffect(() => {
 		editorRef.current = editor;
+		setActiveEditor(editor);
+		return () => clearActiveEditor(editor);
 	}, [editor]);
 
 	useEffect(() => {

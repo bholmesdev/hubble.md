@@ -19,6 +19,11 @@ import { keymatch } from "keymatch";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
+import {
+	loadRecentCommands,
+	recordRecentCommand,
+} from "./commands/recentCommands";
+import { buildAppCommands } from "./commands/useAppCommands";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
@@ -186,6 +191,7 @@ function App() {
 	);
 	const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
+	const [recentCommandIds, setRecentCommandIds] = useState(loadRecentCommands);
 	const workspaceFiles = useStoreValue(workspaceStore).files;
 	const paletteFiles: PaletteFile[] = workspaceFiles
 		.filter((file) => (file.kind ?? fileKindForPath(file.path)) === "document")
@@ -195,6 +201,30 @@ function App() {
 			modifiedAt: file.modified_at,
 		}));
 	const lastSeenVersion = useStoreValue(lastSeenVersionStore);
+	const pinnedNotes = useStoreValue(workspaceStore).pinnedNotes;
+	// Read the resolved class rather than the preference, so "system" toggles
+	// away from what the user is actually looking at.
+	const isDark =
+		typeof document !== "undefined" &&
+		document.documentElement.classList.contains("dark");
+	const paletteCommands = buildAppCommands(
+		{
+			openSettings: () => setSettingsOpen(true),
+			requestCopyAsMarkdown: () =>
+				setCopyAsMarkdownRequest((request) => request + 1),
+			focusSidebar: focusSidebarNav,
+		},
+		{
+			currentPath: state.currentPath ?? null,
+			workspacePath: workspacePath ?? null,
+			isSourceMode: state.viewMode === "source",
+			sidebarOpen,
+			isDark,
+			isPinned: state.currentPath
+				? pinnedNotes.includes(state.currentPath)
+				: false,
+		},
+	);
 
 	const readyVersion =
 		updateState?.status === "ready"
@@ -666,6 +696,11 @@ function App() {
 				files={paletteFiles}
 				onSelectFile={(path) => void loadPath(path)}
 				searchContents={searchFileContents}
+				commands={paletteCommands}
+				recentCommandIds={recentCommandIds}
+				onRunCommand={(id) =>
+					setRecentCommandIds((current) => recordRecentCommand(id, current))
+				}
 			/>
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
 				<GeneralSettingsSection />

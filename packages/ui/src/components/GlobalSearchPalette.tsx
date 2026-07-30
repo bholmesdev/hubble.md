@@ -4,7 +4,16 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import MingcuteCornerDownLeftLine from "~icons/mingcute/corner-down-left-line";
 import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteSearch2Line from "~icons/mingcute/search-2-line";
+import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { type MatchRange, matchRanges, scorePath } from "../lib/fuzzy";
+import {
+	COMMAND_PREFIX,
+	groupCommands,
+	isCommandQuery,
+	type PaletteCommand,
+	rankCommands,
+	stripCommandPrefix,
+} from "../lib/paletteCommand";
 
 const SEARCH_DEBOUNCE_MS = 150;
 const MIN_CONTENT_QUERY_LENGTH = 3;
@@ -40,6 +49,11 @@ export type GlobalSearchPaletteProps = {
 	files: PaletteFile[];
 	onSelectFile: (path: string) => void;
 	searchContents: (query: string) => Promise<PaletteContentResult>;
+	/** Runnable commands, already filtered to those enabled in this context. */
+	commands?: PaletteCommand[];
+	/** Most-recently-run command ids first; used only to break ranking ties. */
+	recentCommandIds?: string[];
+	onRunCommand?: (id: string) => void;
 };
 
 function Highlight({ text, ranges }: { text: string; ranges: MatchRange[] }) {
@@ -143,11 +157,25 @@ function GlobalSearchPalette({
 	files,
 	onSelectFile,
 	searchContents,
+	commands = [],
+	recentCommandIds = [],
+	onRunCommand,
 }: GlobalSearchPaletteProps) {
 	const [query, setQuery] = useState("");
 	const inputRef = useRef<HTMLInputElement | null>(null);
-	const nameResults = getNameResults(files, query);
-	const { result, searching } = useContentResults(query, open, searchContents);
+	const commandMode = isCommandQuery(query);
+	// Content search must not run in command mode, and must not see the `/`.
+	const fileQuery = commandMode ? "" : query;
+	const nameResults = getNameResults(files, fileQuery);
+	const { result, searching } = useContentResults(
+		fileQuery,
+		open && !commandMode,
+		searchContents,
+	);
+
+	const commandResults = groupCommands(
+		rankCommands(stripCommandPrefix(query), commands, recentCommandIds),
+	);
 
 	useEffect(() => {
 		if (!open) setQuery("");
@@ -167,8 +195,18 @@ function GlobalSearchPalette({
 		onSelectFile(path);
 	};
 
-	const isEmptyQuery = query.trim() === "";
-	const hasResults = nameResults.length > 0 || contentResults.length > 0;
+	// Close before running: a command that opens another dialog or moves focus
+	// would otherwise fight the palette's own closing focus restore.
+	const runCommand = (command: PaletteCommand) => {
+		onOpenChange(false);
+		onRunCommand?.(command.id);
+		void command.run();
+	};
+
+	const isEmptyQuery = fileQuery.trim() === "";
+	const hasResults = commandMode
+		? commandResults.length > 0
+		: nameResults.length > 0 || contentResults.length > 0;
 	return (
 		<Dialog.Root open={open} onOpenChange={onOpenChange}>
 			<Dialog.Portal>
@@ -189,23 +227,35 @@ function GlobalSearchPalette({
 					initialFocus={inputRef}
 					className="fixed top-[12vh] left-1/2 z-50 flex max-h-[60vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 scale-100 flex-col overflow-hidden rounded-[var(--radius-popover)] bg-popover text-popover-foreground opacity-100 shadow-overlay ring-1 ring-black/10 outline-hidden transition-[translate,scale,opacity] duration-200 ease-snappy data-[closed]:pointer-events-none data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 dark:ring-white/15"
 				>
-					<Dialog.Title className="sr-only">Search files</Dialog.Title>
+					<Dialog.Title className="sr-only">
+						{commandMode ? "Run a command" : "Search files"}
+					</Dialog.Title>
 					<Dialog.Description className="sr-only">
-						Find a note by name, path, or content.
+						{commandMode
+							? "Run a Hubble command. Clear the leading slash to search notes instead."
+							: "Find a note by name, path, or content. Type a slash to run a command instead."}
 					</Dialog.Description>
 					<Command
-						label="Search files"
+						label={commandMode ? "Run a command" : "Search files"}
 						shouldFilter={false}
 						loop
 						className="flex min-h-0 flex-1 flex-col"
 					>
 						<div className="flex items-center gap-2.5 border-b border-border px-3.5">
-							<MingcuteSearch2Line className="size-4 shrink-0 text-muted-foreground" />
+							{commandMode ? (
+								<MingcuteTerminalLine className="size-4 shrink-0 text-muted-foreground" />
+							) : (
+								<MingcuteSearch2Line className="size-4 shrink-0 text-muted-foreground" />
+							)}
 							<Command.Input
 								ref={inputRef}
 								value={query}
 								onValueChange={setQuery}
-								placeholder="Search notes by name or content"
+								placeholder={
+									commandMode
+										? "Run a command"
+										: "Search notes, or type / for commands"
+								}
 								className="h-12 w-full border-0 bg-transparent text-[13px] text-foreground outline-hidden placeholder:text-muted-foreground"
 							/>
 							{searching && (
@@ -218,11 +268,34 @@ function GlobalSearchPalette({
 						<Command.List className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
 							{!hasResults && !searching && (
 								<div className="px-3 py-8 text-center text-xs text-muted-foreground">
-									{isEmptyQuery ? "No notes yet" : "No matches"}
+									{commandMode
+										? "No commands"
+										: isEmptyQuery
+											? "No notes yet"
+											: "No matches"}
 								</div>
 							)}
 
-							{nameResults.length > 0 && (
+							{commandMode &&
+								commandResults.map(({ group, commands: groupItems }) => (
+									<ResultGroup key={group} heading={group}>
+										{groupItems.map((command) => (
+											<Command.Item
+												key={command.id}
+												value={`command:${command.id}`}
+												onSelect={() => runCommand(command)}
+												className={ROW_CLASS}
+											>
+												<CommandRow
+													command={command}
+													query={stripCommandPrefix(query)}
+												/>
+											</Command.Item>
+										))}
+									</ResultGroup>
+								))}
+
+							{!commandMode && nameResults.length > 0 && (
 								<ResultGroup heading={isEmptyQuery ? "Recent" : "Notes"}>
 									{nameResults.map((file) => (
 										<Command.Item
@@ -240,7 +313,7 @@ function GlobalSearchPalette({
 								</ResultGroup>
 							)}
 
-							{contentResults.length > 0 && (
+							{!commandMode && contentResults.length > 0 && (
 								<ResultGroup heading="Content">
 									{contentResults.map((entry) => {
 										const relativePath =
@@ -285,10 +358,18 @@ function GlobalSearchPalette({
 								<Legend
 									icon={<MingcuteCornerDownLeftLine className="size-3" />}
 								>
-									Open
+									{commandMode ? "Run" : "Open"}
 								</Legend>
 								<Legend keys="esc">Close</Legend>
 							</span>
+							{commands.length > 0 && (
+								<span className="ms-auto flex items-center gap-1.5">
+									<kbd className="flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-inner)] border border-border px-1 font-sans text-[10px] leading-none text-muted-foreground">
+										{COMMAND_PREFIX}
+									</kbd>
+									{commandMode ? "Clear for notes" : "Commands"}
+								</span>
+							)}
 						</div>
 					</Command>
 				</Dialog.Popup>
@@ -346,6 +427,30 @@ function FileRow({
 				<span className="max-w-[45%] shrink-0 truncate text-[11px] text-muted-foreground">
 					<Highlight text={folder} ranges={folderRanges} />
 				</span>
+			)}
+		</span>
+	);
+}
+
+/** Command label with its shortcut trailing, matched characters emphasized. */
+function CommandRow({
+	command,
+	query,
+}: {
+	command: PaletteCommand;
+	query: string;
+}) {
+	const ranges = query ? matchRanges(query, command.label) : [];
+
+	return (
+		<span className="flex min-w-0 items-center gap-2.5">
+			<span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
+				<Highlight text={command.label} ranges={ranges} />
+			</span>
+			{command.shortcut && (
+				<kbd className="shrink-0 rounded-[var(--radius-inner)] border border-border px-1.5 py-0.5 font-sans text-[10px] leading-none text-muted-foreground">
+					{command.shortcut}
+				</kbd>
 			)}
 		</span>
 	);

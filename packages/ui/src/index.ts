@@ -21,6 +21,14 @@ export {
 export { NewNoteButton, Toolbar } from "./components/Toolbar";
 export { WorkspaceSwitcherMenu } from "./components/WorkspaceSwitcherMenu";
 export {
+	clearActiveEditor,
+	type EditorActionId,
+	editorActionIds,
+	getActiveEditor,
+	runEditorAction,
+	setActiveEditor,
+} from "./editor/activeEditor";
+export {
 	EditorView,
 	type EditorViewProps,
 	type WikiTarget,
@@ -53,6 +61,15 @@ export {
 	type ResizePointerContext,
 	useResizeSeparator,
 } from "./hooks/useResizeSeparator";
+export {
+	COMMAND_PREFIX,
+	groupCommands,
+	isCommandQuery,
+	type PaletteCommand,
+	rankCommands,
+	scoreCommand,
+	stripCommandPrefix,
+} from "./lib/paletteCommand";
 export { formatCommandShortcut, formatShortcut } from "./lib/shortcut";
 export { Button, buttonVariants } from "./primitives/button";
 export { Input } from "./primitives/input";

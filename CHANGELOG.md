@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Run any Hubble command from the search palette. Press Cmd+P and type `/` to switch from searching notes to running commands by name — including ones with no menu entry at all, like Reveal in File Manager and Chat About This Note. Each row shows its keyboard shortcut, search matches synonyms (`finder` finds Reveal), and the commands you use most stay at the top. [#208](https://github.com/bholmesdev/hubble.md/issues/208)
+
 ### Changed
 
 ### Fixed
