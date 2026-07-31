@@ -81,6 +81,7 @@ jobs:
       - name: Prepare review context
         env:
           GH_TOKEN: ${{ github.token }}
+          EXPECTED_BASE_SHA: ${{ needs.resolve.outputs.base_sha }}
           EXPECTED_HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
           PR_NUMBER: ${{ needs.resolve.outputs.pr_number }}
           REPO: ${{ github.repository }}
@@ -89,6 +90,7 @@ jobs:
 
           gh api "repos/$REPO/pulls/$PR_NUMBER" > pr.json
           test "$(jq -r '.head.sha' pr.json)" = "$EXPECTED_HEAD_SHA"
+          test "$(jq -r '.base.sha' pr.json)" = "$EXPECTED_BASE_SHA"
           jq -r '
             "# Pull request #\(.number): \(.title)\n\n" +
             "Author: @\(.user.login)\n" +
