@@ -1,8 +1,7 @@
 name: Review Pull Requests
 
-# pull_request_target lets fork PRs use WARP_API_KEY. The agent checks out only
-# the trusted PR base and reads contributor changes as review data. A separate
-# job validates its review before publishing it.
+# The agent checks out only the trusted PR base and reads contributor changes as
+# review data. A separate job validates its review before publishing it.
 
 on:
   pull_request_target:
