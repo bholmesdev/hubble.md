@@ -937,7 +937,9 @@ export function Sidebar({
 										"transition-[background-color,opacity,filter] duration-150 ease-out motion-reduce:transition-none",
 										!isActive &&
 											isSelected &&
-											"bg-selected text-selected-foreground",
+											(row.kind === "folder"
+												? "bg-accent"
+												: "bg-selected text-selected-foreground"),
 										!isActive && !isSelected && isFocused && "bg-accent",
 										isActive &&
 											"bg-sidebar-accent text-sidebar-accent-foreground font-medium",
