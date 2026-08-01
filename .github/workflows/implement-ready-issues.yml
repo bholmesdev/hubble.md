@@ -39,6 +39,18 @@ jobs:
           # Do not leave a writable GitHub credential where the agent can use it.
           persist-credentials: false
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Record baseline
         id: baseline
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -50,7 +62,7 @@ jobs:
         run: |
           gh issue view "$ISSUE_NUMBER" \
             --repo "$REPO" \
-            --json number,title,body,labels,comments \
+            --json number,title,body,author,labels,comments \
             > issue-context.json
 
       - name: Implement issue with Warp Factory agent
@@ -75,6 +87,10 @@ jobs:
             trusted job will perform the skill's GitHub publication step and
             open the draft pull request. Do not modify `issue-context.json`.
 
+            Follow `.agents/skills/changelog/SKILL.md`. If it needs the
+            not-yet-created PR link, use `[#__PR_NUMBER__](__PR_URL__)`; the
+            trusted job will replace both placeholders after opening the PR.
+
             - Repository: ${{ github.repository }}
             - Issue number: #${{ env.ISSUE_NUMBER }}
           warp_api_key: ${{ secrets.WARP_API_KEY }}
@@ -91,6 +107,11 @@ jobs:
           grep -Fq '## Testing' pr-body.md
           grep -Fq '## Checklist' pr-body.md
           grep -Fq "#${ISSUE_NUMBER}" pr-body.md
+
+          if ! git diff --quiet "$BASE_SHA" -- CHANGELOG.md; then
+            git diff "$BASE_SHA" -- CHANGELOG.md |
+              grep -F '[#__PR_NUMBER__](__PR_URL__)' > /dev/null
+          fi
 
           mv pr-body.md "$RUNNER_TEMP/pr-body.md"
           rm issue-context.json
@@ -146,6 +167,13 @@ jobs:
 
           git apply --index implementation.patch
 
+          PENDING_CHANGELOG=""
+          if grep -Fq '[#__PR_NUMBER__](__PR_URL__)' CHANGELOG.md; then
+            PENDING_CHANGELOG="$RUNNER_TEMP/CHANGELOG.md"
+            cp CHANGELOG.md "$PENDING_CHANGELOG"
+            git restore --staged --worktree CHANGELOG.md
+          fi
+
           BRANCH="agent/issue-${ISSUE_NUMBER}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           TITLE="$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json title --jq '.title')"
 
@@ -159,10 +187,23 @@ jobs:
           # Sign the PR body so reviewers see which agent wrote the change.
           printf '\n---\n\n_Implemented by a [Warp Factory agent](https://www.warp.dev/oz)._\n' >> pr-body.md
 
-          gh pr create \
+          PR_URL="$(gh pr create \
             --repo "$REPO" \
             --base "$BASE_BRANCH" \
             --head "$BRANCH" \
             --draft \
             --title "$TITLE" \
-            --body-file pr-body.md
+            --body-file pr-body.md)"
+
+          if [[ -n "$PENDING_CHANGELOG" ]]; then
+            PR_NUMBER="${PR_URL##*/}"
+            mv "$PENDING_CHANGELOG" CHANGELOG.md
+            sed -i \
+              -e "s|__PR_NUMBER__|${PR_NUMBER}|g" \
+              -e "s|__PR_URL__|${PR_URL}|g" \
+              CHANGELOG.md
+            ! grep -Fq '__PR_' CHANGELOG.md
+            git add CHANGELOG.md
+            git commit -m "Add changelog for #${ISSUE_NUMBER}"
+            git push origin "$BRANCH"
+          fi
