@@ -65,8 +65,8 @@ const desktopApi = {
 		ipcRenderer.invoke("desktop:start-workspace-watcher", { path }),
 	stopWorkspaceWatcher: (generation) =>
 		ipcRenderer.invoke("desktop:stop-workspace-watcher", { generation }),
-	reconcileWorkspacePath: (workspacePath, changedPath) =>
-		ipcRenderer.invoke("desktop:reconcile-workspace-path", {
+	sidebarDeltaForPath: (workspacePath, changedPath) =>
+		ipcRenderer.invoke("desktop:sidebar-delta-for-path", {
 			workspacePath,
 			changedPath,
 		}),

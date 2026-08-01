@@ -66,9 +66,9 @@ import {
 	openWorkspace,
 	openWorkspaceWithSidebar,
 	reconcileWorkspacePath,
+	refreshFileList,
 	refreshFiles,
 	refreshFilesDebounced,
-	refreshFilesSnapshot,
 	reloadFromDiskConflict,
 	requestChatAboutNote,
 	savePathContent,
@@ -473,7 +473,7 @@ function App() {
 					return;
 				}
 				if (change.kind === "refresh") {
-					await refreshFilesSnapshot(workspacePath);
+					await refreshFileList(workspacePath);
 					return;
 				}
 				for (const changedPath of change.paths) {

@@ -12,7 +12,7 @@ type MockDesktopApi = {
 	pathExists: ReturnType<typeof vi.fn>;
 	openPathFromLink: ReturnType<typeof vi.fn>;
 	openPathInDefaultApp: ReturnType<typeof vi.fn>;
-	reconcileWorkspacePath: ReturnType<typeof vi.fn>;
+	sidebarDeltaForPath: ReturnType<typeof vi.fn>;
 	setThemeSource: ReturnType<typeof vi.fn>;
 };
 
@@ -29,7 +29,7 @@ function createDesktopApi(): MockDesktopApi {
 		pathExists: vi.fn(async () => false),
 		openPathFromLink: vi.fn(async () => ({ kind: "opened" })),
 		openPathInDefaultApp: vi.fn(async () => {}),
-		reconcileWorkspacePath: vi.fn(async () => null),
+		sidebarDeltaForPath: vi.fn(async () => null),
 		setThemeSource: vi.fn(async () => {}),
 	};
 }
@@ -464,7 +464,7 @@ describe("desktop refreshFiles", () => {
 		api.readFileText.mockResolvedValue("updated");
 		const { refreshFiles, viewerStore } = await setupActiveNote(api);
 
-		const snapshot = refreshFiles("/workspace", { reconcileActive: false });
+		const snapshot = refreshFiles("/workspace", { reloadActive: false });
 		const full = refreshFiles();
 		finishListing?.();
 		await Promise.all([snapshot, full]);
@@ -538,7 +538,7 @@ describe("desktop refreshFiles", () => {
 	it("drops an incremental result when the workspace switches mid-request", async () => {
 		const api = createDesktopApi();
 		let finish: ((delta: unknown) => void) | undefined;
-		api.reconcileWorkspacePath.mockImplementation(
+		api.sidebarDeltaForPath.mockImplementation(
 			() =>
 				new Promise((resolve) => {
 					finish = resolve;

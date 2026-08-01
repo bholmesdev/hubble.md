@@ -31,6 +31,7 @@ import type {
 } from "../src/desktopApi/types";
 import {
 	fileKindForPath,
+	HUBBLE_DIR,
 	hasMarkdownExtension,
 	isEditableFile,
 	markdownAssetFolderPath,
@@ -49,12 +50,9 @@ import { setupTerminalIpc } from "./terminal";
 import {
 	collectWorkspaceFiles,
 	listSidebarFiles,
-	reconcileSidebarPath,
+	sidebarDeltaForPath,
 } from "./workspaceSidebar";
-import {
-	startNativeWorkspaceWatcher,
-	type WorkspaceWatchHandle,
-} from "./workspaceWatcher";
+import { type WatchHandle, watchWorkspace } from "./workspaceWatcher";
 import {
 	loadZoomFactor,
 	resetWindowZoom,
@@ -171,7 +169,7 @@ const watchers = new Map<string, FSWatcher>();
 type ActiveWorkspaceWatcher = {
 	root: string;
 	generation: number;
-	handle: WorkspaceWatchHandle;
+	handle: WatchHandle;
 };
 let workspaceWatcher: ActiveWorkspaceWatcher | null = null;
 let workspaceWatcherGeneration = 0;
@@ -186,7 +184,6 @@ let grantsLoaded = false;
 let latestSearchRequestId = 0;
 
 const workspaceConfigVersion = 1;
-const workspaceConfigDir = ".hubble";
 const workspaceConfigFile = "config.json";
 const workspaceConfigSchema = z.object({
 	version: z.literal(workspaceConfigVersion),
@@ -270,7 +267,7 @@ function saveThemeSource(source: ThemePreference) {
 
 function workspaceConfigPath(workspacePath: string): string {
 	const root = assertGrantedRoot(workspacePath);
-	return path.join(root, workspaceConfigDir, workspaceConfigFile);
+	return path.join(root, HUBBLE_DIR, workspaceConfigFile);
 }
 
 function emptyWorkspaceConfig(): WorkspaceConfig {
@@ -1233,7 +1230,7 @@ function registerIpc() {
 				}
 				stopWorkspaceWatcher();
 				const generation = workspaceWatcherGeneration;
-				const watcher = startNativeWorkspaceWatcher(
+				const watcher = watchWorkspace(
 					root,
 					(paths) => {
 						if (workspaceWatcher?.generation !== generation) return;
@@ -1275,14 +1272,14 @@ function registerIpc() {
 	);
 
 	ipcMain.handle(
-		"desktop:reconcile-workspace-path",
+		"desktop:sidebar-delta-for-path",
 		async (_event, { workspacePath, changedPath }) => {
 			const root = assertGranted(workspacePath);
 			if (!workspaceWatcher || workspaceWatcher.root !== root) return null;
 			const resolvedPath = resolvePath(changedPath);
 			if (!isWithin(root, resolvedPath)) return { kind: "refresh" };
 			try {
-				return await reconcileSidebarPath(root, resolvedPath);
+				return await sidebarDeltaForPath(root, resolvedPath);
 			} catch (error) {
 				console.error("Workspace path reconciliation failed:", error);
 				return { kind: "refresh" };

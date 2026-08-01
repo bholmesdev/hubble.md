@@ -17,7 +17,7 @@ export type DirectoryListing = {
 	folders: FolderEntry[];
 };
 
-export type WorkspaceChange =
+export type WorkspaceWatchEvent =
 	| { kind: "paths"; paths: string[] }
 	| { kind: "refresh" };
 
@@ -169,7 +169,7 @@ export type DesktopApi = {
 	}): Promise<string | null>;
 	startWorkspaceWatcher(path: string): Promise<number | null>;
 	stopWorkspaceWatcher(generation: number): Promise<void>;
-	reconcileWorkspacePath(
+	sidebarDeltaForPath(
 		workspacePath: string,
 		changedPath: string,
 	): Promise<WorkspaceDelta | null>;
@@ -211,7 +211,9 @@ export type DesktopApi = {
 	onMenuShowWorkspaceSwitcher(callback: () => void): Unsubscribe;
 	onMenuGoToFile(callback: () => void): Unsubscribe;
 	onMenuSyncWorkspace(callback: () => void): Unsubscribe;
-	onWorkspaceChanged(callback: (change: WorkspaceChange) => void): Unsubscribe;
+	onWorkspaceChanged(
+		callback: (event: WorkspaceWatchEvent) => void,
+	): Unsubscribe;
 	onMenuToggleTerminal(callback: () => void): Unsubscribe;
 	onMenuGoBack(callback: () => void): Unsubscribe;
 	onMenuGoForward(callback: () => void): Unsubscribe;

@@ -7,15 +7,12 @@ type SidebarSnapshot = {
 	folders: FolderEntry[];
 };
 
-function isSameOrInside(candidate: string, parent: string): boolean {
-	return pathEquals(candidate, parent) || pathInFolder(candidate, parent);
-}
-
-function withoutPrefix<T extends { path: string }>(
-	entries: T[],
-	prefix: string,
-): T[] {
-	return entries.filter((entry) => !isSameOrInside(entry.path, prefix));
+/** Drop entries at `parent` or anywhere under it. */
+function prune<T extends { path: string }>(entries: T[], parent: string): T[] {
+	return entries.filter(
+		(entry) =>
+			!pathEquals(entry.path, parent) && !pathInFolder(entry.path, parent),
+	);
 }
 
 function upsert<T extends { path: string }>(entries: T[], next: T): T[] {
@@ -34,23 +31,20 @@ export function applyWorkspaceDelta(
 		case "file":
 			return {
 				files: upsert(snapshot.files, delta.entry),
-				folders: withoutPrefix(snapshot.folders, delta.entry.path),
+				folders: prune(snapshot.folders, delta.entry.path),
 			};
 		case "subtree":
 			return {
-				files: [
-					...withoutPrefix(snapshot.files, delta.path),
-					...delta.listing.files,
-				],
+				files: [...prune(snapshot.files, delta.path), ...delta.listing.files],
 				folders: [
-					...withoutPrefix(snapshot.folders, delta.path),
+					...prune(snapshot.folders, delta.path),
 					...delta.listing.folders,
 				],
 			};
 		case "remove":
 			return {
-				files: withoutPrefix(snapshot.files, delta.path),
-				folders: withoutPrefix(snapshot.folders, delta.path),
+				files: prune(snapshot.files, delta.path),
+				folders: prune(snapshot.folders, delta.path),
 			};
 		case "refresh":
 			return snapshot;

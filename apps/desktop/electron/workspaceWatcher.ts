@@ -1,19 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export type WorkspaceWatchFilename = string | Buffer | null;
-export type WorkspaceWatchListener = (
+export type WatchFilename = string | Buffer | null;
+export type WatchListener = (
 	eventType: string,
-	filename: WorkspaceWatchFilename,
+	filename: WatchFilename,
 ) => void;
 
-export type WorkspaceWatchHandle = {
+export type WatchHandle = {
 	close: () => void;
 };
 
-export type WorkspaceWatchFactory = (
+export type WatchFactory = (
 	root: string,
-	listener: WorkspaceWatchListener,
+	listener: WatchListener,
 ) => fs.FSWatcher;
 
 const DEFAULT_COALESCE_MS = 75;
@@ -26,9 +26,9 @@ function isWithin(root: string, candidate: string): boolean {
 	);
 }
 
-export function normalizeWorkspaceEventPath(
+export function normalizeEventPath(
 	root: string,
-	filename: WorkspaceWatchFilename,
+	filename: WatchFilename,
 ): string | null {
 	if (filename === null) return null;
 	const value = Buffer.isBuffer(filename) ? filename.toString() : filename;
@@ -37,7 +37,7 @@ export function normalizeWorkspaceEventPath(
 	return isWithin(root, resolved) ? resolved : null;
 }
 
-export function createWorkspacePathCoalescer(
+export function createPathCoalescer(
 	onPaths: (paths: string[]) => void,
 	delayMs = DEFAULT_COALESCE_MS,
 ) {
@@ -66,17 +66,17 @@ export function createWorkspacePathCoalescer(
 	};
 }
 
-const nativeWatch: WorkspaceWatchFactory = (root, listener) =>
+const nativeWatch: WatchFactory = (root, listener) =>
 	fs.watch(root, { recursive: true }, listener);
 
-export function startNativeWorkspaceWatcher(
+export function watchWorkspace(
 	root: string,
 	onPaths: (paths: string[]) => void,
 	onFallback: () => void,
-	watch: WorkspaceWatchFactory = nativeWatch,
-): WorkspaceWatchHandle | null {
+	watch: WatchFactory = nativeWatch,
+): WatchHandle | null {
 	let closed = false;
-	const coalescer = createWorkspacePathCoalescer(onPaths);
+	const coalescer = createPathCoalescer(onPaths);
 	let watcher: fs.FSWatcher;
 	try {
 		watcher = watch(root, (eventType, filename) => {
@@ -84,7 +84,7 @@ export function startNativeWorkspaceWatcher(
 			// Content changes belong to the active-file watcher; sidebar state only
 			// needs the add/delete/rename hints reported as rename events.
 			if (eventType !== "rename") return;
-			const changedPath = normalizeWorkspaceEventPath(root, filename);
+			const changedPath = normalizeEventPath(root, filename);
 			if (changedPath === null) {
 				onFallback();
 				return;

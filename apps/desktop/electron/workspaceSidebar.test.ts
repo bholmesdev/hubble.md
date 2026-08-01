@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { listSidebarFiles, reconcileSidebarPath } from "./workspaceSidebar";
+import { listSidebarFiles, sidebarDeltaForPath } from "./workspaceSidebar";
 
 describe("workspace sidebar reconciliation", () => {
 	let root = "";
@@ -20,7 +20,7 @@ describe("workspace sidebar reconciliation", () => {
 		const changedPath = path.join(root, "new.md");
 		await fs.writeFile(changedPath, "new");
 
-		expect(await reconcileSidebarPath(root, changedPath)).toMatchObject({
+		expect(await sidebarDeltaForPath(root, changedPath)).toMatchObject({
 			kind: "file",
 			entry: { path: path.join(root, "new.md") },
 		});
@@ -33,7 +33,7 @@ describe("workspace sidebar reconciliation", () => {
 		await fs.writeFile(path.join(subtree, "inside.md"), "inside");
 		await fs.writeFile(path.join(subtree, "deeper", "leaf.md"), "leaf");
 
-		const added = await reconcileSidebarPath(root, subtree);
+		const added = await sidebarDeltaForPath(root, subtree);
 		expect(added).toMatchObject({
 			kind: "subtree",
 			path: subtree,
@@ -48,7 +48,7 @@ describe("workspace sidebar reconciliation", () => {
 		});
 
 		await fs.rm(subtree, { recursive: true });
-		expect(await reconcileSidebarPath(root, subtree)).toEqual({
+		expect(await sidebarDeltaForPath(root, subtree)).toEqual({
 			kind: "remove",
 			path: subtree,
 		});
@@ -63,7 +63,7 @@ describe("workspace sidebar reconciliation", () => {
 		const ignorePath = path.join(nested, ".ignore");
 		await fs.writeFile(ignorePath, "ignored.md\n");
 
-		const hidden = await reconcileSidebarPath(root, ignorePath);
+		const hidden = await sidebarDeltaForPath(root, ignorePath);
 		expect(hidden).toMatchObject({
 			kind: "subtree",
 			path: nested,
@@ -74,7 +74,7 @@ describe("workspace sidebar reconciliation", () => {
 		]);
 
 		await fs.rm(ignorePath);
-		const visible = await reconcileSidebarPath(root, ignorePath);
+		const visible = await sidebarDeltaForPath(root, ignorePath);
 		expect(visible).toMatchObject({ kind: "subtree", path: nested });
 		if (visible.kind !== "subtree") throw new Error("expected subtree delta");
 		expect(new Set(visible.listing.files.map((file) => file.path))).toEqual(
@@ -105,12 +105,12 @@ describe("workspace sidebar reconciliation", () => {
 			const link = path.join(root, "linked");
 			await fs.symlink(outside, link, "dir");
 			expect((await listSidebarFiles(root)).folders).toEqual([]);
-			expect(await reconcileSidebarPath(root, link)).toEqual({
+			expect(await sidebarDeltaForPath(root, link)).toEqual({
 				kind: "remove",
 				path: link,
 			});
 			expect(
-				await reconcileSidebarPath(root, path.join(link, "secret.md")),
+				await sidebarDeltaForPath(root, path.join(link, "secret.md")),
 			).toEqual({
 				kind: "remove",
 				path: path.join(link, "secret.md"),
@@ -134,7 +134,7 @@ describe("workspace sidebar reconciliation", () => {
 			path.join(link, "review.md"),
 		);
 
-		const delta = await reconcileSidebarPath(root, link);
+		const delta = await sidebarDeltaForPath(root, link);
 		expect(delta).toMatchObject({
 			kind: "subtree",
 			path: link,

@@ -1,14 +1,14 @@
 import type fs from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	createWorkspacePathCoalescer,
-	normalizeWorkspaceEventPath,
-	startNativeWorkspaceWatcher,
-	type WorkspaceWatchListener,
+	createPathCoalescer,
+	normalizeEventPath,
+	type WatchListener,
+	watchWorkspace,
 } from "./workspaceWatcher";
 
 function fakeWatcher() {
-	let listener: WorkspaceWatchListener | undefined;
+	let listener: WatchListener | undefined;
 	let errorListener: (() => void) | undefined;
 	const watcher = {
 		close: vi.fn(),
@@ -22,7 +22,7 @@ function fakeWatcher() {
 		emitError() {
 			errorListener?.();
 		},
-		setListener(next: WorkspaceWatchListener) {
+		setListener(next: WatchListener) {
 			listener = next;
 		},
 	};
@@ -39,18 +39,16 @@ describe("workspace watcher", () => {
 	});
 
 	it("normalizes only paths inside the watched root", () => {
-		expect(normalizeWorkspaceEventPath("/workspace", "notes/today.md")).toBe(
+		expect(normalizeEventPath("/workspace", "notes/today.md")).toBe(
 			"/workspace/notes/today.md",
 		);
-		expect(normalizeWorkspaceEventPath("/workspace", "../outside.md")).toBe(
-			null,
-		);
-		expect(normalizeWorkspaceEventPath("/workspace", null)).toBe(null);
+		expect(normalizeEventPath("/workspace", "../outside.md")).toBe(null);
+		expect(normalizeEventPath("/workspace", null)).toBe(null);
 	});
 
 	it("coalesces duplicate paths into one short batch", () => {
 		const onPaths = vi.fn();
-		const coalescer = createWorkspacePathCoalescer(onPaths, 50);
+		const coalescer = createPathCoalescer(onPaths, 50);
 
 		coalescer.add("/workspace/note.md");
 		coalescer.add("/workspace/note.md");
@@ -69,7 +67,7 @@ describe("workspace watcher", () => {
 		const watcher = fakeWatcher();
 		const onPaths = vi.fn();
 		const onFallback = vi.fn();
-		const handle = startNativeWorkspaceWatcher(
+		const handle = watchWorkspace(
 			"/workspace",
 			onPaths,
 			onFallback,
@@ -97,15 +95,10 @@ describe("workspace watcher", () => {
 	it("falls back when the native watcher reports an error", () => {
 		const watcher = fakeWatcher();
 		const onFallback = vi.fn();
-		startNativeWorkspaceWatcher(
-			"/workspace",
-			vi.fn(),
-			onFallback,
-			(_root, listener) => {
-				watcher.setListener(listener);
-				return watcher;
-			},
-		);
+		watchWorkspace("/workspace", vi.fn(), onFallback, (_root, listener) => {
+			watcher.setListener(listener);
+			return watcher;
+		});
 
 		watcher.emitError();
 		expect(onFallback).toHaveBeenCalledOnce();
@@ -115,15 +108,10 @@ describe("workspace watcher", () => {
 	it("falls back when a rename event has no usable path", () => {
 		const watcher = fakeWatcher();
 		const onFallback = vi.fn();
-		startNativeWorkspaceWatcher(
-			"/workspace",
-			vi.fn(),
-			onFallback,
-			(_root, listener) => {
-				watcher.setListener(listener);
-				return watcher;
-			},
-		);
+		watchWorkspace("/workspace", vi.fn(), onFallback, (_root, listener) => {
+			watcher.setListener(listener);
+			return watcher;
+		});
 
 		watcher.emit("rename", null);
 
@@ -132,14 +120,9 @@ describe("workspace watcher", () => {
 
 	it("does not install a watcher when recursive watch is unsupported", () => {
 		const onFallback = vi.fn();
-		const handle = startNativeWorkspaceWatcher(
-			"/workspace",
-			vi.fn(),
-			onFallback,
-			() => {
-				throw new Error("recursive watch unavailable");
-			},
-		);
+		const handle = watchWorkspace("/workspace", vi.fn(), onFallback, () => {
+			throw new Error("recursive watch unavailable");
+		});
 
 		expect(handle).toBe(null);
 		expect(onFallback).not.toHaveBeenCalled();

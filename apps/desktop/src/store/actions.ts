@@ -87,10 +87,7 @@ const missingPathErrorPattern = /\bENOENT\b|\bENOTDIR\b/;
 let refreshFilesTimer: ReturnType<typeof setTimeout> | null = null;
 const refreshFilesInFlight = new Map<
 	string,
-	{
-		refreshIntent: { reconcileActive: boolean };
-		promise: Promise<void>;
-	}
+	{ reloadActive: boolean; promise: Promise<void> }
 >();
 // The active-file watcher also sees Hubble's own writes. If save A reaches disk
 // after the editor already has draft B, that watcher event is not an external
@@ -103,19 +100,21 @@ type SidebarMoveItem =
 
 export async function refreshFiles(
 	path = workspaceStore.get().workspacePath,
-	options?: { reconcileActive?: boolean },
+	options?: { reloadActive?: boolean },
 ) {
 	if (!path) return;
-	const reconcileActive = options?.reconcileActive !== false;
 	const pending = refreshFilesInFlight.get(path);
 	if (pending) {
-		// A user refresh must not lose reconciliation by joining a snapshot-only scan.
-		pending.refreshIntent.reconcileActive ||= reconcileActive;
+		// A full refresh must not lose the active-note reload by joining a list-only one.
+		pending.reloadActive ||= options?.reloadActive !== false;
 		return pending.promise;
 	}
 
-	const refreshIntent = { reconcileActive };
-	const refresh = (async () => {
+	const run = {
+		reloadActive: options?.reloadActive !== false,
+		promise: Promise.resolve(),
+	};
+	run.promise = (async () => {
 		let listing: { files: FileEntry[]; folders: FolderEntry[] };
 		try {
 			listing = await desktopApi.listDirectory(path);
@@ -132,7 +131,7 @@ export async function refreshFiles(
 
 		const currentPath = viewerStore.get().currentPath;
 		if (
-			!refreshIntent.reconcileActive ||
+			!run.reloadActive ||
 			workspaceStore.get().workspacePath !== path ||
 			!currentPath ||
 			isChangelogPath(currentPath) ||
@@ -150,19 +149,17 @@ export async function refreshFiles(
 			});
 		}
 	})();
-	refreshFilesInFlight.set(path, { refreshIntent, promise: refresh });
+	refreshFilesInFlight.set(path, run);
 	try {
-		await refresh;
+		await run.promise;
 	} finally {
 		refreshFilesInFlight.delete(path);
 	}
 }
 
 // Mutations already update or clear the active document themselves.
-export function refreshFilesSnapshot(
-	path = workspaceStore.get().workspacePath,
-) {
-	return refreshFiles(path, { reconcileActive: false });
+export function refreshFileList(path = workspaceStore.get().workspacePath) {
+	return refreshFiles(path, { reloadActive: false });
 }
 
 export async function reconcileWorkspacePath(
@@ -171,13 +168,13 @@ export async function reconcileWorkspacePath(
 ) {
 	let delta: WorkspaceDelta | null;
 	try {
-		delta = await desktopApi.reconcileWorkspacePath(workspacePath, changedPath);
+		delta = await desktopApi.sidebarDeltaForPath(workspacePath, changedPath);
 	} catch {
 		return;
 	}
 	if (!delta || workspaceStore.get().workspacePath !== workspacePath) return;
 	if (delta.kind === "refresh") {
-		await refreshFilesSnapshot(workspacePath);
+		await refreshFileList(workspacePath);
 		return;
 	}
 	workspaceStore.set((state) => {
@@ -626,10 +623,7 @@ export async function openWorkspace(path?: string) {
 		};
 	});
 	switcherOpenStore.set(false);
-	await Promise.all([
-		refreshFilesSnapshot(nextPath),
-		loadPinnedNotes(nextPath),
-	]);
+	await Promise.all([refreshFileList(nextPath), loadPinnedNotes(nextPath)]);
 
 	const lastFile = workspaceStore.get().lastOpenedPaths[nextPath];
 	if (lastFile) {
@@ -824,7 +818,7 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 			},
 		}));
 		await syncPinnedNotes();
-		await refreshFilesSnapshot();
+		await refreshFileList();
 		if (isCurrentFile) {
 			// Path rewrite already updated history; reload content without a new visit.
 			await loadPath(nextPath, { history: "none", launchExternal: false });
@@ -948,11 +942,11 @@ export async function renameFolder(
 		}));
 		await updateMovedLinks(movedFiles, filesBeforeRename);
 		await syncPinnedNotes();
-		await refreshFilesSnapshot();
+		await refreshFileList();
 	} catch (err) {
 		const message = handleFileError(err);
 		toast.error("Failed to rename folder", { description: message });
-		await refreshFilesSnapshot();
+		await refreshFileList();
 	}
 }
 
@@ -1060,11 +1054,11 @@ export async function moveSidebarItem(
 		if (movedAssetFolder) movedFiles.push(movedAssetFolder);
 		await updateMovedLinks(movedFiles, filesBeforeMove);
 		await syncPinnedNotes();
-		await refreshFilesSnapshot();
+		await refreshFileList();
 	} catch (err) {
 		const message = handleFileError(err);
 		toast.error("Failed to move item", { description: message });
-		await refreshFilesSnapshot();
+		await refreshFileList();
 	}
 }
 
@@ -1094,7 +1088,7 @@ async function createEmptyFileInFolder(
 			],
 		}));
 		await loadPath(path);
-		await refreshFilesSnapshot();
+		await refreshFileList();
 		return path;
 	} catch (err) {
 		const message = handleFileError(err);
@@ -1120,7 +1114,7 @@ export async function createFolderInFolder(parentPath: string) {
 			...state,
 			folders: [...state.folders, { path, modified_at }],
 		}));
-		await refreshFilesSnapshot();
+		await refreshFileList();
 		return path;
 	} catch (err) {
 		const message = handleFileError(err);
@@ -1171,7 +1165,7 @@ export async function deleteMarkdownFile(
 						},
 		}));
 		await syncPinnedNotes();
-		await refreshFilesSnapshot();
+		await refreshFileList();
 	} catch (err) {
 		const message = handleFileError(err);
 		toast.error("Failed to delete file", { description: message });
@@ -1223,7 +1217,7 @@ export async function deleteFolder(path: string) {
 						},
 		}));
 		await syncPinnedNotes();
-		await refreshFilesSnapshot();
+		await refreshFileList();
 	} catch (err) {
 		const message = handleFileError(err);
 		toast.error("Failed to delete folder", { description: message });
