@@ -57,6 +57,7 @@
 		"sonner": "^2.0.7",
 		"tailwind-merge": "^3.5.0",
 		"tw-animate-css": "^1.4.0",
+		"uiohook-napi": "^1.5.5",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
@@ -103,8 +104,13 @@
 				"dmg",
 				"zip"
 			],
-			"category": "public.app-category.productivity"
+			"category": "public.app-category.productivity",
+			"entitlements": "build/entitlements.mac.plist",
+			"entitlementsInherit": "build/entitlements.mac.plist"
 		},
+		"asarUnpack": [
+			"**/node_modules/uiohook-napi/**"
+		],
 		"win": {
 			"icon": "assets/icon-master-1024.png",
 			"target": [

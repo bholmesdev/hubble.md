@@ -53,7 +53,10 @@ export default defineConfig({
 		},
 		build: {
 			rollupOptions: {
-				input: "index.html",
+				input: {
+					index: fileURLToPath(new URL("./index.html", import.meta.url)),
+					capture: fileURLToPath(new URL("./capture.html", import.meta.url)),
+				},
 			},
 		},
 	},

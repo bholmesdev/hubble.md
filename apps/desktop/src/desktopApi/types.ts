@@ -237,4 +237,47 @@ export type DesktopApi = {
 		callback: (data: string) => void,
 	): Unsubscribe;
 	onTerminalExit(sessionId: string, callback: () => void): Unsubscribe;
+
+	// Capture
+	captureGetState(): Promise<CaptureClientState>;
+	captureSetEnabled(enabled: boolean): Promise<{
+		settings: CaptureSettings;
+		hasAccessibility: boolean;
+		shortcutRunning: boolean;
+	}>;
+	captureUpdateSettings(
+		patch: Partial<CaptureSettings>,
+	): Promise<CaptureSettings>;
+	captureSyncRecentWorkspaces(paths: string[]): Promise<CaptureSettings>;
+	captureRecheckAccessibility(): Promise<{
+		hasAccessibility: boolean;
+		shortcutRunning: boolean;
+	}>;
+	captureGetDraft(): Promise<string>;
+	captureSetDraft(markdown: string): Promise<void>;
+	captureSaveNotes(): Promise<CaptureSessionState>;
+	captureHideWindow(): Promise<void>;
+	captureShowWindow(): Promise<void>;
+	onCaptureSessionState(
+		callback: (state: CaptureSessionState) => void,
+	): Unsubscribe;
+	onCaptureWindowShown(callback: () => void): Unsubscribe;
+};
+
+export type CaptureSettings = {
+	enabled: boolean;
+	targetWorkspace: string | null;
+	recentWorkspaces: string[];
+};
+
+export type CaptureSessionState =
+	| { phase: "idle" }
+	| { phase: "saved"; filePath: string }
+	| { phase: "error"; message: string };
+
+export type CaptureClientState = {
+	settings: CaptureSettings;
+	hasAccessibility: boolean;
+	shortcutRunning: boolean;
+	session: CaptureSessionState;
 };

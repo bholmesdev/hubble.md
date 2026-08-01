@@ -46,6 +46,8 @@ import {
 	SEARCH_MIN_QUERY_LENGTH,
 } from "../src/lib/searchContent";
 import type { ThemePreference } from "../src/theme";
+import { initCapture, shutdownCapture } from "./capture";
+import { getCaptureWindow } from "./capture/window";
 import { DeleteUndo } from "./deleteUndo";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
@@ -1870,15 +1872,22 @@ if (!singleInstanceLock) {
 		registerIpc();
 		buildMenu();
 		configureAutoUpdates();
+		await initCapture();
 		await createWindow();
 	});
+
+	app.on("before-quit", () => shutdownCapture());
 
 	app.on("window-all-closed", () => {
 		if (process.platform !== "darwin") app.quit();
 	});
 
 	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
+		// The floating capture panel is not a window worth reopening the editor for.
+		if (
+			BrowserWindow.getAllWindows().filter((w) => w !== getCaptureWindow())
+				.length === 0
+		) {
 			void createWindow();
 		}
 	});

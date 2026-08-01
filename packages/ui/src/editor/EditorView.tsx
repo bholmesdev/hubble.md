@@ -72,6 +72,10 @@ export type EditorViewProps = {
 	path: string;
 	initialMarkdown: string;
 	editable?: boolean;
+	/** Front matter editing. Off for scratch surfaces with no file behind them. */
+	showFileProperties?: boolean;
+	/** Word count and formatting readout along the bottom edge. */
+	showStatusBar?: boolean;
 	wikiTargets?: WikiTarget[];
 	extensions?: EditorOptions["extensions"];
 	editorProps?: EditorOptions["editorProps"];
@@ -94,6 +98,8 @@ export function EditorView({
 	path,
 	initialMarkdown,
 	editable = true,
+	showFileProperties = true,
+	showStatusBar = true,
 	wikiTargets = [],
 	extensions = [],
 	editorProps,
@@ -316,7 +322,7 @@ export function EditorView({
 				className="editorViewport relative min-h-0 flex-1 overflow-auto overscroll-contain"
 				ref={setEditorViewport}
 			>
-				{editable && (
+				{editable && showFileProperties && (
 					<FilePropertiesPanel
 						path={path}
 						state={frontMatterState}
@@ -374,7 +380,12 @@ export function EditorView({
 				)}
 			</div>
 			<FindBar editor={editor} />
-			<FormattingStatusBar editor={editor} scrollContainer={editorViewportEl} />
+			{showStatusBar && (
+				<FormattingStatusBar
+					editor={editor}
+					scrollContainer={editorViewportEl}
+				/>
+			)}
 		</div>
 	);
 }

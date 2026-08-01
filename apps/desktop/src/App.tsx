@@ -19,6 +19,7 @@ import { keymatch } from "keymatch";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
+import { CaptureSettings } from "./components/CaptureSettings";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
@@ -94,6 +95,7 @@ import {
 	chatCommandStore,
 	codeFileOpenModeStore,
 	lastSeenVersionStore,
+	recentWorkspacesStore,
 	sidebarOpenStore,
 	terminalPositionStore,
 	themePreferenceStore,
@@ -167,6 +169,7 @@ async function searchFileContents(query: string) {
 function App() {
 	const state = useStoreValue(viewerStore);
 	const workspacePath = useStoreValue(workspacePathStore);
+	const recentWorkspaces = useStoreValue(recentWorkspacesStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
 	const hasWorkspace = workspacePath !== null;
@@ -219,6 +222,15 @@ function App() {
 	useEffect(() => {
 		void desktopApi.getTelemetryConsent().then(setTelemetryConsent);
 	}, []);
+
+	// Recent-workspace ordering lives in this renderer, but the capture panel
+	// needs a target while this window may be closed. Mirror it into main.
+	useEffect(() => {
+		const ordered = workspacePath
+			? [workspacePath, ...recentWorkspaces.filter((p) => p !== workspacePath)]
+			: recentWorkspaces;
+		void desktopApi.captureSyncRecentWorkspaces(ordered);
+	}, [recentWorkspaces, workspacePath]);
 
 	const chooseTelemetry = async (choice: TelemetryChoice) => {
 		setTelemetryConsent(await desktopApi.setTelemetryConsent(choice));
@@ -667,24 +679,31 @@ function App() {
 				onSelectFile={(path) => void loadPath(path)}
 				searchContents={searchFileContents}
 			/>
-			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-				<GeneralSettingsSection />
-				<CodeFilesSettingsSection />
-				<ChatAboutNoteSettingsSection />
-				{telemetryConsent ? (
-					<TelemetrySettingsSection
-						consent={telemetryConsent}
-						onChoose={(choice) => void chooseTelemetry(choice)}
-					/>
-				) : null}
-				{updateState ? (
-					<UpdatesSection
-						state={updateState}
-						onPrimaryAction={() => void triggerPrimaryUpdateAction()}
-						onViewChangelog={openWhatsNew}
-					/>
-				) : null}
-			</SettingsDialog>
+			<SettingsDialog
+				open={settingsOpen}
+				onOpenChange={setSettingsOpen}
+				capture={<CaptureSettings />}
+				general={
+					<>
+						<GeneralSettingsSection />
+						<CodeFilesSettingsSection />
+						<ChatAboutNoteSettingsSection />
+						{telemetryConsent ? (
+							<TelemetrySettingsSection
+								consent={telemetryConsent}
+								onChoose={(choice) => void chooseTelemetry(choice)}
+							/>
+						) : null}
+						{updateState ? (
+							<UpdatesSection
+								state={updateState}
+								onPrimaryAction={() => void triggerPrimaryUpdateAction()}
+								onViewChangelog={openWhatsNew}
+							/>
+						) : null}
+					</>
+				}
+			/>
 		</main>
 	);
 }

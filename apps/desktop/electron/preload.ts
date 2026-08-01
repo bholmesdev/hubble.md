@@ -174,6 +174,25 @@ const desktopApi = {
 	},
 	onTerminalExit: (sessionId, callback) =>
 		subscribe(`desktop:terminal-exit-${sessionId}`, callback),
+	captureGetState: () => ipcRenderer.invoke("capture:get-state"),
+	captureSetEnabled: (enabled) =>
+		ipcRenderer.invoke("capture:set-enabled", { enabled }),
+	captureUpdateSettings: (patch) =>
+		ipcRenderer.invoke("capture:update-settings", patch),
+	captureSyncRecentWorkspaces: (paths) =>
+		ipcRenderer.invoke("capture:sync-recent-workspaces", { paths }),
+	captureRecheckAccessibility: () =>
+		ipcRenderer.invoke("capture:recheck-accessibility"),
+	captureGetDraft: () => ipcRenderer.invoke("capture:get-draft"),
+	captureSetDraft: (markdown) =>
+		ipcRenderer.invoke("capture:set-draft", { markdown }),
+	captureSaveNotes: () => ipcRenderer.invoke("capture:save-notes"),
+	captureHideWindow: () => ipcRenderer.invoke("capture:hide-window"),
+	captureShowWindow: () => ipcRenderer.invoke("capture:show-window"),
+	onCaptureSessionState: (callback) =>
+		subscribe("capture:session-state", callback),
+	onCaptureWindowShown: (callback) =>
+		subscribe("capture:window-shown", callback),
 } satisfies DesktopApi;
 
 contextBridge.exposeInMainWorld("desktopApi", desktopApi);
