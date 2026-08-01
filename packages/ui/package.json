@@ -42,7 +42,6 @@
 		"@tiptap/core": "^3.4.3",
 		"@tiptap/extension-blockquote": "^3.20.0",
 		"@tiptap/extension-bold": "^3.20.0",
-		"@tiptap/extension-code": "^3.20.0",
 		"@tiptap/extension-code-block-lowlight": "3.20.0",
 		"@tiptap/extension-document": "3.20.0",
 		"@tiptap/extension-heading": "^3.20.0",
