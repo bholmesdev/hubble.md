@@ -12,6 +12,7 @@ type MockDesktopApi = {
 	pathExists: ReturnType<typeof vi.fn>;
 	openPathFromLink: ReturnType<typeof vi.fn>;
 	openPathInDefaultApp: ReturnType<typeof vi.fn>;
+	sidebarDeltaForPath: ReturnType<typeof vi.fn>;
 	setThemeSource: ReturnType<typeof vi.fn>;
 };
 
@@ -28,6 +29,7 @@ function createDesktopApi(): MockDesktopApi {
 		pathExists: vi.fn(async () => false),
 		openPathFromLink: vi.fn(async () => ({ kind: "opened" })),
 		openPathInDefaultApp: vi.fn(async () => {}),
+		sidebarDeltaForPath: vi.fn(async () => null),
 		setThemeSource: vi.fn(async () => {}),
 	};
 }
@@ -406,6 +408,216 @@ describe("desktop savePathContent", () => {
 	});
 });
 
+describe("desktop refreshFiles", () => {
+	async function setupActiveNote(api: MockDesktopApi, content = "before") {
+		const stores = await loadStoreActions(api);
+		stores.appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace" },
+			document: {
+				...current.document,
+				currentPath: "/workspace/note.md",
+				content,
+				diskContent: "before",
+				status: "ready",
+			},
+		}));
+		return stores;
+	}
+
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("coalesces refreshes and reconciles a clean active note", async () => {
+		const api = createDesktopApi();
+		let finishListing: (() => void) | undefined;
+		api.listDirectory.mockImplementation(
+			() =>
+				new Promise<{ files: []; folders: [] }>((resolve) => {
+					finishListing = () => resolve({ files: [], folders: [] });
+				}),
+		);
+		api.readFileText.mockResolvedValue("updated");
+		const { refreshFiles, viewerStore } = await setupActiveNote(api);
+
+		const first = refreshFiles();
+		const second = refreshFiles();
+		expect(api.listDirectory).toHaveBeenCalledTimes(1);
+		finishListing?.();
+		await Promise.all([first, second]);
+
+		expect(api.readFileText).toHaveBeenCalledTimes(1);
+		expect(viewerStore.get().content).toBe("updated");
+		expect(viewerStore.get().diskContent).toBe("updated");
+	});
+
+	it("reconciles when a full refresh joins a snapshot-only refresh", async () => {
+		const api = createDesktopApi();
+		let finishListing: (() => void) | undefined;
+		api.listDirectory.mockImplementation(
+			() =>
+				new Promise<{ files: []; folders: [] }>((resolve) => {
+					finishListing = () => resolve({ files: [], folders: [] });
+				}),
+		);
+		api.readFileText.mockResolvedValue("updated");
+		const { refreshFiles, viewerStore } = await setupActiveNote(api);
+
+		const snapshot = refreshFiles("/workspace", { reloadActive: false });
+		const full = refreshFiles();
+		finishListing?.();
+		await Promise.all([snapshot, full]);
+
+		expect(api.listDirectory).toHaveBeenCalledTimes(1);
+		expect(api.readFileText).toHaveBeenCalledTimes(1);
+		expect(viewerStore.get().content).toBe("updated");
+	});
+
+	it("serializes incremental and snapshot sidebar updates", async () => {
+		const api = createDesktopApi();
+		const events: string[] = [];
+		let finishDelta: (() => void) | undefined;
+		api.sidebarDeltaForPath.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					events.push("delta-start");
+					finishDelta = () => {
+						events.push("delta-end");
+						resolve({
+							kind: "file",
+							entry: {
+								path: "/workspace/new.md",
+								modified_at: 1,
+								kind: "document",
+							},
+						});
+					};
+				}),
+		);
+		api.listDirectory.mockImplementation(async () => {
+			events.push("snapshot");
+			return { files: [], folders: [] };
+		});
+		const { appStore, reconcileWorkspacePath, refreshFileList } =
+			await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace" },
+		}));
+
+		const incremental = reconcileWorkspacePath(
+			"/workspace",
+			"/workspace/new.md",
+		);
+		await Promise.resolve();
+		const snapshot = refreshFileList();
+
+		expect(events).toEqual(["delta-start"]);
+		finishDelta?.();
+		await Promise.all([incremental, snapshot]);
+
+		expect(events).toEqual(["delta-start", "delta-end", "snapshot"]);
+	});
+
+	it("preserves local edits when the active note changed on disk", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("external");
+		const { refreshFiles, viewerStore } = await setupActiveNote(
+			api,
+			"local edit",
+		);
+
+		await refreshFiles();
+
+		expect(viewerStore.get().content).toBe("local edit");
+		expect(viewerStore.get().externalChange).toEqual({
+			kind: "conflict",
+			diskContent: "external",
+		});
+	});
+
+	it("keeps the previous snapshot and reports listing failures", async () => {
+		const api = createDesktopApi();
+		api.listDirectory.mockRejectedValue(new Error("Permission denied"));
+		const toastError = vi.fn();
+		vi.doMock("sonner", () => ({ toast: { error: toastError } }));
+		const { appStore, refreshFiles, workspaceStore } =
+			await loadStoreActions(api);
+		const files = [{ path: "/workspace/note.md", modified_at: 1 }];
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files,
+			},
+		}));
+
+		await refreshFiles();
+
+		expect(workspaceStore.get().files).toEqual(files);
+		expect(toastError).toHaveBeenCalledWith("Failed to refresh folder", {
+			description: "Permission denied",
+		});
+	});
+
+	it("keeps a successful snapshot when the active note cannot be read", async () => {
+		const api = createDesktopApi();
+		const files = [{ path: "/workspace/other.md", modified_at: 1 }];
+		api.listDirectory.mockResolvedValue({ files, folders: [] });
+		api.readFileText.mockRejectedValue(new Error("File disappeared"));
+		const toastError = vi.fn();
+		vi.doMock("sonner", () => ({ toast: { error: toastError } }));
+		const { refreshFiles, viewerStore, workspaceStore } =
+			await setupActiveNote(api);
+
+		await refreshFiles();
+
+		expect(workspaceStore.get().files).toEqual(files);
+		expect(viewerStore.get().content).toBe("before");
+		expect(toastError).toHaveBeenCalledWith("Failed to refresh active note", {
+			description: "File disappeared",
+		});
+	});
+
+	it("drops an incremental result when the workspace switches mid-request", async () => {
+		const api = createDesktopApi();
+		let finish: ((delta: unknown) => void) | undefined;
+		api.sidebarDeltaForPath.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					finish = resolve;
+				}),
+		);
+		const { appStore, reconcileWorkspacePath, workspaceStore } =
+			await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace-a" },
+		}));
+
+		const pending = reconcileWorkspacePath(
+			"/workspace-a",
+			"/workspace-a/new.md",
+		);
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace-b" },
+		}));
+		finish?.({
+			kind: "file",
+			entry: {
+				path: "/workspace-a/new.md",
+				modified_at: 1,
+				kind: "document",
+			},
+		});
+		await pending;
+
+		expect(workspaceStore.get().files).toEqual([]);
+	});
+});
 describe("desktop renameMarkdownFile", () => {
 	beforeEach(() => {
 		vi.unstubAllGlobals();

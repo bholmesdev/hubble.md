@@ -65,6 +65,8 @@ import {
 	openChangelog,
 	openWorkspace,
 	openWorkspaceWithSidebar,
+	reconcileWorkspacePath,
+	refreshFileList,
 	refreshFiles,
 	refreshFilesDebounced,
 	reloadFromDiskConflict,
@@ -459,6 +461,55 @@ function App() {
 			dispose();
 		};
 	}, []);
+
+	useEffect(() => {
+		if (!workspacePath) return;
+		let active = true;
+		let generation: number | null = null;
+		let workspaceChangeQueue = Promise.resolve();
+		const dispose = desktopApi.onWorkspaceChanged((change) => {
+			workspaceChangeQueue = workspaceChangeQueue
+				.then(async () => {
+					if (!active || workspaceStore.get().workspacePath !== workspacePath) {
+						return;
+					}
+					if (change.kind === "refresh") {
+						await refreshFileList(workspacePath);
+						return;
+					}
+					for (const changedPath of change.paths) {
+						if (!active) return;
+						await reconcileWorkspacePath(workspacePath, changedPath);
+					}
+				})
+				.catch((error) => {
+					console.error("Workspace change reconciliation failed:", error);
+				});
+		});
+		void desktopApi
+			.startWorkspaceWatcher(workspacePath)
+			.then((nextGeneration) => {
+				if (!active) {
+					if (nextGeneration !== null) {
+						void desktopApi.stopWorkspaceWatcher(nextGeneration);
+					}
+					return;
+				}
+				generation = nextGeneration;
+			})
+			.catch((error) => {
+				if (active) {
+					console.error("Failed to start workspace watcher:", error);
+				}
+			});
+		return () => {
+			active = false;
+			dispose();
+			if (generation !== null) {
+				void desktopApi.stopWorkspaceWatcher(generation);
+			}
+		};
+	}, [workspacePath]);
 
 	useEffect(() => {
 		let active = true;

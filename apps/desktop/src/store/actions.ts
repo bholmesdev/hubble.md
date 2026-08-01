@@ -2,6 +2,7 @@ import type { ReviewThread } from "@hubble.md/ui";
 import { toast } from "sonner";
 import changelogRaw from "../../../../CHANGELOG.md?raw";
 import { desktopApi } from "../desktopApi";
+import type { WorkspaceDelta } from "../desktopApi/types";
 import { classifyFileChange } from "../externalFileChange";
 import {
 	CHANGELOG_PATH,
@@ -78,11 +79,18 @@ import {
 	withOpenedDoc,
 	workspaceStore,
 } from "./state";
+import { applyWorkspaceDelta } from "./workspaceDelta";
 
 const REFRESH_FILES_DEBOUNCE_MS = 250;
 const SELF_SAVE_TTL_MS = 5000;
 const missingPathErrorPattern = /\bENOENT\b|\bENOTDIR\b/;
 let refreshFilesTimer: ReturnType<typeof setTimeout> | null = null;
+type RefreshRun = {
+	reloadActive: boolean;
+	promise: Promise<void>;
+};
+const refreshFilesInFlight = new Map<string, RefreshRun>();
+const workspaceSidebarQueues = new Map<string, Promise<void>>();
 // The active-file watcher also sees Hubble's own writes. If save A reaches disk
 // after the editor already has draft B, that watcher event is not an external
 // conflict; it is just the disk baseline catching up to a save we started.
@@ -92,21 +100,118 @@ type SidebarMoveItem =
 	| { kind: "file"; path: string }
 	| { kind: "folder"; folderId: string };
 
-export async function refreshFiles(path = workspaceStore.get().workspacePath) {
-	if (!path) return;
-	const listing = await desktopApi
-		.listDirectory(path)
-		.catch((): { files: FileEntry[]; folders: FolderEntry[] } => ({
-			files: [],
-			folders: [],
-		}));
+function enqueueWorkspaceSidebarUpdate(
+	workspacePath: string,
+	update: () => Promise<void>,
+) {
+	const previous = workspaceSidebarQueues.get(workspacePath);
+	const updatePromise = previous ? previous.then(update) : update();
+	const queue = updatePromise.catch((error) => {
+		console.error("Workspace sidebar update failed:", error);
+	});
+	workspaceSidebarQueues.set(workspacePath, queue);
+	void queue.then(() => {
+		if (workspaceSidebarQueues.get(workspacePath) === queue) {
+			workspaceSidebarQueues.delete(workspacePath);
+		}
+	});
+	return updatePromise;
+}
 
+async function refreshFilesNow(
+	path: string,
+	options: { reloadActive: boolean },
+) {
+	let listing: { files: FileEntry[]; folders: FolderEntry[] };
+	try {
+		listing = await desktopApi.listDirectory(path);
+	} catch (err) {
+		toast.error("Failed to refresh folder", {
+			description: errorMessage(err),
+		});
+		return;
+	}
 	workspaceStore.set((state) => {
 		if (state.workspacePath !== path) return state;
 		return { ...state, files: listing.files, folders: listing.folders };
 	});
+
+	const currentPath = viewerStore.get().currentPath;
+	if (
+		!options.reloadActive ||
+		workspaceStore.get().workspacePath !== path ||
+		!currentPath ||
+		isChangelogPath(currentPath) ||
+		!isEditableFile(currentPath) ||
+		!isInWorkspace(currentPath, path)
+	) {
+		return;
+	}
+	try {
+		const nextContent = await desktopApi.readFileText(currentPath);
+		handleExternalFileChange(currentPath, nextContent);
+	} catch (err) {
+		toast.error("Failed to refresh active note", {
+			description: errorMessage(err),
+		});
+	}
 }
 
+export async function refreshFiles(
+	path = workspaceStore.get().workspacePath,
+	options?: { reloadActive?: boolean },
+) {
+	if (!path) return;
+	const pending = refreshFilesInFlight.get(path);
+	if (pending) {
+		// A full refresh must not lose the active-note reload by joining a list-only one.
+		pending.reloadActive ||= options?.reloadActive !== false;
+		return pending.promise;
+	}
+
+	const run: RefreshRun = {
+		reloadActive: options?.reloadActive !== false,
+		promise: Promise.resolve(),
+	};
+	run.promise = enqueueWorkspaceSidebarUpdate(path, () =>
+		refreshFilesNow(path, run),
+	);
+	refreshFilesInFlight.set(path, run);
+	try {
+		await run.promise;
+	} finally {
+		refreshFilesInFlight.delete(path);
+	}
+}
+
+// Mutations already update or clear the active document themselves.
+export function refreshFileList(path = workspaceStore.get().workspacePath) {
+	return refreshFiles(path, { reloadActive: false });
+}
+
+export async function reconcileWorkspacePath(
+	workspacePath: string,
+	changedPath: string,
+) {
+	return enqueueWorkspaceSidebarUpdate(workspacePath, async () => {
+		let delta: WorkspaceDelta | null;
+		try {
+			delta = await desktopApi.sidebarDeltaForPath(workspacePath, changedPath);
+		} catch {
+			return;
+		}
+		if (!delta || workspaceStore.get().workspacePath !== workspacePath) return;
+		if (delta.kind === "refresh") {
+			await refreshFilesNow(workspacePath, { reloadActive: false });
+			return;
+		}
+		workspaceStore.set((state) => {
+			if (state.workspacePath !== workspacePath) return state;
+			const nextSidebar = applyWorkspaceDelta(state, delta);
+			return { ...state, ...nextSidebar };
+		});
+	});
+}
 /**
  * Debounced wrapper for event-driven sidebar refreshes.
  *
@@ -547,7 +652,7 @@ export async function openWorkspace(path?: string) {
 		};
 	});
 	switcherOpenStore.set(false);
-	await Promise.all([refreshFiles(nextPath), loadPinnedNotes(nextPath)]);
+	await Promise.all([refreshFileList(nextPath), loadPinnedNotes(nextPath)]);
 
 	const lastFile = workspaceStore.get().lastOpenedPaths[nextPath];
 	if (lastFile) {
@@ -742,7 +847,7 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 			},
 		}));
 		await syncPinnedNotes();
-		await refreshFiles();
+		await refreshFileList();
 		if (isCurrentFile) {
 			// Path rewrite already updated history; reload content without a new visit.
 			await loadPath(nextPath, { history: "none", launchExternal: false });
@@ -866,11 +971,11 @@ export async function renameFolder(
 		}));
 		await updateMovedLinks(movedFiles, filesBeforeRename);
 		await syncPinnedNotes();
-		await refreshFiles();
+		await refreshFileList();
 	} catch (err) {
 		const message = handleFileError(err);
 		toast.error("Failed to rename folder", { description: message });
-		await refreshFiles();
+		await refreshFileList();
 	}
 }
 
@@ -978,11 +1083,11 @@ export async function moveSidebarItem(
 		if (movedAssetFolder) movedFiles.push(movedAssetFolder);
 		await updateMovedLinks(movedFiles, filesBeforeMove);
 		await syncPinnedNotes();
-		await refreshFiles();
+		await refreshFileList();
 	} catch (err) {
 		const message = handleFileError(err);
 		toast.error("Failed to move item", { description: message });
-		await refreshFiles();
+		await refreshFileList();
 	}
 }
 
@@ -1012,7 +1117,7 @@ async function createEmptyFileInFolder(
 			],
 		}));
 		await loadPath(path);
-		await refreshFiles();
+		await refreshFileList();
 		return path;
 	} catch (err) {
 		const message = handleFileError(err);
@@ -1038,7 +1143,7 @@ export async function createFolderInFolder(parentPath: string) {
 			...state,
 			folders: [...state.folders, { path, modified_at }],
 		}));
-		await refreshFiles();
+		await refreshFileList();
 		return path;
 	} catch (err) {
 		const message = handleFileError(err);
@@ -1089,7 +1194,7 @@ export async function deleteMarkdownFile(
 						},
 		}));
 		await syncPinnedNotes();
-		await refreshFiles();
+		await refreshFileList();
 	} catch (err) {
 		const message = handleFileError(err);
 		toast.error("Failed to delete file", { description: message });
@@ -1141,7 +1246,7 @@ export async function deleteFolder(path: string) {
 						},
 		}));
 		await syncPinnedNotes();
-		await refreshFiles();
+		await refreshFileList();
 	} catch (err) {
 		const message = handleFileError(err);
 		toast.error("Failed to delete folder", { description: message });

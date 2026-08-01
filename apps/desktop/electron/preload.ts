@@ -61,6 +61,15 @@ const desktopApi = {
 	createFolderPicker: () => ipcRenderer.invoke("desktop:create-folder-picker"),
 	saveMarkdownFilePicker: (options) =>
 		ipcRenderer.invoke("desktop:save-markdown-file-picker", options),
+	startWorkspaceWatcher: (path) =>
+		ipcRenderer.invoke("desktop:start-workspace-watcher", { path }),
+	stopWorkspaceWatcher: (generation) =>
+		ipcRenderer.invoke("desktop:stop-workspace-watcher", { generation }),
+	sidebarDeltaForPath: (workspacePath, changedPath) =>
+		ipcRenderer.invoke("desktop:sidebar-delta-for-path", {
+			workspacePath,
+			changedPath,
+		}),
 	watchPath: async (path, options, callback) => {
 		const watchId = String(++nextWatchId);
 		const unsubscribeEvents = subscribe(
@@ -124,6 +133,8 @@ const desktopApi = {
 	onMenuGoToFile: (callback) => subscribe("desktop:menu-go-to-file", callback),
 	onMenuSyncWorkspace: (callback) =>
 		subscribe("desktop:menu-sync-workspace", callback),
+	onWorkspaceChanged: (callback) =>
+		subscribe("desktop:workspace-changed", callback),
 	onMenuToggleTerminal: (callback) =>
 		subscribe("desktop:menu-toggle-terminal", callback),
 	onMenuGoBack: (callback) => subscribe("desktop:menu-go-back", callback),
