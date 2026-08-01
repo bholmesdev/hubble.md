@@ -2,6 +2,7 @@ import type { ReviewThread } from "@hubble.md/ui";
 import { toast } from "sonner";
 import changelogRaw from "../../../../CHANGELOG.md?raw";
 import { desktopApi } from "../desktopApi";
+import type { WorkspaceDelta } from "../desktopApi/types";
 import { classifyFileChange } from "../externalFileChange";
 import {
 	CHANGELOG_PATH,
@@ -78,6 +79,7 @@ import {
 	withOpenedDoc,
 	workspaceStore,
 } from "./state";
+import { applyWorkspaceDelta } from "./workspaceDelta";
 
 const REFRESH_FILES_DEBOUNCE_MS = 250;
 const SELF_SAVE_TTL_MS = 5000;
@@ -161,6 +163,28 @@ export function refreshFilesSnapshot(
 	path = workspaceStore.get().workspacePath,
 ) {
 	return refreshFiles(path, { reconcileActive: false });
+}
+
+export async function reconcileWorkspacePath(
+	workspacePath: string,
+	changedPath: string,
+) {
+	let delta: WorkspaceDelta | null;
+	try {
+		delta = await desktopApi.reconcileWorkspacePath(workspacePath, changedPath);
+	} catch {
+		return;
+	}
+	if (!delta || workspaceStore.get().workspacePath !== workspacePath) return;
+	if (delta.kind === "refresh") {
+		await refreshFilesSnapshot(workspacePath);
+		return;
+	}
+	workspaceStore.set((state) => {
+		if (state.workspacePath !== workspacePath) return state;
+		const snapshot = applyWorkspaceDelta(state, delta);
+		return { ...state, ...snapshot };
+	});
 }
 /**
  * Debounced wrapper for event-driven sidebar refreshes.

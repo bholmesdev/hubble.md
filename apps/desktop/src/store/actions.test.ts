@@ -12,6 +12,7 @@ type MockDesktopApi = {
 	pathExists: ReturnType<typeof vi.fn>;
 	openPathFromLink: ReturnType<typeof vi.fn>;
 	openPathInDefaultApp: ReturnType<typeof vi.fn>;
+	reconcileWorkspacePath: ReturnType<typeof vi.fn>;
 	setThemeSource: ReturnType<typeof vi.fn>;
 };
 
@@ -28,6 +29,7 @@ function createDesktopApi(): MockDesktopApi {
 		pathExists: vi.fn(async () => false),
 		openPathFromLink: vi.fn(async () => ({ kind: "opened" })),
 		openPathInDefaultApp: vi.fn(async () => {}),
+		reconcileWorkspacePath: vi.fn(async () => null),
 		setThemeSource: vi.fn(async () => {}),
 	};
 }
@@ -531,6 +533,43 @@ describe("desktop refreshFiles", () => {
 		expect(toastError).toHaveBeenCalledWith("Failed to refresh active note", {
 			description: "File disappeared",
 		});
+	});
+
+	it("drops an incremental result when the workspace switches mid-request", async () => {
+		const api = createDesktopApi();
+		let finish: ((delta: unknown) => void) | undefined;
+		api.reconcileWorkspacePath.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					finish = resolve;
+				}),
+		);
+		const { appStore, reconcileWorkspacePath, workspaceStore } =
+			await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace-a" },
+		}));
+
+		const pending = reconcileWorkspacePath(
+			"/workspace-a",
+			"/workspace-a/new.md",
+		);
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace-b" },
+		}));
+		finish?.({
+			kind: "file",
+			entry: {
+				path: "/workspace-a/new.md",
+				modified_at: 1,
+				kind: "document",
+			},
+		});
+		await pending;
+
+		expect(workspaceStore.get().files).toEqual([]);
 	});
 });
 describe("desktop renameMarkdownFile", () => {

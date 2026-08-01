@@ -65,8 +65,10 @@ import {
 	openChangelog,
 	openWorkspace,
 	openWorkspaceWithSidebar,
+	reconcileWorkspacePath,
 	refreshFiles,
 	refreshFilesDebounced,
+	refreshFilesSnapshot,
 	reloadFromDiskConflict,
 	requestChatAboutNote,
 	savePathContent,
@@ -96,7 +98,6 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
-import { workspaceSync } from "./store/workspaceSync";
 
 // Forces editor refresh when underlying TipTap extensions change
 const HMR_REV = (() => {
@@ -463,14 +464,43 @@ function App() {
 
 	useEffect(() => {
 		if (!workspacePath) return;
-		const dispose = desktopApi.onWorkspaceChanged(() =>
-			workspaceSync.markDirty(),
-		);
-		void desktopApi.watchWorkspace(workspacePath);
+		let active = true;
+		let disposed = false;
+		let generation: number | null = null;
+		let queue = Promise.resolve();
+		const dispose = desktopApi.onWorkspaceChanged((change) => {
+			queue = queue.then(async () => {
+				if (!active || workspaceStore.get().workspacePath !== workspacePath) {
+					return;
+				}
+				if (change.kind === "refresh") {
+					await refreshFilesSnapshot(workspacePath);
+					return;
+				}
+				for (const changedPath of change.paths) {
+					if (!active) return;
+					await reconcileWorkspacePath(workspacePath, changedPath);
+				}
+			});
+		});
+		void desktopApi
+			.startWorkspaceWatcher(workspacePath)
+			.then((nextGeneration) => {
+				if (disposed) {
+					if (nextGeneration !== null) {
+						void desktopApi.stopWorkspaceWatcher(nextGeneration);
+					}
+					return;
+				}
+				generation = nextGeneration;
+			});
 		return () => {
+			active = false;
+			disposed = true;
 			dispose();
-			workspaceSync.reset();
-			void desktopApi.unwatchWorkspace();
+			if (generation !== null) {
+				void desktopApi.stopWorkspaceWatcher(generation);
+			}
 		};
 	}, [workspacePath]);
 

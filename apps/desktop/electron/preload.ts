@@ -61,9 +61,15 @@ const desktopApi = {
 	createFolderPicker: () => ipcRenderer.invoke("desktop:create-folder-picker"),
 	saveMarkdownFilePicker: (options) =>
 		ipcRenderer.invoke("desktop:save-markdown-file-picker", options),
-	watchWorkspace: (path) =>
-		ipcRenderer.invoke("desktop:watch-workspace", { path }),
-	unwatchWorkspace: () => ipcRenderer.invoke("desktop:unwatch-workspace"),
+	startWorkspaceWatcher: (path) =>
+		ipcRenderer.invoke("desktop:start-workspace-watcher", { path }),
+	stopWorkspaceWatcher: (generation) =>
+		ipcRenderer.invoke("desktop:stop-workspace-watcher", { generation }),
+	reconcileWorkspacePath: (workspacePath, changedPath) =>
+		ipcRenderer.invoke("desktop:reconcile-workspace-path", {
+			workspacePath,
+			changedPath,
+		}),
 	watchPath: async (path, options, callback) => {
 		const watchId = String(++nextWatchId);
 		const unsubscribeEvents = subscribe(

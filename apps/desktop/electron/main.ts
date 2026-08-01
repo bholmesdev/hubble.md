@@ -21,11 +21,10 @@ import {
 	shell,
 } from "electron";
 import electronUpdater from "electron-updater";
-import ignore from "ignore";
 import { z } from "zod/v4";
 import type {
 	DesktopUpdateState,
-	DirectoryListing,
+	HtmlAppFileEntry,
 	MenuState,
 	SearchFileResult,
 	WorkspaceConfig,
@@ -34,8 +33,6 @@ import {
 	fileKindForPath,
 	hasMarkdownExtension,
 	isEditableFile,
-	isHiddenSidebarFolderName,
-	isVisibleSidebarFileName,
 	markdownAssetFolderPath,
 	withMarkdownExtension,
 } from "../src/lib/filePath";
@@ -50,10 +47,14 @@ import type { ThemePreference } from "../src/theme";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
 import {
-	createTerminalIdleReporter,
-	type Disposable,
-	startGitWatcher,
-} from "./workspaceHints";
+	collectWorkspaceFiles,
+	listSidebarFiles,
+	reconcileSidebarPath,
+} from "./workspaceSidebar";
+import {
+	startNativeWorkspaceWatcher,
+	type WorkspaceWatchHandle,
+} from "./workspaceWatcher";
 import {
 	loadZoomFactor,
 	resetWindowZoom,
@@ -62,18 +63,6 @@ import {
 	trafficLightPositionForZoom,
 	zoomStep,
 } from "./zoom";
-
-type HtmlAppFileEntry = {
-	name: string;
-	path: string;
-	modified_at: number;
-	size: number;
-};
-
-type IgnoreRule = {
-	dir: string;
-	matcher: ReturnType<typeof ignore>;
-};
 
 type HtmlAppAsset = {
 	name: string;
@@ -179,9 +168,16 @@ let updateState: DesktopUpdateState = {
 	lastCheckedAt: null,
 };
 const watchers = new Map<string, FSWatcher>();
-let gitWatcher: Disposable | null = null;
-let gitWatcherRoot: string | null = null;
-let gitWatcherGeneration = 0;
+type ActiveWorkspaceWatcher = {
+	root: string;
+	generation: number;
+	handle: WorkspaceWatchHandle;
+};
+let workspaceWatcher: ActiveWorkspaceWatcher | null = null;
+let workspaceWatcherGeneration = 0;
+// Root validation is async; serialize starts so stale IPC requests cannot
+// replace a newer workspace watcher while validation is in flight.
+let workspaceWatcherStart = Promise.resolve();
 const grantedFiles = new Set<string>();
 const grantedRoots = new Set<string>();
 let grantsLoaded = false;
@@ -189,8 +185,6 @@ let grantsLoaded = false;
 // comparing its id against the newest one between files.
 let latestSearchRequestId = 0;
 
-const ignoreConfigFiles = [".gitignore", ".ignore"];
-const ignoredWorkspaceDirs = new Set([".git", "dist", "node_modules"]);
 const workspaceConfigVersion = 1;
 const workspaceConfigDir = ".hubble";
 const workspaceConfigFile = "config.json";
@@ -491,22 +485,10 @@ function isWithin(rootPath: string, candidatePath: string): boolean {
 	);
 }
 
-/** Covers always-ignored workspace dirs in case Git ignores do not catch them. */
-function isIgnoredWorkspacePath(candidatePath: string): boolean {
-	return candidatePath
-		.split(/[\\/]+/)
-		.some((segment) => ignoredWorkspaceDirs.has(segment));
-}
-
-function stopGitWatcher() {
-	gitWatcherGeneration += 1;
-	gitWatcher?.close();
-	gitWatcher = null;
-	gitWatcherRoot = null;
-}
-
-function toIgnorePath(input: string): string {
-	return input.split(path.sep).join("/");
+function stopWorkspaceWatcher() {
+	workspaceWatcherGeneration += 1;
+	workspaceWatcher?.handle.close();
+	workspaceWatcher = null;
 }
 
 /**
@@ -518,53 +500,6 @@ function toIgnorePath(input: string): string {
  */
 function toRendererPath(input: string): string {
 	return input.split(path.sep).join("/");
-}
-
-function isIgnoredByRules(candidatePath: string, rules: IgnoreRule[]) {
-	if (isIgnoredWorkspacePath(candidatePath)) return true;
-
-	let ignored = false;
-	for (const { dir, matcher } of rules) {
-		const relative = path.relative(dir, candidatePath);
-		if (
-			relative === "" ||
-			relative.startsWith("..") ||
-			path.isAbsolute(relative)
-		)
-			continue;
-		const ignorePath = toIgnorePath(relative);
-		const result = matcher.test(ignorePath);
-		const directoryResult = matcher.test(`${ignorePath}/`);
-		if (result.ignored || directoryResult.ignored) ignored = true;
-		if (result.unignored || directoryResult.unignored) ignored = false;
-	}
-	return ignored;
-}
-
-function isMissingPathError(error: unknown): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		"code" in error &&
-		error.code === "ENOENT"
-	);
-}
-
-async function rulesForDir(dir: string, inherited: IgnoreRule[]) {
-	const matcher = ignore();
-	let hasRules = false;
-
-	for (const fileName of ignoreConfigFiles) {
-		try {
-			matcher.add(await fs.readFile(path.join(dir, fileName), "utf8"));
-			hasRules = true;
-		} catch (error) {
-			if (isMissingPathError(error)) continue;
-			throw error;
-		}
-	}
-
-	return hasRules ? [...inherited, { dir, matcher }] : inherited;
 }
 
 function assertGranted(input: string): string {
@@ -1186,90 +1121,6 @@ function fileAssetsDir(filePath: string): string {
 	return assetsDir;
 }
 
-async function collectSidebarFiles(
-	dir: string,
-	out: DirectoryListing,
-	inheritedRules: IgnoreRule[] = [],
-) {
-	const rules = await rulesForDir(dir, inheritedRules);
-	const entries = await fs.readdir(dir, { withFileTypes: true });
-	for (const entry of entries) {
-		const entryPath = path.join(dir, entry.name);
-		if (isIgnoredByRules(entryPath, rules)) continue;
-		if (entry.isDirectory()) {
-			if (isHiddenSidebarFolderName(entry.name)) continue;
-			const stat = await fs.stat(entryPath);
-			out.folders.push({
-				path: toRendererPath(entryPath),
-				modified_at: Math.floor(stat.mtimeMs / 1000),
-			});
-			await collectSidebarFiles(entryPath, out, rules);
-		} else if (entry.isFile() && isVisibleSidebarFileName(entry.name)) {
-			const stat = await fs.stat(entryPath);
-			out.files.push({
-				path: toRendererPath(entryPath),
-				modified_at: Math.floor(stat.mtimeMs / 1000),
-				kind: fileKindForPath(entry.name),
-			});
-		}
-	}
-}
-
-async function collectWorkspaceFiles(
-	root: string,
-	dir: string,
-	glob: string,
-	out: HtmlAppFileEntry[],
-	inheritedRules: IgnoreRule[] = [],
-) {
-	const rules = await rulesForDir(dir, inheritedRules);
-	const entries = await fs.readdir(dir, { withFileTypes: true });
-	for (const entry of entries) {
-		const entryPath = path.join(dir, entry.name);
-		if (isIgnoredByRules(entryPath, rules)) continue;
-		const relativePath = path
-			.relative(root, entryPath)
-			.split(path.sep)
-			.join("/");
-		if (relativePath === ".hubble" || relativePath.startsWith(".hubble/"))
-			continue;
-		if (entry.isDirectory()) {
-			await collectWorkspaceFiles(root, entryPath, glob, out, rules);
-			continue;
-		}
-		if (!matchesGlob(relativePath, glob)) continue;
-		const stat = await fs.stat(entryPath);
-		out.push({
-			name: entry.name,
-			path: relativePath,
-			modified_at: Math.floor(stat.mtimeMs / 1000),
-			size: stat.size,
-		});
-	}
-}
-
-function matchesGlob(relativePath: string, glob: string): boolean {
-	if (glob === "" || glob === "**" || glob === "**/*") return true;
-	let source = "";
-	for (let index = 0; index < glob.length; index += 1) {
-		const char = glob[index];
-		const next = glob[index + 1];
-		const afterNext = glob[index + 2];
-		if (char === "*" && next === "*" && afterNext === "/") {
-			source += "(?:.*/)?";
-			index += 2;
-		} else if (char === "*" && next === "*") {
-			source += ".*";
-			index += 1;
-		} else if (char === "*") {
-			source += "[^/]*";
-		} else {
-			source += char.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
-		}
-	}
-	return new RegExp(`^${source}$`).test(relativePath);
-}
-
 async function createWindow() {
 	const windowState = await loadWindowState();
 	const zoomFactor = loadZoomFactor();
@@ -1368,50 +1219,86 @@ async function createWindow() {
 }
 
 function registerIpc() {
-	const terminalIdle = createTerminalIdleReporter(() =>
-		sendToRenderer("desktop:workspace-changed"),
-	);
-	setupTerminalIpc(sendToRenderer, {
-		onInput: terminalIdle.recordInput,
-		onOutput: terminalIdle.recordOutput,
-		onExit: terminalIdle.closeSession,
-	});
+	setupTerminalIpc(sendToRenderer);
 
 	ipcMain.handle(
-		"desktop:watch-workspace",
+		"desktop:start-workspace-watcher",
 		async (_event, { path: dirPath }) => {
-			const root = assertGrantedRoot(dirPath);
-			if (gitWatcherRoot === root && gitWatcher) return true;
-			stopGitWatcher();
-			gitWatcherRoot = root;
-			const generation = gitWatcherGeneration;
-			const watcher = await startGitWatcher(root, () => {
-				if (generation === gitWatcherGeneration) {
-					sendToRenderer("desktop:workspace-changed");
+			const start = workspaceWatcherStart.then(async () => {
+				const root = assertGrantedRoot(dirPath);
+				const rootStat = await fs.lstat(root);
+				if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) return null;
+				if (workspaceWatcher?.root === root) {
+					return workspaceWatcher.generation;
 				}
+				stopWorkspaceWatcher();
+				const generation = workspaceWatcherGeneration;
+				const watcher = startNativeWorkspaceWatcher(
+					root,
+					(paths) => {
+						if (workspaceWatcher?.generation !== generation) return;
+						sendToRenderer("desktop:workspace-changed", {
+							kind: "paths",
+							paths,
+						});
+					},
+					() => {
+						if (workspaceWatcher?.generation !== generation) return;
+						stopWorkspaceWatcher();
+						sendToRenderer("desktop:workspace-changed", {
+							kind: "refresh",
+						});
+					},
+				);
+				if (!watcher || workspaceWatcherGeneration !== generation) {
+					watcher?.close();
+					return null;
+				}
+				workspaceWatcher = { root, generation, handle: watcher };
+				return generation;
 			});
-			if (generation !== gitWatcherGeneration || gitWatcherRoot !== root) {
-				watcher?.close();
-				return false;
-			}
-			gitWatcher = watcher;
-			return watcher !== null;
+			workspaceWatcherStart = start.then(
+				() => undefined,
+				() => undefined,
+			);
+			return start;
 		},
 	);
 
-	ipcMain.handle("desktop:unwatch-workspace", async () => {
-		stopGitWatcher();
-	});
+	ipcMain.handle(
+		"desktop:stop-workspace-watcher",
+		async (_event, { generation }) => {
+			if (workspaceWatcher?.generation === generation) {
+				stopWorkspaceWatcher();
+			}
+		},
+	);
+
+	ipcMain.handle(
+		"desktop:reconcile-workspace-path",
+		async (_event, { workspacePath, changedPath }) => {
+			const root = assertGranted(workspacePath);
+			if (!workspaceWatcher || workspaceWatcher.root !== root) return null;
+			const resolvedPath = resolvePath(changedPath);
+			if (!isWithin(root, resolvedPath)) return { kind: "refresh" };
+			try {
+				return await reconcileSidebarPath(root, resolvedPath);
+			} catch (error) {
+				console.error("Workspace path reconciliation failed:", error);
+				return { kind: "refresh" };
+			}
+		},
+	);
 
 	ipcMain.handle(
 		"desktop:list-directory",
 		async (_event, { path: dirPath }) => {
 			const root = assertGrantedRoot(dirPath);
-			const stat = await fs.stat(root);
-			if (!stat.isDirectory()) throw new Error(`Not a directory: ${dirPath}`);
-			const listing: DirectoryListing = { files: [], folders: [] };
-			await collectSidebarFiles(root, listing);
-			return listing;
+			const stat = await fs.lstat(root);
+			if (!stat.isDirectory() || stat.isSymbolicLink()) {
+				throw new Error(`Not a directory: ${dirPath}`);
+			}
+			return listSidebarFiles(root);
 		},
 	);
 

@@ -115,15 +115,6 @@ function createPtySession(
 
 export function setupTerminalIpc(
 	sendToRenderer: (channel: string, ...args: unknown[]) => void,
-	activity: {
-		onInput: (sessionId: string, chunk: string) => void;
-		onOutput: (sessionId: string, chunk: string) => void;
-		onExit: (sessionId: string) => void;
-	} = {
-		onInput: () => {},
-		onOutput: () => {},
-		onExit: () => {},
-	},
 ) {
 	ipcMain.handle(
 		"desktop:terminal-start",
@@ -140,15 +131,12 @@ export function setupTerminalIpc(
 					clearTimeout(initialCommandTimer);
 					initialCommandTimer = null;
 				}
-				const input = `${initialCommand}\n`;
-				activity.onInput(sessionId, input);
-				session.write(input);
+				session.write(`${initialCommand}\n`);
 			};
 
 			const onData = (data: string) => {
 				if (session) appendHistory(session, data);
 				sendToRenderer(`desktop:terminal-data-${sessionId}`, data);
-				activity.onOutput(sessionId, data);
 				writeInitialCommand();
 			};
 
@@ -158,7 +146,6 @@ export function setupTerminalIpc(
 					initialCommandTimer = null;
 				}
 				delete sessions[sessionId];
-				activity.onExit(sessionId);
 				sendToRenderer(`desktop:terminal-exit-${sessionId}`);
 			};
 
@@ -193,7 +180,6 @@ export function setupTerminalIpc(
 		(_event, { sessionId, data }: { sessionId: string; data: string }) => {
 			const session = sessions[sessionId];
 			if (session) {
-				activity.onInput(sessionId, data);
 				session.write(data);
 			}
 		},
@@ -223,7 +209,6 @@ export function setupTerminalIpc(
 			if (session) {
 				session.kill();
 				delete sessions[sessionId];
-				activity.onExit(sessionId);
 			}
 		},
 	);
