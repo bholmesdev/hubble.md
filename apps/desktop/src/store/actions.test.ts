@@ -1211,6 +1211,37 @@ describe("desktop folder actions", () => {
 		vi.doUnmock("sonner");
 	});
 
+	it("does not finalize files after restore fails", async () => {
+		const api = createDesktopApi();
+		api.restoreDelete.mockRejectedValue(new Error("path exists"));
+		const toast = Object.assign(
+			vi.fn(() => "delete-undo"),
+			{
+				dismiss: vi.fn(),
+				success: vi.fn(),
+				error: vi.fn(),
+			},
+		);
+		vi.doMock("sonner", () => ({ toast }));
+		const { appStore, deleteSidebarItems, undoPendingDelete } =
+			await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [{ path: "/workspace/delete.md", modified_at: 1 }],
+			},
+		}));
+
+		await deleteSidebarItems([{ kind: "file", path: "/workspace/delete.md" }]);
+
+		expect(await undoPendingDelete()).toBe(false);
+		expect(api.finalizeDelete).not.toHaveBeenCalled();
+		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
+		vi.doUnmock("sonner");
+	});
+
 	it("expires sidebar delete undo when document editing resumes", async () => {
 		const api = createDesktopApi();
 		const toast = Object.assign(

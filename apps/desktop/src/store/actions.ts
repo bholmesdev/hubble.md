@@ -1332,8 +1332,7 @@ export async function undoPendingDelete(token?: string) {
 		await pending.pinRemovalSaved;
 		await desktopApi.restoreDelete(pending.token);
 	} catch (error) {
-		pending.isRestoring = false;
-		await finalizePendingDeleteUndo(pending.token);
+		clearPendingDelete(pending);
 		toast.error("Failed to undo deletion", {
 			description: handleFileError(error),
 		});

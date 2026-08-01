@@ -31,6 +31,20 @@ function isInside(root: string, candidate: string) {
 export class DeleteUndo {
 	private jobs = new Map<string, Job>();
 
+	private async keepForRecovery(token: string, job: Job) {
+		const workspace = path.dirname(path.dirname(path.dirname(job.dir)));
+		const recovery = path.join(
+			workspace,
+			HUBBLE_DIR,
+			"delete-recovery",
+			path.basename(job.dir),
+		);
+		await fs.mkdir(path.dirname(recovery), { recursive: true });
+		await fs.rename(job.dir, recovery);
+		this.jobs.delete(token);
+		return recovery;
+	}
+
 	async stage(workspace: string, paths: string[]) {
 		if (paths.length === 0) throw new Error("No files selected for deletion");
 		if (new Set(paths).size !== paths.length) {
@@ -86,15 +100,7 @@ export class DeleteUndo {
 				this.jobs.delete(token);
 				throw error;
 			}
-			const recovery = path.join(
-				workspace,
-				HUBBLE_DIR,
-				"delete-recovery",
-				token,
-			);
-			await fs.mkdir(path.dirname(recovery), { recursive: true });
-			await fs.rename(dir, recovery);
-			this.jobs.delete(token);
+			const recovery = await this.keepForRecovery(token, job);
 			throw new Error(`Delete recovery required at ${recovery}`);
 		}
 	}
@@ -106,8 +112,9 @@ export class DeleteUndo {
 		}
 		for (const entry of job.entries) {
 			if (await exists(entry.source)) {
+				const recovery = await this.keepForRecovery(token, job);
 				throw new Error(
-					`Cannot restore because this path exists: ${entry.source}`,
+					`Cannot restore ${entry.source} because it exists. Deleted files kept at ${recovery}`,
 				);
 			}
 		}
@@ -119,32 +126,16 @@ export class DeleteUndo {
 				await fs.rename(entry.staged, entry.source);
 				moved.push(entry);
 			}
-		} catch (error) {
-			let failed = false;
+		} catch {
 			for (const entry of moved.reverse()) {
 				try {
 					if (!(await exists(entry.staged))) {
 						await fs.rename(entry.source, entry.staged);
 					}
-				} catch {
-					failed = true;
-				}
+				} catch {}
 			}
-			if (failed) {
-				const workspace = path.dirname(path.dirname(path.dirname(job.dir)));
-				const recovery = path.join(
-					workspace,
-					HUBBLE_DIR,
-					"delete-recovery",
-					path.basename(job.dir),
-				);
-				await fs.mkdir(path.dirname(recovery), { recursive: true });
-				await fs.rename(job.dir, recovery);
-				this.jobs.delete(token);
-				throw new Error(`Delete recovery required at ${recovery}`);
-			}
-			job.state = "ready";
-			throw error;
+			const recovery = await this.keepForRecovery(token, job);
+			throw new Error(`Delete recovery required at ${recovery}`);
 		}
 		this.jobs.delete(token);
 		await fs.rm(job.dir, { recursive: true, force: true });
@@ -155,8 +146,13 @@ export class DeleteUndo {
 		const job = this.jobs.get(token);
 		if (!job || job.state !== "ready") return;
 		job.state = "dropping";
-		await fs.rm(job.dir, { recursive: true, force: true });
-		this.jobs.delete(token);
+		try {
+			await fs.rm(job.dir, { recursive: true, force: true });
+			this.jobs.delete(token);
+		} catch (error) {
+			job.state = "ready";
+			throw error;
+		}
 	}
 
 	async clean(workspace: string) {
