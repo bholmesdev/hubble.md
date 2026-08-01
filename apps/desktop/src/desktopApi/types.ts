@@ -23,7 +23,6 @@ export type WorkspaceChange =
 
 export type WorkspaceDelta =
 	| { kind: "file"; entry: FileEntry }
-	| { kind: "folder"; entry: FolderEntry }
 	| { kind: "subtree"; path: string; listing: DirectoryListing }
 	| { kind: "remove"; path: string }
 	| { kind: "refresh" };

@@ -465,7 +465,6 @@ function App() {
 	useEffect(() => {
 		if (!workspacePath) return;
 		let active = true;
-		let disposed = false;
 		let generation: number | null = null;
 		let queue = Promise.resolve();
 		const dispose = desktopApi.onWorkspaceChanged((change) => {
@@ -486,7 +485,7 @@ function App() {
 		void desktopApi
 			.startWorkspaceWatcher(workspacePath)
 			.then((nextGeneration) => {
-				if (disposed) {
+				if (!active) {
 					if (nextGeneration !== null) {
 						void desktopApi.stopWorkspaceWatcher(nextGeneration);
 					}
@@ -496,7 +495,6 @@ function App() {
 			});
 		return () => {
 			active = false;
-			disposed = true;
 			dispose();
 			if (generation !== null) {
 				void desktopApi.stopWorkspaceWatcher(generation);

@@ -88,7 +88,7 @@ let refreshFilesTimer: ReturnType<typeof setTimeout> | null = null;
 const refreshFilesInFlight = new Map<
 	string,
 	{
-		intent: { reconcileActive: boolean };
+		refreshIntent: { reconcileActive: boolean };
 		promise: Promise<void>;
 	}
 >();
@@ -110,11 +110,11 @@ export async function refreshFiles(
 	const pending = refreshFilesInFlight.get(path);
 	if (pending) {
 		// A user refresh must not lose reconciliation by joining a snapshot-only scan.
-		pending.intent.reconcileActive ||= reconcileActive;
+		pending.refreshIntent.reconcileActive ||= reconcileActive;
 		return pending.promise;
 	}
 
-	const intent = { reconcileActive };
+	const refreshIntent = { reconcileActive };
 	const refresh = (async () => {
 		let listing: { files: FileEntry[]; folders: FolderEntry[] };
 		try {
@@ -132,7 +132,7 @@ export async function refreshFiles(
 
 		const currentPath = viewerStore.get().currentPath;
 		if (
-			!intent.reconcileActive ||
+			!refreshIntent.reconcileActive ||
 			workspaceStore.get().workspacePath !== path ||
 			!currentPath ||
 			isChangelogPath(currentPath) ||
@@ -150,7 +150,7 @@ export async function refreshFiles(
 			});
 		}
 	})();
-	refreshFilesInFlight.set(path, { intent, promise: refresh });
+	refreshFilesInFlight.set(path, { refreshIntent, promise: refresh });
 	try {
 		await refresh;
 	} finally {
@@ -182,8 +182,8 @@ export async function reconcileWorkspacePath(
 	}
 	workspaceStore.set((state) => {
 		if (state.workspacePath !== workspacePath) return state;
-		const snapshot = applyWorkspaceDelta(state, delta);
-		return { ...state, ...snapshot };
+		const nextSidebar = applyWorkspaceDelta(state, delta);
+		return { ...state, ...nextSidebar };
 	});
 }
 /**

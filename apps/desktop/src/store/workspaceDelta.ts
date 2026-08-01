@@ -36,11 +36,6 @@ export function applyWorkspaceDelta(
 				files: upsert(snapshot.files, delta.entry),
 				folders: withoutPrefix(snapshot.folders, delta.entry.path),
 			};
-		case "folder":
-			return {
-				files: withoutPrefix(snapshot.files, delta.entry.path),
-				folders: upsert(snapshot.folders, delta.entry),
-			};
 		case "subtree":
 			return {
 				files: [
