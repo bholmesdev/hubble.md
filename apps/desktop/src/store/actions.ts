@@ -130,7 +130,7 @@ function pathCoveredByDeleteItems(path: string, items: SidebarDeleteItem[]) {
 	return items.some((item) =>
 		item.kind === "file"
 			? item.path === path
-			: pathInFolder(path, item.folderId),
+			: item.folderId === path || pathInFolder(path, item.folderId),
 	);
 }
 
@@ -738,7 +738,7 @@ export function setViewerMode(viewMode: ViewMode) {
 export async function savePathContent(
 	path: string,
 	content: string,
-	options?: { force?: boolean },
+	options?: { force?: boolean; throwOnError?: boolean },
 ) {
 	// Binary viewers, external files, and the virtual changelog never enter text saves.
 	if (isChangelogPath(path) || !isEditableFile(path)) return;
@@ -819,6 +819,7 @@ export async function savePathContent(
 				error: message,
 			};
 		});
+		if (options?.throwOnError) throw err;
 	}
 }
 
@@ -1378,7 +1379,14 @@ async function performSidebarDelete(items: SidebarDeleteItem[]) {
 		viewerBefore.currentPath &&
 		pathCoveredByDeleteItems(viewerBefore.currentPath, items)
 	) {
-		await savePathContent(viewerBefore.currentPath, viewerBefore.content);
+		try {
+			await savePathContent(viewerBefore.currentPath, viewerBefore.content, {
+				force: true,
+				throwOnError: true,
+			});
+		} catch {
+			return;
+		}
 	}
 	blockedSaveItems = items;
 

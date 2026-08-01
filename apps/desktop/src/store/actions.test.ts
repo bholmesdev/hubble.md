@@ -1156,6 +1156,7 @@ describe("desktop folder actions", () => {
 			"/workspace/folder",
 		]);
 		expect(workspaceStore.get().files).toEqual([]);
+		expect(workspaceStore.get().folders).toEqual([]);
 		expect(api.setDeleteUndoAvailable).toHaveBeenCalledWith(true);
 
 		api.listDirectory.mockResolvedValue({
@@ -1170,6 +1171,43 @@ describe("desktop folder actions", () => {
 		expect(api.restoreDelete).toHaveBeenCalledWith("delete-token");
 		expect(workspaceStore.get().files).toHaveLength(2);
 		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
+		vi.doUnmock("sonner");
+	});
+
+	it("keeps an open file when its pre-delete save fails", async () => {
+		const api = createDesktopApi();
+		api.writeFileText.mockRejectedValue(new Error("disk full"));
+		const toast = Object.assign(
+			vi.fn(() => "delete-undo"),
+			{
+				dismiss: vi.fn(),
+				success: vi.fn(),
+				error: vi.fn(),
+			},
+		);
+		vi.doMock("sonner", () => ({ toast }));
+		const { appStore, deleteSidebarItems, viewerStore } =
+			await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [{ path: "/workspace/delete.md", modified_at: 1 }],
+			},
+			document: {
+				...current.document,
+				currentPath: "/workspace/delete.md",
+				content: "unsaved",
+				diskContent: "saved",
+			},
+		}));
+
+		await deleteSidebarItems([{ kind: "file", path: "/workspace/delete.md" }]);
+
+		expect(api.stageDelete).not.toHaveBeenCalled();
+		expect(viewerStore.get().currentPath).toBe("/workspace/delete.md");
+		expect(viewerStore.get().content).toBe("unsaved");
 		vi.doUnmock("sonner");
 	});
 
