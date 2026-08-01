@@ -1,0 +1,1 @@
+This app uses the React compiler. Avoid manual memos or callbacks.
