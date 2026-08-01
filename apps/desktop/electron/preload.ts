@@ -61,6 +61,9 @@ const desktopApi = {
 	createFolderPicker: () => ipcRenderer.invoke("desktop:create-folder-picker"),
 	saveMarkdownFilePicker: (options) =>
 		ipcRenderer.invoke("desktop:save-markdown-file-picker", options),
+	watchWorkspace: (path) =>
+		ipcRenderer.invoke("desktop:watch-workspace", { path }),
+	unwatchWorkspace: () => ipcRenderer.invoke("desktop:unwatch-workspace"),
 	watchPath: async (path, options, callback) => {
 		const watchId = String(++nextWatchId);
 		const unsubscribeEvents = subscribe(
@@ -124,6 +127,8 @@ const desktopApi = {
 	onMenuGoToFile: (callback) => subscribe("desktop:menu-go-to-file", callback),
 	onMenuSyncWorkspace: (callback) =>
 		subscribe("desktop:menu-sync-workspace", callback),
+	onWorkspaceChanged: (callback) =>
+		subscribe("desktop:workspace-changed", callback),
 	onMenuToggleTerminal: (callback) =>
 		subscribe("desktop:menu-toggle-terminal", callback),
 	onMenuGoBack: (callback) => subscribe("desktop:menu-go-back", callback),

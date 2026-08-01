@@ -50,6 +50,11 @@ import type { ThemePreference } from "../src/theme";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
 import {
+	createTerminalIdleReporter,
+	type Disposable,
+	startGitWatcher,
+} from "./workspaceHints";
+import {
 	loadZoomFactor,
 	resetWindowZoom,
 	setTrafficLightInset,
@@ -174,6 +179,9 @@ let updateState: DesktopUpdateState = {
 	lastCheckedAt: null,
 };
 const watchers = new Map<string, FSWatcher>();
+let gitWatcher: Disposable | null = null;
+let gitWatcherRoot: string | null = null;
+let gitWatcherGeneration = 0;
 const grantedFiles = new Set<string>();
 const grantedRoots = new Set<string>();
 let grantsLoaded = false;
@@ -488,6 +496,13 @@ function isIgnoredWorkspacePath(candidatePath: string): boolean {
 	return candidatePath
 		.split(/[\\/]+/)
 		.some((segment) => ignoredWorkspaceDirs.has(segment));
+}
+
+function stopGitWatcher() {
+	gitWatcherGeneration += 1;
+	gitWatcher?.close();
+	gitWatcher = null;
+	gitWatcherRoot = null;
 }
 
 function toIgnorePath(input: string): string {
@@ -1353,7 +1368,40 @@ async function createWindow() {
 }
 
 function registerIpc() {
-	setupTerminalIpc(sendToRenderer);
+	const terminalIdle = createTerminalIdleReporter(() =>
+		sendToRenderer("desktop:workspace-changed"),
+	);
+	setupTerminalIpc(sendToRenderer, {
+		onInput: terminalIdle.recordInput,
+		onOutput: terminalIdle.recordOutput,
+		onExit: terminalIdle.closeSession,
+	});
+
+	ipcMain.handle(
+		"desktop:watch-workspace",
+		async (_event, { path: dirPath }) => {
+			const root = assertGrantedRoot(dirPath);
+			if (gitWatcherRoot === root && gitWatcher) return true;
+			stopGitWatcher();
+			gitWatcherRoot = root;
+			const generation = gitWatcherGeneration;
+			const watcher = await startGitWatcher(root, () => {
+				if (generation === gitWatcherGeneration) {
+					sendToRenderer("desktop:workspace-changed");
+				}
+			});
+			if (generation !== gitWatcherGeneration || gitWatcherRoot !== root) {
+				watcher?.close();
+				return false;
+			}
+			gitWatcher = watcher;
+			return watcher !== null;
+		},
+	);
+
+	ipcMain.handle("desktop:unwatch-workspace", async () => {
+		stopGitWatcher();
+	});
 
 	ipcMain.handle(
 		"desktop:list-directory",

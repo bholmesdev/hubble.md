@@ -157,6 +157,8 @@ export type DesktopApi = {
 	saveMarkdownFilePicker(options: {
 		defaultPath?: string;
 	}): Promise<string | null>;
+	watchWorkspace(path: string): Promise<boolean>;
+	unwatchWorkspace(): Promise<void>;
 	watchPath(
 		path: string,
 		options: WatchOptions,
@@ -195,6 +197,7 @@ export type DesktopApi = {
 	onMenuShowWorkspaceSwitcher(callback: () => void): Unsubscribe;
 	onMenuGoToFile(callback: () => void): Unsubscribe;
 	onMenuSyncWorkspace(callback: () => void): Unsubscribe;
+	onWorkspaceChanged(callback: () => void): Unsubscribe;
 	onMenuToggleTerminal(callback: () => void): Unsubscribe;
 	onMenuGoBack(callback: () => void): Unsubscribe;
 	onMenuGoForward(callback: () => void): Unsubscribe;

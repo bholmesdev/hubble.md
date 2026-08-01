@@ -9,7 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Refresh open folders from the toolbar after external changes such as Git pulls, without restarting Hubble. Thanks [@Mamdouh66](https://github.com/Mamdouh66) for the suggestion! [#202](https://github.com/bholmesdev/hubble.md/pull/202)
+- Refresh open folders automatically after Git changes or terminal work finishes. Thanks [@Mamdouh66](https://github.com/Mamdouh66) for the suggestion! [#202](https://github.com/bholmesdev/hubble.md/pull/202)
 - Replace text from the find bar: swap the current match or every match at once. Press Cmd+Alt+F to open replace, and Cmd+Z to take back one replacement at a time. Thanks [@Mamdouh66](https://github.com/Mamdouh66) for the suggestion! [#200](https://github.com/bholmesdev/hubble.md/pull/200)
 - Choose a Light, Dark, or System default appearance in the new General settings section. The choice sticks across launches and only follows the operating system when System default is picked. Thanks [@camilom](https://github.com/camilom) for the suggestion! [#197](https://github.com/bholmesdev/hubble.md/pull/197)
 

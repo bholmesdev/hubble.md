@@ -157,7 +157,9 @@ export async function refreshFiles(
 }
 
 // Mutations already update or clear the active document themselves.
-function refreshFilesSnapshot(path = workspaceStore.get().workspacePath) {
+export function refreshFilesSnapshot(
+	path = workspaceStore.get().workspacePath,
+) {
 	return refreshFiles(path, { reconcileActive: false });
 }
 /**

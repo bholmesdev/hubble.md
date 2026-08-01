@@ -96,6 +96,7 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
+import { workspaceSync } from "./store/workspaceSync";
 
 // Forces editor refresh when underlying TipTap extensions change
 const HMR_REV = (() => {
@@ -459,6 +460,19 @@ function App() {
 			dispose();
 		};
 	}, []);
+
+	useEffect(() => {
+		if (!workspacePath) return;
+		const dispose = desktopApi.onWorkspaceChanged(() =>
+			workspaceSync.markDirty(),
+		);
+		void desktopApi.watchWorkspace(workspacePath);
+		return () => {
+			dispose();
+			workspaceSync.reset();
+			void desktopApi.unwatchWorkspace();
+		};
+	}, [workspacePath]);
 
 	useEffect(() => {
 		let active = true;
