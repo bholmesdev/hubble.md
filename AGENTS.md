@@ -16,6 +16,6 @@ Defaults: `needs-triage`, `ready-to-implement`, `needs-discussion`, `wontfix`. S
 
 Single-context — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
-### Review readiness
+### Human review readiness
 
-Apply `.agents/skills/simplify` before handing code to a human reviewer, then run the relevant existing checks.
+Use /simplify before handing code to a human reviewer.
