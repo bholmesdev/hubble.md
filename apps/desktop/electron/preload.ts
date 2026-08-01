@@ -51,6 +51,15 @@ const desktopApi = {
 		ipcRenderer.invoke("desktop:persist-pasted-image", input),
 	deleteFile: (path, options) =>
 		ipcRenderer.invoke("desktop:delete-file", { path, options }),
+	stageDelete: (workspacePath, items) =>
+		ipcRenderer.invoke("desktop:stage-delete", { workspacePath, items }),
+	undoText: () => ipcRenderer.invoke("desktop:undo-text"),
+	restoreDelete: (token) =>
+		ipcRenderer.invoke("desktop:restore-delete", { token }),
+	finalizeDelete: (token) =>
+		ipcRenderer.invoke("desktop:finalize-delete", { token }),
+	setDeleteUndoAvailable: (available) =>
+		ipcRenderer.invoke("desktop:set-delete-undo-available", { available }),
 	readBinaryFile: (path) =>
 		ipcRenderer.invoke("desktop:read-binary-file", { path }),
 	writeBinaryFile: (path, bytes) =>
@@ -141,6 +150,7 @@ const desktopApi = {
 	onMenuGoForward: (callback) => subscribe("desktop:menu-go-forward", callback),
 	onMenuToggleSourceMode: (callback) =>
 		subscribe("desktop:menu-toggle-source-mode", callback),
+	onUndoDelete: (callback) => subscribe("desktop:undo-delete", callback),
 	onWindowFocus: (callback) => subscribe("desktop:window-focus", callback),
 	onFullScreenChange: (callback) =>
 		subscribe("desktop:fullscreen-change", (isFullScreen: boolean) =>

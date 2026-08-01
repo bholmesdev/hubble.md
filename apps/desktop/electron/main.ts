@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -180,6 +180,14 @@ let workspaceWatcherStart = Promise.resolve();
 const grantedFiles = new Set<string>();
 const grantedRoots = new Set<string>();
 let grantsLoaded = false;
+let deleteUndoAvailable = false;
+type PendingDeleteItem = { originalPath: string; backupPath: string };
+type PendingDelete = {
+	operationDir: string;
+	items: PendingDeleteItem[];
+	state: "staging" | "pending" | "restoring" | "finalizing";
+};
+const pendingDeletes = new Map<string, PendingDelete>();
 // An AbortSignal cannot cross IPC, so a superseded search is abandoned by
 // comparing its id against the newest one between files.
 let latestSearchRequestId = 0;
@@ -237,6 +245,54 @@ function windowStatePath(): string {
 
 function themeSourcePath(): string {
 	return path.join(app.getPath("userData"), "theme.json");
+}
+
+async function restorePendingDelete(items: PendingDeleteItem[]) {
+	for (const item of items) {
+		if (await pathExists(item.originalPath)) {
+			throw new Error(
+				`Cannot restore because this path exists: ${item.originalPath}`,
+			);
+		}
+	}
+	const restoredPaths: string[] = [];
+	try {
+		for (const item of items) {
+			await fs.mkdir(path.dirname(item.originalPath), { recursive: true });
+			await fs.rename(item.backupPath, item.originalPath);
+			restoredPaths.push(item.originalPath);
+			grantFileWithParent(item.originalPath);
+		}
+	} catch (error) {
+		for (const restoredPath of restoredPaths.reverse()) {
+			const item = items.find(
+				(candidate) => candidate.originalPath === restoredPath,
+			);
+			if (item && !(await pathExists(item.backupPath))) {
+				await fs.rename(restoredPath, item.backupPath);
+			}
+		}
+		throw error;
+	}
+}
+
+async function cleanStaleDeleteUndo(workspace: string) {
+	const undoRoot = path.join(workspace, workspaceConfigDir, "delete-undo");
+	const active = new Set(
+		[...pendingDeletes.values()].map((pending) => pending.operationDir),
+	);
+	const entries = await fs
+		.readdir(undoRoot, { withFileTypes: true })
+		.catch((error: unknown) => {
+			if (isMissingPathError(error)) return [];
+			throw error;
+		});
+	for (const entry of entries) {
+		const entryPath = path.join(undoRoot, entry.name);
+		if (!active.has(entryPath)) {
+			await fs.rm(entryPath, { recursive: true, force: true });
+		}
+	}
 }
 
 function isThemePreference(value: unknown): value is ThemePreference {
@@ -849,7 +905,13 @@ function buildMenu() {
 		{
 			label: "Edit",
 			submenu: [
-				{ role: "undo" },
+				deleteUndoAvailable
+					? {
+							label: "Undo Delete",
+							accelerator: "CmdOrCtrl+Z",
+							click: () => sendToRenderer("desktop:undo-delete"),
+						}
+					: { role: "undo" },
 				{ role: "redo" },
 				{ type: "separator" },
 				{ role: "cut" },
@@ -1270,6 +1332,7 @@ function registerIpc() {
 			if (!stat.isDirectory()) {
 				throw new Error(`Not a directory: ${dirPath}`);
 			}
+			await cleanStaleDeleteUndo(root);
 			return listSidebarFiles(root);
 		},
 	);
@@ -1488,6 +1551,143 @@ function registerIpc() {
 			};
 		},
 	);
+
+	ipcMain.handle(
+		"desktop:stage-delete",
+		async (
+			_event,
+			{
+				workspacePath,
+				items,
+			}: { workspacePath: string; items: Array<{ path: string }> },
+		) => {
+			if (!Array.isArray(items) || items.length === 0) {
+				throw new Error("No files selected for deletion");
+			}
+			const workspace = assertGranted(workspacePath);
+			const token = randomUUID();
+			const operationDir = path.join(
+				workspace,
+				workspaceConfigDir,
+				"delete-undo",
+				token,
+			);
+			const pendingItems = items.map((item, index) => ({
+				originalPath: assertGranted(item.path),
+				backupPath: path.join(operationDir, String(index)),
+			}));
+			const uniquePaths = new Set(
+				pendingItems.map((item) => item.originalPath),
+			);
+			if (uniquePaths.size !== pendingItems.length) {
+				throw new Error("Duplicate delete path");
+			}
+			for (const item of pendingItems) {
+				const relative = path.relative(workspace, item.originalPath);
+				if (
+					!relative ||
+					relative === workspaceConfigDir ||
+					relative.startsWith(`${workspaceConfigDir}${path.sep}`) ||
+					relative.startsWith(`..${path.sep}`) ||
+					path.isAbsolute(relative)
+				) {
+					throw new Error("Delete path is outside the workspace");
+				}
+			}
+			for (const [index, item] of pendingItems.entries()) {
+				if (
+					pendingItems.some(
+						(candidate, candidateIndex) =>
+							candidateIndex !== index &&
+							isWithin(candidate.originalPath, item.originalPath),
+					)
+				) {
+					throw new Error("Delete paths cannot overlap");
+				}
+			}
+
+			const moved: PendingDeleteItem[] = [];
+			const pending: PendingDelete = {
+				operationDir,
+				items: pendingItems,
+				state: "staging",
+			};
+			pendingDeletes.set(token, pending);
+			try {
+				await fs.mkdir(operationDir, { recursive: true });
+				for (const item of pendingItems) {
+					await fs.rename(item.originalPath, item.backupPath);
+					moved.push(item);
+				}
+				pending.state = "pending";
+				return token;
+			} catch (error) {
+				let rollbackFailed = false;
+				for (const item of moved.reverse()) {
+					try {
+						await fs.rename(item.backupPath, item.originalPath);
+					} catch {
+						rollbackFailed = true;
+					}
+				}
+				if (!rollbackFailed) {
+					pendingDeletes.delete(token);
+					await fs.rm(operationDir, { recursive: true, force: true });
+				} else {
+					const recoveryDir = path.join(
+						workspace,
+						workspaceConfigDir,
+						"delete-recovery",
+						token,
+					);
+					await fs.mkdir(path.dirname(recoveryDir), { recursive: true });
+					await fs.rename(operationDir, recoveryDir);
+					pendingDeletes.delete(token);
+					throw new Error(`Delete recovery required at ${recoveryDir}`);
+				}
+				throw error;
+			}
+		},
+	);
+
+	ipcMain.handle(
+		"desktop:restore-delete",
+		async (_event, { token }: { token: string }) => {
+			const pending = pendingDeletes.get(token);
+			if (!pending || pending.state !== "pending") {
+				throw new Error("This deletion can no longer be undone");
+			}
+			pending.state = "restoring";
+			try {
+				await restorePendingDelete(pending.items);
+				pendingDeletes.delete(token);
+				await fs.rm(pending.operationDir, { recursive: true, force: true });
+			} catch (error) {
+				pending.state = "pending";
+				throw error;
+			}
+		},
+	);
+
+	ipcMain.handle(
+		"desktop:finalize-delete",
+		async (_event, { token }: { token: string }) => {
+			const pending = pendingDeletes.get(token);
+			if (!pending || pending.state !== "pending") return;
+			pending.state = "finalizing";
+			await fs.rm(pending.operationDir, { recursive: true, force: true });
+			pendingDeletes.delete(token);
+		},
+	);
+
+	ipcMain.handle(
+		"desktop:set-delete-undo-available",
+		(_event, { available }: { available: boolean }) => {
+			deleteUndoAvailable = available === true;
+			buildMenu();
+		},
+	);
+	ipcMain.handle("desktop:undo-text", (event) => event.sender.undo());
 
 	ipcMain.handle(
 		"desktop:delete-file",

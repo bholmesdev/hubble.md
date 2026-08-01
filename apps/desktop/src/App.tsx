@@ -85,6 +85,7 @@ import {
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
 	toggleTerminal,
+	undoPendingDelete,
 	updateEditorContent,
 } from "./store/actions";
 import { canGoBack, canGoForward } from "./store/history";
@@ -413,6 +414,11 @@ function App() {
 
 	useEffect(() => {
 		const disposers = [
+			desktopApi.onUndoDelete(() => {
+				void undoPendingDelete().then((undone) => {
+					if (!undone) void desktopApi.undoText();
+				});
+			}),
 			desktopApi.onMenuCreateMarkdownFile(() => void createMarkdownFile()),
 			desktopApi.onMenuCreateHtmlFile(() => void createHtmlFile()),
 			desktopApi.onMenuOpenFile(() => void openFilePicker()),

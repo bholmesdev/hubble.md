@@ -74,6 +74,10 @@ export type PersistPastedImageOutput = {
 	deduped: boolean;
 };
 
+export type StagedDeleteItem = {
+	path: string;
+};
+
 export type OpenPathFromLinkResult =
 	| { kind: "file"; path: string }
 	| { kind: "opened" };
@@ -159,6 +163,14 @@ export type DesktopApi = {
 		input: PersistPastedImageInput,
 	): Promise<PersistPastedImageOutput>;
 	deleteFile(path: string, options?: { recursive?: boolean }): Promise<void>;
+	stageDelete(
+		workspacePath: string,
+		items: StagedDeleteItem[],
+	): Promise<string>;
+	undoText(): Promise<void>;
+	restoreDelete(token: string): Promise<void>;
+	finalizeDelete(token: string): Promise<void>;
+	setDeleteUndoAvailable(available: boolean): Promise<void>;
 	readBinaryFile(path: string): Promise<number[]>;
 	writeBinaryFile(path: string, bytes: number[]): Promise<void>;
 	openFilePicker(options: { defaultPath?: string }): Promise<string | null>;
@@ -218,6 +230,7 @@ export type DesktopApi = {
 	onMenuGoBack(callback: () => void): Unsubscribe;
 	onMenuGoForward(callback: () => void): Unsubscribe;
 	onMenuToggleSourceMode(callback: () => void): Unsubscribe;
+	onUndoDelete(callback: () => void): Unsubscribe;
 	onWindowFocus(callback: () => void): Unsubscribe;
 	onFullScreenChange(callback: (isFullScreen: boolean) => void): Unsubscribe;
 

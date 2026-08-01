@@ -9,6 +9,11 @@ type MockDesktopApi = {
 	createFolder: ReturnType<typeof vi.fn>;
 	renameFile: ReturnType<typeof vi.fn>;
 	deleteFile: ReturnType<typeof vi.fn>;
+	stageDelete: ReturnType<typeof vi.fn>;
+	restoreDelete: ReturnType<typeof vi.fn>;
+	finalizeDelete: ReturnType<typeof vi.fn>;
+	setDeleteUndoAvailable: ReturnType<typeof vi.fn>;
+	undoText: ReturnType<typeof vi.fn>;
 	pathExists: ReturnType<typeof vi.fn>;
 	openPathFromLink: ReturnType<typeof vi.fn>;
 	openPathInDefaultApp: ReturnType<typeof vi.fn>;
@@ -26,6 +31,11 @@ function createDesktopApi(): MockDesktopApi {
 		createFolder: vi.fn(async () => {}),
 		renameFile: vi.fn(async () => {}),
 		deleteFile: vi.fn(async () => {}),
+		stageDelete: vi.fn(async () => "delete-token"),
+		restoreDelete: vi.fn(async () => {}),
+		finalizeDelete: vi.fn(async () => {}),
+		setDeleteUndoAvailable: vi.fn(async () => {}),
+		undoText: vi.fn(async () => {}),
 		pathExists: vi.fn(async () => false),
 		openPathFromLink: vi.fn(async () => ({ kind: "opened" })),
 		openPathInDefaultApp: vi.fn(async () => {}),
@@ -1107,6 +1117,113 @@ describe("desktop folder actions", () => {
 			recursive: true,
 		});
 		expect(workspaceStore.get().folders).toEqual([]);
+	});
+
+	it("stages a sidebar group as one deletion and restores it", async () => {
+		const api = createDesktopApi();
+		const toast = Object.assign(
+			vi.fn(() => "delete-undo"),
+			{
+				dismiss: vi.fn(),
+				success: vi.fn(),
+				error: vi.fn(),
+			},
+		);
+		vi.doMock("sonner", () => ({ toast }));
+		const {
+			appStore,
+			canUndoPendingDelete,
+			deleteSidebarItems,
+			undoPendingDelete,
+			workspaceStore,
+		} = await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [
+					{ path: "/workspace/a.md", modified_at: 1 },
+					{ path: "/workspace/folder/b.md", modified_at: 1 },
+				],
+				folders: [{ path: "/workspace/folder", modified_at: 1 }],
+			},
+		}));
+
+		await deleteSidebarItems([
+			{ kind: "file", path: "/workspace/a.md" },
+			{ kind: "folder", folderId: "/workspace/folder" },
+		]);
+
+		expect(api.stageDelete).toHaveBeenCalledOnce();
+		expect(api.stageDelete).toHaveBeenCalledWith("/workspace", [
+			{ path: "/workspace/a.md" },
+			{ path: "/workspace/folder" },
+		]);
+		expect(workspaceStore.get().files).toEqual([]);
+		expect(canUndoPendingDelete()).toBe(true);
+
+		api.listDirectory.mockResolvedValue({
+			files: [
+				{ path: "/workspace/a.md", modified_at: 2 },
+				{ path: "/workspace/folder/b.md", modified_at: 2 },
+			],
+			folders: [{ path: "/workspace/folder", modified_at: 2 }],
+		});
+		expect(await undoPendingDelete()).toBe(true);
+
+		expect(api.restoreDelete).toHaveBeenCalledWith("delete-token");
+		expect(workspaceStore.get().files).toHaveLength(2);
+		expect(canUndoPendingDelete()).toBe(false);
+		vi.doUnmock("sonner");
+	});
+
+	it("expires sidebar delete undo when document editing resumes", async () => {
+		const api = createDesktopApi();
+		const toast = Object.assign(
+			vi.fn(() => "delete-undo"),
+			{
+				dismiss: vi.fn(),
+				success: vi.fn(),
+				error: vi.fn(),
+			},
+		);
+		vi.doMock("sonner", () => ({ toast }));
+		const {
+			appStore,
+			canUndoPendingDelete,
+			deleteSidebarItems,
+			updateEditorContent,
+		} = await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [
+					{ path: "/workspace/keep.md", modified_at: 1 },
+					{ path: "/workspace/delete.md", modified_at: 1 },
+				],
+			},
+			document: {
+				...current.document,
+				currentPath: "/workspace/keep.md",
+				content: "before",
+				diskContent: "before",
+			},
+		}));
+
+		await deleteSidebarItems([{ kind: "file", path: "/workspace/delete.md" }]);
+		updateEditorContent("/workspace/stale.md", "late update");
+		expect(canUndoPendingDelete()).toBe(true);
+		updateEditorContent("/workspace/keep.md", "after");
+		await vi.waitFor(() =>
+			expect(api.finalizeDelete).toHaveBeenCalledWith("delete-token"),
+		);
+
+		expect(canUndoPendingDelete()).toBe(false);
+		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
+		vi.doUnmock("sonner");
 	});
 });
 
