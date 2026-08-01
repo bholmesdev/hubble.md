@@ -101,21 +101,27 @@ describe("workspace watcher", () => {
 		});
 
 		watcher.emitError();
-		expect(onFallback).toHaveBeenCalledOnce();
+		expect(onFallback).toHaveBeenCalledWith("watch-error");
 		expect(watcher.close).toHaveBeenCalledOnce();
 	});
 
-	it("falls back when a rename event has no usable path", () => {
+	it("refreshes without closing when a rename event has no usable path", () => {
 		const watcher = fakeWatcher();
+		const onPaths = vi.fn();
 		const onFallback = vi.fn();
-		watchWorkspace("/workspace", vi.fn(), onFallback, (_root, listener) => {
+		watchWorkspace("/workspace", onPaths, onFallback, (_root, listener) => {
 			watcher.setListener(listener);
 			return watcher;
 		});
 
 		watcher.emit("rename", null);
 
-		expect(onFallback).toHaveBeenCalledOnce();
+		expect(onFallback).toHaveBeenCalledWith("invalid-path");
+		expect(watcher.close).not.toHaveBeenCalled();
+
+		watcher.emit("rename", "later.md");
+		vi.runAllTimers();
+		expect(onPaths).toHaveBeenCalledWith(["/workspace/later.md"]);
 	});
 
 	it("does not install a watcher when recursive watch is unsupported", () => {

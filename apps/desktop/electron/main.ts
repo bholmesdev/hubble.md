@@ -1239,9 +1239,9 @@ function registerIpc() {
 							paths,
 						});
 					},
-					() => {
+					(reason) => {
 						if (workspaceWatcher?.generation !== generation) return;
-						stopWorkspaceWatcher();
+						if (reason === "watch-error") stopWorkspaceWatcher();
 						sendToRenderer("desktop:workspace-changed", {
 							kind: "refresh",
 						});

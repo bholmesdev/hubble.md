@@ -15,6 +15,7 @@ export type WatchFactory = (
 	root: string,
 	listener: WatchListener,
 ) => fs.FSWatcher;
+export type WatchFallbackReason = "invalid-path" | "watch-error";
 
 const DEFAULT_COALESCE_MS = 75;
 
@@ -72,7 +73,7 @@ const nativeWatch: WatchFactory = (root, listener) =>
 export function watchWorkspace(
 	root: string,
 	onPaths: (paths: string[]) => void,
-	onFallback: () => void,
+	onFallback: (reason: WatchFallbackReason) => void,
 	watch: WatchFactory = nativeWatch,
 ): WatchHandle | null {
 	let closed = false;
@@ -86,7 +87,7 @@ export function watchWorkspace(
 			if (eventType !== "rename") return;
 			const changedPath = normalizeEventPath(root, filename);
 			if (changedPath === null) {
-				onFallback();
+				onFallback("invalid-path");
 				return;
 			}
 			coalescer.add(changedPath);
@@ -101,7 +102,7 @@ export function watchWorkspace(
 		closed = true;
 		coalescer.close();
 		watcher.close();
-		onFallback();
+		onFallback("watch-error");
 	};
 	watcher.on("error", fail);
 
