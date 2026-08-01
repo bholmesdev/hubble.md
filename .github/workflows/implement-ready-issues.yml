@@ -208,6 +208,7 @@ jobs:
               CHANGELOG.md
             ! grep -Fq '__PR_' CHANGELOG.md
             git add CHANGELOG.md
-            git commit -m "Add changelog for #${ISSUE_NUMBER}"
+            git commit -m "Add changelog for #${ISSUE_NUMBER}" \
+              --trailer "Co-Authored-By: Warp Factory Agent <oz-agent@warp.dev>"
             git push origin "$BRANCH"
           fi
