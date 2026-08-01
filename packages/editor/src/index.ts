@@ -1,5 +1,11 @@
-export { ContextMenuSpellcheckExtension } from "./ContextMenuSpellcheckExtension";
-export { FakeSelectionExtension } from "./FakeSelectionExtension";
+export { ContextMenuSpellcheckExtension } from "./ContextMenuSpellcheckExtension.js";
+export {
+	type AppCommandId,
+	type CommandId,
+	getCommand,
+	tiptapBinding,
+} from "./commandRegistry.js";
+export { FakeSelectionExtension } from "./FakeSelectionExtension.js";
 export {
 	FindExtension,
 	type FindMatch,
@@ -7,7 +13,7 @@ export {
 	findMatches,
 	getFindState,
 	selectFindMatch,
-} from "./FindExtension";
+} from "./FindExtension.js";
 export {
 	combineMarkdownFrontMatter,
 	detectFilePropertyType,
@@ -20,39 +26,39 @@ export {
 	parseMarkdownFrontMatter,
 	serializeFrontMatter,
 	setMarkdownFrontMatter,
-} from "./frontMatter";
-export { HeadingExtension } from "./Heading";
-export { resetEditorHistory } from "./history";
-export { InlineCodeExtension } from "./InlineCode";
+} from "./frontMatter.js";
+export { HeadingExtension } from "./Heading.js";
+export { resetEditorHistory } from "./history.js";
+export { InlineCodeExtension } from "./InlineCode.js";
 export {
 	createLinkMark,
 	getActiveLinkRange,
 	getLinkHrefFromAttrs,
 	LinkExtension,
 	type LinkKind,
-} from "./Link";
+} from "./Link.js";
 export {
 	ListAutoJoinExtension,
 	ListItemExtension,
 	ListToggleExtension,
 	listExtensions,
-} from "./List";
+} from "./List.js";
 export {
 	type CaretFormattingState,
 	getCaretFormattingState,
 	MarkdownRolloverExtension,
-} from "./MarkdownRolloverExtension";
+} from "./MarkdownRolloverExtension.js";
 export {
 	hasMarkdownExtension,
 	stripMarkdownExtension,
 	wikiDisplayNameForTarget,
 	withMarkdownExtension,
-} from "./markdownPath";
-export { markdownToTiptapDoc } from "./markdownToProsemirror";
+} from "./markdownPath.js";
+export { markdownToTiptapDoc } from "./markdownToProsemirror.js";
 export {
 	selectionToMarkdown,
 	tiptapDocToMarkdown,
-} from "./prosemirrorToMarkdown";
+} from "./prosemirrorToMarkdown.js";
 export {
 	parseReviewMetadata,
 	type ReviewMarkAttrs,
@@ -60,17 +66,16 @@ export {
 	type ReviewMarkName,
 	type ReviewReply,
 	serializeReviewMetadata,
-} from "./ReviewMark";
+} from "./ReviewMark.js";
 export {
 	createRichTextClipboardSerializer,
 	RichTextClipboardExtension,
-} from "./RichTextClipboardExtension";
-export { StoredMarksDecorationExtension } from "./StoredMarksDecorationExtension";
-export { StrikethroughShortcutExtension } from "./StrikethroughShortcutExtension";
+} from "./RichTextClipboardExtension.js";
+export { StoredMarksDecorationExtension } from "./StoredMarksDecorationExtension.js";
 export {
 	isSelectionAtStartOfNode,
 	nearestSharedParentOfType,
 	parentsOfType,
 	textEndPos,
 	textStartPos,
-} from "./utils";
+} from "./utils.js";

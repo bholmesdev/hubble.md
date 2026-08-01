@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { wordRangeAtOffset } from "./ContextMenuSpellcheckExtension";
+import { wordRangeAtOffset } from "./ContextMenuSpellcheckExtension.js";
 
 describe("wordRangeAtOffset", () => {
 	it("selects the word before a caret at its end", () => {

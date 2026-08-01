@@ -2,7 +2,7 @@ import { Extension } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
-import { nextCodePointIndex, previousCodePointIndex } from "./utils";
+import { nextCodePointIndex, previousCodePointIndex } from "./utils.js";
 
 const CURSOR_SCALE = 1.5;
 const WORD_CHARACTER = /[\p{L}\p{M}\p{N}_'’]/u;

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
 	__testing,
 	getCaretFormattingState,
-} from "./MarkdownRolloverExtension";
+} from "./MarkdownRolloverExtension.js";
 
 const schema = new Schema({
 	nodes: {

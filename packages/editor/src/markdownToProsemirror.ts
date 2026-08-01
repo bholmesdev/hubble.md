@@ -10,9 +10,9 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { type Plugin, unified } from "unified";
 import { visit } from "unist-util-visit";
-import { wikiDisplayNameForTarget } from "./markdownPath";
-import { parseReviewMetadata } from "./ReviewMark";
-import { unescapeReviewText } from "./reviewEscaping";
+import { wikiDisplayNameForTarget } from "./markdownPath.js";
+import { parseReviewMetadata } from "./ReviewMark.js";
+import { unescapeReviewText } from "./reviewEscaping.js";
 
 // Convert Markdown (string) -> TipTap JSONContent (ProseMirror document)
 export function markdownToTiptapDoc(markdown: string): JSONContent {

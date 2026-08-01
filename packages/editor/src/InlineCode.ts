@@ -53,11 +53,7 @@ export const InlineCodeExtension = Mark.create({
 		};
 	},
 
-	addKeyboardShortcuts() {
-		return {
-			"Mod-e": () => this.editor.commands.toggleCode(),
-		};
-	},
+	// No keyboard shortcut here: EditorCommandShortcuts binds editor.code.
 
 	addInputRules() {
 		return [markInputRule({ find: inputRegex, type: this.type })];

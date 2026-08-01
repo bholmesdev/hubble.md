@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
-import { tiptapDocToMarkdown } from "./prosemirrorToMarkdown";
+import { tiptapDocToMarkdown } from "./prosemirrorToMarkdown.js";
 
 type Mark = NonNullable<JSONContent["marks"]>[number];
 

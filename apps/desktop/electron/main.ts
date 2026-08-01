@@ -3,6 +3,7 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { type AppCommandId, getCommand } from "@hubble.md/editor/commands";
 import hubbleRuntime from "@hubble.md/runtime/global.js?raw";
 import htmlAppTheme from "@hubble.md/runtime/html-app-theme.css?raw";
 import tailwindRuntime from "@tailwindcss/browser?raw";
@@ -719,8 +720,8 @@ const textContextMenuItems: TextContextMenuItem[] = [
 	{ role: "copy", flag: "canCopy" },
 	{
 		id: "copy-as-markdown",
-		label: "Copy as Markdown",
-		accelerator: "Alt+CmdOrCtrl+C",
+		label: getCommand("app.copy-as-markdown").label,
+		accelerator: getCommand("app.copy-as-markdown").defaultBinding,
 		flag: "canCopy",
 		click: (webContents) => {
 			webContents.send("desktop:menu-copy-as-markdown");
@@ -793,50 +794,47 @@ function registerTextContextMenu(window: BrowserWindow) {
 	});
 }
 
+function commandMenuItem(
+	id: AppCommandId,
+	click: () => void,
+): Electron.MenuItemConstructorOptions {
+	const command = getCommand(id);
+	return {
+		id,
+		label: command.label,
+		accelerator: command.defaultBinding,
+		enabled: command.isEnabled(menuState),
+		click,
+	};
+}
+
 function buildMenu() {
 	const template: Electron.MenuItemConstructorOptions[] = [
 		{
 			label: "File",
 			submenu: [
-				{
-					id: "new-markdown-file",
-					label: "New File",
-					accelerator: "CmdOrCtrl+N",
-					click: () => sendToRenderer("desktop:menu-create-markdown-file"),
-				},
+				commandMenuItem("app.new-file", () =>
+					sendToRenderer("desktop:menu-create-markdown-file"),
+				),
 				{
 					id: "new-html-file",
 					label: "New HTML App",
 					click: () => sendToRenderer("desktop:menu-create-html-file"),
 				},
-				{
-					id: "new-workspace",
-					label: "Add Folder...",
-					accelerator: "CmdOrCtrl+Shift+N",
-					click: () => sendToRenderer("desktop:menu-open-folder"),
-				},
+				commandMenuItem("app.add-folder", () =>
+					sendToRenderer("desktop:menu-open-folder"),
+				),
 				{ type: "separator" },
-				{
-					id: "open",
-					label: "Open...",
-					accelerator: "CmdOrCtrl+O",
-					click: () => sendToRenderer("desktop:menu-open-file"),
-				},
-				{
-					id: "open-workspace",
-					label: "Open Folder...",
-					accelerator: "CmdOrCtrl+Shift+O",
-					enabled: menuState.hasWorkspace,
-					click: () => sendToRenderer("desktop:menu-show-workspace-switcher"),
-				},
+				commandMenuItem("app.open-file", () =>
+					sendToRenderer("desktop:menu-open-file"),
+				),
+				commandMenuItem("app.open-folder", () =>
+					sendToRenderer("desktop:menu-show-workspace-switcher"),
+				),
 				{ type: "separator" },
-				{
-					id: "go-to-file",
-					label: "Go to File...",
-					accelerator: "CmdOrCtrl+P",
-					enabled: menuState.hasWorkspace,
-					click: () => sendToRenderer("desktop:menu-go-to-file"),
-				},
+				commandMenuItem("app.go-to-file", () =>
+					sendToRenderer("desktop:menu-go-to-file"),
+				),
 				{ type: "separator" },
 				{
 					id: "sync-workspace",
@@ -856,13 +854,9 @@ function buildMenu() {
 				{ type: "separator" },
 				{ role: "cut" },
 				{ role: "copy" },
-				{
-					id: "copy-as-markdown",
-					label: "Copy as Markdown",
-					accelerator: "Alt+CmdOrCtrl+C",
-					enabled: !menuState.isSourceMode,
-					click: () => sendToRenderer("desktop:menu-copy-as-markdown"),
-				},
+				commandMenuItem("app.copy-as-markdown", () =>
+					sendToRenderer("desktop:menu-copy-as-markdown"),
+				),
 				{ role: "paste" },
 				{ role: "selectAll" },
 			],
@@ -870,20 +864,12 @@ function buildMenu() {
 		{
 			label: "View",
 			submenu: [
-				{
-					id: "go-back",
-					label: "Go Back",
-					accelerator: "CmdOrCtrl+[",
-					enabled: menuState.canGoBack,
-					click: () => sendToRenderer("desktop:menu-go-back"),
-				},
-				{
-					id: "go-forward",
-					label: "Go Forward",
-					accelerator: "CmdOrCtrl+]",
-					enabled: menuState.canGoForward,
-					click: () => sendToRenderer("desktop:menu-go-forward"),
-				},
+				commandMenuItem("app.go-back", () =>
+					sendToRenderer("desktop:menu-go-back"),
+				),
+				commandMenuItem("app.go-forward", () =>
+					sendToRenderer("desktop:menu-go-forward"),
+				),
 				{ type: "separator" },
 				{
 					id: "zoom-in",
@@ -904,20 +890,12 @@ function buildMenu() {
 					click: () => resetWindowZoom(mainWindow),
 				},
 				{ type: "separator" },
-				{
-					id: "toggle-terminal",
-					label: "Toggle Terminal",
-					accelerator: "CmdOrCtrl+J",
-					enabled: menuState.hasWorkspace,
-					click: () => sendToRenderer("desktop:menu-toggle-terminal"),
-				},
-				{
-					id: "toggle-source-mode",
-					label: "Toggle Source Mode",
-					accelerator: "Alt+CmdOrCtrl+U",
-					enabled: menuState.hasSourceViewOpen,
-					click: () => sendToRenderer("desktop:menu-toggle-source-mode"),
-				},
+				commandMenuItem("app.toggle-terminal", () =>
+					sendToRenderer("desktop:menu-toggle-terminal"),
+				),
+				commandMenuItem("app.toggle-source-mode", () =>
+					sendToRenderer("desktop:menu-toggle-source-mode"),
+				),
 				...(isDev
 					? ([
 							{ type: "separator" },
@@ -945,12 +923,9 @@ function buildMenu() {
 		template.unshift({
 			label: app.name,
 			submenu: [
-				{
-					id: "settings",
-					label: "Settings...",
-					accelerator: "CmdOrCtrl+,",
-					click: () => sendToRenderer("desktop:menu-open-settings"),
-				},
+				commandMenuItem("app.settings", () =>
+					sendToRenderer("desktop:menu-open-settings"),
+				),
 				{ type: "separator" },
 				{
 					id: "check-for-updates",

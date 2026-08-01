@@ -1,8 +1,9 @@
 import { Menu } from "@base-ui/react/menu";
+import type { AppCommandId } from "@hubble.md/editor";
 import {
 	Button,
 	commandReviewThread,
-	formatShortcut,
+	formatCommandShortcut,
 	ReviewCommentSummary,
 	Toolbar as SharedToolbar,
 } from "@hubble.md/ui";
@@ -136,8 +137,8 @@ export function Toolbar({
 
 function NavigationControls() {
 	const { canGoBack, canGoForward } = useHistoryNav();
-	const backLabel = `Go Back (${formatShortcut("CmdOrCtrl+[")})`;
-	const forwardLabel = `Go Forward (${formatShortcut("CmdOrCtrl+]")})`;
+	const backLabel = `Go Back (${formatCommandShortcut("app.go-back")})`;
+	const forwardLabel = `Go Forward (${formatCommandShortcut("app.go-forward")})`;
 	return (
 		<>
 			<Button
@@ -240,7 +241,7 @@ function NoteActionsMenu({
 								>
 									<MingcuteTerminalLine className="size-3 shrink-0" />
 									<span className="min-w-0 flex-1">Chat about this note</span>
-									<ShortcutHint spec="CmdOrCtrl+Shift+J" />
+									<ShortcutHint commandId="app.chat-about-note" />
 								</Menu.Item>
 								<Menu.Item
 									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
@@ -266,7 +267,7 @@ function NoteActionsMenu({
 							>
 								<MingcuteCodeLine className="size-3 shrink-0" />
 								<span className="min-w-0 flex-1">{sourceModeLabel}</span>
-								<ShortcutHint spec="Alt+CmdOrCtrl+U" />
+								<ShortcutHint commandId="app.toggle-source-mode" />
 							</Menu.Item>
 						)}
 						<Menu.Item
@@ -284,7 +285,7 @@ function NoteActionsMenu({
 							<span className="min-w-0 flex-1">
 								{revealFileLabel(desktopApi.platform)}
 							</span>
-							<ShortcutHint spec="CmdOrCtrl+Alt+R" />
+							<ShortcutHint commandId="app.reveal" />
 						</Menu.Item>
 						<Menu.Item
 							className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
@@ -292,7 +293,7 @@ function NoteActionsMenu({
 						>
 							<MingcuteCopy2Line className="size-3 shrink-0" />
 							<span className="min-w-0 flex-1">Copy file path</span>
-							<ShortcutHint spec="CmdOrCtrl+Shift+C" />
+							<ShortcutHint commandId="app.copy-path" />
 						</Menu.Item>
 					</Menu.Popup>
 				</Menu.Positioner>
@@ -301,15 +302,14 @@ function NoteActionsMenu({
 	);
 }
 
-// Takes the "CmdOrCtrl+..." accelerator spec, not a display string, so call
-// sites can't hardcode platform-specific glyphs.
-function ShortcutHint({ spec }: { spec: string }) {
+// Stable IDs keep hints synchronized with command bindings.
+function ShortcutHint({ commandId }: { commandId: AppCommandId }) {
 	return (
 		<span
 			className="ms-auto shrink-0 text-[11px] leading-none text-muted-foreground/60"
 			aria-hidden="true"
 		>
-			{formatShortcut(spec)}
+			{formatCommandShortcut(commandId)}
 		</span>
 	);
 }

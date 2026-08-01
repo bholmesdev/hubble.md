@@ -18,6 +18,10 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
+		},
+		"./commands": {
+			"types": "./dist/commandRegistry.d.ts",
+			"default": "./dist/commandRegistry.js"
 		}
 	},
 	"files": [

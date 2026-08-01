@@ -13,7 +13,6 @@ import {
 	ReviewMarkExtension,
 	RichTextClipboardExtension,
 	resetEditorHistory,
-	StrikethroughShortcutExtension,
 	tiptapDocToMarkdown,
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
@@ -28,7 +27,6 @@ import {
 	type JSONContent,
 	useEditor,
 } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CODE_BLOCK_COPY_EVENT, HubbleCodeBlock } from "./CodeBlockExtension";
 import { copySelectionAsMarkdown } from "./copyAsMarkdown";
@@ -45,6 +43,10 @@ import { SmartLinkExtension } from "./SmartLinkExtension";
 import { TableCellSelectionExtension } from "./TableCellSelectionExtension";
 import { VirtualCursor } from "./VirtualCursor";
 import "./EditorView.css";
+import {
+	EditorCommandShortcuts,
+	starterKitWithRegistryShortcuts,
+} from "./EditorCommandShortcuts";
 import {
 	FilePropertiesPanel,
 	frontMatterStateFromMarkdown,
@@ -159,7 +161,11 @@ export function EditorView({
 	const editor = useEditor({
 		editable,
 		extensions: [
-			StarterKit.configure({ code: false, codeBlock: false, listItem: false }),
+			...starterKitWithRegistryShortcuts({
+				code: false,
+				codeBlock: false,
+				listItem: false,
+			}),
 			InlineCodeExtension,
 			HubbleCodeBlock,
 			LinkExtension,
@@ -177,7 +183,7 @@ export function EditorView({
 			HeadingExtension,
 			MarkdownRolloverExtension,
 			ReviewMarkExtension,
-			StrikethroughShortcutExtension,
+			EditorCommandShortcuts,
 			...listExtensions,
 			...extensions,
 			TaskItem.configure({ nested: true }),

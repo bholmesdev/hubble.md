@@ -5,7 +5,7 @@ import {
 	parseDateInput,
 	parseMarkdownFrontMatter,
 	serializeFrontMatter,
-} from "./frontMatter";
+} from "./frontMatter.js";
 
 describe("front matter", () => {
 	it("splits valid front matter from the markdown body", () => {

@@ -1,4 +1,8 @@
-import { wikiDisplayNameForTarget } from "@hubble.md/editor";
+import {
+	type AppCommandId,
+	getCommand,
+	wikiDisplayNameForTarget,
+} from "@hubble.md/editor";
 import {
 	Button,
 	classifyHref,
@@ -330,61 +334,53 @@ function App() {
 
 	useEffect(() => {
 		const onKeyDown = async (event: KeyboardEvent) => {
-			if (keymatch(event, "CmdOrCtrl+[")) {
-				if (!canGoBack()) return;
-				event.preventDefault();
-				await goBack();
-			} else if (keymatch(event, "CmdOrCtrl+]")) {
-				if (!canGoForward()) return;
-				event.preventDefault();
-				await goForward();
-			} else if (keymatch(event, "CmdOrCtrl+N")) {
-				event.preventDefault();
-				await createMarkdownFile();
-			} else if (keymatch(event, "CmdOrCtrl+,")) {
-				event.preventDefault();
-				setSettingsOpen(true);
-			} else if (keymatch(event, "CmdOrCtrl+Shift+O")) {
-				if (!workspaceStore.get().workspacePath) return;
-				event.preventDefault();
-				setWorkspaceSwitcherOpen(true);
-			} else if (keymatch(event, "CmdOrCtrl+P")) {
-				if (!workspaceStore.get().workspacePath) return;
-				event.preventDefault();
+			const currentPath = focusedSidebarPath ?? viewerStore.get().currentPath;
+			// Chat targets the note open in the viewer, not the sidebar focus.
+			const viewerPath = viewerStore.get().currentPath;
+			const context = {
+				hasCurrentFile: Boolean(currentPath && !isChangelogPath(currentPath)),
+				hasEditableFile: Boolean(
+					viewerPath &&
+						!isChangelogPath(viewerPath) &&
+						isEditableFile(viewerPath),
+				),
+				hasWorkspace: Boolean(workspaceStore.get().workspacePath),
+				canGoBack: canGoBack(),
+				canGoForward: canGoForward(),
+			};
+			const handlers: Partial<
+				Record<AppCommandId, () => void | Promise<void>>
+			> = {
+				"app.go-back": goBack,
+				"app.go-forward": goForward,
+				"app.new-file": createMarkdownFile,
+				"app.settings": () => setSettingsOpen(true),
+				"app.open-folder": () => setWorkspaceSwitcherOpen(true),
 				// The File menu accelerator fires too, but opening is idempotent.
-				setSearchOpen(true);
-			} else if (keymatch(event, "CmdOrCtrl+Shift+N")) {
-				event.preventDefault();
-				await openWorkspaceWithSidebar();
-			} else if (keymatch(event, "CmdOrCtrl+O")) {
-				event.preventDefault();
-				await openFilePicker();
-			} else if (keymatch(event, "CmdOrCtrl+Shift+C")) {
-				const path = focusedSidebarPath ?? viewerStore.get().currentPath;
-				if (!path || isChangelogPath(path)) return;
-				event.preventDefault();
-				await copyFilePath(path);
-			} else if (keymatch(event, "CmdOrCtrl+Alt+R")) {
-				const path = focusedSidebarPath ?? viewerStore.get().currentPath;
-				if (!path || isChangelogPath(path)) return;
-				event.preventDefault();
-				await revealPath(path);
-			} else if (keymatch(event, "CmdOrCtrl+Shift+J")) {
-				const chatPath = viewerStore.get().currentPath;
+				"app.go-to-file": () => setSearchOpen(true),
+				"app.add-folder": openWorkspaceWithSidebar,
+				"app.open-file": openFilePicker,
+				"app.copy-path": () => copyFilePath(currentPath),
+				"app.reveal": () => revealPath(currentPath),
+				"app.chat-about-note": requestChatAboutNote,
+				"app.toggle-sidebar": () => {
+					const opening = !uiStore.get().sidebarOpen;
+					setSidebarOpen(opening);
+					if (opening) requestAnimationFrame(() => focusSidebarNav());
+				},
+			};
+			for (const [id, handler] of Object.entries(handlers) as [
+				AppCommandId,
+				() => void | Promise<void>,
+			][]) {
+				const command = getCommand(id);
 				if (
-					!chatPath ||
-					!isEditableFile(chatPath) ||
-					!workspaceStore.get().workspacePath
-				)
+					keymatch(event, command.defaultBinding) &&
+					command.isEnabled(context)
+				) {
+					event.preventDefault();
+					await handler();
 					return;
-				event.preventDefault();
-				requestChatAboutNote();
-			} else if (keymatch(event, "CmdOrCtrl+Shift+E")) {
-				event.preventDefault();
-				const opening = !uiStore.get().sidebarOpen;
-				setSidebarOpen(opening);
-				if (opening) {
-					requestAnimationFrame(() => focusSidebarNav());
 				}
 			}
 		};

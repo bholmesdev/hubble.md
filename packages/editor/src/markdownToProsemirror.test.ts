@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { markdownToTiptapDoc } from "./markdownToProsemirror";
-import { tiptapDocToMarkdown } from "./prosemirrorToMarkdown";
+import { markdownToTiptapDoc } from "./markdownToProsemirror.js";
+import { tiptapDocToMarkdown } from "./prosemirrorToMarkdown.js";
 
 test("parses markdown table", () => {
 	const result = markdownToTiptapDoc("| A | B |\n|---|---|\n| 1 | 2 |");

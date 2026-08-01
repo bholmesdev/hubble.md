@@ -1,3 +1,4 @@
+import type { CommandId } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import { Command } from "cmdk";
 import {
@@ -18,7 +19,7 @@ import MingcuteQuoteLeftLine from "~icons/mingcute/quote-left-line";
 import MingcuteStrikethroughLine from "~icons/mingcute/strikethrough-line";
 import MingcuteTable2Line from "~icons/mingcute/table-2-line";
 import MingcuteTextLine from "~icons/mingcute/text-line";
-import { formatShortcut } from "../lib/shortcut";
+import { formatCommandShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { useCommandMenuPosition } from "./commandMenuPosition";
 import {
@@ -34,9 +35,8 @@ type SlashCommand = {
 	description: string;
 	aliases: string[];
 	icon: ComponentType<{ className?: string }>;
-	// Platform-agnostic accelerator spec (e.g. "CmdOrCtrl+Shift+8"), rendered
-	// per-platform via formatShortcut. Omit when the command has no shortcut.
-	shortcut?: string;
+	// Stable registry ID. Omit when the command has no shortcut.
+	shortcut?: CommandId;
 };
 
 type MenuPosition = {
@@ -79,7 +79,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
 		description: "Create a simple list",
 		aliases: ["bullet", "bullets", "ul", "list"],
 		icon: MingcuteListCheckLine,
-		shortcut: "CmdOrCtrl+Shift+8",
+		shortcut: "editor.bullet-list",
 	},
 	{
 		kind: "orderedList",
@@ -87,7 +87,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
 		description: "Create an ordered list",
 		aliases: ["number", "numbered", "ol", "1."],
 		icon: MingcuteListOrderedLine,
-		shortcut: "CmdOrCtrl+Shift+7",
+		shortcut: "editor.ordered-list",
 	},
 	{
 		kind: "taskList",
@@ -95,7 +95,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
 		description: "Create a task list",
 		aliases: ["todo", "task", "check", "checkbox"],
 		icon: MingcuteListCheck2Line,
-		shortcut: "CmdOrCtrl+Shift+9",
+		shortcut: "editor.task-list",
 	},
 	{
 		kind: "blockquote",
@@ -117,7 +117,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
 		description: "Toggle strikethrough",
 		aliases: ["strike", "s", "delete"],
 		icon: MingcuteStrikethroughLine,
-		shortcut: "CmdOrCtrl+Shift+X",
+		shortcut: "editor.strike",
 	},
 	{
 		kind: "table",
@@ -320,7 +320,7 @@ export function SlashCommandMenu({
 										className="shrink-0 text-[10px] leading-none text-muted-foreground/60"
 										aria-hidden="true"
 									>
-										{formatShortcut(command.shortcut)}
+										{formatCommandShortcut(command.shortcut)}
 									</span>
 								)}
 							</Command.Item>

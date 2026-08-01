@@ -2,7 +2,7 @@ import { history, undo } from "@tiptap/pm/history";
 import { Schema } from "@tiptap/pm/model";
 import { EditorState, type Transaction } from "@tiptap/pm/state";
 import { describe, expect, it } from "vitest";
-import { findMatches, replaceFindMatches } from "./FindExtension";
+import { findMatches, replaceFindMatches } from "./FindExtension.js";
 
 const schema = new Schema({
 	nodes: {

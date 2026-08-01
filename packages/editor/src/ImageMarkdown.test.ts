@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { markdownToTiptapDoc } from "./markdownToProsemirror";
-import { tiptapDocToMarkdown } from "./prosemirrorToMarkdown";
+import { markdownToTiptapDoc } from "./markdownToProsemirror.js";
+import { tiptapDocToMarkdown } from "./prosemirrorToMarkdown.js";
 
 describe("image markdown conversion", () => {
 	it("parses markdown image into image node", () => {
