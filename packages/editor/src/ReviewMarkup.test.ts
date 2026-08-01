@@ -1,8 +1,8 @@
 import type { JSONContent } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
-import { markdownToTiptapDoc } from "./markdownToProsemirror";
-import { tiptapDocToMarkdown } from "./prosemirrorToMarkdown";
-import { parseReviewMetadata, serializeReviewMetadata } from "./ReviewMark";
+import { markdownToTiptapDoc } from "./markdownToProsemirror.js";
+import { tiptapDocToMarkdown } from "./prosemirrorToMarkdown.js";
+import { parseReviewMetadata, serializeReviewMetadata } from "./ReviewMark.js";
 
 function textNodes(value: JSONContent) {
 	const nodes: JSONContent[] = [];
