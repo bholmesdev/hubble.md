@@ -1,7 +1,7 @@
 import { Schema } from "@tiptap/pm/model";
 import { EditorState, TextSelection } from "@tiptap/pm/state";
 import { describe, expect, it } from "vitest";
-import { getActiveLinkRange } from "./Link";
+import { getActiveLinkRange } from "./Link.js";
 
 const schema = new Schema({
 	nodes: {

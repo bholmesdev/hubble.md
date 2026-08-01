@@ -4,7 +4,10 @@ import type { Node as PMNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { canJoin } from "@tiptap/pm/transform";
-import { isSelectionAtStartOfNode, nearestSharedParentOfType } from "./utils";
+import {
+	isSelectionAtStartOfNode,
+	nearestSharedParentOfType,
+} from "./utils.js";
 
 const LIST_NODE_NAMES = ["bulletList", "orderedList"];
 

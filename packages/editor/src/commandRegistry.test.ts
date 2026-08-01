@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { commandRegistry, getCommand, tiptapBinding } from "./commandRegistry";
+import {
+	commandRegistry,
+	getCommand,
+	tiptapBinding,
+} from "./commandRegistry.js";
 
 describe("commandRegistry", () => {
 	it("owns unique bindings for every command", () => {

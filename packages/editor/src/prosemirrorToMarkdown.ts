@@ -1,10 +1,10 @@
 import type { JSONContent } from "@tiptap/core";
 import type { Fragment } from "@tiptap/pm/model";
 import type { Selection } from "@tiptap/pm/state";
-import type { LinkAttrs } from "./Link";
-import { wikiDisplayNameForTarget } from "./markdownPath";
-import { serializeReviewMetadata } from "./ReviewMark";
-import { escapeReviewBody, escapeReviewContent } from "./reviewEscaping";
+import type { LinkAttrs } from "./Link.js";
+import { wikiDisplayNameForTarget } from "./markdownPath.js";
+import { serializeReviewMetadata } from "./ReviewMark.js";
+import { escapeReviewBody, escapeReviewContent } from "./reviewEscaping.js";
 
 /**
  * Convert TipTap JSONContent (ProseMirror document) -> Markdown string

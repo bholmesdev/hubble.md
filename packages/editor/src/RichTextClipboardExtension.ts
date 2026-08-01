@@ -6,7 +6,7 @@ import {
 	type Schema,
 } from "@tiptap/pm/model";
 import { Plugin } from "@tiptap/pm/state";
-import { getLinkAttrs } from "./Link";
+import { getLinkAttrs } from "./Link.js";
 
 export const RichTextClipboardExtension = Extension.create({
 	name: "richTextClipboard",
