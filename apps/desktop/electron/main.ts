@@ -277,14 +277,21 @@ async function restorePendingDelete(items: PendingDeleteItem[]) {
 }
 
 async function cleanStaleDeleteUndo(workspace: string) {
-	const undoRoot = path.join(workspace, workspaceConfigDir, "delete-undo");
+	const undoRoot = path.join(workspace, HUBBLE_DIR, "delete-undo");
 	const active = new Set(
 		[...pendingDeletes.values()].map((pending) => pending.operationDir),
 	);
 	const entries = await fs
 		.readdir(undoRoot, { withFileTypes: true })
 		.catch((error: unknown) => {
-			if (isMissingPathError(error)) return [];
+			if (
+				error &&
+				typeof error === "object" &&
+				"code" in error &&
+				error.code === "ENOENT"
+			) {
+				return [];
+			}
 			throw error;
 		});
 	for (const entry of entries) {
@@ -1568,7 +1575,7 @@ function registerIpc() {
 			const token = randomUUID();
 			const operationDir = path.join(
 				workspace,
-				workspaceConfigDir,
+				HUBBLE_DIR,
 				"delete-undo",
 				token,
 			);
@@ -1586,8 +1593,8 @@ function registerIpc() {
 				const relative = path.relative(workspace, item.originalPath);
 				if (
 					!relative ||
-					relative === workspaceConfigDir ||
-					relative.startsWith(`${workspaceConfigDir}${path.sep}`) ||
+					relative === HUBBLE_DIR ||
+					relative.startsWith(`${HUBBLE_DIR}${path.sep}`) ||
 					relative.startsWith(`..${path.sep}`) ||
 					path.isAbsolute(relative)
 				) {
@@ -1636,7 +1643,7 @@ function registerIpc() {
 				} else {
 					const recoveryDir = path.join(
 						workspace,
-						workspaceConfigDir,
+						HUBBLE_DIR,
 						"delete-recovery",
 						token,
 					);
