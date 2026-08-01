@@ -18,6 +18,11 @@ type IgnoreRule = {
 	matcher: ReturnType<typeof ignore>;
 };
 
+type SidebarWalk = {
+	rootRealPath: string;
+	ancestors: Set<string>;
+};
+
 const ignoreConfigFiles = [".gitignore", ".ignore"];
 const ignoredWorkspaceDirs = new Set([".git", "dist", "node_modules"]);
 
@@ -91,26 +96,68 @@ async function rulesForDir(dir: string, inherited: IgnoreRule[]) {
 	return hasRules ? [...inherited, { dir, matcher }] : inherited;
 }
 
+async function directoryRealPath(
+	rootRealPath: string,
+	entryPath: string,
+	lstat: Awaited<ReturnType<typeof fs.lstat>>,
+): Promise<string | null> {
+	let stat = lstat;
+	if (stat.isSymbolicLink()) {
+		try {
+			stat = await fs.stat(entryPath);
+		} catch (error) {
+			if (isMissingPathError(error)) return null;
+			throw error;
+		}
+	}
+	if (!stat.isDirectory()) return null;
+
+	try {
+		const realPath = await fs.realpath(entryPath);
+		return isWithin(rootRealPath, realPath) ? realPath : null;
+	} catch (error) {
+		if (isMissingPathError(error)) return null;
+		throw error;
+	}
+}
+
 async function collectSidebarFiles(
 	dir: string,
 	out: DirectoryListing,
-	inheritedRules: IgnoreRule[] = [],
+	inheritedRules: IgnoreRule[],
+	walk: SidebarWalk,
 ) {
 	const rules = await rulesForDir(dir, inheritedRules);
 	const entries = await fs.readdir(dir, { withFileTypes: true });
 	for (const entry of entries) {
 		const entryPath = path.join(dir, entry.name);
 		if (isIgnoredByRules(entryPath, rules)) continue;
-		if (entry.isDirectory()) {
+
+		let stat: Awaited<ReturnType<typeof fs.lstat>>;
+		try {
+			stat = await fs.lstat(entryPath);
+		} catch (error) {
+			if (isMissingPathError(error)) continue;
+			throw error;
+		}
+
+		const realDirectory = await directoryRealPath(
+			walk.rootRealPath,
+			entryPath,
+			stat,
+		);
+		if (realDirectory) {
 			if (isHiddenSidebarFolderName(entry.name)) continue;
-			const stat = await fs.lstat(entryPath);
+			if (walk.ancestors.has(realDirectory)) continue;
 			out.folders.push({
 				path: toRendererPath(entryPath),
 				modified_at: Math.floor(stat.mtimeMs / 1000),
 			});
-			await collectSidebarFiles(entryPath, out, rules);
-		} else if (entry.isFile() && isVisibleSidebarFileName(entry.name)) {
-			const stat = await fs.lstat(entryPath);
+			await collectSidebarFiles(entryPath, out, rules, {
+				rootRealPath: walk.rootRealPath,
+				ancestors: new Set([...walk.ancestors, realDirectory]),
+			});
+		} else if (stat.isFile() && isVisibleSidebarFileName(entry.name)) {
 			out.files.push({
 				path: toRendererPath(entryPath),
 				modified_at: Math.floor(stat.mtimeMs / 1000),
@@ -134,8 +181,9 @@ async function rulesForPath(root: string, dir: string) {
 	return rules;
 }
 
-async function containsSymlink(
+async function hasExternalSymlink(
 	root: string,
+	rootRealPath: string,
 	candidate: string,
 ): Promise<boolean> {
 	const relative = path.relative(root, candidate);
@@ -144,7 +192,10 @@ async function containsSymlink(
 	for (const segment of segments) {
 		current = path.join(current, segment);
 		try {
-			if ((await fs.lstat(current)).isSymbolicLink()) return true;
+			if ((await fs.lstat(current)).isSymbolicLink()) {
+				const realPath = await fs.realpath(current);
+				if (!isWithin(rootRealPath, realPath)) return true;
+			}
 		} catch (error) {
 			if (isMissingPathError(error)) return false;
 			throw error;
@@ -177,14 +228,18 @@ async function listSidebarSubtree(
 	target: string,
 ): Promise<DirectoryListing> {
 	const listing: DirectoryListing = { files: [], folders: [] };
+	const rootRealPath = await fs.realpath(root);
 	const inheritedRules =
 		target === root ? [] : await rulesForPath(root, path.dirname(target));
+	let targetRealPath = rootRealPath;
 
 	if (target !== root) {
 		const stat = await fs.lstat(target);
+		targetRealPath =
+			(await directoryRealPath(rootRealPath, target, stat)) ?? "";
 		if (
-			!stat.isDirectory() ||
-			stat.isSymbolicLink() ||
+			!targetRealPath ||
+			targetRealPath === rootRealPath ||
 			!isVisibleSidebarPath(root, target, inheritedRules)
 		) {
 			return listing;
@@ -195,7 +250,10 @@ async function listSidebarSubtree(
 		});
 	}
 
-	await collectSidebarFiles(target, listing, inheritedRules);
+	await collectSidebarFiles(target, listing, inheritedRules, {
+		rootRealPath,
+		ancestors: new Set([rootRealPath, targetRealPath]),
+	});
 	return listing;
 }
 
@@ -227,7 +285,11 @@ export async function listSidebarFiles(
 	root: string,
 ): Promise<DirectoryListing> {
 	const listing: DirectoryListing = { files: [], folders: [] };
-	await collectSidebarFiles(root, listing);
+	const rootRealPath = await fs.realpath(root);
+	await collectSidebarFiles(root, listing, [], {
+		rootRealPath,
+		ancestors: new Set([rootRealPath]),
+	});
 	return listing;
 }
 
@@ -242,7 +304,8 @@ export async function reconcileSidebarPath(
 
 	if (ignoreConfigFiles.includes(path.basename(resolvedPath))) {
 		const target = path.dirname(resolvedPath);
-		if (await containsSymlink(resolvedRoot, target)) {
+		const rootRealPath = await fs.realpath(resolvedRoot);
+		if (await hasExternalSymlink(resolvedRoot, rootRealPath, target)) {
 			return { kind: "remove", path: toRendererPath(resolvedPath) };
 		}
 		const listing = await listSidebarSubtree(resolvedRoot, target);
@@ -263,13 +326,14 @@ export async function reconcileSidebarPath(
 		return { kind: "refresh" };
 	}
 
-	if (stat.isSymbolicLink()) {
+	const rootRealPath = await fs.realpath(resolvedRoot);
+	if (await hasExternalSymlink(resolvedRoot, rootRealPath, resolvedPath)) {
 		return { kind: "remove", path: toRendererPath(resolvedPath) };
 	}
-	if (await containsSymlink(resolvedRoot, resolvedPath)) {
-		return { kind: "remove", path: toRendererPath(resolvedPath) };
-	}
-	if (stat.isDirectory()) {
+	if (stat.isDirectory() || stat.isSymbolicLink()) {
+		if (!(await directoryRealPath(rootRealPath, resolvedPath, stat))) {
+			return { kind: "remove", path: toRendererPath(resolvedPath) };
+		}
 		const listing = await listSidebarSubtree(resolvedRoot, resolvedPath);
 		return {
 			kind: "subtree",

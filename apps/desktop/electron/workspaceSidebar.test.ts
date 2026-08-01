@@ -119,4 +119,30 @@ describe("workspace sidebar reconciliation", () => {
 			await fs.rm(outside, { recursive: true, force: true });
 		}
 	});
+
+	it("follows symlinked directories within the workspace", async () => {
+		const target = path.join(root, ".agents", "skills");
+		await fs.mkdir(target, { recursive: true });
+		await fs.writeFile(path.join(target, "review.md"), "review");
+		const link = path.join(root, ".claude", "skills");
+		await fs.mkdir(path.dirname(link));
+		await fs.symlink(target, link, "dir");
+
+		const listing = await listSidebarFiles(root);
+		expect(listing.folders.map((folder) => folder.path)).toContain(link);
+		expect(listing.files.map((file) => file.path)).toContain(
+			path.join(link, "review.md"),
+		);
+
+		const delta = await reconcileSidebarPath(root, link);
+		expect(delta).toMatchObject({
+			kind: "subtree",
+			path: link,
+			listing: {
+				files: [
+					expect.objectContaining({ path: path.join(link, "review.md") }),
+				],
+			},
+		});
+	});
 });
