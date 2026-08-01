@@ -17,6 +17,16 @@ export type DirectoryListing = {
 	folders: FolderEntry[];
 };
 
+export type WorkspaceWatchEvent =
+	| { kind: "paths"; paths: string[] }
+	| { kind: "refresh" };
+
+export type WorkspaceDelta =
+	| { kind: "file"; entry: FileEntry }
+	| { kind: "subtree"; path: string; listing: DirectoryListing }
+	| { kind: "remove"; path: string }
+	| { kind: "refresh" };
+
 export type HtmlAppFileEntry = {
 	name: string;
 	path: string;
@@ -157,6 +167,12 @@ export type DesktopApi = {
 	saveMarkdownFilePicker(options: {
 		defaultPath?: string;
 	}): Promise<string | null>;
+	startWorkspaceWatcher(path: string): Promise<number | null>;
+	stopWorkspaceWatcher(generation: number): Promise<void>;
+	sidebarDeltaForPath(
+		workspacePath: string,
+		changedPath: string,
+	): Promise<WorkspaceDelta | null>;
 	watchPath(
 		path: string,
 		options: WatchOptions,
@@ -195,6 +211,9 @@ export type DesktopApi = {
 	onMenuShowWorkspaceSwitcher(callback: () => void): Unsubscribe;
 	onMenuGoToFile(callback: () => void): Unsubscribe;
 	onMenuSyncWorkspace(callback: () => void): Unsubscribe;
+	onWorkspaceChanged(
+		callback: (event: WorkspaceWatchEvent) => void,
+	): Unsubscribe;
 	onMenuToggleTerminal(callback: () => void): Unsubscribe;
 	onMenuGoBack(callback: () => void): Unsubscribe;
 	onMenuGoForward(callback: () => void): Unsubscribe;

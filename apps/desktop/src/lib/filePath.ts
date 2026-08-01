@@ -144,8 +144,11 @@ export function sourceLanguageForPath(path: string): string {
 	return SOURCE_LANGUAGE_ALIASES[extension] ?? (extension || "text");
 }
 
+/** Folder holding Hubble's per-workspace config; hidden from the sidebar. */
+export const HUBBLE_DIR = ".hubble";
+
 export function isHiddenSidebarFolderName(name: string): boolean {
-	return name === ".hubble" || name.endsWith(".assets");
+	return name === HUBBLE_DIR || name.endsWith(".assets");
 }
 
 export function isVisibleSidebarFileName(name: string): boolean {
