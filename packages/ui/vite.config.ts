@@ -25,6 +25,7 @@ export default defineConfig({
 		}),
 	],
 	build: {
+		emptyOutDir: !process.argv.includes("--watch"),
 		cssCodeSplit: true,
 		lib: {
 			entry: {
