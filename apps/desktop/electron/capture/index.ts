@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { readDraft, writeDraft } from "./draft";
+import { clearDraft, readDraft, writeDraft } from "./draft";
 import { CaptureSession, type SessionState } from "./session";
 import {
 	type CaptureSettings,
@@ -15,8 +15,10 @@ import {
 } from "./shortcut";
 import {
 	hideCaptureWindow,
+	isCaptureWindowCollapsed,
 	isCaptureWindowVisible,
 	sendToCaptureWindow,
+	setCaptureWindowCollapsed,
 	showCaptureWindow,
 } from "./window";
 
@@ -70,6 +72,7 @@ function registerCaptureIpc() {
 		hasAccessibility: hasAccessibilityPermission(),
 		shortcutRunning: isDoubleTapShiftRunning(),
 		session: getSession().state,
+		collapsed: isCaptureWindowCollapsed(),
 	}));
 
 	ipcMain.handle(
@@ -130,6 +133,18 @@ function registerCaptureIpc() {
 
 	ipcMain.handle("capture:hide-window", () => {
 		hideCaptureWindow();
+	});
+
+	ipcMain.handle(
+		"capture:set-collapsed",
+		(_event, { collapsed }: { collapsed: boolean }) => {
+			setCaptureWindowCollapsed(collapsed);
+		},
+	);
+
+	ipcMain.handle("capture:discard-draft", () => {
+		clearDraft();
+		getSession().reset();
 	});
 
 	// A BrowserWindow cannot cross IPC, so resolve with nothing.

@@ -11,6 +11,10 @@ const MIN_HEIGHT = 220;
 /** Inset from the corner of the work area when the panel has no saved spot. */
 const EDGE_MARGIN = 24;
 
+/** Size of the collapsed pill the panel shrinks into. */
+const PILL_WIDTH = 200;
+const PILL_HEIGHT = 44;
+
 const SAVE_DEBOUNCE_MS = 300;
 
 type CaptureBounds = {
@@ -22,6 +26,14 @@ type CaptureBounds = {
 
 let captureWindow: BrowserWindow | null = null;
 let saveBoundsTimer: ReturnType<typeof setTimeout> | null = null;
+let collapsed = false;
+/** Size to restore when the pill expands back into the panel. */
+let expandedSize = { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+let quitting = false;
+
+app.on("before-quit", () => {
+	quitting = true;
+});
 
 export function getCaptureWindow() {
 	return captureWindow;
@@ -83,6 +95,8 @@ async function loadBounds(): Promise<CaptureBounds> {
 }
 
 function saveBounds(window: BrowserWindow) {
+	// Pill bounds are derived, never the panel's remembered spot.
+	if (collapsed) return;
 	if (window.isDestroyed() || window.isMinimized()) return;
 	try {
 		fsSync.writeFileSync(
@@ -106,6 +120,9 @@ async function createCaptureWindow() {
 	const bounds = await loadBounds();
 	const window = new BrowserWindow({
 		...bounds,
+		// A non-activating macOS panel takes key focus without activating the
+		// app, so opening and closing it never drags the main window forward.
+		...(process.platform === "darwin" ? { type: "panel" as const } : {}),
 		minWidth: MIN_WIDTH,
 		minHeight: MIN_HEIGHT,
 		show: false,
@@ -134,8 +151,16 @@ async function createCaptureWindow() {
 	window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 	window.on("move", () => queueSaveBounds(window));
 	window.on("resize", () => queueSaveBounds(window));
+	// Cmd+W and the menu route through close; the renderer decides whether the
+	// draft should be saved or trashed before the window actually goes away.
+	window.on("close", (event) => {
+		if (quitting) return;
+		event.preventDefault();
+		window.webContents.send("capture:close-requested");
+	});
 	window.on("closed", () => {
 		if (captureWindow === window) captureWindow = null;
+		collapsed = false;
 	});
 
 	if (process.env.ELECTRON_RENDERER_URL) {
@@ -148,6 +173,8 @@ async function createCaptureWindow() {
 
 export async function showCaptureWindow() {
 	const window = captureWindow ?? (await createCaptureWindow());
+	// Summoning the panel means writing, so a collapsed pill expands first.
+	setCaptureWindowCollapsed(false);
 	// Reopening keeps wherever it was dragged to; only an offscreen spot resets.
 	const bounds = window.getNormalBounds();
 	if (!isOnSomeDisplay(bounds)) window.setBounds(defaultBounds());
@@ -170,6 +197,58 @@ export function hideCaptureWindow() {
 
 export function isCaptureWindowVisible() {
 	return captureWindow?.isVisible() === true;
+}
+
+export function isCaptureWindowCollapsed() {
+	return collapsed;
+}
+
+function clampToDisplay(bounds: CaptureBounds): CaptureBounds {
+	const { workArea } = screen.getDisplayMatching(bounds);
+	return {
+		...bounds,
+		x: Math.max(
+			workArea.x,
+			Math.min(bounds.x, workArea.x + workArea.width - bounds.width),
+		),
+		y: Math.max(
+			workArea.y,
+			Math.min(bounds.y, workArea.y + workArea.height - bounds.height),
+		),
+	};
+}
+
+/**
+ * Shrinks the panel into a pill anchored to its bottom-right corner, or grows
+ * it back out from the same anchor.
+ */
+export function setCaptureWindowCollapsed(next: boolean) {
+	const window = captureWindow;
+	if (!window || window.isDestroyed() || next === collapsed) return;
+	collapsed = next;
+	const bounds = window.getNormalBounds();
+	if (next) {
+		expandedSize = { width: bounds.width, height: bounds.height };
+		window.setResizable(false);
+		window.setMinimumSize(PILL_WIDTH, PILL_HEIGHT);
+		window.setBounds({
+			x: bounds.x + bounds.width - PILL_WIDTH,
+			y: bounds.y + bounds.height - PILL_HEIGHT,
+			width: PILL_WIDTH,
+			height: PILL_HEIGHT,
+		});
+	} else {
+		window.setMinimumSize(MIN_WIDTH, MIN_HEIGHT);
+		window.setResizable(true);
+		window.setBounds(
+			clampToDisplay({
+				x: bounds.x + bounds.width - expandedSize.width,
+				y: bounds.y + bounds.height - expandedSize.height,
+				...expandedSize,
+			}),
+		);
+	}
+	window.webContents.send("capture:collapsed-changed", collapsed);
 }
 
 export function sendToCaptureWindow(channel: string, ...args: unknown[]) {

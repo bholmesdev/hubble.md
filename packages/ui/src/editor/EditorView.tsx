@@ -72,6 +72,8 @@ export type EditorViewProps = {
 	path: string;
 	initialMarkdown: string;
 	editable?: boolean;
+	/** Place the cursor at the end of the document as soon as the editor mounts. */
+	autoFocus?: boolean;
 	/** Front matter editing. Off for scratch surfaces with no file behind them. */
 	showFileProperties?: boolean;
 	/** Word count and formatting readout along the bottom edge. */
@@ -98,6 +100,7 @@ export function EditorView({
 	path,
 	initialMarkdown,
 	editable = true,
+	autoFocus = false,
 	showFileProperties = true,
 	showStatusBar = true,
 	wikiTargets = [],
@@ -236,6 +239,11 @@ export function EditorView({
 	useLayoutEffect(() => {
 		editorRef.current = editor;
 	}, [editor]);
+
+	useEffect(() => {
+		if (!editor || !autoFocus) return;
+		editor.commands.focus("end");
+	}, [editor, autoFocus]);
 
 	useEffect(() => {
 		if (!editor || !editorViewportEl) return;

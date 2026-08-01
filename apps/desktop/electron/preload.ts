@@ -189,10 +189,19 @@ const desktopApi = {
 	captureSaveNotes: () => ipcRenderer.invoke("capture:save-notes"),
 	captureHideWindow: () => ipcRenderer.invoke("capture:hide-window"),
 	captureShowWindow: () => ipcRenderer.invoke("capture:show-window"),
+	captureSetCollapsed: (collapsed) =>
+		ipcRenderer.invoke("capture:set-collapsed", { collapsed }),
+	captureDiscardDraft: () => ipcRenderer.invoke("capture:discard-draft"),
 	onCaptureSessionState: (callback) =>
 		subscribe("capture:session-state", callback),
 	onCaptureWindowShown: (callback) =>
 		subscribe("capture:window-shown", callback),
+	onCaptureCollapsedChanged: (callback) =>
+		subscribe("capture:collapsed-changed", (collapsed: boolean) =>
+			callback(collapsed),
+		),
+	onCaptureCloseRequested: (callback) =>
+		subscribe("capture:close-requested", callback),
 } satisfies DesktopApi;
 
 contextBridge.exposeInMainWorld("desktopApi", desktopApi);

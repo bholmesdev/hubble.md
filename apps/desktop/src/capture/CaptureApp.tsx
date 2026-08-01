@@ -1,11 +1,20 @@
 import { EditorView } from "@hubble.md/ui";
 import { useCallback, useEffect, useState } from "react";
+import MingcuteArrowLeftUp from "~icons/mingcute/arrow-left-up-line";
+import MingcuteArrowRightDown from "~icons/mingcute/arrow-right-down-line";
 import MingcuteCheck from "~icons/mingcute/check-circle-line";
+import MingcuteClose from "~icons/mingcute/close-line";
 import { desktopApi } from "../desktopApi";
 import type { CaptureSessionState, CaptureSettings } from "../desktopApi/types";
 
 /** EditorView keys its state by path; the notepad is not a real file. */
 const DRAFT_PATH = "capture://draft";
+
+/** Two Escape taps inside this window collapse the panel into the pill. */
+const DOUBLE_ESCAPE_MS = 500;
+
+const dragRegion = { WebkitAppRegion: "drag" } as React.CSSProperties;
+const noDragRegion = { WebkitAppRegion: "no-drag" } as React.CSSProperties;
 
 function basename(path: string) {
 	const segments = path.split("/").filter(Boolean);
@@ -19,20 +28,39 @@ export function CaptureApp() {
 	});
 	const [draft, setDraft] = useState<string | null>(null);
 	const [hasNotes, setHasNotes] = useState(false);
+	const [collapsed, setCollapsed] = useState(false);
+	const [confirmingClose, setConfirmingClose] = useState(false);
 	// Remounts the editor after a save so it picks up the cleared draft.
 	const [draftGeneration, setDraftGeneration] = useState(0);
+
+	// The main process owns the draft; edits made before a collapse or on
+	// another route only reach this window through a reload.
+	const reloadDraft = useCallback(() => {
+		void desktopApi.captureGetDraft().then((markdown) => {
+			setDraft(markdown);
+			setHasNotes(markdown.trim().length > 0);
+			setDraftGeneration((generation) => generation + 1);
+		});
+	}, []);
 
 	useEffect(() => {
 		void desktopApi.captureGetState().then((state) => {
 			setSettings(state.settings);
 			setSession(state.session);
+			setCollapsed(state.collapsed);
 		});
-		void desktopApi.captureGetDraft().then((markdown) => {
-			setDraft(markdown);
-			setHasNotes(markdown.trim().length > 0);
-		});
+		reloadDraft();
 		return desktopApi.onCaptureSessionState(setSession);
-	}, []);
+	}, [reloadDraft]);
+
+	useEffect(
+		() =>
+			desktopApi.onCaptureCollapsedChanged((next) => {
+				setCollapsed(next);
+				if (!next) reloadDraft();
+			}),
+		[reloadDraft],
+	);
 
 	// A saved capture consumed the draft, so reset the notepad and step away.
 	useEffect(() => {
@@ -48,34 +76,79 @@ export function CaptureApp() {
 	// from a different route since this window last rendered.
 	useEffect(() =>
 		desktopApi.onCaptureWindowShown(() => {
-			void desktopApi.captureGetDraft().then((markdown) => {
-				setDraft(markdown);
-				setHasNotes(markdown.trim().length > 0);
-				setDraftGeneration((generation) => generation + 1);
-			});
+			setConfirmingClose(false);
+			reloadDraft();
 		}),
 	);
 
-	useEffect(() => {
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key !== "Escape") return;
+	const requestClose = useCallback(() => {
+		if (!hasNotes) {
 			void desktopApi.captureHideWindow();
+			return;
+		}
+		// The prompt lives in the expanded layout, so a collapsed pill grows back.
+		void desktopApi.captureSetCollapsed(false);
+		setConfirmingClose(true);
+	}, [hasNotes]);
+
+	useEffect(
+		() => desktopApi.onCaptureCloseRequested(requestClose),
+		[requestClose],
+	);
+
+	// Capture phase, because editor popovers legitimately consume single Escape
+	// presses; a quick double tap collapses the panel no matter who ate them.
+	useEffect(() => {
+		let lastEscapeAt = 0;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "w") {
+				event.preventDefault();
+				requestClose();
+				return;
+			}
+			if (event.key !== "Escape" || event.repeat) return;
+			if (confirmingClose) {
+				setConfirmingClose(false);
+				return;
+			}
+			const now = Date.now();
+			if (now - lastEscapeAt <= DOUBLE_ESCAPE_MS) {
+				lastEscapeAt = 0;
+				void desktopApi.captureSetCollapsed(true);
+				return;
+			}
+			lastEscapeAt = now;
 		};
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, []);
+		window.addEventListener("keydown", onKeyDown, true);
+		return () => window.removeEventListener("keydown", onKeyDown, true);
+	}, [confirmingClose, requestClose]);
 
 	const onDraftChange = useCallback((_path: string, markdown: string) => {
 		setHasNotes(markdown.trim().length > 0);
 		void desktopApi.captureSetDraft(markdown);
 	}, []);
 
+	const trashAndClose = () => {
+		setConfirmingClose(false);
+		void desktopApi.captureDiscardDraft().then(() => {
+			setDraft("");
+			setHasNotes(false);
+			setDraftGeneration((generation) => generation + 1);
+			void desktopApi.captureHideWindow();
+		});
+	};
+
+	const saveAndClose = () => {
+		setConfirmingClose(false);
+		void desktopApi.captureSaveNotes();
+	};
+
 	const workspaces = settings?.recentWorkspaces ?? [];
 	const target = settings?.targetWorkspace ?? workspaces[0] ?? "";
 
 	const statusLine =
 		session.phase === "saved"
-			? "Saved to Captures"
+			? "Saved"
 			: session.phase === "error"
 				? "Something went wrong"
 				: "Ready to capture";
@@ -87,18 +160,58 @@ export function CaptureApp() {
 				? basename(session.filePath)
 				: "Double-tap Shift to open and close";
 
+	if (collapsed) {
+		return (
+			<div className="flex h-screen items-stretch overflow-hidden rounded-full border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur">
+				<button
+					type="button"
+					onClick={() => void desktopApi.captureSetCollapsed(false)}
+					className="flex min-w-0 flex-1 items-center gap-2 px-3 text-left hover:bg-accent"
+				>
+					<MingcuteArrowLeftUp className="size-4 shrink-0 text-muted-foreground" />
+					<span className="truncate text-xs font-medium">
+						{hasNotes ? "Draft in progress" : "Capture"}
+					</span>
+				</button>
+			</div>
+		);
+	}
+
 	return (
-		<div className="flex h-screen flex-col overflow-hidden rounded-xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur">
-			<div
-				className="h-6 shrink-0"
-				style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
-			/>
+		<div className="relative flex h-screen flex-col overflow-hidden rounded-xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur">
+			<div className="relative h-7 shrink-0" style={dragRegion}>
+				<div
+					className="absolute inset-y-0 right-1.5 flex items-center gap-0.5"
+					style={noDragRegion}
+				>
+					<button
+						type="button"
+						title="Collapse"
+						onClick={() => {
+							setConfirmingClose(false);
+							void desktopApi.captureSetCollapsed(true);
+						}}
+						className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+					>
+						<MingcuteArrowRightDown className="size-3.5" />
+					</button>
+					<button
+						type="button"
+						title="Close"
+						onClick={requestClose}
+						className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+					>
+						<MingcuteClose className="size-3.5" />
+					</button>
+				</div>
+			</div>
 
 			<div className="min-h-0 flex-1 text-sm">
 				{draft === null ? null : (
 					<EditorView
 						key={draftGeneration}
 						path={DRAFT_PATH}
+						autoFocus
 						initialMarkdown={draft}
 						showFileProperties={false}
 						showStatusBar={false}
@@ -156,6 +269,40 @@ export function CaptureApp() {
 					</button>
 				</div>
 			</div>
+
+			{confirmingClose ? (
+				<div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 p-4 backdrop-blur-sm">
+					<div className="w-full max-w-64 rounded-lg border border-border bg-popover p-3 shadow-lg">
+						<p className="text-[13px] font-medium">Close this note?</p>
+						<p className="mt-1 text-xs text-muted-foreground">
+							Save it to your workspace or trash the draft.
+						</p>
+						<div className="mt-3 flex items-center justify-end gap-2">
+							<button
+								type="button"
+								onClick={() => setConfirmingClose(false)}
+								className="rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={trashAndClose}
+								className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-accent"
+							>
+								Trash
+							</button>
+							<button
+								type="button"
+								onClick={saveAndClose}
+								className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+							>
+								Save
+							</button>
+						</div>
+					</div>
+				</div>
+			) : null}
 		</div>
 	);
 }

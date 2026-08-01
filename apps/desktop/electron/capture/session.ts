@@ -1,7 +1,9 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { app, dialog } from "electron";
 import { clearDraft, readDraft } from "./draft";
 import { resolveTargetWorkspace } from "./settings";
+import { getCaptureWindow } from "./window";
 
 const CAPTURES_FOLDER = "Captures";
 
@@ -30,6 +32,8 @@ export class CaptureSession {
 		if (!notes) return;
 		try {
 			const filePath = await writeCaptureNote(notes);
+			// A dismissed save dialog keeps the draft for another try.
+			if (!filePath) return;
 			clearDraft();
 			this.setState({ phase: "saved", filePath });
 		} catch (error) {
@@ -63,16 +67,35 @@ async function uniquePath(dir: string, stem: string, extension: string) {
 	}
 }
 
+/** With no workspace to land in, the user picks a spot on disk directly. */
+async function askForCapturePath(stem: string) {
+	const captureWindow = getCaptureWindow();
+	const options = {
+		title: "Save capture",
+		defaultPath: path.join(app.getPath("documents"), `${stem}.md`),
+		filters: [{ name: "Markdown", extensions: ["md"] }],
+	};
+	const { canceled, filePath } = captureWindow
+		? await dialog.showSaveDialog(captureWindow, options)
+		: await dialog.showSaveDialog(options);
+	return canceled || !filePath ? null : filePath;
+}
+
 async function writeCaptureNote(notes: string) {
-	const workspace = resolveTargetWorkspace();
-	if (!workspace) throw new Error("No workspace selected for captures");
-
-	const dir = path.join(workspace, CAPTURES_FOLDER);
-	await fsp.mkdir(dir, { recursive: true });
-
 	const started = new Date();
 	const stem = formatStamp(started);
-	const filePath = await uniquePath(dir, stem, ".md");
+
+	const workspace = resolveTargetWorkspace();
+	let filePath: string;
+	if (workspace) {
+		const dir = path.join(workspace, CAPTURES_FOLDER);
+		await fsp.mkdir(dir, { recursive: true });
+		filePath = await uniquePath(dir, stem, ".md");
+	} else {
+		const picked = await askForCapturePath(stem);
+		if (!picked) return null;
+		filePath = picked;
+	}
 
 	const frontMatter = [
 		"---",

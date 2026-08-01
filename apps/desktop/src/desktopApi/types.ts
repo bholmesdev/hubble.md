@@ -258,10 +258,16 @@ export type DesktopApi = {
 	captureSaveNotes(): Promise<CaptureSessionState>;
 	captureHideWindow(): Promise<void>;
 	captureShowWindow(): Promise<void>;
+	captureSetCollapsed(collapsed: boolean): Promise<void>;
+	captureDiscardDraft(): Promise<void>;
 	onCaptureSessionState(
 		callback: (state: CaptureSessionState) => void,
 	): Unsubscribe;
 	onCaptureWindowShown(callback: () => void): Unsubscribe;
+	onCaptureCollapsedChanged(
+		callback: (collapsed: boolean) => void,
+	): Unsubscribe;
+	onCaptureCloseRequested(callback: () => void): Unsubscribe;
 };
 
 export type CaptureSettings = {
@@ -280,4 +286,5 @@ export type CaptureClientState = {
 	hasAccessibility: boolean;
 	shortcutRunning: boolean;
 	session: CaptureSessionState;
+	collapsed: boolean;
 };

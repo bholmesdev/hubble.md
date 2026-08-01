@@ -56,9 +56,21 @@ export function writeCaptureSettings(patch: Partial<CaptureSettings>) {
 	return next;
 }
 
-/** The workspace a capture should land in, preferring an explicit pick. */
+function isUsableWorkspace(dir: string | null): dir is string {
+	if (!dir) return false;
+	try {
+		return fs.statSync(dir).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * The workspace a capture should land in: an explicit pick, then the most
+ * recent workspace still on disk. Null means the caller must ask for a path.
+ */
 export function resolveTargetWorkspace() {
 	const { targetWorkspace, recentWorkspaces } = readCaptureSettings();
-	if (targetWorkspace) return targetWorkspace;
-	return recentWorkspaces[0] ?? null;
+	if (isUsableWorkspace(targetWorkspace)) return targetWorkspace;
+	return recentWorkspaces.find(isUsableWorkspace) ?? null;
 }
