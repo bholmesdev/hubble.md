@@ -1569,8 +1569,9 @@ function registerIpc() {
 			],
 		});
 		const selected = result.filePaths[0] ?? null;
-		if (selected) grantFileWithParent(selected);
-		return selected ? toRendererPath(selected) : null;
+		if (!selected || !(await pathExistsAsFile(selected))) return null;
+		grantFileWithParent(selected);
+		return toRendererPath(selected);
 	});
 
 	ipcMain.handle("desktop:open-folder-picker", async () => {

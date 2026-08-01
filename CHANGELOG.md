@@ -15,6 +15,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Open File (Cmd+O) only lets you pick a file, so choosing a folder no longer fails to open. [#215](https://github.com/bholmesdev/hubble.md/pull/215)
+
 ## [0.1.23] - 2026-07-29
 
 ### Added
