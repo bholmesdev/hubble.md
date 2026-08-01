@@ -3,8 +3,6 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-// The commands subpath keeps Electron main from loading the TipTap graph;
-// this dep is externalized, so Node resolves it at startup.
 import { type AppCommandId, getCommand } from "@hubble.md/editor/commands";
 import hubbleRuntime from "@hubble.md/runtime/global.js?raw";
 import htmlAppTheme from "@hubble.md/runtime/html-app-theme.css?raw";
