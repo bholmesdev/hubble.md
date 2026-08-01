@@ -27,7 +27,6 @@ import {
 	type JSONContent,
 	useEditor,
 } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CODE_BLOCK_COPY_EVENT, HubbleCodeBlock } from "./CodeBlockExtension";
 import { copySelectionAsMarkdown } from "./copyAsMarkdown";
@@ -46,10 +45,7 @@ import { VirtualCursor } from "./VirtualCursor";
 import "./EditorView.css";
 import {
 	EditorCommandShortcuts,
-	RegistryBlockquote,
-	RegistryBold,
-	RegistryHeading,
-	RegistryItalic,
+	starterKitWithRegistryShortcuts,
 } from "./EditorCommandShortcuts";
 import {
 	FilePropertiesPanel,
@@ -165,19 +161,11 @@ export function EditorView({
 	const editor = useEditor({
 		editable,
 		extensions: [
-			StarterKit.configure({
-				blockquote: false,
-				bold: false,
+			...starterKitWithRegistryShortcuts({
 				code: false,
 				codeBlock: false,
-				heading: false,
-				italic: false,
 				listItem: false,
 			}),
-			RegistryBlockquote,
-			RegistryBold,
-			RegistryHeading,
-			RegistryItalic,
 			InlineCodeExtension,
 			HubbleCodeBlock,
 			LinkExtension,

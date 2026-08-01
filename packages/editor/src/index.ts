@@ -1,13 +1,7 @@
 export { ContextMenuSpellcheckExtension } from "./ContextMenuSpellcheckExtension";
 export {
 	type AppCommandId,
-	appCommandIds,
-	type CommandContext,
-	type CommandDefinition,
 	type CommandId,
-	commandRegistry,
-	type EditorCommandId,
-	editorCommandIds,
 	getCommand,
 	tiptapBinding,
 } from "./commandRegistry";

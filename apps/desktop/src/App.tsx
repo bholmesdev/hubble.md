@@ -335,12 +335,14 @@ function App() {
 	useEffect(() => {
 		const onKeyDown = async (event: KeyboardEvent) => {
 			const currentPath = focusedSidebarPath ?? viewerStore.get().currentPath;
+			// Chat targets the note open in the viewer, not the sidebar focus.
+			const viewerPath = viewerStore.get().currentPath;
 			const context = {
 				hasCurrentFile: Boolean(currentPath && !isChangelogPath(currentPath)),
 				hasEditableFile: Boolean(
-					currentPath &&
-						!isChangelogPath(currentPath) &&
-						isEditableFile(currentPath),
+					viewerPath &&
+						!isChangelogPath(viewerPath) &&
+						isEditableFile(viewerPath),
 				),
 				hasWorkspace: Boolean(workspaceStore.get().workspacePath),
 				canGoBack: canGoBack(),

@@ -13,9 +13,6 @@ export type CommandDefinition = {
 	label: string;
 	isEnabled: (context: CommandContext) => boolean;
 };
-// Context-sensitive structural keys (Enter, Tab, Mod-a, Escape, and
-// ProseMirror handleKeyDown plugins), OS zoom conventions, and Electron roles
-// remain fixed at their execution sites rather than becoming named commands.
 
 const always = () => true;
 const hasCurrentFile = (context: CommandContext) =>
@@ -26,6 +23,9 @@ const hasSourceViewOpen = (context: CommandContext) =>
 	context.hasSourceViewOpen === true;
 const hasWorkspace = (context: CommandContext) => context.hasWorkspace === true;
 
+// Context-sensitive structural keys (Enter, Tab, Mod-a, Escape, and
+// ProseMirror handleKeyDown plugins), OS zoom conventions, and Electron roles
+// remain fixed at their execution sites rather than becoming named commands.
 export const commandRegistry = {
 	"app.new-file": {
 		defaultBinding: "CmdOrCtrl+N",
@@ -202,14 +202,6 @@ export type EditorCommandId = Extract<CommandId, `editor.${string}`>;
 export function getCommand<Id extends CommandId>(id: Id) {
 	return commandRegistry[id];
 }
-
-export const appCommandIds = Object.keys(commandRegistry).filter((id) =>
-	id.startsWith("app."),
-) as AppCommandId[];
-
-export const editorCommandIds = Object.keys(commandRegistry).filter((id) =>
-	id.startsWith("editor."),
-) as EditorCommandId[];
 
 export function tiptapBinding(id: EditorCommandId) {
 	return getCommand(id)

@@ -1,20 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-	appCommandIds,
-	commandRegistry,
-	editorCommandIds,
-	getCommand,
-	tiptapBinding,
-} from "./commandRegistry";
+import { commandRegistry, getCommand, tiptapBinding } from "./commandRegistry";
 
 describe("commandRegistry", () => {
-	it("owns unique bindings for every scoped command", () => {
+	it("owns unique bindings for every command", () => {
 		const bindings = Object.values(commandRegistry).map(
 			(command) => command.defaultBinding,
 		);
 		expect(new Set(bindings).size).toBe(bindings.length);
-		expect(appCommandIds).toHaveLength(18);
-		expect(editorCommandIds).toHaveLength(15);
 	});
 
 	it("resolves context-dependent enablement", () => {

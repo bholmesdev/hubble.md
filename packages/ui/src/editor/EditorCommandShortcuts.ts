@@ -2,17 +2,32 @@ import { tiptapBinding } from "@hubble.md/editor";
 import { Extension } from "@tiptap/core";
 import { Blockquote } from "@tiptap/extension-blockquote";
 import { Bold } from "@tiptap/extension-bold";
-import { Code } from "@tiptap/extension-code";
 import { Heading } from "@tiptap/extension-heading";
 import { Italic } from "@tiptap/extension-italic";
+import StarterKit from "@tiptap/starter-kit";
 
 const withoutShortcuts = { addKeyboardShortcuts: () => ({}) };
 
-export const RegistryBlockquote = Blockquote.extend(withoutShortcuts);
-export const RegistryBold = Bold.extend(withoutShortcuts);
-export const RegistryCode = Code.extend(withoutShortcuts);
-export const RegistryHeading = Heading.extend(withoutShortcuts);
-export const RegistryItalic = Italic.extend(withoutShortcuts);
+// StarterKit binds its own mark and heading shortcuts. Swap those extensions
+// for shortcut-free versions so EditorCommandShortcuts owns every binding.
+// The code mark is Hubble's own InlineCodeExtension, added by the caller.
+export function starterKitWithRegistryShortcuts(
+	options?: Parameters<typeof StarterKit.configure>[0],
+) {
+	return [
+		StarterKit.configure({
+			...options,
+			blockquote: false,
+			bold: false,
+			heading: false,
+			italic: false,
+		}),
+		Blockquote.extend(withoutShortcuts),
+		Bold.extend(withoutShortcuts),
+		Heading.extend(withoutShortcuts),
+		Italic.extend(withoutShortcuts),
+	];
+}
 
 export const EditorCommandShortcuts = Extension.create({
 	name: "editorCommandShortcuts",

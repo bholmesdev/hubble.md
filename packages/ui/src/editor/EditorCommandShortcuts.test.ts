@@ -3,15 +3,10 @@
 import { listExtensions } from "@hubble.md/editor";
 import { Editor } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list";
-import StarterKit from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	EditorCommandShortcuts,
-	RegistryBlockquote,
-	RegistryBold,
-	RegistryCode,
-	RegistryHeading,
-	RegistryItalic,
+	starterKitWithRegistryShortcuts,
 } from "./EditorCommandShortcuts";
 
 const editors: Editor[] = [];
@@ -45,19 +40,7 @@ function createEditor() {
 	const editor = new Editor({
 		element: document.createElement("div"),
 		extensions: [
-			StarterKit.configure({
-				blockquote: false,
-				bold: false,
-				code: false,
-				heading: false,
-				italic: false,
-				listItem: false,
-			}),
-			RegistryBlockquote,
-			RegistryBold,
-			RegistryCode,
-			RegistryHeading,
-			RegistryItalic,
+			...starterKitWithRegistryShortcuts({ listItem: false }),
 			...listExtensions,
 			TaskItem.configure({ nested: true }),
 			EditorCommandShortcuts,
