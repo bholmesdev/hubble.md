@@ -74,10 +74,6 @@ export type PersistPastedImageOutput = {
 	deduped: boolean;
 };
 
-export type StagedDeleteItem = {
-	path: string;
-};
-
 export type OpenPathFromLinkResult =
 	| { kind: "file"; path: string }
 	| { kind: "opened" };
@@ -163,10 +159,7 @@ export type DesktopApi = {
 		input: PersistPastedImageInput,
 	): Promise<PersistPastedImageOutput>;
 	deleteFile(path: string, options?: { recursive?: boolean }): Promise<void>;
-	stageDelete(
-		workspacePath: string,
-		items: StagedDeleteItem[],
-	): Promise<string>;
+	stageDelete(workspacePath: string, paths: string[]): Promise<string>;
 	undoText(): Promise<void>;
 	restoreDelete(token: string): Promise<void>;
 	finalizeDelete(token: string): Promise<void>;

@@ -51,8 +51,8 @@ const desktopApi = {
 		ipcRenderer.invoke("desktop:persist-pasted-image", input),
 	deleteFile: (path, options) =>
 		ipcRenderer.invoke("desktop:delete-file", { path, options }),
-	stageDelete: (workspacePath, items) =>
-		ipcRenderer.invoke("desktop:stage-delete", { workspacePath, items }),
+	stageDelete: (workspacePath, paths) =>
+		ipcRenderer.invoke("desktop:stage-delete", { workspacePath, paths }),
 	undoText: () => ipcRenderer.invoke("desktop:undo-text"),
 	restoreDelete: (token) =>
 		ipcRenderer.invoke("desktop:restore-delete", { token }),

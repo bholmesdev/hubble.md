@@ -1130,13 +1130,8 @@ describe("desktop folder actions", () => {
 			},
 		);
 		vi.doMock("sonner", () => ({ toast }));
-		const {
-			appStore,
-			canUndoPendingDelete,
-			deleteSidebarItems,
-			undoPendingDelete,
-			workspaceStore,
-		} = await loadStoreActions(api);
+		const { appStore, deleteSidebarItems, undoPendingDelete, workspaceStore } =
+			await loadStoreActions(api);
 		appStore.set((current) => ({
 			...current,
 			workspace: {
@@ -1157,11 +1152,11 @@ describe("desktop folder actions", () => {
 
 		expect(api.stageDelete).toHaveBeenCalledOnce();
 		expect(api.stageDelete).toHaveBeenCalledWith("/workspace", [
-			{ path: "/workspace/a.md" },
-			{ path: "/workspace/folder" },
+			"/workspace/a.md",
+			"/workspace/folder",
 		]);
 		expect(workspaceStore.get().files).toEqual([]);
-		expect(canUndoPendingDelete()).toBe(true);
+		expect(api.setDeleteUndoAvailable).toHaveBeenCalledWith(true);
 
 		api.listDirectory.mockResolvedValue({
 			files: [
@@ -1174,7 +1169,7 @@ describe("desktop folder actions", () => {
 
 		expect(api.restoreDelete).toHaveBeenCalledWith("delete-token");
 		expect(workspaceStore.get().files).toHaveLength(2);
-		expect(canUndoPendingDelete()).toBe(false);
+		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
 		vi.doUnmock("sonner");
 	});
 
@@ -1189,12 +1184,8 @@ describe("desktop folder actions", () => {
 			},
 		);
 		vi.doMock("sonner", () => ({ toast }));
-		const {
-			appStore,
-			canUndoPendingDelete,
-			deleteSidebarItems,
-			updateEditorContent,
-		} = await loadStoreActions(api);
+		const { appStore, deleteSidebarItems, updateEditorContent } =
+			await loadStoreActions(api);
 		appStore.set((current) => ({
 			...current,
 			workspace: {
@@ -1215,13 +1206,12 @@ describe("desktop folder actions", () => {
 
 		await deleteSidebarItems([{ kind: "file", path: "/workspace/delete.md" }]);
 		updateEditorContent("/workspace/stale.md", "late update");
-		expect(canUndoPendingDelete()).toBe(true);
+		expect(api.finalizeDelete).not.toHaveBeenCalled();
 		updateEditorContent("/workspace/keep.md", "after");
 		await vi.waitFor(() =>
 			expect(api.finalizeDelete).toHaveBeenCalledWith("delete-token"),
 		);
 
-		expect(canUndoPendingDelete()).toBe(false);
 		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
 		vi.doUnmock("sonner");
 	});

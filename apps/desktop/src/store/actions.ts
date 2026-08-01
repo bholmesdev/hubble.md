@@ -96,18 +96,17 @@ const workspaceSidebarQueues = new Map<string, Promise<void>>();
 // conflict; it is just the disk baseline catching up to a save we started.
 const selfSaves = new Map<string, Map<string, number>>();
 const DELETE_UNDO_DURATION_MS = 8000;
-const stagedDeletePaths = new Set<string>();
+let blockedSaveItems: SidebarDeleteItem[] | null = null;
 
 type PendingDeleteUndo = {
 	token: string;
-	items: SidebarDeleteItem[];
-	workspacePath: string | null;
-	currentPath: string | null;
-	pinnedNotes: string[];
-	lastOpenedPaths: Record<string, string>;
+	workspacePath: string;
+	reopenPath: string | null;
+	removedPins: string[];
+	removedLastOpened: Record<string, string>;
 	historyBefore: ReturnType<typeof historyStore.get>;
-	historyAfter: string;
-	deleteStateSettled: Promise<void>;
+	historyAfter: ReturnType<typeof historyStore.get>;
+	pinRemovalSaved: Promise<void>;
 	toastId: string | number | null;
 	isRestoring: boolean;
 };
@@ -132,13 +131,9 @@ function pathCoveredByDeleteItems(path: string, items: SidebarDeleteItem[]) {
 }
 
 function isStagedForDelete(path: string) {
-	return [...stagedDeletePaths].some(
-		(stagedPath) => path === stagedPath || pathInFolder(path, stagedPath),
-	);
-}
-
-function clearStagedDeletePaths(items: SidebarDeleteItem[]) {
-	for (const item of items) stagedDeletePaths.delete(deleteItemPath(item));
+	return blockedSaveItems
+		? pathCoveredByDeleteItems(path, blockedSaveItems)
+		: false;
 }
 
 function enqueueWorkspaceSidebarUpdate(
@@ -1297,21 +1292,11 @@ export async function deleteFolder(path: string) {
 	}
 }
 
-function cloneHistoryState() {
-	const history = historyStore.get();
-	return {
-		...history,
-		byWorkspace: Object.fromEntries(
-			Object.entries(history.byWorkspace).map(([key, stack]) => [
-				key,
-				{ ...stack, entries: [...stack.entries] },
-			]),
-		),
-	};
-}
-
-export function canUndoPendingDelete() {
-	return pendingDeleteUndo !== null;
+function clearPendingDelete(pending: PendingDeleteUndo) {
+	pendingDeleteUndo = null;
+	blockedSaveItems = null;
+	if (pending.toastId !== null) toast.dismiss(pending.toastId);
+	void desktopApi.setDeleteUndoAvailable(false);
 }
 
 export async function finalizePendingDeleteUndo(token?: string) {
@@ -1319,12 +1304,9 @@ export async function finalizePendingDeleteUndo(token?: string) {
 	if (!pending || pending.isRestoring || (token && pending.token !== token)) {
 		return false;
 	}
-	pendingDeleteUndo = null;
-	if (pending.toastId !== null) toast.dismiss(pending.toastId);
-	void desktopApi.setDeleteUndoAvailable(false);
-	clearStagedDeletePaths(pending.items);
+	clearPendingDelete(pending);
 	try {
-		await pending.deleteStateSettled;
+		await pending.pinRemovalSaved;
 		await desktopApi.finalizeDelete(pending.token);
 	} catch (error) {
 		toast.error("Failed to finish deleting items", {
@@ -1341,7 +1323,8 @@ export async function undoPendingDelete(token?: string) {
 	}
 	pending.isRestoring = true;
 	try {
-		await pending.deleteStateSettled;
+		// Finish the removal write so it cannot overwrite the restored pins.
+		await pending.pinRemovalSaved;
 		await desktopApi.restoreDelete(pending.token);
 	} catch (error) {
 		pending.isRestoring = false;
@@ -1352,35 +1335,23 @@ export async function undoPendingDelete(token?: string) {
 		return false;
 	}
 
-	pendingDeleteUndo = null;
-	clearStagedDeletePaths(pending.items);
-	if (pending.toastId !== null) toast.dismiss(pending.toastId);
-	void desktopApi.setDeleteUndoAvailable(false);
+	clearPendingDelete(pending);
 	const currentWorkspace = workspaceStore.get().workspacePath;
 	if (currentWorkspace === pending.workspacePath) {
-		const restoredPins = pending.pinnedNotes.filter((pin) =>
-			pathCoveredByDeleteItems(pin, pending.items),
-		);
-		const restoredLastOpened = Object.fromEntries(
-			Object.entries(pending.lastOpenedPaths).filter(([, openedPath]) =>
-				pathCoveredByDeleteItems(openedPath, pending.items),
-			),
-		);
 		workspaceStore.set((state) => ({
 			...state,
-			pinnedNotes: [...new Set([...state.pinnedNotes, ...restoredPins])],
-			lastOpenedPaths: { ...state.lastOpenedPaths, ...restoredLastOpened },
+			pinnedNotes: [...new Set([...state.pinnedNotes, ...pending.removedPins])],
+			lastOpenedPaths: {
+				...state.lastOpenedPaths,
+				...pending.removedLastOpened,
+			},
 		}));
-		if (JSON.stringify(historyStore.get()) === pending.historyAfter) {
+		if (historyStore.get() === pending.historyAfter) {
 			historyStore.set(pending.historyBefore);
 		}
 		await refreshFiles(pending.workspacePath);
-		if (
-			pending.currentPath &&
-			viewerStore.get().currentPath === null &&
-			pathCoveredByDeleteItems(pending.currentPath, pending.items)
-		) {
-			await loadPath(pending.currentPath, {
+		if (pending.reopenPath && viewerStore.get().currentPath === null) {
+			await loadPath(pending.reopenPath, {
 				history: "none",
 				launchExternal: false,
 			});
@@ -1399,30 +1370,30 @@ async function performSidebarDelete(items: SidebarDeleteItem[]) {
 	const workspaceBefore = workspaceStore.get();
 	if (!workspaceBefore.workspacePath) return;
 	const viewerBefore = viewerStore.get();
-	const historyBefore = cloneHistoryState();
+	const historyBefore = historyStore.get();
 	if (
 		viewerBefore.currentPath &&
 		pathCoveredByDeleteItems(viewerBefore.currentPath, items)
 	) {
 		await savePathContent(viewerBefore.currentPath, viewerBefore.content);
 	}
-	for (const item of items) stagedDeletePaths.add(deleteItemPath(item));
+	blockedSaveItems = items;
 
 	let token: string;
 	try {
 		token = await desktopApi.stageDelete(
 			workspaceBefore.workspacePath,
-			items.map((item) => ({ path: deleteItemPath(item) })),
+			items.map(deleteItemPath),
 		);
 	} catch (error) {
-		clearStagedDeletePaths(items);
+		blockedSaveItems = null;
 		toast.error("Failed to delete items", {
 			description: handleFileError(error),
 		});
 		return;
 	}
 	if (workspaceStore.get().workspacePath !== workspaceBefore.workspacePath) {
-		clearStagedDeletePaths(items);
+		blockedSaveItems = null;
 		await desktopApi.finalizeDelete(token);
 		return;
 	}
@@ -1431,6 +1402,12 @@ async function performSidebarDelete(items: SidebarDeleteItem[]) {
 		pathCoveredByDeleteItems(candidate, items);
 	const deletedCurrent =
 		viewerBefore.currentPath !== null && deletedPath(viewerBefore.currentPath);
+	const removedPins = workspaceBefore.pinnedNotes.filter(deletedPath);
+	const removedLastOpened = Object.fromEntries(
+		Object.entries(workspaceBefore.lastOpenedPaths).filter(([, path]) =>
+			deletedPath(path),
+		),
+	);
 	if (deletedCurrent) {
 		clearHistory();
 	} else {
@@ -1472,17 +1449,16 @@ async function performSidebarDelete(items: SidebarDeleteItem[]) {
 							: state.document.lastOpenedPath,
 				},
 	}));
-	const deleteStateSettled = syncPinnedNotes();
+	const pinRemovalSaved = syncPinnedNotes();
 	pendingDeleteUndo = {
 		token,
-		items,
 		workspacePath: workspaceBefore.workspacePath,
-		currentPath: viewerBefore.currentPath,
-		pinnedNotes: workspaceBefore.pinnedNotes,
-		lastOpenedPaths: workspaceBefore.lastOpenedPaths,
+		reopenPath: deletedCurrent ? viewerBefore.currentPath : null,
+		removedPins,
+		removedLastOpened,
 		historyBefore,
-		historyAfter: JSON.stringify(historyStore.get()),
-		deleteStateSettled,
+		historyAfter: historyStore.get(),
+		pinRemovalSaved,
 		toastId: null,
 		isRestoring: false,
 	};
@@ -1504,7 +1480,7 @@ async function performSidebarDelete(items: SidebarDeleteItem[]) {
 	);
 	if (pendingDeleteUndo?.token === token) pendingDeleteUndo.toastId = toastId;
 	await desktopApi.setDeleteUndoAvailable(true);
-	await deleteStateSettled;
+	await pinRemovalSaved;
 }
 
 export async function deleteSidebarItems(items: SidebarDeleteItem[]) {
