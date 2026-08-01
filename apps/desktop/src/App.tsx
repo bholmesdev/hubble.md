@@ -466,21 +466,25 @@ function App() {
 		if (!workspacePath) return;
 		let active = true;
 		let generation: number | null = null;
-		let queue = Promise.resolve();
+		let workspaceChangeQueue = Promise.resolve();
 		const dispose = desktopApi.onWorkspaceChanged((change) => {
-			queue = queue.then(async () => {
-				if (!active || workspaceStore.get().workspacePath !== workspacePath) {
-					return;
-				}
-				if (change.kind === "refresh") {
-					await refreshFileList(workspacePath);
-					return;
-				}
-				for (const changedPath of change.paths) {
-					if (!active) return;
-					await reconcileWorkspacePath(workspacePath, changedPath);
-				}
-			});
+			workspaceChangeQueue = workspaceChangeQueue
+				.then(async () => {
+					if (!active || workspaceStore.get().workspacePath !== workspacePath) {
+						return;
+					}
+					if (change.kind === "refresh") {
+						await refreshFileList(workspacePath);
+						return;
+					}
+					for (const changedPath of change.paths) {
+						if (!active) return;
+						await reconcileWorkspacePath(workspacePath, changedPath);
+					}
+				})
+				.catch((error) => {
+					console.error("Workspace change reconciliation failed:", error);
+				});
 		});
 		void desktopApi
 			.startWorkspaceWatcher(workspacePath)

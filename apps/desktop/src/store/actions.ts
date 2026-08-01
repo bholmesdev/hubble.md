@@ -85,10 +85,12 @@ const REFRESH_FILES_DEBOUNCE_MS = 250;
 const SELF_SAVE_TTL_MS = 5000;
 const missingPathErrorPattern = /\bENOENT\b|\bENOTDIR\b/;
 let refreshFilesTimer: ReturnType<typeof setTimeout> | null = null;
-const refreshFilesInFlight = new Map<
-	string,
-	{ reloadActive: boolean; promise: Promise<void> }
->();
+type RefreshRun = {
+	reloadActive: boolean;
+	promise: Promise<void>;
+};
+const refreshFilesInFlight = new Map<string, RefreshRun>();
+const workspaceSidebarQueues = new Map<string, Promise<void>>();
 // The active-file watcher also sees Hubble's own writes. If save A reaches disk
 // after the editor already has draft B, that watcher event is not an external
 // conflict; it is just the disk baseline catching up to a save we started.
@@ -97,6 +99,63 @@ const selfSaves = new Map<string, Map<string, number>>();
 type SidebarMoveItem =
 	| { kind: "file"; path: string }
 	| { kind: "folder"; folderId: string };
+
+function enqueueWorkspaceSidebarUpdate(
+	workspacePath: string,
+	update: () => Promise<void>,
+) {
+	const previous = workspaceSidebarQueues.get(workspacePath);
+	const updatePromise = previous ? previous.then(update) : update();
+	const queue = updatePromise.catch((error) => {
+		console.error("Workspace sidebar update failed:", error);
+	});
+	workspaceSidebarQueues.set(workspacePath, queue);
+	void queue.then(() => {
+		if (workspaceSidebarQueues.get(workspacePath) === queue) {
+			workspaceSidebarQueues.delete(workspacePath);
+		}
+	});
+	return updatePromise;
+}
+
+async function refreshFilesNow(
+	path: string,
+	options: { reloadActive: boolean },
+) {
+	let listing: { files: FileEntry[]; folders: FolderEntry[] };
+	try {
+		listing = await desktopApi.listDirectory(path);
+	} catch (err) {
+		toast.error("Failed to refresh folder", {
+			description: errorMessage(err),
+		});
+		return;
+	}
+	workspaceStore.set((state) => {
+		if (state.workspacePath !== path) return state;
+		return { ...state, files: listing.files, folders: listing.folders };
+	});
+
+	const currentPath = viewerStore.get().currentPath;
+	if (
+		!options.reloadActive ||
+		workspaceStore.get().workspacePath !== path ||
+		!currentPath ||
+		isChangelogPath(currentPath) ||
+		!isEditableFile(currentPath) ||
+		!isInWorkspace(currentPath, path)
+	) {
+		return;
+	}
+	try {
+		const nextContent = await desktopApi.readFileText(currentPath);
+		handleExternalFileChange(currentPath, nextContent);
+	} catch (err) {
+		toast.error("Failed to refresh active note", {
+			description: errorMessage(err),
+		});
+	}
+}
 
 export async function refreshFiles(
 	path = workspaceStore.get().workspacePath,
@@ -110,45 +169,13 @@ export async function refreshFiles(
 		return pending.promise;
 	}
 
-	const run = {
+	const run: RefreshRun = {
 		reloadActive: options?.reloadActive !== false,
 		promise: Promise.resolve(),
 	};
-	run.promise = (async () => {
-		let listing: { files: FileEntry[]; folders: FolderEntry[] };
-		try {
-			listing = await desktopApi.listDirectory(path);
-		} catch (err) {
-			toast.error("Failed to refresh folder", {
-				description: errorMessage(err),
-			});
-			return;
-		}
-		workspaceStore.set((state) => {
-			if (state.workspacePath !== path) return state;
-			return { ...state, files: listing.files, folders: listing.folders };
-		});
-
-		const currentPath = viewerStore.get().currentPath;
-		if (
-			!run.reloadActive ||
-			workspaceStore.get().workspacePath !== path ||
-			!currentPath ||
-			isChangelogPath(currentPath) ||
-			!isEditableFile(currentPath) ||
-			!isInWorkspace(currentPath, path)
-		) {
-			return;
-		}
-		try {
-			const nextContent = await desktopApi.readFileText(currentPath);
-			handleExternalFileChange(currentPath, nextContent);
-		} catch (err) {
-			toast.error("Failed to refresh active note", {
-				description: errorMessage(err),
-			});
-		}
-	})();
+	run.promise = enqueueWorkspaceSidebarUpdate(path, () =>
+		refreshFilesNow(path, run),
+	);
 	refreshFilesInFlight.set(path, run);
 	try {
 		await run.promise;
@@ -166,21 +193,23 @@ export async function reconcileWorkspacePath(
 	workspacePath: string,
 	changedPath: string,
 ) {
-	let delta: WorkspaceDelta | null;
-	try {
-		delta = await desktopApi.sidebarDeltaForPath(workspacePath, changedPath);
-	} catch {
-		return;
-	}
-	if (!delta || workspaceStore.get().workspacePath !== workspacePath) return;
-	if (delta.kind === "refresh") {
-		await refreshFileList(workspacePath);
-		return;
-	}
-	workspaceStore.set((state) => {
-		if (state.workspacePath !== workspacePath) return state;
-		const nextSidebar = applyWorkspaceDelta(state, delta);
-		return { ...state, ...nextSidebar };
+	return enqueueWorkspaceSidebarUpdate(workspacePath, async () => {
+		let delta: WorkspaceDelta | null;
+		try {
+			delta = await desktopApi.sidebarDeltaForPath(workspacePath, changedPath);
+		} catch {
+			return;
+		}
+		if (!delta || workspaceStore.get().workspacePath !== workspacePath) return;
+		if (delta.kind === "refresh") {
+			await refreshFilesNow(workspacePath, { reloadActive: false });
+			return;
+		}
+		workspaceStore.set((state) => {
+			if (state.workspacePath !== workspacePath) return state;
+			const nextSidebar = applyWorkspaceDelta(state, delta);
+			return { ...state, ...nextSidebar };
+		});
 	});
 }
 /**

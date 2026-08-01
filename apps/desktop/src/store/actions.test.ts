@@ -474,6 +474,52 @@ describe("desktop refreshFiles", () => {
 		expect(viewerStore.get().content).toBe("updated");
 	});
 
+	it("serializes incremental and snapshot sidebar updates", async () => {
+		const api = createDesktopApi();
+		const events: string[] = [];
+		let finishDelta: (() => void) | undefined;
+		api.sidebarDeltaForPath.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					events.push("delta-start");
+					finishDelta = () => {
+						events.push("delta-end");
+						resolve({
+							kind: "file",
+							entry: {
+								path: "/workspace/new.md",
+								modified_at: 1,
+								kind: "document",
+							},
+						});
+					};
+				}),
+		);
+		api.listDirectory.mockImplementation(async () => {
+			events.push("snapshot");
+			return { files: [], folders: [] };
+		});
+		const { appStore, reconcileWorkspacePath, refreshFileList } =
+			await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace" },
+		}));
+
+		const incremental = reconcileWorkspacePath(
+			"/workspace",
+			"/workspace/new.md",
+		);
+		await Promise.resolve();
+		const snapshot = refreshFileList();
+
+		expect(events).toEqual(["delta-start"]);
+		finishDelta?.();
+		await Promise.all([incremental, snapshot]);
+
+		expect(events).toEqual(["delta-start", "delta-end", "snapshot"]);
+	});
+
 	it("preserves local edits when the active note changed on disk", async () => {
 		const api = createDesktopApi();
 		api.readFileText.mockResolvedValue("external");
