@@ -6,8 +6,6 @@
 	--toast-shadow: var(--shadow-overlay);
 	--toast-control-radius: 0.375rem;
 	--toast-font-size: 0.75rem;
-	--toast-action-bg: var(--primary);
-	--toast-action-fg: var(--primary-foreground);
 	--toast-cancel-bg: var(--secondary);
 	--toast-muted-fg: var(--muted-foreground);
 }
@@ -31,14 +29,19 @@
 }
 
 .hubble-toast-action {
-	background: var(--toast-action-bg) !important;
-	color: var(--toast-action-fg) !important;
+	background: transparent !important;
+	color: var(--toast-muted-fg) !important;
 	border: 1px solid transparent !important;
 	border-radius: var(--toast-control-radius);
 	box-shadow: none !important;
 	padding-inline: 0.7rem;
 	padding-block: 0.35rem;
 	font-weight: 500;
+}
+
+.hubble-toast-action:hover {
+	background: var(--muted) !important;
+	color: var(--toast-fg) !important;
 }
 
 .hubble-toast-cancel {

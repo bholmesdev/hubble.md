@@ -1,4 +1,8 @@
-import type { ReviewThread, SidebarDeleteItem } from "@hubble.md/ui";
+import {
+	formatShortcut,
+	type ReviewThread,
+	type SidebarDeleteItem,
+} from "@hubble.md/ui";
 import { toast } from "sonner";
 import changelogRaw from "../../../../CHANGELOG.md?raw";
 import { desktopApi } from "../desktopApi";
@@ -1358,7 +1362,6 @@ export async function undoPendingDelete(token?: string) {
 		}
 		await syncPinnedNotes();
 	}
-	toast.success("Deletion undone");
 	return true;
 }
 
@@ -1468,7 +1471,7 @@ async function performSidebarDelete(items: SidebarDeleteItem[]) {
 		{
 			duration: DELETE_UNDO_DURATION_MS,
 			action: {
-				label: "Undo",
+				label: `Undo ${formatShortcut("CmdOrCtrl+Z")}`,
 				onClick: (event) => {
 					event.preventDefault();
 					void undoPendingDelete(token);
