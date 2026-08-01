@@ -18,4 +18,4 @@ Single-context — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents
 
 ### Review readiness
 
-Use `.agents/skills/review-readiness` before handing code to a human reviewer.
+Apply `.agents/skills/simplify` before handing code to a human reviewer, then run the relevant existing checks.

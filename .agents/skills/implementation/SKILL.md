@@ -87,7 +87,7 @@ Then verify the change end-to-end with the repo's verification skills. Passing t
 
 - For changes that affect the desktop app, follow `.agents/skills/test-desktop-app/SKILL.md`: run the app with CDP enabled, drive the changed flow in the real renderer (click controls, type, inspect DOM state), and confirm the issue's expected behavior visibly works. Capture a screenshot of the working flow when practical and include it in the PR.
 - For changes that affect the web app, use the dev server with `?test=1` as described in `AGENTS.md` and drive the changed flow the same way.
-- Before opening the PR, apply `.agents/skills/review-readiness/SKILL.md`.
+- Before opening the PR, apply `.agents/skills/simplify/SKILL.md`.
 
 If end-to-end verification is not possible in the current environment (for example the app cannot launch), say so explicitly in the PR with what was attempted; do not imply the flow was exercised.
 

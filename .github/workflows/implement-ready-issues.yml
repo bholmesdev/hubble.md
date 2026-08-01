@@ -62,7 +62,7 @@ jobs:
             Implement the ready GitHub issue described in `issue-context.json`.
 
             Read `.agents/skills/implementation/SKILL.md` and follow its code,
-            verification, and review-readiness guidance. This workflow replaces
+            verification, and simplify-before-review guidance. This workflow replaces
             the skill's tracker and publication steps: do not use `gh`, mutate
             GitHub, create a branch, commit, push, or open a pull request. Make
             and verify the smallest cohesive implementation only in the local
