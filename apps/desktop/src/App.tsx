@@ -496,6 +496,11 @@ function App() {
 					return;
 				}
 				generation = nextGeneration;
+			})
+			.catch((error) => {
+				if (active) {
+					console.error("Failed to start workspace watcher:", error);
+				}
 			});
 		return () => {
 			active = false;

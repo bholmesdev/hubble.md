@@ -1223,8 +1223,8 @@ function registerIpc() {
 		async (_event, { path: dirPath }) => {
 			const start = workspaceWatcherStart.then(async () => {
 				const root = assertGrantedRoot(dirPath);
-				const rootStat = await fs.lstat(root);
-				if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) return null;
+				const rootStat = await fs.stat(root);
+				if (!rootStat.isDirectory()) return null;
 				if (workspaceWatcher?.root === root) {
 					return workspaceWatcher.generation;
 				}
@@ -1291,8 +1291,8 @@ function registerIpc() {
 		"desktop:list-directory",
 		async (_event, { path: dirPath }) => {
 			const root = assertGrantedRoot(dirPath);
-			const stat = await fs.lstat(root);
-			if (!stat.isDirectory() || stat.isSymbolicLink()) {
+			const stat = await fs.stat(root);
+			if (!stat.isDirectory()) {
 				throw new Error(`Not a directory: ${dirPath}`);
 			}
 			return listSidebarFiles(root);

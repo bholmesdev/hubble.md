@@ -98,6 +98,23 @@ describe("workspace sidebar reconciliation", () => {
 		expect(listing.folders).toEqual([]);
 	});
 
+	it("follows a symlinked workspace root", async () => {
+		const target = await fs.mkdtemp(path.join(os.tmpdir(), "hubble-root-"));
+		try {
+			const link = path.join(root, "workspace");
+			await fs.writeFile(path.join(target, "visible.md"), "visible");
+			await fs.symlink(target, link, "dir");
+
+			const listing = await listSidebarFiles(link);
+
+			expect(listing.files.map((file) => file.path)).toEqual([
+				path.join(link, "visible.md"),
+			]);
+		} finally {
+			await fs.rm(target, { recursive: true, force: true });
+		}
+	});
+
 	it("does not follow a symlink into another tree", async () => {
 		const outside = await fs.mkdtemp(path.join(os.tmpdir(), "hubble-outside-"));
 		try {
