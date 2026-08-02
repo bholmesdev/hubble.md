@@ -1130,7 +1130,7 @@ describe("desktop folder actions", () => {
 			},
 		);
 		vi.doMock("sonner", () => ({ toast }));
-		const { appStore, deleteSidebarItems, undoPendingDelete, workspaceStore } =
+		const { appStore, deleteSidebarItems, undoDelete, workspaceStore } =
 			await loadStoreActions(api);
 		appStore.set((current) => ({
 			...current,
@@ -1166,7 +1166,7 @@ describe("desktop folder actions", () => {
 			],
 			folders: [{ path: "/workspace/folder", modified_at: 2 }],
 		});
-		expect(await undoPendingDelete()).toBe(true);
+		expect(await undoDelete()).toBe(true);
 
 		expect(api.restoreDelete).toHaveBeenCalledWith("delete-token");
 		expect(workspaceStore.get().files).toHaveLength(2);
@@ -1223,7 +1223,7 @@ describe("desktop folder actions", () => {
 			},
 		);
 		vi.doMock("sonner", () => ({ toast }));
-		const { appStore, deleteSidebarItems, undoPendingDelete } =
+		const { appStore, deleteSidebarItems, undoDelete } =
 			await loadStoreActions(api);
 		appStore.set((current) => ({
 			...current,
@@ -1236,51 +1236,8 @@ describe("desktop folder actions", () => {
 
 		await deleteSidebarItems([{ kind: "file", path: "/workspace/delete.md" }]);
 
-		expect(await undoPendingDelete()).toBe(false);
+		expect(await undoDelete()).toBe(false);
 		expect(api.finalizeDelete).not.toHaveBeenCalled();
-		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
-		vi.doUnmock("sonner");
-	});
-
-	it("expires sidebar delete undo when document editing resumes", async () => {
-		const api = createDesktopApi();
-		const toast = Object.assign(
-			vi.fn(() => "delete-undo"),
-			{
-				dismiss: vi.fn(),
-				success: vi.fn(),
-				error: vi.fn(),
-			},
-		);
-		vi.doMock("sonner", () => ({ toast }));
-		const { appStore, deleteSidebarItems, updateEditorContent } =
-			await loadStoreActions(api);
-		appStore.set((current) => ({
-			...current,
-			workspace: {
-				...current.workspace,
-				workspacePath: "/workspace",
-				files: [
-					{ path: "/workspace/keep.md", modified_at: 1 },
-					{ path: "/workspace/delete.md", modified_at: 1 },
-				],
-			},
-			document: {
-				...current.document,
-				currentPath: "/workspace/keep.md",
-				content: "before",
-				diskContent: "before",
-			},
-		}));
-
-		await deleteSidebarItems([{ kind: "file", path: "/workspace/delete.md" }]);
-		updateEditorContent("/workspace/stale.md", "late update");
-		expect(api.finalizeDelete).not.toHaveBeenCalled();
-		updateEditorContent("/workspace/keep.md", "after");
-		await vi.waitFor(() =>
-			expect(api.finalizeDelete).toHaveBeenCalledWith("delete-token"),
-		);
-
 		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
 		vi.doUnmock("sonner");
 	});
@@ -1303,12 +1260,8 @@ describe("desktop folder actions", () => {
 			},
 		);
 		vi.doMock("sonner", () => ({ toast }));
-		const {
-			appStore,
-			deleteSidebarItems,
-			undoPendingDelete,
-			updateEditorContent,
-		} = await loadStoreActions(api);
+		const { appStore, deleteSidebarItems, undoDelete, updateEditorContent } =
+			await loadStoreActions(api);
 		appStore.set((current) => ({
 			...current,
 			workspace: {
@@ -1330,7 +1283,7 @@ describe("desktop folder actions", () => {
 		await deleteSidebarItems([{ kind: "file", path: "/workspace/delete.md" }]);
 		updateEditorContent("/workspace/keep.md", "after");
 
-		expect(await undoPendingDelete()).toBe(false);
+		expect(await undoDelete()).toBe(false);
 		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
 		finishDrop();
 		await vi.waitFor(() => expect(api.finalizeDelete).toHaveBeenCalled());

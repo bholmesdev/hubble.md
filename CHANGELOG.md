@@ -10,7 +10,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Added
 
 - Keep the sidebar in sync when files and folders are added, deleted, or renamed outside Hubble. Thanks [@Mamdouh66](https://github.com/Mamdouh66) for the suggestion! [#202](https://github.com/bholmesdev/hubble.md/pull/202)
-- Undo file and folder deletions for eight seconds from the toast or with Cmd+Z. Starting another edit returns Cmd+Z to normal text undo. [#218](https://github.com/bholmesdev/hubble.md/pull/218)
+- Undo accidental file and folder deletions, including multi-select deletes, from the confirmation toast or with Cmd+Z. Thanks [@Siffrico](https://github.com/Siffrico) for the suggestion! [#218](https://github.com/bholmesdev/hubble.md/pull/218)
 
 ### Changed
 

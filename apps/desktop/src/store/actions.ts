@@ -1,8 +1,4 @@
-import {
-	formatShortcut,
-	type ReviewThread,
-	type SidebarDeleteItem,
-} from "@hubble.md/ui";
+import type { ReviewThread } from "@hubble.md/ui";
 import { toast } from "sonner";
 import changelogRaw from "../../../../CHANGELOG.md?raw";
 import { desktopApi } from "../desktopApi";
@@ -13,7 +9,7 @@ import {
 	isChangelogPath,
 	prepareChangelogMarkdown,
 } from "../lib/changelogNote";
-import { takeLatest } from "../lib/concurrency";
+import { keyedQueue, takeLatest } from "../lib/concurrency";
 import {
 	absoluteWorkspacePath,
 	basename,
@@ -43,13 +39,12 @@ import {
 	initTheme,
 	type ThemePreference,
 } from "../theme";
+import { createDeleteActions } from "./deleteActions";
 import {
 	activeHistory,
 	canGoBack,
 	canGoForward,
-	clearHistory,
 	normalizeStack,
-	pruneHistory,
 	pushHistory,
 	rewriteHistory,
 	setHistory,
@@ -99,47 +94,11 @@ const workspaceSidebarQueues = new Map<string, Promise<void>>();
 // after the editor already has draft B, that watcher event is not an external
 // conflict; it is just the disk baseline catching up to a save we started.
 const selfSaves = new Map<string, Map<string, number>>();
-const saveQueues = new Map<string, Promise<void>>();
-const DELETE_UNDO_DURATION_MS = 8000;
-let blockedSaveItems: SidebarDeleteItem[] | null = null;
-
-type PendingDeleteUndo = {
-	token: string;
-	workspacePath: string;
-	reopenPath: string | null;
-	removedPins: string[];
-	removedLastOpened: Record<string, string>;
-	historyBefore: ReturnType<typeof historyStore.get>;
-	historyAfter: ReturnType<typeof historyStore.get>;
-	pinRemovalSaved: Promise<void>;
-	toastId: string | number | null;
-	state: "active" | "finalizing" | "restoring";
-};
-
-let pendingDeleteUndo: PendingDeleteUndo | null = null;
-let deleteInFlight = false;
+const saves = keyedQueue<string>();
 
 type SidebarMoveItem =
 	| { kind: "file"; path: string }
 	| { kind: "folder"; folderId: string };
-
-function deleteItemPath(item: SidebarDeleteItem) {
-	return item.kind === "file" ? item.path : item.folderId;
-}
-
-function pathCoveredByDeleteItems(path: string, items: SidebarDeleteItem[]) {
-	return items.some((item) =>
-		item.kind === "file"
-			? item.path === path
-			: item.folderId === path || pathInFolder(path, item.folderId),
-	);
-}
-
-function isStagedForDelete(path: string) {
-	return blockedSaveItems
-		? pathCoveredByDeleteItems(path, blockedSaveItems)
-		: false;
-}
 
 function enqueueWorkspaceSidebarUpdate(
 	workspacePath: string,
@@ -682,7 +641,7 @@ export async function openWorkspace(path?: string) {
 		nextPath = selected;
 	}
 	if (workspaceStore.get().workspacePath !== nextPath) {
-		await finalizePendingDeleteUndo();
+		await expireDeleteUndo();
 	}
 
 	workspaceStore.set((state) => {
@@ -710,7 +669,7 @@ export async function openWorkspace(path?: string) {
 export function updateEditorContent(path: string, content: string) {
 	const current = viewerStore.get();
 	if (current.currentPath !== path || current.content === content) return;
-	void finalizePendingDeleteUndo();
+	void expireDeleteUndo();
 
 	viewerStore.set((state) => {
 		if (state.currentPath !== path) return state;
@@ -739,17 +698,6 @@ export function setViewerMode(viewMode: ViewMode) {
 	});
 }
 
-function queueSave(path: string, save: () => Promise<void>) {
-	const previous = saveQueues.get(path);
-	const next = previous ? previous.catch(() => {}).then(save) : save();
-	saveQueues.set(path, next);
-	const clear = () => {
-		if (saveQueues.get(path) === next) saveQueues.delete(path);
-	};
-	void next.then(clear, clear);
-	return next;
-}
-
 async function savePathContentNow(
 	path: string,
 	content: string,
@@ -758,7 +706,7 @@ async function savePathContentNow(
 	// Binary viewers, external files, and the virtual changelog never enter text saves.
 	if (isChangelogPath(path) || !isEditableFile(path)) return;
 	// A save already queued by the editor must not recreate a staged deletion.
-	if (!options?.allowBlocked && isStagedForDelete(path)) return;
+	if (!options?.allowBlocked && deletionActions.isSaveBlocked(path)) return;
 	const current = viewerStore.get();
 	const force = options?.force === true;
 	if (current.currentPath !== path) return;
@@ -843,8 +791,33 @@ export function savePathContent(
 	content: string,
 	options?: { force?: boolean; throwOnError?: boolean },
 ) {
-	return queueSave(path, () => savePathContentNow(path, content, options));
+	return saves.run(path, () => savePathContentNow(path, content, options));
 }
+
+const deletionActions = createDeleteActions({
+	saveBeforeDelete: (path, content) =>
+		saves.run(path, () =>
+			savePathContentNow(path, content, {
+				force: true,
+				throwOnError: true,
+				allowBlocked: true,
+			}),
+		),
+	waitForSaves: saves.waitFor,
+	refreshFiles,
+	refreshFileList,
+	loadPath,
+	syncPins: syncPinnedNotes,
+	handleError: handleFileError,
+});
+
+export const {
+	deleteFolder,
+	deleteMarkdownFile,
+	deleteSidebarItems,
+	expireDeleteUndo,
+	undoDelete,
+} = deletionActions;
 
 export async function renameMarkdownFile(path: string, nextName: string) {
 	const current = viewerStore.get();
@@ -1216,329 +1189,6 @@ export async function createFolderInFolder(parentPath: string) {
 		const message = handleFileError(err);
 		toast.error("Failed to create folder", { description: message });
 		return null;
-	}
-}
-
-export async function deleteMarkdownFile(
-	path: string,
-	options?: { throwOnError?: boolean },
-) {
-	try {
-		await desktopApi.deleteFile(path);
-		const wasCurrentFile = viewerStore.get().currentPath === path;
-		if (wasCurrentFile) {
-			clearHistory();
-		} else {
-			pruneHistory(path);
-		}
-		appStore.set((state) => ({
-			...state,
-			workspace: {
-				...state.workspace,
-				files: state.workspace.files.filter((file) => file.path !== path),
-				pinnedNotes: state.workspace.pinnedNotes.filter(
-					(pinnedPath) => pinnedPath !== path,
-				),
-				lastOpenedPaths: Object.fromEntries(
-					Object.entries(state.workspace.lastOpenedPaths).filter(
-						([, openedPath]) => openedPath !== path,
-					),
-				),
-			},
-			document:
-				state.document.currentPath === path
-					? emptyDoc(
-							state.document.lastOpenedPath === path
-								? null
-								: state.document.lastOpenedPath,
-						)
-					: {
-							...state.document,
-							lastOpenedPath:
-								state.document.lastOpenedPath === path
-									? null
-									: state.document.lastOpenedPath,
-						},
-		}));
-		await syncPinnedNotes();
-		await refreshFileList();
-	} catch (err) {
-		const message = handleFileError(err);
-		toast.error("Failed to delete file", { description: message });
-		if (options?.throwOnError) throw err;
-	}
-}
-
-export async function deleteFolder(path: string) {
-	try {
-		await desktopApi.deleteFile(path, { recursive: true });
-		const currentPath = viewerStore.get().currentPath;
-		if (currentPath && pathInFolder(currentPath, path)) {
-			clearHistory();
-		} else {
-			pruneHistory(path, true);
-		}
-		appStore.set((state) => ({
-			...state,
-			workspace: {
-				...state.workspace,
-				files: state.workspace.files.filter(
-					(file) => !pathInFolder(file.path, path),
-				),
-				pinnedNotes: state.workspace.pinnedNotes.filter(
-					(pinnedPath) => !pathInFolder(pinnedPath, path),
-				),
-				lastOpenedPaths: Object.fromEntries(
-					Object.entries(state.workspace.lastOpenedPaths).filter(
-						([, openedPath]) => !pathInFolder(openedPath, path),
-					),
-				),
-			},
-			document:
-				state.document.currentPath &&
-				pathInFolder(state.document.currentPath, path)
-					? emptyDoc(
-							state.document.lastOpenedPath &&
-								pathInFolder(state.document.lastOpenedPath, path)
-								? null
-								: state.document.lastOpenedPath,
-						)
-					: {
-							...state.document,
-							lastOpenedPath:
-								state.document.lastOpenedPath &&
-								pathInFolder(state.document.lastOpenedPath, path)
-									? null
-									: state.document.lastOpenedPath,
-						},
-		}));
-		await syncPinnedNotes();
-		await refreshFileList();
-	} catch (err) {
-		const message = handleFileError(err);
-		toast.error("Failed to delete folder", { description: message });
-	}
-}
-
-function claimPendingDelete(state: "finalizing" | "restoring", token?: string) {
-	const pending = pendingDeleteUndo;
-	if (
-		!pending ||
-		pending.state !== "active" ||
-		(token && pending.token !== token)
-	) {
-		return null;
-	}
-	pending.state = state;
-	if (pending.toastId !== null) toast.dismiss(pending.toastId);
-	void desktopApi.setDeleteUndoAvailable(false);
-	return pending;
-}
-
-function finishPendingDelete(pending: PendingDeleteUndo) {
-	if (pendingDeleteUndo !== pending) return;
-	pendingDeleteUndo = null;
-	blockedSaveItems = null;
-}
-
-export async function finalizePendingDeleteUndo(token?: string) {
-	const pending = claimPendingDelete("finalizing", token);
-	if (!pending) return false;
-	try {
-		await pending.pinRemovalSaved;
-		await desktopApi.finalizeDelete(pending.token);
-	} catch (error) {
-		toast.error("Failed to finish deleting items", {
-			description: handleFileError(error),
-		});
-	}
-	finishPendingDelete(pending);
-	return true;
-}
-
-export async function undoPendingDelete(token?: string) {
-	const pending = claimPendingDelete("restoring", token);
-	if (!pending) return false;
-	try {
-		// Finish the removal write so it cannot overwrite the restored pins.
-		await pending.pinRemovalSaved;
-		await desktopApi.restoreDelete(pending.token);
-	} catch (error) {
-		toast.error("Failed to undo deletion", {
-			description: handleFileError(error),
-		});
-		finishPendingDelete(pending);
-		return false;
-	}
-
-	finishPendingDelete(pending);
-	const currentWorkspace = workspaceStore.get().workspacePath;
-	if (currentWorkspace === pending.workspacePath) {
-		workspaceStore.set((state) => ({
-			...state,
-			pinnedNotes: [...new Set([...state.pinnedNotes, ...pending.removedPins])],
-			lastOpenedPaths: {
-				...state.lastOpenedPaths,
-				...pending.removedLastOpened,
-			},
-		}));
-		if (historyStore.get() === pending.historyAfter) {
-			historyStore.set(pending.historyBefore);
-		}
-		await refreshFiles(pending.workspacePath);
-		if (pending.reopenPath && viewerStore.get().currentPath === null) {
-			await loadPath(pending.reopenPath, {
-				history: "none",
-				launchExternal: false,
-			});
-		}
-		await syncPinnedNotes();
-	}
-	return true;
-}
-
-async function performSidebarDelete(items: SidebarDeleteItem[]) {
-	if (items.length === 0) return;
-	await finalizePendingDeleteUndo();
-	if (pendingDeleteUndo) return;
-
-	const workspaceBefore = workspaceStore.get();
-	if (!workspaceBefore.workspacePath) return;
-	const viewerBefore = viewerStore.get();
-	const historyBefore = historyStore.get();
-	blockedSaveItems = items;
-	await Promise.all(
-		[...saveQueues]
-			.filter(([path]) => pathCoveredByDeleteItems(path, items))
-			.map(([, save]) => save.catch(() => {})),
-	);
-	const currentPath = viewerBefore.currentPath;
-	if (currentPath && pathCoveredByDeleteItems(currentPath, items)) {
-		try {
-			await queueSave(currentPath, () =>
-				savePathContentNow(currentPath, viewerBefore.content, {
-					force: true,
-					throwOnError: true,
-					allowBlocked: true,
-				}),
-			);
-		} catch {
-			blockedSaveItems = null;
-			return;
-		}
-	}
-
-	let token: string;
-	try {
-		token = await desktopApi.stageDelete(
-			workspaceBefore.workspacePath,
-			items.map(deleteItemPath),
-		);
-	} catch (error) {
-		blockedSaveItems = null;
-		toast.error("Failed to delete items", {
-			description: handleFileError(error),
-		});
-		return;
-	}
-	if (workspaceStore.get().workspacePath !== workspaceBefore.workspacePath) {
-		blockedSaveItems = null;
-		await desktopApi.finalizeDelete(token);
-		return;
-	}
-
-	const deletedPath = (candidate: string) =>
-		pathCoveredByDeleteItems(candidate, items);
-	const deletedCurrent =
-		viewerBefore.currentPath !== null && deletedPath(viewerBefore.currentPath);
-	const removedPins = workspaceBefore.pinnedNotes.filter(deletedPath);
-	const removedLastOpened = Object.fromEntries(
-		Object.entries(workspaceBefore.lastOpenedPaths).filter(([, path]) =>
-			deletedPath(path),
-		),
-	);
-	if (deletedCurrent) {
-		clearHistory();
-	} else {
-		for (const item of items) {
-			if (item.kind === "file") pruneHistory(item.path);
-			else pruneHistory(item.folderId, true);
-		}
-	}
-	appStore.set((state) => ({
-		...state,
-		workspace: {
-			...state.workspace,
-			files: state.workspace.files.filter((file) => !deletedPath(file.path)),
-			folders: state.workspace.folders.filter(
-				(folder) => !deletedPath(folder.path),
-			),
-			pinnedNotes: state.workspace.pinnedNotes.filter(
-				(pin) => !deletedPath(pin),
-			),
-			lastOpenedPaths: Object.fromEntries(
-				Object.entries(state.workspace.lastOpenedPaths).filter(
-					([, openedPath]) => !deletedPath(openedPath),
-				),
-			),
-		},
-		document: deletedCurrent
-			? emptyDoc(
-					state.document.lastOpenedPath &&
-						deletedPath(state.document.lastOpenedPath)
-						? null
-						: state.document.lastOpenedPath,
-				)
-			: {
-					...state.document,
-					lastOpenedPath:
-						state.document.lastOpenedPath &&
-						deletedPath(state.document.lastOpenedPath)
-							? null
-							: state.document.lastOpenedPath,
-				},
-	}));
-	const pinRemovalSaved = syncPinnedNotes();
-	pendingDeleteUndo = {
-		token,
-		workspacePath: workspaceBefore.workspacePath,
-		reopenPath: deletedCurrent ? viewerBefore.currentPath : null,
-		removedPins,
-		removedLastOpened,
-		historyBefore,
-		historyAfter: historyStore.get(),
-		pinRemovalSaved,
-		toastId: null,
-		state: "active",
-	};
-	const count = items.length;
-	const toastId = toast(
-		`Deleted ${count === 1 ? "1 item" : `${count} items`}`,
-		{
-			duration: DELETE_UNDO_DURATION_MS,
-			action: {
-				label: `Undo ${formatShortcut("CmdOrCtrl+Z")}`,
-				onClick: (event) => {
-					event.preventDefault();
-					void undoPendingDelete(token);
-				},
-			},
-			onAutoClose: () => void finalizePendingDeleteUndo(token),
-			onDismiss: () => void finalizePendingDeleteUndo(token),
-		},
-	);
-	if (pendingDeleteUndo?.token === token) pendingDeleteUndo.toastId = toastId;
-	await desktopApi.setDeleteUndoAvailable(true);
-	await pinRemovalSaved;
-}
-
-export async function deleteSidebarItems(items: SidebarDeleteItem[]) {
-	if (deleteInFlight) return;
-	deleteInFlight = true;
-	try {
-		await performSidebarDelete(items);
-	} finally {
-		deleteInFlight = false;
 	}
 }
 

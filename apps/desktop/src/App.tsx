@@ -85,7 +85,7 @@ import {
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
 	toggleTerminal,
-	undoPendingDelete,
+	undoDelete,
 	updateEditorContent,
 } from "./store/actions";
 import { canGoBack, canGoForward } from "./store/history";
@@ -415,7 +415,7 @@ function App() {
 	useEffect(() => {
 		const disposers = [
 			desktopApi.onUndoDelete(() => {
-				void undoPendingDelete().then((undone) => {
+				void undoDelete().then((undone) => {
 					if (!undone) void desktopApi.undoText();
 				});
 			}),
