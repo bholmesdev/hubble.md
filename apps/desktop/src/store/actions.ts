@@ -680,6 +680,9 @@ export async function openWorkspace(path?: string) {
 		if (typeof selected !== "string") return;
 		nextPath = selected;
 	}
+	if (workspaceStore.get().workspacePath !== nextPath) {
+		await finalizePendingDeleteUndo();
+	}
 
 	workspaceStore.set((state) => {
 		const filtered = state.recentWorkspaces.filter((p) => p !== nextPath);
@@ -1309,7 +1312,6 @@ export async function finalizePendingDeleteUndo(token?: string) {
 	if (!pending || pending.isRestoring || (token && pending.token !== token)) {
 		return false;
 	}
-	clearPendingDelete(pending);
 	try {
 		await pending.pinRemovalSaved;
 		await desktopApi.finalizeDelete(pending.token);
@@ -1318,6 +1320,7 @@ export async function finalizePendingDeleteUndo(token?: string) {
 			description: handleFileError(error),
 		});
 	}
+	clearPendingDelete(pending);
 	return true;
 }
 

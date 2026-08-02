@@ -1284,6 +1284,36 @@ describe("desktop folder actions", () => {
 		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
 		vi.doUnmock("sonner");
 	});
+
+	it("expires sidebar delete undo before switching workspaces", async () => {
+		const api = createDesktopApi();
+		const toast = Object.assign(
+			vi.fn(() => "delete-undo"),
+			{
+				dismiss: vi.fn(),
+				success: vi.fn(),
+				error: vi.fn(),
+			},
+		);
+		vi.doMock("sonner", () => ({ toast }));
+		const { appStore, deleteSidebarItems, openWorkspace } =
+			await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [{ path: "/workspace/delete.md", modified_at: 1 }],
+			},
+		}));
+
+		await deleteSidebarItems([{ kind: "file", path: "/workspace/delete.md" }]);
+		await openWorkspace("/other-workspace");
+
+		expect(api.finalizeDelete).toHaveBeenCalledWith("delete-token");
+		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
+		vi.doUnmock("sonner");
+	});
 });
 
 describe("desktop moveSidebarItem", () => {

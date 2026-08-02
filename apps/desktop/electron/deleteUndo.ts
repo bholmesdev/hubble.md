@@ -5,6 +5,7 @@ import { HUBBLE_DIR } from "../src/lib/filePath";
 
 type Entry = { source: string; staged: string };
 type Job = {
+	workspace: string;
 	dir: string;
 	entries: Entry[];
 	state: "staging" | "ready" | "restoring" | "dropping";
@@ -32,9 +33,8 @@ export class DeleteUndo {
 	private jobs = new Map<string, Job>();
 
 	private async keepForRecovery(token: string, job: Job) {
-		const workspace = path.dirname(path.dirname(path.dirname(job.dir)));
 		const recovery = path.join(
-			workspace,
+			job.workspace,
 			HUBBLE_DIR,
 			"delete-recovery",
 			path.basename(job.dir),
@@ -75,7 +75,7 @@ export class DeleteUndo {
 			source,
 			staged: path.join(dir, String(index)),
 		}));
-		const job: Job = { dir, entries, state: "staging" };
+		const job: Job = { workspace, dir, entries, state: "staging" };
 		this.jobs.set(token, job);
 		const moved: Entry[] = [];
 		try {
@@ -149,9 +149,12 @@ export class DeleteUndo {
 		try {
 			await fs.rm(job.dir, { recursive: true, force: true });
 			this.jobs.delete(token);
-		} catch (error) {
+		} catch {
 			job.state = "ready";
-			throw error;
+			const recovery = await this.keepForRecovery(token, job);
+			throw new Error(
+				`Could not empty trash. Deleted files kept at ${recovery}`,
+			);
 		}
 	}
 
