@@ -104,9 +104,7 @@
 				"dmg",
 				"zip"
 			],
-			"category": "public.app-category.productivity",
-			"entitlements": "build/entitlements.mac.plist",
-			"entitlementsInherit": "build/entitlements.mac.plist"
+			"category": "public.app-category.productivity"
 		},
 		"asarUnpack": [
 			"**/node_modules/uiohook-napi/**"
