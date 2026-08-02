@@ -27,11 +27,11 @@ export class CaptureSession {
 		this.setState({ phase: "idle" });
 	}
 
-	async saveNotes() {
+	async saveNotes(name?: string | null, saveAs = false) {
 		const notes = readDraft().trim();
 		if (!notes) return;
 		try {
-			const filePath = await writeCaptureNote(notes);
+			const filePath = await writeCaptureNote(notes, name ?? null, saveAs);
 			// A dismissed save dialog keeps the draft for another try.
 			if (!filePath) return;
 			clearDraft();
@@ -67,12 +67,17 @@ async function uniquePath(dir: string, stem: string, extension: string) {
 	}
 }
 
-/** With no workspace to land in, the user picks a spot on disk directly. */
-async function askForCapturePath(stem: string) {
+/** Lets the user pick a spot on disk, starting from where a capture would land. */
+async function askForCapturePath(stem: string, workspace: string | null) {
+	let dir = app.getPath("documents");
+	if (workspace) {
+		dir = path.join(workspace, CAPTURES_FOLDER);
+		await fsp.mkdir(dir, { recursive: true }).catch(() => {});
+	}
 	const captureWindow = getCaptureWindow();
 	const options = {
 		title: "Save capture",
-		defaultPath: path.join(app.getPath("documents"), `${stem}.md`),
+		defaultPath: path.join(dir, `${stem}.md`),
 		filters: [{ name: "Markdown", extensions: ["md"] }],
 	};
 	const { canceled, filePath } = captureWindow
@@ -81,38 +86,41 @@ async function askForCapturePath(stem: string) {
 	return canceled || !filePath ? null : filePath;
 }
 
-async function writeCaptureNote(notes: string) {
+/** Titles come from note text, so squash anything a filesystem would reject. */
+function sanitizeFileStem(name: string | null) {
+	if (!name) return null;
+	const cleaned = name
+		.replace(/[\\/:*?"<>|]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+		.replace(/^\.+/, "");
+	return cleaned || null;
+}
+
+async function writeCaptureNote(
+	notes: string,
+	name: string | null,
+	saveAs: boolean,
+) {
 	const started = new Date();
-	const stem = formatStamp(started);
+	const stem = sanitizeFileStem(name) ?? formatStamp(started);
 
 	const workspace = resolveTargetWorkspace();
 	let filePath: string;
-	if (workspace) {
+	if (workspace && !saveAs) {
 		const dir = path.join(workspace, CAPTURES_FOLDER);
 		await fsp.mkdir(dir, { recursive: true });
 		filePath = await uniquePath(dir, stem, ".md");
 	} else {
-		const picked = await askForCapturePath(stem);
+		const picked = await askForCapturePath(stem, workspace);
 		if (!picked) return null;
 		filePath = picked;
 	}
 
-	const frontMatter = [
-		"---",
-		`created: ${started.toISOString()}`,
-		"source: capture",
-		"---",
-	].join("\n");
+	const frontMatter = ["---", `created: ${started.toISOString()}`, "---"].join(
+		"\n",
+	);
 
-	const body = stripFrontMatter(notes).trim() || "_Nothing captured._";
-
-	await fsp.writeFile(filePath, `${frontMatter}\n\n${body}\n`, "utf8");
+	await fsp.writeFile(filePath, `${frontMatter}\n\n${notes}\n`, "utf8");
 	return filePath;
-}
-
-/** The notepad round-trips through the editor, which may add its own front matter. */
-function stripFrontMatter(markdown: string) {
-	if (!markdown.startsWith("---\n")) return markdown;
-	const end = markdown.indexOf("\n---", 4);
-	return end === -1 ? markdown : markdown.slice(end + 4);
 }

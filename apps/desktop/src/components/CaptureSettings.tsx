@@ -4,8 +4,13 @@ import { desktopApi } from "../desktopApi";
 import type { CaptureClientState } from "../desktopApi/types";
 import { SettingsSection } from "./SettingsDialog";
 
-/** macOS never reports an Accessibility grant, so the toggle polls for it. */
+/** System Settings grants Accessibility access without notifying the app. */
 const ACCESSIBILITY_POLL_MS = 1000;
+
+function basename(path: string) {
+	const segments = path.split("/").filter(Boolean);
+	return segments[segments.length - 1] ?? path;
+}
 
 export function CaptureSettings() {
 	const [state, setState] = useState<CaptureClientState | null>(null);
@@ -27,7 +32,7 @@ export function CaptureSettings() {
 
 	if (!state) return null;
 
-	const { settings, hasAccessibility } = state;
+	const { settings, hasAccessibility, shortcutError } = state;
 	const waitingForPermission = settings.enabled && !hasAccessibility;
 
 	return (
@@ -37,6 +42,7 @@ export function CaptureSettings() {
 			action={
 				<Switch
 					checked={settings.enabled}
+					disabled={!state.shortcutSupported}
 					onCheckedChange={(enabled) => {
 						void desktopApi
 							.captureSetEnabled(enabled)
@@ -49,23 +55,66 @@ export function CaptureSettings() {
 				/>
 			}
 		>
+			{!state.shortcutSupported ? (
+				<p className="text-xs text-muted-foreground">
+					{shortcutError ?? "Capture is not available on this system."}
+				</p>
+			) : null}
+			{settings.enabled && settings.recentWorkspaces.length > 0 ? (
+				<div className="flex items-center justify-between gap-3">
+					<p className="text-xs text-muted-foreground">Save captures to</p>
+					<select
+						value={settings.targetWorkspace ?? settings.recentWorkspaces[0]}
+						onChange={(event) => {
+							const next = event.currentTarget.value;
+							void desktopApi
+								.captureUpdateSettings({ targetWorkspace: next })
+								.then((nextSettings) =>
+									setState((current) =>
+										current ? { ...current, settings: nextSettings } : current,
+									),
+								);
+						}}
+						className="max-w-[55%] truncate rounded border border-border bg-transparent px-1.5 py-0.5 text-xs"
+					>
+						{settings.recentWorkspaces.map((path) => (
+							<option key={path} value={path}>
+								{basename(path)}
+							</option>
+						))}
+					</select>
+				</div>
+			) : null}
 			{waitingForPermission ? (
 				<div className="rounded-md border border-border bg-muted/40 p-3">
 					<p className="text-xs text-muted-foreground">
-						macOS needs Accessibility access to notice the Shift taps. Hubble
-						reads modifier keys only, never what you type. Turn Hubble on under
-						Privacy &amp; Security &rarr; Accessibility, and this switches on by
-						itself.
+						macOS needs Accessibility access to detect two Shift taps anywhere.
+						Hubble uses this access only for that shortcut and never stores your
+						input. Turn Hubble on under Privacy &amp; Security &rarr;
+						Accessibility.
 					</p>
 					<Button
 						size="sm"
 						variant="outline"
 						className="mt-2"
-						onClick={() => void desktopApi.captureRecheckAccessibility()}
+						onClick={() => {
+							void desktopApi
+								.captureRequestAccessibility()
+								.then((next) =>
+									setState((current) =>
+										current ? { ...current, ...next } : current,
+									),
+								);
+						}}
 					>
-						Open System Settings
+						Request access
 					</Button>
 				</div>
+			) : null}
+			{settings.enabled && shortcutError ? (
+				<p className="text-xs text-destructive">
+					Capture shortcut unavailable: {shortcutError}
+				</p>
 			) : null}
 		</SettingsSection>
 	);

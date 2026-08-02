@@ -7,14 +7,19 @@ import {
 	writeCaptureSettings,
 } from "./settings";
 import {
+	getDoubleTapShiftError,
 	hasAccessibilityPermission,
 	isDoubleTapShiftRunning,
 	requestAccessibilityPermission,
 	startDoubleTapShift,
 	stopDoubleTapShift,
+	supportsDoubleTapShift,
 } from "./shortcut";
 import {
-	hideCaptureWindow,
+	closeCaptureWindow,
+	destroyCaptureWindow,
+	dismissCaptureWindow,
+	getCaptureWindow,
 	isCaptureWindowCollapsed,
 	isCaptureWindowVisible,
 	sendToCaptureWindow,
@@ -23,6 +28,7 @@ import {
 } from "./window";
 
 let session: CaptureSession | null = null;
+let openCapturedFile: (filePath: string) => void | Promise<void>;
 
 function broadcastSession(state: SessionState) {
 	sendToCaptureWindow("capture:session-state", state);
@@ -40,25 +46,31 @@ async function openCapturePanel() {
 	await showCaptureWindow();
 }
 
-/** A double tap toggles the panel open and closed. */
 async function onDoubleTapShift() {
 	if (isCaptureWindowVisible()) {
-		hideCaptureWindow();
+		setCaptureWindowCollapsed(!isCaptureWindowCollapsed());
 		return;
 	}
 	await openCapturePanel();
 }
 
-function syncShortcut(settings: CaptureSettings) {
+async function syncShortcut(settings: CaptureSettings) {
 	if (settings.enabled && hasAccessibilityPermission()) {
-		startDoubleTapShift(() => void onDoubleTapShift());
+		await startDoubleTapShift(() => void onDoubleTapShift());
 	} else {
 		stopDoubleTapShift();
 	}
 }
 
-export async function initCapture() {
-	syncShortcut(readCaptureSettings());
+export async function initCapture(options: {
+	openCapturedFile: (filePath: string) => void | Promise<void>;
+}) {
+	openCapturedFile = options.openCapturedFile;
+	const settings = readCaptureSettings();
+	if (settings.enabled && !supportsDoubleTapShift()) {
+		writeCaptureSettings({ enabled: false });
+	}
+	await syncShortcut(readCaptureSettings());
 	registerCaptureIpc();
 }
 
@@ -71,6 +83,8 @@ function registerCaptureIpc() {
 		settings: readCaptureSettings(),
 		hasAccessibility: hasAccessibilityPermission(),
 		shortcutRunning: isDoubleTapShiftRunning(),
+		shortcutError: getDoubleTapShiftError(),
+		shortcutSupported: supportsDoubleTapShift(),
 		session: getSession().state,
 		collapsed: isCaptureWindowCollapsed(),
 	}));
@@ -78,24 +92,26 @@ function registerCaptureIpc() {
 	ipcMain.handle(
 		"capture:set-enabled",
 		async (_event, { enabled }: { enabled: boolean }) => {
-			const settings = writeCaptureSettings({ enabled });
-			if (enabled && !hasAccessibilityPermission()) {
-				requestAccessibilityPermission();
-			}
-			syncShortcut(settings);
+			const settings = writeCaptureSettings({
+				enabled: enabled && supportsDoubleTapShift(),
+			});
+			await syncShortcut(settings);
+			if (!settings.enabled) destroyCaptureWindow();
 			return {
 				settings,
 				hasAccessibility: hasAccessibilityPermission(),
 				shortcutRunning: isDoubleTapShiftRunning(),
+				shortcutError: getDoubleTapShiftError(),
+				shortcutSupported: supportsDoubleTapShift(),
 			};
 		},
 	);
 
 	ipcMain.handle(
 		"capture:update-settings",
-		(_event, patch: Partial<CaptureSettings>) => {
+		async (_event, patch: Partial<CaptureSettings>) => {
 			const settings = writeCaptureSettings(patch);
-			syncShortcut(settings);
+			await syncShortcut(settings);
 			return settings;
 		},
 	);
@@ -108,12 +124,24 @@ function registerCaptureIpc() {
 			writeCaptureSettings({ recentWorkspaces: paths }),
 	);
 
-	ipcMain.handle("capture:recheck-accessibility", () => {
+	ipcMain.handle("capture:recheck-accessibility", async () => {
 		const granted = hasAccessibilityPermission();
-		syncShortcut(readCaptureSettings());
+		await syncShortcut(readCaptureSettings());
 		return {
 			hasAccessibility: granted,
 			shortcutRunning: isDoubleTapShiftRunning(),
+			shortcutError: getDoubleTapShiftError(),
+		};
+	});
+
+	ipcMain.handle("capture:request-accessibility", async () => {
+		requestAccessibilityPermission();
+		const granted = hasAccessibilityPermission();
+		await syncShortcut(readCaptureSettings());
+		return {
+			hasAccessibility: granted,
+			shortcutRunning: isDoubleTapShiftRunning(),
+			shortcutError: getDoubleTapShiftError(),
 		};
 	});
 
@@ -126,13 +154,24 @@ function registerCaptureIpc() {
 		},
 	);
 
-	ipcMain.handle("capture:save-notes", async () => {
-		await getSession().saveNotes();
-		return getSession().state;
-	});
+	ipcMain.handle(
+		"capture:save-notes",
+		async (
+			_event,
+			{ name, saveAs }: { name: string | null; saveAs?: boolean },
+		) => {
+			const session = getSession();
+			await session.saveNotes(name, saveAs === true);
+			if (session.state.phase === "saved") {
+				await openCapturedFile(session.state.filePath);
+				await dismissCaptureWindow();
+			}
+			return session.state;
+		},
+	);
 
-	ipcMain.handle("capture:hide-window", () => {
-		hideCaptureWindow();
+	ipcMain.handle("capture:close-window", () => {
+		closeCaptureWindow();
 	});
 
 	ipcMain.handle(
@@ -146,6 +185,16 @@ function registerCaptureIpc() {
 		clearDraft();
 		getSession().reset();
 	});
+
+	// The pill drags itself by hand (a native drag region would swallow the
+	// click that expands it), so the renderer streams positions here.
+	ipcMain.handle(
+		"capture:move-window",
+		(_event, { x, y }: { x: number; y: number }) => {
+			const window = getCaptureWindow();
+			if (window && !window.isDestroyed()) window.setPosition(x, y);
+		},
+	);
 
 	// A BrowserWindow cannot cross IPC, so resolve with nothing.
 	ipcMain.handle("capture:show-window", async () => {

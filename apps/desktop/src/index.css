@@ -97,6 +97,12 @@
 	[role="button"]:not(:disabled) {
 		cursor: pointer;
 	}
+	/* The capture panel is a transparent window; its rounded container paints
+	   its own background, so an opaque body would poke out square corners. */
+	html[data-capture-window],
+	html[data-capture-window] body {
+		background: transparent;
+	}
 }
 
 @keyframes welcome-rise {

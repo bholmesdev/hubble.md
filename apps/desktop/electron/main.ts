@@ -47,7 +47,7 @@ import {
 } from "../src/lib/searchContent";
 import type { ThemePreference } from "../src/theme";
 import { initCapture, shutdownCapture } from "./capture";
-import { getCaptureWindow } from "./capture/window";
+import { destroyCaptureWindow, getCaptureWindow } from "./capture/window";
 import { DeleteUndo } from "./deleteUndo";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
@@ -609,6 +609,18 @@ function firstExistingFileArg(args: string[]): string | null {
 
 function sendToRenderer(channel: string, ...args: unknown[]) {
 	mainWindow?.webContents.send(channel, ...args);
+}
+
+function openCapturedFile(filePath: string) {
+	const resolved = resolvePath(filePath);
+	grantFileWithParent(resolved);
+
+	if (!mainWindow || mainWindow.isDestroyed()) {
+		pendingOpenPath = resolved;
+		return;
+	}
+
+	sendToRenderer("desktop:open-file", toRendererPath(resolved));
 }
 
 function assetPathFromUrl(url: URL): string {
@@ -1192,6 +1204,11 @@ async function createWindow() {
 	});
 	window.on("closed", () => {
 		if (mainWindow === window) mainWindow = null;
+		// Without a tray, closing the main window must not leave a hidden process.
+		if (process.platform !== "darwin") {
+			destroyCaptureWindow();
+			app.quit();
+		}
 	});
 
 	if (isDev && process.env.ELECTRON_RENDERER_URL) {
@@ -1872,7 +1889,7 @@ if (!singleInstanceLock) {
 		registerIpc();
 		buildMenu();
 		configureAutoUpdates();
-		await initCapture();
+		await initCapture({ openCapturedFile });
 		await createWindow();
 	});
 

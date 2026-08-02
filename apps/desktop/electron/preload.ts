@@ -183,15 +183,23 @@ const desktopApi = {
 		ipcRenderer.invoke("capture:sync-recent-workspaces", { paths }),
 	captureRecheckAccessibility: () =>
 		ipcRenderer.invoke("capture:recheck-accessibility"),
+	captureRequestAccessibility: () =>
+		ipcRenderer.invoke("capture:request-accessibility"),
 	captureGetDraft: () => ipcRenderer.invoke("capture:get-draft"),
 	captureSetDraft: (markdown) =>
 		ipcRenderer.invoke("capture:set-draft", { markdown }),
-	captureSaveNotes: () => ipcRenderer.invoke("capture:save-notes"),
-	captureHideWindow: () => ipcRenderer.invoke("capture:hide-window"),
+	captureSaveNotes: (name, saveAs) =>
+		ipcRenderer.invoke("capture:save-notes", {
+			name: name ?? null,
+			saveAs: saveAs === true,
+		}),
+	captureCloseWindow: () => ipcRenderer.invoke("capture:close-window"),
 	captureShowWindow: () => ipcRenderer.invoke("capture:show-window"),
 	captureSetCollapsed: (collapsed) =>
 		ipcRenderer.invoke("capture:set-collapsed", { collapsed }),
 	captureDiscardDraft: () => ipcRenderer.invoke("capture:discard-draft"),
+	captureMoveWindow: (x, y) =>
+		ipcRenderer.invoke("capture:move-window", { x, y }),
 	onCaptureSessionState: (callback) =>
 		subscribe("capture:session-state", callback),
 	onCaptureWindowShown: (callback) =>
@@ -200,8 +208,6 @@ const desktopApi = {
 		subscribe("capture:collapsed-changed", (collapsed: boolean) =>
 			callback(collapsed),
 		),
-	onCaptureCloseRequested: (callback) =>
-		subscribe("capture:close-requested", callback),
 } satisfies DesktopApi;
 
 contextBridge.exposeInMainWorld("desktopApi", desktopApi);

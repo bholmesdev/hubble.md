@@ -2,6 +2,7 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow, screen } from "electron";
+import { type FrontmostApp, focusApp, getFrontmostApp } from "./frontmostApp";
 
 const DEFAULT_WIDTH = 400;
 const DEFAULT_HEIGHT = 460;
@@ -12,10 +13,11 @@ const MIN_HEIGHT = 220;
 const EDGE_MARGIN = 24;
 
 /** Size of the collapsed pill the panel shrinks into. */
-const PILL_WIDTH = 200;
-const PILL_HEIGHT = 44;
+const PILL_WIDTH = 220;
+const PILL_HEIGHT = 36;
 
 const SAVE_DEBOUNCE_MS = 300;
+const FOCUS_SETTLE_MS = 75;
 
 type CaptureBounds = {
 	x: number;
@@ -30,6 +32,8 @@ let collapsed = false;
 /** Size to restore when the pill expands back into the panel. */
 let expandedSize = { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
 let quitting = false;
+let previousApp: FrontmostApp | null = null;
+let dismissing: Promise<void> | null = null;
 
 app.on("before-quit", () => {
 	quitting = true;
@@ -131,7 +135,7 @@ async function createCaptureWindow() {
 		minimizable: false,
 		maximizable: false,
 		fullscreenable: false,
-		skipTaskbar: true,
+		...(process.platform === "win32" ? { skipTaskbar: true } : {}),
 		alwaysOnTop: true,
 		transparent: true,
 		backgroundColor: "#00000000",
@@ -147,16 +151,16 @@ async function createCaptureWindow() {
 
 	// Float above fullscreen apps so capture works without leaving what you were doing.
 	window.setAlwaysOnTop(true, "floating");
-	window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+	if (process.platform === "linux") window.setVisibleOnAllWorkspaces(true);
 	window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 	window.on("move", () => queueSaveBounds(window));
 	window.on("resize", () => queueSaveBounds(window));
-	// Cmd+W and the menu route through close; the renderer decides whether the
-	// draft should be saved or trashed before the window actually goes away.
+	// Cmd+W and the menu route through close; the draft survives hiding, so
+	// closing just puts the panel away instead of destroying the window.
 	window.on("close", (event) => {
 		if (quitting) return;
 		event.preventDefault();
-		window.webContents.send("capture:close-requested");
+		void dismissCaptureWindow();
 	});
 	window.on("closed", () => {
 		if (captureWindow === window) captureWindow = null;
@@ -172,27 +176,59 @@ async function createCaptureWindow() {
 }
 
 export async function showCaptureWindow() {
+	previousApp = await getFrontmostApp();
 	const window = captureWindow ?? (await createCaptureWindow());
 	// Summoning the panel means writing, so a collapsed pill expands first.
 	setCaptureWindowCollapsed(false);
 	// Reopening keeps wherever it was dragged to; only an offscreen spot resets.
 	const bounds = window.getNormalBounds();
 	if (!isOnSomeDisplay(bounds)) window.setBounds(defaultBounds());
-	window.show();
+	if (process.platform === "darwin") {
+		// show() activates Hubble before the panel can take key focus.
+		window.showInactive();
+	} else {
+		window.show();
+	}
 	window.focus();
 	window.webContents.send("capture:window-shown");
 	return window;
 }
 
-export function hideCaptureWindow() {
-	if (!captureWindow || captureWindow.isDestroyed()) return;
+export function dismissCaptureWindow() {
+	if (dismissing) return dismissing;
+	dismissing = runDismiss().finally(() => {
+		dismissing = null;
+	});
+	return dismissing;
+}
+
+async function runDismiss() {
+	const window = captureWindow;
+	if (!window || window.isDestroyed()) return;
 	// Flush the pending debounce so a drag right before hiding is not lost.
 	if (saveBoundsTimer) {
 		clearTimeout(saveBoundsTimer);
 		saveBoundsTimer = null;
-		saveBounds(captureWindow);
+		saveBounds(window);
 	}
-	captureWindow.hide();
+	const appToRestore = previousApp;
+	previousApp = null;
+	if (appToRestore) {
+		await focusApp(appToRestore);
+		// Let AppKit switch apps before hiding the active capture window.
+		await new Promise((resolve) => setTimeout(resolve, FOCUS_SETTLE_MS));
+	}
+	if (!window.isDestroyed()) window.hide();
+}
+
+export function closeCaptureWindow() {
+	if (!captureWindow || captureWindow.isDestroyed()) return;
+	captureWindow.close();
+}
+
+export function destroyCaptureWindow() {
+	if (!captureWindow || captureWindow.isDestroyed()) return;
+	captureWindow.destroy();
 }
 
 export function isCaptureWindowVisible() {

@@ -244,6 +244,8 @@ export type DesktopApi = {
 		settings: CaptureSettings;
 		hasAccessibility: boolean;
 		shortcutRunning: boolean;
+		shortcutError: string | null;
+		shortcutSupported: boolean;
 	}>;
 	captureUpdateSettings(
 		patch: Partial<CaptureSettings>,
@@ -252,14 +254,24 @@ export type DesktopApi = {
 	captureRecheckAccessibility(): Promise<{
 		hasAccessibility: boolean;
 		shortcutRunning: boolean;
+		shortcutError: string | null;
+	}>;
+	captureRequestAccessibility(): Promise<{
+		hasAccessibility: boolean;
+		shortcutRunning: boolean;
+		shortcutError: string | null;
 	}>;
 	captureGetDraft(): Promise<string>;
 	captureSetDraft(markdown: string): Promise<void>;
-	captureSaveNotes(): Promise<CaptureSessionState>;
-	captureHideWindow(): Promise<void>;
+	captureSaveNotes(
+		name?: string | null,
+		saveAs?: boolean,
+	): Promise<CaptureSessionState>;
+	captureCloseWindow(): Promise<void>;
 	captureShowWindow(): Promise<void>;
 	captureSetCollapsed(collapsed: boolean): Promise<void>;
 	captureDiscardDraft(): Promise<void>;
+	captureMoveWindow(x: number, y: number): Promise<void>;
 	onCaptureSessionState(
 		callback: (state: CaptureSessionState) => void,
 	): Unsubscribe;
@@ -267,7 +279,6 @@ export type DesktopApi = {
 	onCaptureCollapsedChanged(
 		callback: (collapsed: boolean) => void,
 	): Unsubscribe;
-	onCaptureCloseRequested(callback: () => void): Unsubscribe;
 };
 
 export type CaptureSettings = {
@@ -285,6 +296,8 @@ export type CaptureClientState = {
 	settings: CaptureSettings;
 	hasAccessibility: boolean;
 	shortcutRunning: boolean;
+	shortcutError: string | null;
+	shortcutSupported: boolean;
 	session: CaptureSessionState;
 	collapsed: boolean;
 };

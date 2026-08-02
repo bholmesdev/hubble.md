@@ -31,6 +31,37 @@ afterEach(() => {
 });
 
 describe("editor path attribution", () => {
+	it("keeps front-matter-like text in scratch editors", async () => {
+		const initialMarkdown = "---\ntitle: Keep me\n---\nBody";
+		const onLocalChange = vi.fn();
+		const root = createTestRoot();
+		const getEditor = captureEditorCreation();
+
+		await act(async () => {
+			root.render(
+				<EditorView
+					path="capture://draft"
+					initialMarkdown={initialMarkdown}
+					showFileProperties={false}
+					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
+					onLocalChange={onLocalChange}
+					onSave={() => {}}
+					onOpenExternalLink={() => {}}
+					onOpenWikiLink={() => {}}
+				/>,
+			);
+		});
+		act(() => {
+			getEditor().commands.focus("end");
+			getEditor().commands.insertContent(" tail");
+		});
+
+		expect(onLocalChange).toHaveBeenLastCalledWith(
+			"capture://draft",
+			`${initialMarkdown} tail`,
+		);
+	});
+
 	it("attributes a rich editor change and save to the new path", async () => {
 		const onLocalChange = vi.fn();
 		const onSave = vi.fn();
