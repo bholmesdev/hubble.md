@@ -23,7 +23,7 @@ type PendingDelete = {
 	historyAfter: ReturnType<typeof historyStore.get>;
 	pinRemovalSaved: Promise<void>;
 	toastId: string | number | null;
-	state: "active" | "expiring" | "restoring";
+	claimed: boolean;
 };
 
 type DeleteDeps = {
@@ -59,20 +59,21 @@ export function createDeleteActions(deps: DeleteDeps) {
 	const isSaveBlocked = (path: string) =>
 		blockedItems ? covers(path, blockedItems) : false;
 
-	const claim = (state: "expiring" | "restoring", token?: string) => {
-		if (
-			!pending ||
-			pending.state !== "active" ||
-			(token && pending.token !== token)
-		) {
+	// The toast timeout, Cmd+Z, and the next delete all race to settle the
+	// pending deletion; exactly one caller may claim it. Passing a token
+	// limits the claim to that deletion, so a stale toast callback is a no-op.
+	const claim = (token?: string) => {
+		if (!pending || pending.claimed || (token && pending.token !== token)) {
 			return null;
 		}
-		pending.state = state;
+		pending.claimed = true;
 		if (pending.toastId !== null) toast.dismiss(pending.toastId);
 		void desktopApi.setDeleteUndoAvailable(false);
 		return pending;
 	};
 
+	// Saves to the deleted paths stay blocked while the claimed expire or
+	// restore is in flight, so cleanup happens here rather than in claim.
 	const finish = (finished: PendingDelete) => {
 		if (pending !== finished) return;
 		pending = null;
@@ -80,7 +81,7 @@ export function createDeleteActions(deps: DeleteDeps) {
 	};
 
 	const expireDeleteUndo = async (token?: string) => {
-		const deletion = claim("expiring", token);
+		const deletion = claim(token);
 		if (!deletion) return false;
 		try {
 			await deletion.pinRemovalSaved;
@@ -95,7 +96,7 @@ export function createDeleteActions(deps: DeleteDeps) {
 	};
 
 	const undoDelete = async (token?: string) => {
-		const deletion = claim("restoring", token);
+		const deletion = claim(token);
 		if (!deletion) return false;
 		try {
 			// The removal write must finish before restored pins are written back.
@@ -136,6 +137,51 @@ export function createDeleteActions(deps: DeleteDeps) {
 		return true;
 	};
 
+	/**
+	 * Blocks saves to the items, flushes the open note, and stages the items
+	 * for undoable deletion. Returns the deletion token, or null if the
+	 * delete was abandoned; abandoning unblocks saves.
+	 */
+	const stageItems = async (
+		items: SidebarDeleteItem[],
+		workspacePath: string,
+		viewer: { currentPath: string | null; content: string },
+	): Promise<string | null> => {
+		const abandon = () => {
+			blockedItems = null;
+			return null;
+		};
+		// Block new saves to the deleted paths before waiting out in-flight
+		// ones, so a queued autosave cannot recreate a staged file.
+		blockedItems = items;
+		await deps.waitForSaves((path) => covers(path, items));
+		if (viewer.currentPath && covers(viewer.currentPath, items)) {
+			try {
+				// Flush the open note so the staged copy holds its latest text.
+				await deps.saveBeforeDelete(viewer.currentPath, viewer.content);
+			} catch {
+				return abandon(); // The save already raised its own toast.
+			}
+		}
+		let token: string;
+		try {
+			token = await desktopApi.stageDelete(workspacePath, items.map(itemPath));
+		} catch (error) {
+			toast.error("Failed to delete items", {
+				description: deps.handleError(error),
+			});
+			return abandon();
+		}
+		if (workspaceStore.get().workspacePath !== workspacePath) {
+			// The user switched workspaces while staging; undo would restore
+			// into the wrong sidebar, so drop the staged files right away.
+			abandon();
+			await desktopApi.finalizeDelete(token);
+			return null;
+		}
+		return token;
+	};
+
 	const runDelete = async (items: SidebarDeleteItem[]) => {
 		if (items.length === 0) return;
 		await expireDeleteUndo();
@@ -145,36 +191,12 @@ export function createDeleteActions(deps: DeleteDeps) {
 		if (!workspaceBefore.workspacePath) return;
 		const viewerBefore = viewerStore.get();
 		const historyBefore = historyStore.get();
-		blockedItems = items;
-		await deps.waitForSaves((path) => covers(path, items));
-		const currentPath = viewerBefore.currentPath;
-		if (currentPath && covers(currentPath, items)) {
-			try {
-				await deps.saveBeforeDelete(currentPath, viewerBefore.content);
-			} catch {
-				blockedItems = null;
-				return;
-			}
-		}
-
-		let token: string;
-		try {
-			token = await desktopApi.stageDelete(
-				workspaceBefore.workspacePath,
-				items.map(itemPath),
-			);
-		} catch (error) {
-			blockedItems = null;
-			toast.error("Failed to delete items", {
-				description: deps.handleError(error),
-			});
-			return;
-		}
-		if (workspaceStore.get().workspacePath !== workspaceBefore.workspacePath) {
-			blockedItems = null;
-			await desktopApi.finalizeDelete(token);
-			return;
-		}
+		const token = await stageItems(
+			items,
+			workspaceBefore.workspacePath,
+			viewerBefore,
+		);
+		if (token === null) return;
 
 		const deletedPath = (path: string) => covers(path, items);
 		const deletedCurrent =
@@ -228,7 +250,7 @@ export function createDeleteActions(deps: DeleteDeps) {
 					},
 		}));
 		const pinRemovalSaved = deps.syncPins();
-		pending = {
+		const deletion: PendingDelete = {
 			token,
 			workspacePath: workspaceBefore.workspacePath,
 			reopenPath: deletedCurrent ? viewerBefore.currentPath : null,
@@ -238,10 +260,11 @@ export function createDeleteActions(deps: DeleteDeps) {
 			historyAfter: historyStore.get(),
 			pinRemovalSaved,
 			toastId: null,
-			state: "active",
+			claimed: false,
 		};
+		pending = deletion;
 		const count = items.length;
-		const toastId = toast(
+		deletion.toastId = toast(
 			`Deleted ${count === 1 ? "1 item" : `${count} items`}`,
 			{
 				duration: UNDO_MS,
@@ -256,7 +279,6 @@ export function createDeleteActions(deps: DeleteDeps) {
 				onDismiss: () => void expireDeleteUndo(token),
 			},
 		);
-		if (pending?.token === token) pending.toastId = toastId;
 		await desktopApi.setDeleteUndoAvailable(true);
 		await pinRemovalSaved;
 	};
