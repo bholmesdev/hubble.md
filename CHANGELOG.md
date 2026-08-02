@@ -9,10 +9,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.1.24] - 2026-08-02
+
+### Added
+
 - Keep the sidebar in sync when files and folders are added, deleted, or renamed outside Hubble. Thanks [@Mamdouh66](https://github.com/Mamdouh66) for the suggestion! [#202](https://github.com/bholmesdev/hubble.md/pull/202)
 - Undo accidental file and folder deletions from the confirmation toast or with Cmd+Z. Thanks [@Siffrico](https://github.com/Siffrico) for the suggestion! [#218](https://github.com/bholmesdev/hubble.md/pull/218)
-
-### Changed
 
 ### Fixed
 
