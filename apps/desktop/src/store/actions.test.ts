@@ -1285,6 +1285,114 @@ describe("desktop folder actions", () => {
 		vi.doUnmock("sonner");
 	});
 
+	it("releases Cmd+Z as soon as document editing resumes", async () => {
+		const api = createDesktopApi();
+		let finishDrop: () => void = () => {};
+		api.finalizeDelete.mockImplementation(
+			() =>
+				new Promise<void>((resolve) => {
+					finishDrop = resolve;
+				}),
+		);
+		const toast = Object.assign(
+			vi.fn(() => "delete-undo"),
+			{
+				dismiss: vi.fn(),
+				success: vi.fn(),
+				error: vi.fn(),
+			},
+		);
+		vi.doMock("sonner", () => ({ toast }));
+		const {
+			appStore,
+			deleteSidebarItems,
+			undoPendingDelete,
+			updateEditorContent,
+		} = await loadStoreActions(api);
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [
+					{ path: "/workspace/keep.md", modified_at: 1 },
+					{ path: "/workspace/delete.md", modified_at: 1 },
+				],
+			},
+			document: {
+				...current.document,
+				currentPath: "/workspace/keep.md",
+				content: "before",
+				diskContent: "before",
+			},
+		}));
+
+		await deleteSidebarItems([{ kind: "file", path: "/workspace/delete.md" }]);
+		updateEditorContent("/workspace/keep.md", "after");
+
+		expect(await undoPendingDelete()).toBe(false);
+		expect(api.setDeleteUndoAvailable).toHaveBeenLastCalledWith(false);
+		finishDrop();
+		await vi.waitFor(() => expect(api.finalizeDelete).toHaveBeenCalled());
+		vi.doUnmock("sonner");
+	});
+
+	it("waits for an in-flight save before staging a deletion", async () => {
+		const api = createDesktopApi();
+		let finishFirstWrite: () => void = () => {};
+		api.writeFileText
+			.mockImplementationOnce(
+				() =>
+					new Promise<void>((resolve) => {
+						finishFirstWrite = resolve;
+					}),
+			)
+			.mockResolvedValue(undefined);
+		const toast = Object.assign(
+			vi.fn(() => "delete-undo"),
+			{
+				dismiss: vi.fn(),
+				success: vi.fn(),
+				error: vi.fn(),
+			},
+		);
+		vi.doMock("sonner", () => ({ toast }));
+		const { appStore, deleteSidebarItems, savePathContent } =
+			await loadStoreActions(api);
+		const path = "/workspace/delete.md";
+		appStore.set((current) => ({
+			...current,
+			workspace: {
+				...current.workspace,
+				workspacePath: "/workspace",
+				files: [{ path, modified_at: 1 }],
+			},
+			document: {
+				...current.document,
+				currentPath: path,
+				content: "latest",
+				diskContent: "before",
+			},
+		}));
+
+		const firstSave = savePathContent(path, "older", { force: true });
+		await vi.waitFor(() =>
+			expect(api.writeFileText).toHaveBeenCalledWith(path, "older"),
+		);
+		const deletion = deleteSidebarItems([{ kind: "file", path }]);
+
+		expect(api.stageDelete).not.toHaveBeenCalled();
+		finishFirstWrite();
+		await firstSave;
+		await deletion;
+
+		expect(api.writeFileText).toHaveBeenLastCalledWith(path, "latest");
+		expect(api.writeFileText.mock.invocationCallOrder[1]).toBeLessThan(
+			api.stageDelete.mock.invocationCallOrder[0],
+		);
+		vi.doUnmock("sonner");
+	});
+
 	it("expires sidebar delete undo before switching workspaces", async () => {
 		const api = createDesktopApi();
 		const toast = Object.assign(

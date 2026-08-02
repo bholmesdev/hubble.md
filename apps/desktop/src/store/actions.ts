@@ -99,6 +99,7 @@ const workspaceSidebarQueues = new Map<string, Promise<void>>();
 // after the editor already has draft B, that watcher event is not an external
 // conflict; it is just the disk baseline catching up to a save we started.
 const selfSaves = new Map<string, Map<string, number>>();
+const saveQueues = new Map<string, Promise<void>>();
 const DELETE_UNDO_DURATION_MS = 8000;
 let blockedSaveItems: SidebarDeleteItem[] | null = null;
 
@@ -112,7 +113,7 @@ type PendingDeleteUndo = {
 	historyAfter: ReturnType<typeof historyStore.get>;
 	pinRemovalSaved: Promise<void>;
 	toastId: string | number | null;
-	isRestoring: boolean;
+	state: "active" | "finalizing" | "restoring";
 };
 
 let pendingDeleteUndo: PendingDeleteUndo | null = null;
@@ -738,15 +739,26 @@ export function setViewerMode(viewMode: ViewMode) {
 	});
 }
 
-export async function savePathContent(
+function queueSave(path: string, save: () => Promise<void>) {
+	const previous = saveQueues.get(path);
+	const next = previous ? previous.catch(() => {}).then(save) : save();
+	saveQueues.set(path, next);
+	const clear = () => {
+		if (saveQueues.get(path) === next) saveQueues.delete(path);
+	};
+	void next.then(clear, clear);
+	return next;
+}
+
+async function savePathContentNow(
 	path: string,
 	content: string,
-	options?: { force?: boolean; throwOnError?: boolean },
+	options?: { force?: boolean; throwOnError?: boolean; allowBlocked?: boolean },
 ) {
 	// Binary viewers, external files, and the virtual changelog never enter text saves.
 	if (isChangelogPath(path) || !isEditableFile(path)) return;
 	// A save already queued by the editor must not recreate a staged deletion.
-	if (isStagedForDelete(path)) return;
+	if (!options?.allowBlocked && isStagedForDelete(path)) return;
 	const current = viewerStore.get();
 	const force = options?.force === true;
 	if (current.currentPath !== path) return;
@@ -824,6 +836,14 @@ export async function savePathContent(
 		});
 		if (options?.throwOnError) throw err;
 	}
+}
+
+export function savePathContent(
+	path: string,
+	content: string,
+	options?: { force?: boolean; throwOnError?: boolean },
+) {
+	return queueSave(path, () => savePathContentNow(path, content, options));
 }
 
 export async function renameMarkdownFile(path: string, nextName: string) {
@@ -1300,18 +1320,30 @@ export async function deleteFolder(path: string) {
 	}
 }
 
-function clearPendingDelete(pending: PendingDeleteUndo) {
-	pendingDeleteUndo = null;
-	blockedSaveItems = null;
+function claimPendingDelete(state: "finalizing" | "restoring", token?: string) {
+	const pending = pendingDeleteUndo;
+	if (
+		!pending ||
+		pending.state !== "active" ||
+		(token && pending.token !== token)
+	) {
+		return null;
+	}
+	pending.state = state;
 	if (pending.toastId !== null) toast.dismiss(pending.toastId);
 	void desktopApi.setDeleteUndoAvailable(false);
+	return pending;
+}
+
+function finishPendingDelete(pending: PendingDeleteUndo) {
+	if (pendingDeleteUndo !== pending) return;
+	pendingDeleteUndo = null;
+	blockedSaveItems = null;
 }
 
 export async function finalizePendingDeleteUndo(token?: string) {
-	const pending = pendingDeleteUndo;
-	if (!pending || pending.isRestoring || (token && pending.token !== token)) {
-		return false;
-	}
+	const pending = claimPendingDelete("finalizing", token);
+	if (!pending) return false;
 	try {
 		await pending.pinRemovalSaved;
 		await desktopApi.finalizeDelete(pending.token);
@@ -1320,29 +1352,26 @@ export async function finalizePendingDeleteUndo(token?: string) {
 			description: handleFileError(error),
 		});
 	}
-	clearPendingDelete(pending);
+	finishPendingDelete(pending);
 	return true;
 }
 
 export async function undoPendingDelete(token?: string) {
-	const pending = pendingDeleteUndo;
-	if (!pending || pending.isRestoring || (token && pending.token !== token)) {
-		return false;
-	}
-	pending.isRestoring = true;
+	const pending = claimPendingDelete("restoring", token);
+	if (!pending) return false;
 	try {
 		// Finish the removal write so it cannot overwrite the restored pins.
 		await pending.pinRemovalSaved;
 		await desktopApi.restoreDelete(pending.token);
 	} catch (error) {
-		clearPendingDelete(pending);
 		toast.error("Failed to undo deletion", {
 			description: handleFileError(error),
 		});
+		finishPendingDelete(pending);
 		return false;
 	}
 
-	clearPendingDelete(pending);
+	finishPendingDelete(pending);
 	const currentWorkspace = workspaceStore.get().workspacePath;
 	if (currentWorkspace === pending.workspacePath) {
 		workspaceStore.set((state) => ({
@@ -1377,20 +1406,27 @@ async function performSidebarDelete(items: SidebarDeleteItem[]) {
 	if (!workspaceBefore.workspacePath) return;
 	const viewerBefore = viewerStore.get();
 	const historyBefore = historyStore.get();
-	if (
-		viewerBefore.currentPath &&
-		pathCoveredByDeleteItems(viewerBefore.currentPath, items)
-	) {
+	blockedSaveItems = items;
+	await Promise.all(
+		[...saveQueues]
+			.filter(([path]) => pathCoveredByDeleteItems(path, items))
+			.map(([, save]) => save.catch(() => {})),
+	);
+	const currentPath = viewerBefore.currentPath;
+	if (currentPath && pathCoveredByDeleteItems(currentPath, items)) {
 		try {
-			await savePathContent(viewerBefore.currentPath, viewerBefore.content, {
-				force: true,
-				throwOnError: true,
-			});
+			await queueSave(currentPath, () =>
+				savePathContentNow(currentPath, viewerBefore.content, {
+					force: true,
+					throwOnError: true,
+					allowBlocked: true,
+				}),
+			);
 		} catch {
+			blockedSaveItems = null;
 			return;
 		}
 	}
-	blockedSaveItems = items;
 
 	let token: string;
 	try {
@@ -1473,7 +1509,7 @@ async function performSidebarDelete(items: SidebarDeleteItem[]) {
 		historyAfter: historyStore.get(),
 		pinRemovalSaved,
 		toastId: null,
-		isRestoring: false,
+		state: "active",
 	};
 	const count = items.length;
 	const toastId = toast(
