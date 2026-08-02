@@ -46,6 +46,7 @@ import {
 	SEARCH_MIN_QUERY_LENGTH,
 } from "../src/lib/searchContent";
 import type { ThemePreference } from "../src/theme";
+import { DeleteUndo } from "./deleteUndo";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
 import {
@@ -180,6 +181,8 @@ let workspaceWatcherStart = Promise.resolve();
 const grantedFiles = new Set<string>();
 const grantedRoots = new Set<string>();
 let grantsLoaded = false;
+let deleteUndoAvailable = false;
+const deleteUndo = new DeleteUndo();
 // An AbortSignal cannot cross IPC, so a superseded search is abandoned by
 // comparing its id against the newest one between files.
 let latestSearchRequestId = 0;
@@ -849,7 +852,13 @@ function buildMenu() {
 		{
 			label: "Edit",
 			submenu: [
-				{ role: "undo" },
+				deleteUndoAvailable
+					? {
+							label: "Undo Delete",
+							accelerator: "CmdOrCtrl+Z",
+							click: () => sendToRenderer("desktop:undo-delete"),
+						}
+					: { role: "undo" },
 				{ role: "redo" },
 				{ type: "separator" },
 				{ role: "cut" },
@@ -1270,6 +1279,7 @@ function registerIpc() {
 			if (!stat.isDirectory()) {
 				throw new Error(`Not a directory: ${dirPath}`);
 			}
+			await deleteUndo.clean(root);
 			return listSidebarFiles(root);
 		},
 	);
@@ -1488,6 +1498,38 @@ function registerIpc() {
 			};
 		},
 	);
+
+	ipcMain.handle(
+		"desktop:stage-delete",
+		async (
+			_event,
+			{ workspacePath, paths }: { workspacePath: string; paths: string[] },
+		) =>
+			deleteUndo.stage(assertGranted(workspacePath), paths.map(assertGranted)),
+	);
+
+	ipcMain.handle(
+		"desktop:restore-delete",
+		async (_event, { token }: { token: string }) => {
+			for (const restoredPath of await deleteUndo.restore(token)) {
+				grantFileWithParent(restoredPath);
+			}
+		},
+	);
+
+	ipcMain.handle(
+		"desktop:finalize-delete",
+		(_event, { token }: { token: string }) => deleteUndo.drop(token),
+	);
+
+	ipcMain.handle(
+		"desktop:set-delete-undo-available",
+		(_event, { available }: { available: boolean }) => {
+			deleteUndoAvailable = available === true;
+			buildMenu();
+		},
+	);
+	ipcMain.handle("desktop:undo-text", (event) => event.sender.undo());
 
 	ipcMain.handle(
 		"desktop:delete-file",

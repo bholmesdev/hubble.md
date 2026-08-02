@@ -15,6 +15,7 @@ import {
 	createMarkdownFileInFolder,
 	deleteFolder,
 	deleteMarkdownFile,
+	deleteSidebarItems,
 	loadPath,
 	moveSidebarItems,
 	openPathInDefaultApp,
@@ -130,6 +131,15 @@ export function Sidebar({
 				)
 			}
 			onDeleteFile={(path) => void deleteMarkdownFile(path)}
+			onDeleteItems={(items) =>
+				void deleteSidebarItems(
+					items.map((item) =>
+						item.kind === "file"
+							? item
+							: { ...item, folderId: absolutePath(item.folderId) },
+					),
+				)
+			}
 			onTogglePinnedFile={(path) => void togglePinnedNote(path)}
 			onCreateFile={(folderId) =>
 				createMarkdownFileInFolder(absolutePath(folderId))

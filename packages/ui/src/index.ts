@@ -9,6 +9,7 @@ export {
 } from "./components/GlobalSearchPalette";
 export {
 	Sidebar,
+	type SidebarDeleteItem,
 	type SidebarFile,
 	type SidebarFocusedItem,
 	type SidebarFolder,

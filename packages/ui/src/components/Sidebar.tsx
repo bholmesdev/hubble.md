@@ -72,6 +72,8 @@ export type SidebarMoveItemInput = {
 	targetFolderId: string | null;
 };
 
+export type SidebarDeleteItem = SidebarMoveItem;
+
 export type SidebarFocusedItem =
 	| { kind: "file"; path: string }
 	| { kind: "folder"; folderId: string }
@@ -379,6 +381,7 @@ export function Sidebar({
 	onRenameFile,
 	onRenameFolder,
 	onDeleteFile,
+	onDeleteItems,
 	onTogglePinnedFile,
 	onCreateFile,
 	onCreateHtmlFile,
@@ -413,6 +416,7 @@ export function Sidebar({
 		targetDisplayPath: string,
 	) => void;
 	onDeleteFile?: (path: string) => void;
+	onDeleteItems?: (items: SidebarDeleteItem[]) => void;
 	onTogglePinnedFile?: (path: string) => void;
 	onCreateFile?: (folderId: string | null) => Promise<string | null>;
 	onCreateHtmlFile?: (folderId: string | null) => Promise<string | null>;
@@ -607,8 +611,8 @@ export function Sidebar({
 		const actionable = sidebarDeleteSelection(
 			targetSelection,
 			getDisplayPath,
-			Boolean(onDeleteFile),
-			Boolean(onDeleteFolder),
+			Boolean(onDeleteItems || onDeleteFile),
+			Boolean(onDeleteItems || onDeleteFolder),
 		);
 		if (actionable.count === 0) return;
 		if (
@@ -617,6 +621,19 @@ export function Sidebar({
 			)
 		)
 			return;
+		if (onDeleteItems) {
+			onDeleteItems([
+				...actionable.files.map((file) => ({
+					kind: "file" as const,
+					path: file.path,
+				})),
+				...actionable.folders.map((folderId) => ({
+					kind: "folder" as const,
+					folderId,
+				})),
+			]);
+			return;
+		}
 		for (const file of actionable.files) onDeleteFile?.(file.path);
 		for (const folderId of actionable.folders) onDeleteFolder?.(folderId);
 	};
@@ -979,6 +996,7 @@ export function Sidebar({
 											!onOpenFileInDefaultApp &&
 											!onCopyFilePath &&
 											!onRenameFile &&
+											!onDeleteItems &&
 											!onDeleteFile
 										)
 											return;
@@ -988,6 +1006,7 @@ export function Sidebar({
 											!onCreateFolder &&
 											!onRenameFolder &&
 											!onCreateFile &&
+											!onDeleteItems &&
 											!onDeleteFolder
 										)
 											return;
@@ -1092,6 +1111,7 @@ export function Sidebar({
 												onCreateFile ||
 												onCreateFolder ||
 												onRenameFolder ||
+												onDeleteItems ||
 												onDeleteFolder) && (
 												<FolderActionsMenu
 													id={row.id}
@@ -1125,6 +1145,7 @@ export function Sidebar({
 															: undefined
 													}
 													onDeleteFolder={onDeleteFolder}
+													onDeleteSelection={handleDeleteSelection}
 													selection={actionSelection}
 													onDeleteFiles={onDeleteFile}
 													onTogglePinnedFile={onTogglePinnedFile}
@@ -1150,6 +1171,7 @@ export function Sidebar({
 												onOpenFileInDefaultApp ||
 												onCopyFilePath ||
 												onRenameFile ||
+												onDeleteItems ||
 												onDeleteFile ||
 												onTogglePinnedFile) && (
 												<FileActionsMenu
@@ -1171,6 +1193,7 @@ export function Sidebar({
 													}
 													onTogglePinnedFile={onTogglePinnedFile}
 													onDeleteFile={onDeleteFile}
+													onDeleteSelection={handleDeleteSelection}
 													selection={actionSelection}
 													onDeleteFolders={onDeleteFolder}
 													getDisplayPath={getDisplayPath}
@@ -1844,6 +1867,7 @@ function FolderActionsMenu({
 	onRenameFolder,
 	onDeleteFolder,
 	onDeleteFiles,
+	onDeleteSelection,
 	onTogglePinnedFile,
 	getDisplayPath,
 }: {
@@ -1860,6 +1884,7 @@ function FolderActionsMenu({
 	onRenameFolder?: (id: string, label: string) => void;
 	onDeleteFolder?: (id: string) => void;
 	onDeleteFiles?: (path: string) => void;
+	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	onTogglePinnedFile?: (path: string) => void;
 	getDisplayPath: (path: string) => string;
 }) {
@@ -1874,6 +1899,7 @@ function FolderActionsMenu({
 					selection={selection}
 					onDeleteFile={onDeleteFiles}
 					onDeleteFolder={onDeleteFolder}
+					onDeleteSelection={onDeleteSelection}
 					getDisplayPath={getDisplayPath}
 				/>
 			</ActionsMenu>
@@ -1923,16 +1949,17 @@ function FolderActionsMenu({
 					Rename
 				</ActionItem>
 			)}
-			{onDeleteFolder && (
+			{(onDeleteSelection || onDeleteFolder) && (
 				<ActionItem
 					destructive
 					icon={<MingcuteDeleteLine />}
 					shortcut={formatCommandShortcut("app.delete")}
-					onClick={() => {
-						if (!window.confirm(`Delete ${label} and all its contents?`))
-							return;
-						onDeleteFolder(id);
-					}}
+					onClick={() =>
+						onDeleteSelection
+							? onDeleteSelection({ files: [], folders: [id], count: 1 })
+							: window.confirm(`Delete ${label} and all its contents?`) &&
+								onDeleteFolder?.(id)
+					}
 				>
 					Delete
 				</ActionItem>
@@ -1955,6 +1982,7 @@ function FileActionsMenu({
 	onTogglePinnedFile,
 	onDeleteFile,
 	onDeleteFolders,
+	onDeleteSelection,
 	getDisplayPath,
 }: {
 	file: SidebarFile;
@@ -1970,6 +1998,7 @@ function FileActionsMenu({
 	onTogglePinnedFile?: (path: string) => void;
 	onDeleteFile?: (path: string) => void;
 	onDeleteFolders?: (id: string) => void;
+	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	getDisplayPath: (path: string) => string;
 }) {
 	if (selection.count > 1) {
@@ -1983,6 +2012,7 @@ function FileActionsMenu({
 					selection={selection}
 					onDeleteFile={onDeleteFile}
 					onDeleteFolder={onDeleteFolders}
+					onDeleteSelection={onDeleteSelection}
 					getDisplayPath={getDisplayPath}
 				/>
 			</ActionsMenu>
@@ -2032,15 +2062,16 @@ function FileActionsMenu({
 					{file.pinned ? "Unpin" : "Pin"}
 				</ActionItem>
 			)}
-			{onDeleteFile && (
+			{(onDeleteSelection || onDeleteFile) && (
 				<ActionItem
 					destructive
 					icon={<MingcuteDeleteLine />}
 					shortcut={formatCommandShortcut("app.delete")}
-					onClick={() => {
-						if (!window.confirm(`Delete ${label}?`)) return;
-						onDeleteFile(file.path);
-					}}
+					onClick={() =>
+						onDeleteSelection
+							? onDeleteSelection({ files: [file], folders: [], count: 1 })
+							: window.confirm(`Delete ${label}?`) && onDeleteFile?.(file.path)
+					}
 				>
 					Delete
 				</ActionItem>
@@ -2078,18 +2109,20 @@ function BulkDeleteAction({
 	selection,
 	onDeleteFile,
 	onDeleteFolder,
+	onDeleteSelection,
 	getDisplayPath,
 }: {
 	selection: SidebarActionSelection;
 	onDeleteFile?: (path: string) => void;
 	onDeleteFolder?: (id: string) => void;
+	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	getDisplayPath: (path: string) => string;
 }) {
 	const actionable = sidebarDeleteSelection(
 		selection,
 		getDisplayPath,
-		Boolean(onDeleteFile),
-		Boolean(onDeleteFolder),
+		Boolean(onDeleteSelection || onDeleteFile),
+		Boolean(onDeleteSelection || onDeleteFolder),
 	);
 	if (actionable.count === 0) return null;
 	return (
@@ -2098,6 +2131,10 @@ function BulkDeleteAction({
 			icon={<MingcuteDeleteLine />}
 			shortcut={formatCommandShortcut("app.delete")}
 			onClick={() => {
+				if (onDeleteSelection) {
+					onDeleteSelection(actionable);
+					return;
+				}
 				if (
 					!window.confirm(
 						`Delete ${actionable.count} ${actionable.count === 1 ? "item" : "items"}?`,

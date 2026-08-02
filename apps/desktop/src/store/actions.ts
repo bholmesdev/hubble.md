@@ -9,7 +9,7 @@ import {
 	isChangelogPath,
 	prepareChangelogMarkdown,
 } from "../lib/changelogNote";
-import { takeLatest } from "../lib/concurrency";
+import { keyedQueue, takeLatest } from "../lib/concurrency";
 import {
 	absoluteWorkspacePath,
 	basename,
@@ -39,13 +39,12 @@ import {
 	initTheme,
 	type ThemePreference,
 } from "../theme";
+import { createDeleteActions } from "./deleteActions";
 import {
 	activeHistory,
 	canGoBack,
 	canGoForward,
-	clearHistory,
 	normalizeStack,
-	pruneHistory,
 	pushHistory,
 	rewriteHistory,
 	setHistory,
@@ -95,6 +94,7 @@ const workspaceSidebarQueues = new Map<string, Promise<void>>();
 // after the editor already has draft B, that watcher event is not an external
 // conflict; it is just the disk baseline catching up to a save we started.
 const selfSaves = new Map<string, Map<string, number>>();
+const saves = keyedQueue<string>();
 
 type SidebarMoveItem =
 	| { kind: "file"; path: string }
@@ -640,6 +640,9 @@ export async function openWorkspace(path?: string) {
 		if (typeof selected !== "string") return;
 		nextPath = selected;
 	}
+	if (workspaceStore.get().workspacePath !== nextPath) {
+		await expireDeleteUndo();
+	}
 
 	workspaceStore.set((state) => {
 		const filtered = state.recentWorkspaces.filter((p) => p !== nextPath);
@@ -665,7 +668,8 @@ export async function openWorkspace(path?: string) {
 
 export function updateEditorContent(path: string, content: string) {
 	const current = viewerStore.get();
-	if (current.currentPath === path && current.content === content) return;
+	if (current.currentPath !== path || current.content === content) return;
+	void expireDeleteUndo();
 
 	viewerStore.set((state) => {
 		if (state.currentPath !== path) return state;
@@ -694,13 +698,15 @@ export function setViewerMode(viewMode: ViewMode) {
 	});
 }
 
-export async function savePathContent(
+async function savePathContentNow(
 	path: string,
 	content: string,
-	options?: { force?: boolean },
+	options?: { force?: boolean; throwOnError?: boolean; allowBlocked?: boolean },
 ) {
 	// Binary viewers, external files, and the virtual changelog never enter text saves.
 	if (isChangelogPath(path) || !isEditableFile(path)) return;
+	// A save already queued by the editor must not recreate a staged deletion.
+	if (!options?.allowBlocked && deletionActions.isSaveBlocked(path)) return;
 	const current = viewerStore.get();
 	const force = options?.force === true;
 	if (current.currentPath !== path) return;
@@ -776,8 +782,42 @@ export async function savePathContent(
 				error: message,
 			};
 		});
+		if (options?.throwOnError) throw err;
 	}
 }
+
+export function savePathContent(
+	path: string,
+	content: string,
+	options?: { force?: boolean; throwOnError?: boolean },
+) {
+	return saves.run(path, () => savePathContentNow(path, content, options));
+}
+
+const deletionActions = createDeleteActions({
+	saveBeforeDelete: (path, content) =>
+		saves.run(path, () =>
+			savePathContentNow(path, content, {
+				force: true,
+				throwOnError: true,
+				allowBlocked: true,
+			}),
+		),
+	waitForSaves: saves.waitFor,
+	refreshFiles,
+	refreshFileList,
+	loadPath,
+	syncPins: syncPinnedNotes,
+	handleError: handleFileError,
+});
+
+export const {
+	deleteFolder,
+	deleteMarkdownFile,
+	deleteSidebarItems,
+	expireDeleteUndo,
+	undoDelete,
+} = deletionActions;
 
 export async function renameMarkdownFile(path: string, nextName: string) {
 	const current = viewerStore.get();
@@ -1149,107 +1189,6 @@ export async function createFolderInFolder(parentPath: string) {
 		const message = handleFileError(err);
 		toast.error("Failed to create folder", { description: message });
 		return null;
-	}
-}
-
-export async function deleteMarkdownFile(
-	path: string,
-	options?: { throwOnError?: boolean },
-) {
-	try {
-		await desktopApi.deleteFile(path);
-		const wasCurrentFile = viewerStore.get().currentPath === path;
-		if (wasCurrentFile) {
-			clearHistory();
-		} else {
-			pruneHistory(path);
-		}
-		appStore.set((state) => ({
-			...state,
-			workspace: {
-				...state.workspace,
-				files: state.workspace.files.filter((file) => file.path !== path),
-				pinnedNotes: state.workspace.pinnedNotes.filter(
-					(pinnedPath) => pinnedPath !== path,
-				),
-				lastOpenedPaths: Object.fromEntries(
-					Object.entries(state.workspace.lastOpenedPaths).filter(
-						([, openedPath]) => openedPath !== path,
-					),
-				),
-			},
-			document:
-				state.document.currentPath === path
-					? emptyDoc(
-							state.document.lastOpenedPath === path
-								? null
-								: state.document.lastOpenedPath,
-						)
-					: {
-							...state.document,
-							lastOpenedPath:
-								state.document.lastOpenedPath === path
-									? null
-									: state.document.lastOpenedPath,
-						},
-		}));
-		await syncPinnedNotes();
-		await refreshFileList();
-	} catch (err) {
-		const message = handleFileError(err);
-		toast.error("Failed to delete file", { description: message });
-		if (options?.throwOnError) throw err;
-	}
-}
-
-export async function deleteFolder(path: string) {
-	try {
-		await desktopApi.deleteFile(path, { recursive: true });
-		const currentPath = viewerStore.get().currentPath;
-		if (currentPath && pathInFolder(currentPath, path)) {
-			clearHistory();
-		} else {
-			pruneHistory(path, true);
-		}
-		appStore.set((state) => ({
-			...state,
-			workspace: {
-				...state.workspace,
-				files: state.workspace.files.filter(
-					(file) => !pathInFolder(file.path, path),
-				),
-				pinnedNotes: state.workspace.pinnedNotes.filter(
-					(pinnedPath) => !pathInFolder(pinnedPath, path),
-				),
-				lastOpenedPaths: Object.fromEntries(
-					Object.entries(state.workspace.lastOpenedPaths).filter(
-						([, openedPath]) => !pathInFolder(openedPath, path),
-					),
-				),
-			},
-			document:
-				state.document.currentPath &&
-				pathInFolder(state.document.currentPath, path)
-					? emptyDoc(
-							state.document.lastOpenedPath &&
-								pathInFolder(state.document.lastOpenedPath, path)
-								? null
-								: state.document.lastOpenedPath,
-						)
-					: {
-							...state.document,
-							lastOpenedPath:
-								state.document.lastOpenedPath &&
-								pathInFolder(state.document.lastOpenedPath, path)
-									? null
-									: state.document.lastOpenedPath,
-						},
-		}));
-		await syncPinnedNotes();
-		await refreshFileList();
-	} catch (err) {
-		const message = handleFileError(err);
-		toast.error("Failed to delete folder", { description: message });
 	}
 }
 

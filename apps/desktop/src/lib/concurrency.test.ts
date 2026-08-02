@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { dedupeRuns, sequential, takeLatest } from "./concurrency";
+import { dedupeRuns, keyedQueue, sequential, takeLatest } from "./concurrency";
 
 describe("takeLatest", () => {
 	it("marks earlier in-flight calls stale", async () => {
@@ -71,5 +71,51 @@ describe("sequential", () => {
 		await expect(first).rejects.toThrow("disk full");
 		await second;
 		expect(order).toEqual(["first", "second"]);
+	});
+});
+
+describe("keyedQueue", () => {
+	it("runs each key in order while other keys run", async () => {
+		const queue = keyedQueue<string>();
+		const order: string[] = [];
+		let finishFirst: () => void = () => {};
+		const first = queue.run(
+			"a",
+			() =>
+				new Promise<void>((resolve) => {
+					order.push("a1");
+					finishFirst = resolve;
+				}),
+		);
+		const second = queue.run("a", async () => {
+			order.push("a2");
+		});
+		await queue.run("b", async () => {
+			order.push("b");
+		});
+
+		expect(order).toEqual(["a1", "b"]);
+		finishFirst();
+		await Promise.all([first, second]);
+		expect(order).toEqual(["a1", "b", "a2"]);
+	});
+
+	it("waits for matching work even when it fails", async () => {
+		const queue = keyedQueue<string>();
+		let finish: () => void = () => {};
+		void queue.run(
+			"note.md",
+			() =>
+				new Promise<void>((_resolve, reject) => {
+					finish = () => reject(new Error("disk full"));
+				}),
+		);
+		const waited = vi.fn();
+		const wait = queue.waitFor((key) => key.endsWith(".md")).then(waited);
+
+		expect(waited).not.toHaveBeenCalled();
+		finish();
+		await wait;
+		expect(waited).toHaveBeenCalledOnce();
 	});
 });

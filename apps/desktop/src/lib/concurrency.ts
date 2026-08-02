@@ -6,6 +6,7 @@
  * - `takeLatest`: everything runs; only the newest call may apply its result.
  * - `dedupeRuns`: one run at a time; overlapping calls share one follow-up.
  * - `sequential`: every call runs, one at a time, in call order.
+ * - `keyedQueue`: `sequential`, scoped by key, with a way to await matching work.
  */
 
 /**
@@ -93,4 +94,30 @@ export function sequential<Args extends unknown[]>(
 		tail = tail.catch(() => {}).then(() => fn(...args));
 		return tail;
 	};
+}
+
+/** Runs tasks in order per key and waits for any matching work on demand. */
+export function keyedQueue<Key>() {
+	const tails = new Map<Key, Promise<void>>();
+
+	const run = (key: Key, task: () => Promise<void>) => {
+		const previous = tails.get(key);
+		const next = previous ? previous.catch(() => {}).then(task) : task();
+		tails.set(key, next);
+		const clear = () => {
+			if (tails.get(key) === next) tails.delete(key);
+		};
+		void next.then(clear, clear);
+		return next;
+	};
+
+	const waitFor = async (matches: (key: Key) => boolean) => {
+		await Promise.all(
+			[...tails]
+				.filter(([key]) => matches(key))
+				.map(([, tail]) => tail.catch(() => {})),
+		);
+	};
+
+	return { run, waitFor };
 }
