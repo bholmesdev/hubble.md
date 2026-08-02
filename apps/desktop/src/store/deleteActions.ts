@@ -12,7 +12,7 @@ import {
 	workspaceStore,
 } from "./state";
 
-const UNDO_MS = 8000;
+const UNDO_MS = 5000;
 
 type PendingDelete = {
 	token: string;
