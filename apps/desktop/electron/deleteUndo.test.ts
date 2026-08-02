@@ -18,28 +18,28 @@ describe("DeleteUndo", () => {
 	it("stages and restores a file", async () => {
 		const source = path.join(workspace, "note.md");
 		await fs.writeFile(source, "original");
-		const trash = new DeleteUndo();
+		const undo = new DeleteUndo();
 
-		const token = await trash.stage(workspace, [source]);
+		const token = await undo.stage(workspace, [source]);
 		await expect(fs.stat(source)).rejects.toMatchObject({ code: "ENOENT" });
 
-		await trash.restore(token);
+		await undo.restore(token);
 		expect(await fs.readFile(source, "utf8")).toBe("original");
 	});
 
 	it("keeps the staged file when its path is recreated", async () => {
 		const source = path.join(workspace, "note.md");
 		await fs.writeFile(source, "original");
-		const trash = new DeleteUndo();
-		const token = await trash.stage(workspace, [source]);
+		const undo = new DeleteUndo();
+		const token = await undo.stage(workspace, [source]);
 		await fs.writeFile(source, "replacement");
 
-		await expect(trash.restore(token)).rejects.toThrow(/Deleted files kept at/);
+		await expect(undo.restore(token)).rejects.toThrow(/Deleted files kept at/);
 
 		expect(await fs.readFile(source, "utf8")).toBe("replacement");
 		expect(
 			await fs.readFile(
-				path.join(workspace, ".hubble", "delete-recovery", token, "0"),
+				path.join(workspace, ".hubble", "recovered", token, "0"),
 				"utf8",
 			),
 		).toBe("original");

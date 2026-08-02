@@ -28,7 +28,7 @@ function isInside(root: string, candidate: string) {
 	);
 }
 
-/** Short-lived file trash backed by atomic moves within the workspace. */
+/** Stages deletions for a short undo window using atomic moves within the workspace. */
 export class DeleteUndo {
 	private jobs = new Map<string, Job>();
 
@@ -36,7 +36,7 @@ export class DeleteUndo {
 		const recovery = path.join(
 			job.workspace,
 			HUBBLE_DIR,
-			"delete-recovery",
+			"recovered",
 			path.basename(job.dir),
 		);
 		await fs.mkdir(path.dirname(recovery), { recursive: true });
@@ -70,7 +70,7 @@ export class DeleteUndo {
 		}
 
 		const token = randomUUID();
-		const dir = path.join(workspace, HUBBLE_DIR, "trash", token);
+		const dir = path.join(workspace, HUBBLE_DIR, "deleting", token);
 		const entries = paths.map((source, index) => ({
 			source,
 			staged: path.join(dir, String(index)),
@@ -153,13 +153,13 @@ export class DeleteUndo {
 			job.state = "ready";
 			const recovery = await this.keepForRecovery(token, job);
 			throw new Error(
-				`Could not empty trash. Deleted files kept at ${recovery}`,
+				`Could not finish deleting. Deleted files kept at ${recovery}`,
 			);
 		}
 	}
 
 	async clean(workspace: string) {
-		const root = path.join(workspace, HUBBLE_DIR, "trash");
+		const root = path.join(workspace, HUBBLE_DIR, "deleting");
 		const active = new Set([...this.jobs.values()].map((job) => job.dir));
 		const entries = await fs
 			.readdir(root, { withFileTypes: true })
