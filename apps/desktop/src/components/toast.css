@@ -34,9 +34,21 @@
 	border: 1px solid transparent !important;
 	border-radius: var(--toast-control-radius);
 	box-shadow: none !important;
+	/* Sonner pins action buttons to height: 24px, which swallows the
+	   vertical padding; let content and padding set the height. */
+	height: auto !important;
 	padding-inline: 0.7rem;
 	padding-block: 0.35rem;
 	font-weight: 500;
+}
+
+.hubble-toast-action kbd {
+	margin-left: 0.45em;
+	padding: 0.05rem 0.3rem;
+	border: 1px solid var(--toast-border);
+	border-radius: calc(var(--toast-control-radius) - 2px);
+	font-family: inherit;
+	font-size: 0.95em;
 }
 
 .hubble-toast-action:hover {

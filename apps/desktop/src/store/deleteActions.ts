@@ -1,5 +1,6 @@
-import { formatShortcut, type SidebarDeleteItem } from "@hubble.md/ui";
+import type { SidebarDeleteItem } from "@hubble.md/ui";
 import { toast } from "sonner";
+import { undoToastLabel } from "../components/undoToastLabel";
 import { desktopApi } from "../desktopApi";
 import { pathInFolder } from "../lib/filePath";
 import { clearHistory, pruneHistory } from "./history";
@@ -269,7 +270,7 @@ export function createDeleteActions(deps: DeleteDeps) {
 			{
 				duration: UNDO_MS,
 				action: {
-					label: `Undo ${formatShortcut("CmdOrCtrl+Z")}`,
+					label: undoToastLabel(),
 					onClick: (event) => {
 						event.preventDefault();
 						void undoDelete(token);
