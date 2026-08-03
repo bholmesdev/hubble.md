@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Keyboard navigation keeps the selected slash command in view. Thanks [@ggbao666](https://github.com/ggbao666) for the suggestion! [#223](https://github.com/bholmesdev/hubble.md/pull/223)
+
 ## [0.1.24] - 2026-08-02
 
 ### Added
