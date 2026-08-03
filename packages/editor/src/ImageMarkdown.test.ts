@@ -61,4 +61,47 @@ describe("image markdown conversion", () => {
 		expect(markdown).toContain("![diagram](example.png)");
 		expect(markdown).toContain("trailing");
 	});
+
+	it("round-trips an image-only bullet without losing the image", () => {
+		const doc = markdownToTiptapDoc("- ![](example.png)");
+
+		expect(doc.content?.[0]).toMatchObject({
+			type: "bulletList",
+			content: [
+				{
+					type: "listItem",
+					content: [
+						{ type: "paragraph" },
+						{ type: "image", attrs: { src: "example.png", alt: "" } },
+					],
+				},
+			],
+		});
+		expect(tiptapDocToMarkdown(doc)).toContain("![](example.png)");
+	});
+
+	it("round-trips text and an image in a bullet without losing either", () => {
+		const doc = markdownToTiptapDoc("- before ![diagram](example.png) after");
+
+		expect(doc.content?.[0]).toMatchObject({
+			type: "bulletList",
+			content: [
+				{
+					type: "listItem",
+					content: [
+						{ type: "paragraph", content: [{ type: "text", text: "before" }] },
+						{
+							type: "image",
+							attrs: { src: "example.png", alt: "diagram" },
+						},
+						{ type: "paragraph", content: [{ type: "text", text: "after" }] },
+					],
+				},
+			],
+		});
+		const markdown = tiptapDocToMarkdown(doc);
+		expect(markdown).toContain("before");
+		expect(markdown).toContain("![diagram](example.png)");
+		expect(markdown).toContain("after");
+	});
 });

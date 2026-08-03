@@ -223,13 +223,17 @@ function listItemToPM(li: ListItem, allowChecked: boolean): JSONContent[] {
 	// mdast listItem children may be paragraphs and nested lists.
 	const blocks = (li.children ?? []) as Content[];
 	const first = blocks[0];
-	const paragraphContent =
-		first && first.type === "paragraph" ? inlineToPM(first.children ?? []) : [];
+	const firstBlocks =
+		first && first.type === "paragraph"
+			? splitParagraphAroundImages(first.children ?? [])
+			: [];
 	const restBlocks = (
 		first && first.type === "paragraph" ? blocks.slice(1) : blocks
 	).flatMap(blockToPM);
-	const content: JSONContent[] = [];
-	content.push({ type: "paragraph", content: paragraphContent });
+	const content: JSONContent[] =
+		firstBlocks[0]?.type === "paragraph"
+			? firstBlocks
+			: [{ type: "paragraph", content: [] }, ...firstBlocks];
 	content.push(...restBlocks);
 
 	const checkedAttr = allowChecked && li.checked != null ? !!li.checked : null;
