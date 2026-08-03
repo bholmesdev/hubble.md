@@ -34,6 +34,14 @@ describe("isCommandQuery / stripCommandPrefix", () => {
 	it("strips only the first slash, so nested paths survive", () => {
 		expect(stripCommandPrefix("/notes/todo")).toBe("notes/todo");
 	});
+
+	// The palette promotes the prefix to a chip on the keystroke that produces
+	// it, so only the empty-query case ever triggers the switch. A slash typed
+	// later is an ordinary character in a filename.
+	it("does not treat a slash after other text as a mode switch", () => {
+		expect(isCommandQuery("notes/")).toBe(false);
+		expect(isCommandQuery("a/b")).toBe(false);
+	});
 });
 
 describe("scoreCommand", () => {

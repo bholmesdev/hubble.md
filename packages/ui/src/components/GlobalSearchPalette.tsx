@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import MingcuteCornerDownLeftLine from "~icons/mingcute/corner-down-left-line";
 import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteSearch2Line from "~icons/mingcute/search-2-line";
-import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { type MatchRange, matchRanges, scorePath } from "../lib/fuzzy";
 import {
 	COMMAND_PREFIX,
@@ -162,9 +161,11 @@ function GlobalSearchPalette({
 	onRunCommand,
 }: GlobalSearchPaletteProps) {
 	const [query, setQuery] = useState("");
+	// Mode is held rather than derived from the query, because the prefix is
+	// promoted to a chip the moment it is typed and never becomes text. `query`
+	// is always the search terms alone, in either mode.
+	const [commandMode, setCommandMode] = useState(false);
 	const inputRef = useRef<HTMLInputElement | null>(null);
-	const commandMode = isCommandQuery(query);
-	// Content search must not run in command mode, and must not see the `/`.
 	const fileQuery = commandMode ? "" : query;
 	const nameResults = getNameResults(files, fileQuery);
 	const { result, searching } = useContentResults(
@@ -174,11 +175,37 @@ function GlobalSearchPalette({
 	);
 
 	const commandResults = groupCommands(
-		rankCommands(stripCommandPrefix(query), commands, recentCommandIds),
+		rankCommands(query, commands, recentCommandIds),
 	);
 
+	/** Typing the prefix into an empty query swaps the chip in, not the text. */
+	const changeQuery = (next: string) => {
+		if (!commandMode && isCommandQuery(next)) {
+			setCommandMode(true);
+			setQuery(stripCommandPrefix(next));
+			return;
+		}
+		setQuery(next);
+	};
+
+	/**
+	 * Backspace on an empty command query removes the chip.
+	 *
+	 * This keeps the chip feeling like the character it replaced: the same
+	 * keystroke that used to delete a leading `/` still leaves command mode,
+	 * so nobody has to discover a different way back to searching notes.
+	 */
+	const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+		if (event.key !== "Backspace" || !commandMode || query !== "") return;
+		event.preventDefault();
+		setCommandMode(false);
+	};
+
 	useEffect(() => {
-		if (!open) setQuery("");
+		if (!open) {
+			setQuery("");
+			setCommandMode(false);
+		}
 	}, [open]);
 
 	const relativeByPath = new Map(
@@ -232,7 +259,7 @@ function GlobalSearchPalette({
 					</Dialog.Title>
 					<Dialog.Description className="sr-only">
 						{commandMode
-							? "Run a Hubble command. Clear the leading slash to search notes instead."
+							? "Run a Hubble command. Press Backspace on an empty query to search notes instead."
 							: "Find a note by name, path, or content. Type a slash to run a command instead."}
 					</Dialog.Description>
 					<Command
@@ -243,14 +270,21 @@ function GlobalSearchPalette({
 					>
 						<div className="flex items-center gap-2.5 border-b border-border px-3.5">
 							{commandMode ? (
-								<MingcuteTerminalLine className="size-4 shrink-0 text-muted-foreground" />
+								/* The prefix itself, promoted out of the text. It reads as a
+								   state the input is in rather than a character to edit
+								   around, and keeps the palette looking like a text editor
+								   rather than a terminal. */
+								<span className="flex h-[22px] shrink-0 items-center rounded-[var(--radius-inner)] bg-accent px-2 font-medium text-[13px] text-foreground leading-none">
+									{COMMAND_PREFIX}
+								</span>
 							) : (
 								<MingcuteSearch2Line className="size-4 shrink-0 text-muted-foreground" />
 							)}
 							<Command.Input
 								ref={inputRef}
 								value={query}
-								onValueChange={setQuery}
+								onValueChange={changeQuery}
+								onKeyDown={handleKeyDown}
 								placeholder={
 									commandMode
 										? "Run a command"
@@ -367,7 +401,7 @@ function GlobalSearchPalette({
 									<kbd className="flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-inner)] border border-border px-1 font-sans text-[10px] leading-none text-muted-foreground">
 										{COMMAND_PREFIX}
 									</kbd>
-									{commandMode ? "Clear for notes" : "Commands"}
+									{commandMode ? "Backspace for notes" : "Commands"}
 								</span>
 							)}
 						</div>
