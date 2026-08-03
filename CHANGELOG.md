@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Images in list items no longer disappear after reopening a note. Thanks [@parthiv-krishna](https://github.com/parthiv-krishna) for the suggestion! [#225](https://github.com/bholmesdev/hubble.md/pull/225)
+
 ## [0.1.24] - 2026-08-02
 
 ### Added
