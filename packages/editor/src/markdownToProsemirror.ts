@@ -143,15 +143,16 @@ function blockToPM(node: Content): JSONContent[] {
 					type: "table",
 					content: tableNode.children.map((row, rowIndex) => ({
 						type: "tableRow",
-						content: row.children.map((cell) => ({
-							type: rowIndex === 0 ? "tableHeader" : "tableCell",
-							content: [
-								{
-									type: "paragraph",
-									content: inlineToPM(cell.children ?? []),
-								},
-							],
-						})),
+						content: row.children.map((cell) => {
+							const blocks = splitParagraphAroundImages(cell.children ?? []);
+							return {
+								type: rowIndex === 0 ? "tableHeader" : "tableCell",
+								content:
+									blocks.length > 0
+										? blocks
+										: [{ type: "paragraph", content: [] }],
+							};
+						}),
 					})),
 				},
 			];

@@ -104,4 +104,22 @@ describe("image markdown conversion", () => {
 		expect(markdown).toContain("![diagram](example.png)");
 		expect(markdown).toContain("after");
 	});
+
+	it("round-trips text and an image in a table cell", () => {
+		const doc = markdownToTiptapDoc(
+			"| Header |\n| --- |\n| Before ![diagram](example.png) after |",
+		);
+
+		expect(doc.content?.[0]?.content?.[1]?.content?.[0]).toMatchObject({
+			type: "tableCell",
+			content: [
+				{ type: "paragraph", content: [{ type: "text", text: "Before" }] },
+				{ type: "image", attrs: { src: "example.png", alt: "diagram" } },
+				{ type: "paragraph", content: [{ type: "text", text: "after" }] },
+			],
+		});
+		expect(tiptapDocToMarkdown(doc)).toContain(
+			"Before<br>![diagram](example.png)<br>after",
+		);
+	});
 });
