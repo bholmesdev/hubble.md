@@ -18,7 +18,7 @@ import {
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import {
@@ -119,6 +119,19 @@ const HMR_REV = (() => {
 	return hotData.__editorRev;
 })();
 
+function subscribeToResolvedTheme(onChange: () => void) {
+	const observer = new MutationObserver(onChange);
+	observer.observe(document.documentElement, {
+		attributeFilter: ["class"],
+		attributes: true,
+	});
+	return () => observer.disconnect();
+}
+
+function isResolvedThemeDark() {
+	return document.documentElement.classList.contains("dark");
+}
+
 function focusSidebarNav() {
 	document.querySelector<HTMLElement>(SIDEBAR_NAV_SELECTOR)?.focus();
 }
@@ -204,11 +217,13 @@ function App() {
 		}));
 	const lastSeenVersion = useStoreValue(lastSeenVersionStore);
 	const pinnedNotes = useStoreValue(workspaceStore).pinnedNotes;
-	// Read the resolved class rather than the preference, so "system" toggles
-	// away from what the user is actually looking at.
-	const isDark =
-		typeof document !== "undefined" &&
-		document.documentElement.classList.contains("dark");
+	// The root class is the resolved theme, including live OS changes while the
+	// preference is "system".
+	const isDark = useSyncExternalStore(
+		subscribeToResolvedTheme,
+		isResolvedThemeDark,
+		() => false,
+	);
 	const paletteCommands = buildAppCommands(
 		{
 			openSettings: () => setSettingsOpen(true),

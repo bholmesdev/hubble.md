@@ -1785,7 +1785,14 @@ function registerIpc() {
 
 	// Same operations the View menu's zoom items run, exposed so the command
 	// palette can dispatch them. The accelerators stay owned by the menu.
-	ipcMain.handle("desktop:zoom-window", (_event, { direction }) => {
+	ipcMain.handle("desktop:zoom-window", (_event, input: unknown) => {
+		const direction =
+			typeof input === "object" && input !== null && "direction" in input
+				? input.direction
+				: undefined;
+		if (direction !== "in" && direction !== "out" && direction !== "reset") {
+			throw new Error("Invalid zoom direction");
+		}
 		if (direction === "reset") {
 			resetWindowZoom(mainWindow);
 			return;

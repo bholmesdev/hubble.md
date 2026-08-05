@@ -254,10 +254,14 @@ function GlobalSearchPalette({
 
 	// Close before running: a command that opens another dialog or moves focus
 	// would otherwise fight the palette's own closing focus restore.
-	const runCommand = (command: PaletteCommand) => {
+	const runCommand = async (command: PaletteCommand) => {
 		onOpenChange(false);
 		onRunCommand?.(command.id);
-		void command.run();
+		try {
+			await command.run();
+		} catch (error) {
+			console.error(`Failed to run command "${command.label}":`, error);
+		}
 	};
 
 	const isEmptyQuery = fileQuery.trim() === "";
@@ -343,7 +347,7 @@ function GlobalSearchPalette({
 											<Command.Item
 												key={command.id}
 												value={`command:${command.id}`}
-												onSelect={() => runCommand(command)}
+												onSelect={() => void runCommand(command)}
 												className={ROW_CLASS}
 											>
 												<CommandRow
@@ -361,7 +365,7 @@ function GlobalSearchPalette({
 										<Command.Item
 											key={command.id}
 											value={`command:${command.id}`}
-											onSelect={() => runCommand(command)}
+											onSelect={() => void runCommand(command)}
 											className={ROW_CLASS}
 										>
 											<CommandRow command={command} query={query} />

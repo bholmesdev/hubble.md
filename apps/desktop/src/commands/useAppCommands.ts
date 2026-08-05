@@ -14,7 +14,11 @@ import { desktopApi } from "../desktopApi";
 import { createMarkdownFile } from "../fileActions";
 import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
-import { isEditableFile } from "../lib/filePath";
+import {
+	hasMarkdownExtension,
+	isEditableFile,
+	supportsSourceToggle,
+} from "../lib/filePath";
 import {
 	createFolderInFolder,
 	deleteMarkdownFile,
@@ -70,6 +74,7 @@ function toRegistryContext(context: AppCommandContext): RegistryContext {
 	return {
 		hasCurrentFile: isRealFile,
 		hasEditableFile: isRealFile && isEditableFile(path),
+		hasSourceViewOpen: isRealFile && supportsSourceToggle(path),
 		hasWorkspace: context.workspacePath !== null,
 		isSourceMode: context.isSourceMode,
 		canGoBack: canGoBack(),
@@ -79,8 +84,13 @@ function toRegistryContext(context: AppCommandContext): RegistryContext {
 
 /** Rich text is being edited, so an editor command has somewhere to land. */
 function hasRichTextEditor(context: AppCommandContext) {
-	const registry = toRegistryContext(context);
-	return registry.hasEditableFile === true && !context.isSourceMode;
+	const path = context.currentPath;
+	return (
+		path !== null &&
+		!isChangelogPath(path) &&
+		hasMarkdownExtension(path) &&
+		!context.isSourceMode
+	);
 }
 
 type Declaration = Omit<PaletteCommand, "binding" | "shortcut"> & {
