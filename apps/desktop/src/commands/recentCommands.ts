@@ -1,7 +1,10 @@
+import { store } from "@simplestack/store";
+import { localStoragePersist } from "../lib/localStoragePersist";
+
 const STORAGE_KEY = "hubble-desktop-recent-commands";
 const MAX_RECENT = 40;
 
-export function loadRecentCommands(): string[] {
+function loadRecentCommands(): string[] {
 	if (typeof localStorage === "undefined") return [];
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
@@ -14,19 +17,14 @@ export function loadRecentCommands(): string[] {
 	}
 }
 
-export function recordRecentCommand(id: string, current: string[]): string[] {
-	const next = [id, ...current.filter((existing) => existing !== id)].slice(
-		0,
-		MAX_RECENT,
+export const recentCommandIdsStore = store<string[]>(loadRecentCommands(), {
+	middleware: [localStoragePersist(STORAGE_KEY)],
+});
+
+export function recordRecentCommand(id: string) {
+	recentCommandIdsStore.set((current) =>
+		[id, ...current.filter((existing) => existing !== id)].slice(0, MAX_RECENT),
 	);
-	if (typeof localStorage !== "undefined") {
-		try {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-		} catch {
-			// Recency is optional.
-		}
-	}
-	return next;
 }
 
 export { STORAGE_KEY as RECENT_COMMANDS_STORAGE_KEY };

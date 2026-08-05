@@ -22,7 +22,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import {
-	loadRecentCommands,
+	recentCommandIdsStore,
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
@@ -219,7 +219,7 @@ function App() {
 	const [searchFolderParent, setSearchFolderParent] = useState<string | null>(
 		null,
 	);
-	const [recentCommandIds, setRecentCommandIds] = useState(loadRecentCommands);
+	const recentCommandIds = useStoreValue(recentCommandIdsStore);
 	const workspaceFiles = useStoreValue(workspaceStore).files;
 	const paletteFiles: PaletteFile[] = workspaceFiles
 		.filter((file) => (file.kind ?? fileKindForPath(file.path)) === "document")
@@ -746,9 +746,7 @@ function App() {
 				searchContents={searchFileContents}
 				commands={paletteCommands}
 				recentCommandIds={recentCommandIds}
-				onRunCommand={(id) =>
-					setRecentCommandIds((current) => recordRecentCommand(id, current))
-				}
+				onRunCommand={recordRecentCommand}
 			/>
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
 				<GeneralSettingsSection />
