@@ -4,8 +4,9 @@ import { markdownToTiptapDoc } from "@hubble.md/editor";
 import { Editor, type JSONContent, Node } from "@tiptap/core";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
-import StarterKit from "@tiptap/starter-kit";
+import { Fragment } from "@tiptap/pm/model";
 import { afterEach, expect, it } from "vitest";
+import { starterKitWithRegistryShortcuts } from "./EditorCommandShortcuts";
 import {
 	MarkdownTableCell,
 	MarkdownTableHeader,
@@ -13,7 +14,7 @@ import {
 
 const Image = Node.create({
 	name: "image",
-	group: "block",
+	group: "block tableCellContent",
 	atom: true,
 	renderHTML: ({ HTMLAttributes }) => ["img", HTMLAttributes],
 	addAttributes: () => ({
@@ -30,7 +31,7 @@ it("loads images in Markdown table cells", () => {
 	editor = new Editor({
 		element: document.createElement("div"),
 		extensions: [
-			StarterKit,
+			...starterKitWithRegistryShortcuts(),
 			Image,
 			Table,
 			TableRow,
@@ -52,4 +53,26 @@ it("loads images in Markdown table cells", () => {
 			{ type: "paragraph", content: [{ type: "text", text: "after" }] },
 		],
 	});
+});
+
+it("rejects other block types in Markdown table cells", () => {
+	editor = new Editor({
+		element: document.createElement("div"),
+		extensions: [
+			...starterKitWithRegistryShortcuts(),
+			Image,
+			Table,
+			TableRow,
+			MarkdownTableHeader,
+			MarkdownTableCell,
+		],
+	});
+
+	const paragraph = editor.schema.nodes.paragraph?.create();
+	const listItem = editor.schema.nodes.listItem?.create(null, paragraph);
+	const bulletList = editor.schema.nodes.bulletList?.create(null, listItem);
+	const tableCell = editor.schema.nodes.tableCell;
+	if (!bulletList || !tableCell) throw new Error("Missing table test nodes");
+
+	expect(tableCell.validContent(Fragment.from(bulletList))).toBe(false);
 });
