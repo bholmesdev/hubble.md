@@ -2,13 +2,26 @@ export type ThemePreference = "light" | "dark" | "system";
 
 let systemQuery: MediaQueryList | null = null;
 let preference: ThemePreference = "system";
+let dark = false;
+const listeners = new Set<() => void>();
+
+export function isDarkTheme(): boolean {
+	return dark;
+}
+
+export function subscribeTheme(listener: () => void): () => void {
+	listeners.add(listener);
+	return () => listeners.delete(listener);
+}
 
 function applyTheme(): void {
-	document.documentElement.classList.toggle(
-		"dark",
+	const isDark =
 		preference === "dark" ||
-			(preference === "system" && systemQuery?.matches === true),
-	);
+		(preference === "system" && systemQuery?.matches === true);
+	document.documentElement.classList.toggle("dark", isDark);
+	if (isDark === dark) return;
+	dark = isDark;
+	for (const listener of listeners) listener();
 }
 
 /**

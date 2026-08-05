@@ -111,6 +111,7 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
+import { isDarkTheme, subscribeTheme } from "./theme";
 
 // Forces editor refresh when underlying TipTap extensions change
 const HMR_REV = (() => {
@@ -119,19 +120,6 @@ const HMR_REV = (() => {
 	hotData.__editorRev = (hotData.__editorRev ?? 0) + 1;
 	return hotData.__editorRev;
 })();
-
-function subscribeToResolvedTheme(onChange: () => void) {
-	const observer = new MutationObserver(onChange);
-	observer.observe(document.documentElement, {
-		attributeFilter: ["class"],
-		attributes: true,
-	});
-	return () => observer.disconnect();
-}
-
-function isResolvedThemeDark() {
-	return document.documentElement.classList.contains("dark");
-}
 
 function sameSidebarFocus(
 	current: DesktopSidebarFocus,
@@ -242,11 +230,7 @@ function App() {
 		}));
 	const lastSeenVersion = useStoreValue(lastSeenVersionStore);
 	const pinnedNotes = useStoreValue(workspaceStore).pinnedNotes;
-	const isDark = useSyncExternalStore(
-		subscribeToResolvedTheme,
-		isResolvedThemeDark,
-		() => false,
-	);
+	const isDark = useSyncExternalStore(subscribeTheme, isDarkTheme, () => false);
 	const focusedSidebarPath = focusedSidebarItem
 		? focusedSidebarItem.path
 		: null;
