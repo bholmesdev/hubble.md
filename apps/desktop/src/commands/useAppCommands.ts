@@ -44,12 +44,12 @@ const CONTRIBUTING_URL =
  * App state the palette needs, beyond what the registry's `CommandContext`
  * already covers.
  *
- * The extra fields exist only to label toggles by what they will *do* — "Hide
- * Sidebar" rather than "Toggle Sidebar" — so a user reading the list does not
- * have to know the current state to predict the outcome.
+ * It includes targets for contextual actions and state used to label toggles
+ * by what they will do, such as "Hide Sidebar" instead of "Toggle Sidebar".
  */
 export type AppCommandContext = {
 	currentPath: string | null;
+	newFolderParent: string | null;
 	workspacePath: string | null;
 	isSourceMode: boolean;
 	sidebarOpen: boolean;
@@ -175,10 +175,10 @@ function defineCommands(
 			label: "New Folder",
 			group: "File",
 			keywords: ["create", "directory"],
-			isEnabled: () => context.workspacePath !== null,
+			isEnabled: () => context.newFolderParent !== null,
 			run: async () => {
-				if (context.workspacePath) {
-					await createFolderInFolder(context.workspacePath);
+				if (context.newFolderParent) {
+					await createFolderInFolder(context.newFolderParent);
 				}
 			},
 		}),
@@ -208,6 +208,7 @@ function defineCommands(
 			"File",
 			["clipboard", "export", "source"],
 			actions.requestCopyAsMarkdown,
+			{ isEnabled: () => hasRichTextEditor(context) },
 		),
 		fromRegistry(
 			"app.delete",

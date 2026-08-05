@@ -18,7 +18,7 @@ import {
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import {
@@ -28,7 +28,7 @@ import {
 import { buildAppCommands } from "./commands/useAppCommands";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
-import { Sidebar } from "./components/Sidebar";
+import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
 import {
 	TelemetryConsentCallout,
 	TelemetrySettingsSection,
@@ -51,6 +51,7 @@ import { createHtmlFile, createMarkdownFile } from "./fileActions";
 import { isChangelogPath } from "./lib/changelogNote";
 import { copyText } from "./lib/clipboard";
 import {
+	dirname,
 	fileKindForPath,
 	hasHtmlExtension,
 	hasImageExtension,
@@ -132,6 +133,23 @@ function isResolvedThemeDark() {
 	return document.documentElement.classList.contains("dark");
 }
 
+function sameSidebarFocus(
+	current: DesktopSidebarFocus,
+	next: DesktopSidebarFocus,
+) {
+	if (!current || !next) return current === next;
+	return current.kind === next.kind && current.path === next.path;
+}
+
+function folderForSidebarFocus(
+	item: DesktopSidebarFocus,
+	workspacePath: string | null | undefined,
+) {
+	if (!item) return workspacePath ?? null;
+	if (item.kind === "folder") return item.path;
+	return dirname(item.path) ?? workspacePath ?? null;
+}
+
 function focusSidebarNav() {
 	document.querySelector<HTMLElement>(SIDEBAR_NAV_SELECTOR)?.focus();
 }
@@ -201,11 +219,18 @@ function App() {
 	);
 	const [telemetryConsent, setTelemetryConsent] =
 		useState<TelemetryConsent | null>(null);
-	const [focusedSidebarPath, setFocusedSidebarPath] = useState<string | null>(
-		null,
-	);
+	const [focusedSidebarItem, setFocusedSidebarItem] =
+		useState<DesktopSidebarFocus>(null);
+	const updateFocusedSidebarItem = useCallback((next: DesktopSidebarFocus) => {
+		setFocusedSidebarItem((current) =>
+			sameSidebarFocus(current, next) ? current : next,
+		);
+	}, []);
 	const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
+	const [searchFolderParent, setSearchFolderParent] = useState<string | null>(
+		null,
+	);
 	const [recentCommandIds, setRecentCommandIds] = useState(loadRecentCommands);
 	const workspaceFiles = useStoreValue(workspaceStore).files;
 	const paletteFiles: PaletteFile[] = workspaceFiles
@@ -224,6 +249,20 @@ function App() {
 		isResolvedThemeDark,
 		() => false,
 	);
+	const focusedSidebarPath = focusedSidebarItem
+		? focusedSidebarItem.path
+		: null;
+	const focusedFolderParent = folderForSidebarFocus(
+		focusedSidebarItem,
+		workspacePath,
+	);
+	const changeSearchOpen = useCallback(
+		(open: boolean) => {
+			if (open) setSearchFolderParent(focusedFolderParent ?? null);
+			setSearchOpen(open);
+		},
+		[focusedFolderParent],
+	);
 	const paletteCommands = buildAppCommands(
 		{
 			openSettings: () => setSettingsOpen(true),
@@ -233,6 +272,9 @@ function App() {
 		},
 		{
 			currentPath: state.currentPath ?? null,
+			newFolderParent: searchOpen
+				? searchFolderParent
+				: (focusedFolderParent ?? null),
 			workspacePath: workspacePath ?? null,
 			isSourceMode: state.viewMode === "source",
 			sidebarOpen,
@@ -377,7 +419,7 @@ function App() {
 	]);
 
 	useEffect(() => {
-		if (!sidebarOpen) setFocusedSidebarPath(null);
+		if (!sidebarOpen) setFocusedSidebarItem(null);
 	}, [sidebarOpen]);
 
 	useEffect(() => {
@@ -413,7 +455,7 @@ function App() {
 				"app.settings": () => setSettingsOpen(true),
 				"app.open-folder": () => setWorkspaceSwitcherOpen(true),
 				// The File menu accelerator fires too, but opening is idempotent.
-				"app.go-to-file": () => setSearchOpen(true),
+				"app.go-to-file": () => changeSearchOpen(true),
 				"app.add-folder": openWorkspaceWithSidebar,
 				"app.open-file": openFilePicker,
 				"app.copy-path": () => copyFilePath(currentPath),
@@ -442,7 +484,7 @@ function App() {
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [focusedSidebarPath]);
+	}, [changeSearchOpen, focusedSidebarPath]);
 
 	useEffect(() => {
 		let active = true;
@@ -489,7 +531,7 @@ function App() {
 			desktopApi.onMenuShowWorkspaceSwitcher(() =>
 				setWorkspaceSwitcherOpen(true),
 			),
-			desktopApi.onMenuGoToFile(() => setSearchOpen(true)),
+			desktopApi.onMenuGoToFile(() => changeSearchOpen(true)),
 			desktopApi.onMenuSyncWorkspace(() => void refreshFiles()),
 			desktopApi.onMenuToggleTerminal(() => toggleTerminal()),
 			desktopApi.onMenuGoBack(() => void goBack()),
@@ -508,7 +550,7 @@ function App() {
 		return () => {
 			for (const dispose of disposers) dispose();
 		};
-	}, []);
+	}, [changeSearchOpen]);
 
 	useEffect(() => {
 		// Window focus can fire in bursts when switching apps, so debounce the
@@ -624,7 +666,7 @@ function App() {
 			/>
 			<div className="flex min-h-0 flex-1 overflow-hidden">
 				<Sidebar
-					onFocusedPathChange={setFocusedSidebarPath}
+					onFocusedItemChange={updateFocusedSidebarItem}
 					footer={
 						showReadyCallout ? (
 							<SidebarCallout
@@ -717,7 +759,7 @@ function App() {
 			</div>
 			<GlobalSearchPalette
 				open={searchOpen}
-				onOpenChange={setSearchOpen}
+				onOpenChange={changeSearchOpen}
 				files={paletteFiles}
 				onSelectFile={(path) => void loadPath(path)}
 				searchContents={searchFileContents}

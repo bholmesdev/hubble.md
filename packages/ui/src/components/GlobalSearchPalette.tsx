@@ -154,6 +154,16 @@ function useContentResults(
 	return { result, searching };
 }
 
+async function runPaletteCommand(command: PaletteCommand) {
+	try {
+		await command.run();
+		return true;
+	} catch (error) {
+		console.error(`Failed to run command "${command.label}":`, error);
+		return false;
+	}
+}
+
 function GlobalSearchPalette({
 	open,
 	onOpenChange,
@@ -256,11 +266,8 @@ function GlobalSearchPalette({
 	// would otherwise fight the palette's own closing focus restore.
 	const runCommand = async (command: PaletteCommand) => {
 		onOpenChange(false);
-		try {
-			await command.run();
+		if (await runPaletteCommand(command)) {
 			onRunCommand?.(command.id);
-		} catch (error) {
-			console.error(`Failed to run command "${command.label}":`, error);
 		}
 	};
 
