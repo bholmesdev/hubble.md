@@ -1,5 +1,6 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { Command } from "cmdk";
+import { keymatch } from "keymatch";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import MingcuteCornerDownLeftLine from "~icons/mingcute/corner-down-left-line";
 import MingcuteFileLine from "~icons/mingcute/file-line";
@@ -13,6 +14,7 @@ import {
 	rankCommands,
 	stripCommandPrefix,
 } from "../lib/paletteCommand";
+import { formatShortcut } from "../lib/shortcut";
 
 const SEARCH_DEBOUNCE_MS = 150;
 const MIN_CONTENT_QUERY_LENGTH = 3;
@@ -196,9 +198,20 @@ function GlobalSearchPalette({
 	 * so nobody has to discover a different way back to searching notes.
 	 */
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-		if (event.key !== "Backspace" || !commandMode || query !== "") return;
-		event.preventDefault();
-		setCommandMode(false);
+		if (event.key === "Backspace" && commandMode && query === "") {
+			event.preventDefault();
+			setCommandMode(false);
+			return;
+		}
+
+		if (
+			commands.some(
+				(command) =>
+					command.binding && keymatch(event.nativeEvent, command.binding),
+			)
+		) {
+			onOpenChange(false);
+		}
 	};
 
 	useEffect(() => {
@@ -270,11 +283,7 @@ function GlobalSearchPalette({
 					>
 						<div className="flex items-center gap-2.5 border-b border-border px-3.5">
 							{commandMode ? (
-								/* The prefix itself, promoted out of the text. It reads as a
-								   state the input is in rather than a character to edit
-								   around, and keeps the palette looking like a text editor
-								   rather than a terminal. */
-								<span className="flex h-[22px] shrink-0 items-center rounded-[var(--radius-inner)] bg-accent px-2 font-medium text-[13px] text-foreground leading-none">
+								<span className="flex size-4 -translate-y-0.5 shrink-0 items-center justify-center text-[13px] text-muted-foreground leading-none">
 									{COMMAND_PREFIX}
 								</span>
 							) : (
@@ -399,9 +408,11 @@ function GlobalSearchPalette({
 							{commands.length > 0 && (
 								<span className="ms-auto flex items-center gap-1.5">
 									<kbd className="flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-inner)] border border-border px-1 font-sans text-[10px] leading-none text-muted-foreground">
-										{COMMAND_PREFIX}
+										{commandMode
+											? formatShortcut("Backspace")
+											: COMMAND_PREFIX}
 									</kbd>
-									{commandMode ? "Backspace for notes" : "Commands"}
+									{commandMode ? "Search notes" : "Commands"}
 								</span>
 							)}
 						</div>

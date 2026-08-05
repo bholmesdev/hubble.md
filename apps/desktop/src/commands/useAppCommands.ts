@@ -83,7 +83,7 @@ function hasRichTextEditor(context: AppCommandContext) {
 	return registry.hasEditableFile === true && !context.isSourceMode;
 }
 
-type Declaration = Omit<PaletteCommand, "shortcut"> & {
+type Declaration = Omit<PaletteCommand, "binding" | "shortcut"> & {
 	binding?: string;
 	isEnabled: () => boolean;
 };
@@ -395,6 +395,7 @@ export function buildAppCommands(
 		.filter((command) => command.isEnabled())
 		.map(({ isEnabled: _isEnabled, binding, ...command }) => ({
 			...command,
+			binding,
 			shortcut: binding ? formatShortcut(binding) : undefined,
 		}));
 }

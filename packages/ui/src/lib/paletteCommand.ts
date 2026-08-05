@@ -18,7 +18,9 @@ export type PaletteCommand = {
 	group: string;
 	/** Search synonyms, so "theme" finds "Toggle Dark Mode". */
 	keywords?: string[];
-	/** Already formatted for the platform via `formatShortcut`. */
+	/** Raw shortcut used to dismiss the palette before the host handles it. */
+	binding?: string;
+	/** Shortcut formatted for display via `formatShortcut`. */
 	shortcut?: string;
 	run: () => void | Promise<void>;
 };
