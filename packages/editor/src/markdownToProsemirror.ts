@@ -144,7 +144,9 @@ function blockToPM(node: Content): JSONContent[] {
 					content: tableNode.children.map((row, rowIndex) => ({
 						type: "tableRow",
 						content: row.children.map((cell) => {
-							const blocks = splitParagraphAroundImages(cell.children ?? []);
+							const blocks = splitParagraphAroundImages(
+								dropBreaksBesideImages(cell.children ?? []),
+							);
 							return {
 								type: rowIndex === 0 ? "tableHeader" : "tableCell",
 								content:
@@ -267,6 +269,23 @@ function splitParagraphAroundImages(children: Content[]): JSONContent[] {
 	}
 	flushRun();
 	return blocks;
+}
+
+function dropBreaksBesideImages(children: Content[]): Content[] {
+	return children.filter((child, index) => {
+		if (!isLineBreak(child)) return true;
+		return (
+			children[index - 1]?.type !== "image" &&
+			children[index + 1]?.type !== "image"
+		);
+	});
+}
+
+function isLineBreak(node: Content): boolean {
+	return (
+		node.type === "break" ||
+		(node.type === "html" && isHtmlLineBreak(node.value))
+	);
 }
 
 function trimInlineRun(run: Content[]): Content[] {

@@ -118,8 +118,8 @@ describe("image markdown conversion", () => {
 				{ type: "paragraph", content: [{ type: "text", text: "after" }] },
 			],
 		});
-		expect(tiptapDocToMarkdown(doc)).toContain(
-			"Before<br>![diagram](example.png)<br>after",
-		);
+		const markdown = tiptapDocToMarkdown(doc);
+		expect(markdown).toContain("Before<br>![diagram](example.png)<br>after");
+		expect(tiptapDocToMarkdown(markdownToTiptapDoc(markdown))).toBe(markdown);
 	});
 });
