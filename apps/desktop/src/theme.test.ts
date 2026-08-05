@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { initTheme, setThemePreference } from "./theme";
+import { initTheme, setThemePreference, subscribeTheme } from "./theme";
 
 type ChangeListener = (event: { matches: boolean }) => void;
 
@@ -61,6 +61,20 @@ describe("theme", () => {
 
 		emit(false);
 		expect(document.documentElement.classList.contains("dark")).toBe(false);
+	});
+
+	it("notifies subscribers when the resolved appearance changes", () => {
+		const { emit } = mockMatchMedia(false);
+		initTheme("system");
+		const listener = vi.fn();
+		const unsubscribe = subscribeTheme(listener);
+
+		emit(true);
+		expect(listener).toHaveBeenCalledOnce();
+
+		unsubscribe();
+		emit(false);
+		expect(listener).toHaveBeenCalledOnce();
 	});
 
 	it("applies explicit light and dark preferences", () => {

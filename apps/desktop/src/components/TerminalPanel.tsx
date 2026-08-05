@@ -27,6 +27,7 @@ import {
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
+import { isDarkTheme, subscribeTheme } from "../theme";
 import "@xterm/xterm/css/xterm.css";
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
@@ -614,8 +615,7 @@ function TerminalInstance({
 			}
 			if (!fontFamily) fontFamily = "monospace";
 
-			const isDark = document.documentElement.classList.contains("dark");
-			const palette = isDark ? DARK_THEME : LIGHT_THEME;
+			const palette = isDarkTheme() ? DARK_THEME : LIGHT_THEME;
 
 			term.options.fontFamily = fontFamily;
 			term.options.theme = {
@@ -628,11 +628,7 @@ function TerminalInstance({
 
 		updateTheme();
 
-		const themeObserver = new MutationObserver(() => updateTheme());
-		themeObserver.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ["class"],
-		});
+		const unsubscribeTheme = subscribeTheme(updateTheme);
 
 		const fitAddon = new FitAddon();
 		term.loadAddon(fitAddon);
@@ -680,7 +676,7 @@ function TerminalInstance({
 			unsubscribeData();
 			unsubscribeExit();
 			resizeObserver.disconnect();
-			themeObserver.disconnect();
+			unsubscribeTheme();
 			term.dispose();
 		};
 	}, [sessionId]); // Important: only sessionId — anything else here remounts xterm

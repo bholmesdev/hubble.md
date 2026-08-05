@@ -1783,6 +1783,21 @@ function registerIpc() {
 		() => mainWindow?.isFullScreen() ?? false,
 	);
 
+	ipcMain.handle("desktop:zoom-window", (_event, input: unknown) => {
+		const direction =
+			typeof input === "object" && input !== null && "direction" in input
+				? input.direction
+				: undefined;
+		if (direction !== "in" && direction !== "out" && direction !== "reset") {
+			throw new Error("Invalid zoom direction");
+		}
+		if (direction === "reset") {
+			resetWindowZoom(mainWindow);
+			return;
+		}
+		stepWindowZoom(mainWindow, direction === "out" ? -zoomStep : zoomStep);
+	});
+
 	ipcMain.handle("desktop:check-for-updates", async () => {
 		await checkForUpdates();
 	});

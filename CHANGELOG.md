@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Find and run Hubble commands alongside note results in the search palette. Thanks [@zcuric](https://github.com/zcuric)! [#209](https://github.com/bholmesdev/hubble.md/pull/209)
+
 ### Changed
 
 ### Fixed
