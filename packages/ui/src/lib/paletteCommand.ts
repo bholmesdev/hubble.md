@@ -5,7 +5,6 @@ export type PaletteCommand = {
 	label: string;
 	group: string;
 	keywords?: string[];
-	destructive?: boolean;
 	globalShortcut?: boolean;
 	binding?: string;
 	shortcut?: string;
@@ -55,11 +54,7 @@ export function rankSearchCommands(
 	const trimmed = query.trim();
 	if (trimmed.replace(/[\s_-]+/g, "").length < 2) return [];
 
-	return rankCommands(
-		trimmed,
-		commands.filter((command) => !command.destructive),
-		recentIds,
-	)
+	return rankCommands(trimmed, commands, recentIds)
 		.filter(
 			(command) => scoreCommand(trimmed, command) >= MIN_SEARCH_COMMAND_SCORE,
 		)

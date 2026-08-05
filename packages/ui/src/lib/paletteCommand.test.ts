@@ -105,7 +105,6 @@ describe("rankSearchCommands", () => {
 		command("c", "Show Sidebar"),
 		command("d", "Show Source"),
 		command("e", "Show Terminal"),
-		{ ...command("f", "Delete Note"), destructive: true },
 	];
 
 	it("requires a meaningful query", () => {
@@ -123,9 +122,8 @@ describe("rankSearchCommands", () => {
 		]);
 	});
 
-	it("drops loose and destructive matches", () => {
+	it("drops loose matches", () => {
 		expect(rankSearchCommands("ss", commands)).toEqual([]);
-		expect(rankSearchCommands("delete", commands)).toEqual([]);
 	});
 
 	it("shows at most three commands", () => {

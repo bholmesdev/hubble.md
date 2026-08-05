@@ -99,7 +99,6 @@ function defineCommands(
 		keywords: string[],
 		run: () => void | Promise<void>,
 		options?: {
-			destructive?: boolean;
 			globalShortcut?: boolean;
 			label?: string;
 			isEnabled?: () => boolean;
@@ -112,7 +111,6 @@ function defineCommands(
 			group,
 			keywords,
 			binding: command.defaultBinding,
-			destructive: options?.destructive,
 			globalShortcut: options?.globalShortcut ?? true,
 			isEnabled: options?.isEnabled ?? (() => command.isEnabled(registry)),
 			run,
@@ -199,7 +197,6 @@ function defineCommands(
 				await deleteMarkdownFile(path);
 			},
 			{
-				destructive: true,
 				globalShortcut: false,
 				label: "Delete Note",
 			},
