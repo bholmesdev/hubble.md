@@ -18,7 +18,7 @@ import {
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import {
@@ -221,11 +221,11 @@ function App() {
 		useState<TelemetryConsent | null>(null);
 	const [focusedSidebarItem, setFocusedSidebarItem] =
 		useState<DesktopSidebarFocus>(null);
-	const updateFocusedSidebarItem = useCallback((next: DesktopSidebarFocus) => {
+	const updateFocusedSidebarItem = (next: DesktopSidebarFocus) => {
 		setFocusedSidebarItem((current) =>
 			sameSidebarFocus(current, next) ? current : next,
 		);
-	}, []);
+	};
 	const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [searchFolderParent, setSearchFolderParent] = useState<string | null>(
@@ -254,13 +254,10 @@ function App() {
 		focusedSidebarItem,
 		workspacePath,
 	);
-	const changeSearchOpen = useCallback(
-		(open: boolean) => {
-			if (open) setSearchFolderParent(focusedFolderParent ?? null);
-			setSearchOpen(open);
-		},
-		[focusedFolderParent],
-	);
+	const changeSearchOpen = (open: boolean) => {
+		if (open) setSearchFolderParent(focusedFolderParent ?? null);
+		setSearchOpen(open);
+	};
 	const paletteCommands = buildAppCommands(
 		{
 			openSettings: () => setSettingsOpen(true),
@@ -482,6 +479,7 @@ function App() {
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	}, [changeSearchOpen, focusedSidebarPath]);
 
 	useEffect(() => {
@@ -548,6 +546,7 @@ function App() {
 		return () => {
 			for (const dispose of disposers) dispose();
 		};
+		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	}, [changeSearchOpen]);
 
 	useEffect(() => {
