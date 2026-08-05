@@ -1783,8 +1783,6 @@ function registerIpc() {
 		() => mainWindow?.isFullScreen() ?? false,
 	);
 
-	// Same operations the View menu's zoom items run, exposed so the command
-	// palette can dispatch them. The accelerators stay owned by the menu.
 	ipcMain.handle("desktop:zoom-window", (_event, input: unknown) => {
 		const direction =
 			typeof input === "object" && input !== null && "direction" in input

@@ -28,7 +28,6 @@ describe("isCommandQuery / stripCommandPrefix", () => {
 
 	it("only strips a leading prefix", () => {
 		expect(stripCommandPrefix("/bold")).toBe("bold");
-		// A path segment mid-query is content, not a mode switch.
 		expect(stripCommandPrefix("notes/todo")).toBe("notes/todo");
 	});
 
@@ -36,9 +35,6 @@ describe("isCommandQuery / stripCommandPrefix", () => {
 		expect(stripCommandPrefix("/notes/todo")).toBe("notes/todo");
 	});
 
-	// The palette promotes the prefix to a chip on the keystroke that produces
-	// it, so only the empty-query case ever triggers the switch. A slash typed
-	// later is an ordinary character in a filename.
 	it("does not treat a slash after other text as a mode switch", () => {
 		expect(isCommandQuery("notes/")).toBe(false);
 		expect(isCommandQuery("a/b")).toBe(false);
@@ -68,7 +64,6 @@ describe("scoreCommand", () => {
 	});
 
 	it("does not match a subsequence spanning two separate keywords", () => {
-		// "ax" would match if keywords were joined into one searchable string.
 		const spanning = command("a", "Unrelated", "App", ["alpha", "xray"]);
 		expect(scoreCommand("ax", spanning)).toBe(0);
 	});
@@ -92,8 +87,6 @@ describe("rankCommands", () => {
 	});
 
 	it("never floats a recent command above a stronger text match", () => {
-		// "Bold" is an exact hit; "Bulleted List" only a prefix hit, even though
-		// it was used more recently.
 		const ranked = rankCommands("bold", [...commands], ["b"]);
 		expect(ranked[0].id).toBe("a");
 	});

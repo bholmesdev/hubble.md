@@ -52,9 +52,7 @@ export type GlobalSearchPaletteProps = {
 	files: PaletteFile[];
 	onSelectFile: (path: string) => void;
 	searchContents: (query: string) => Promise<PaletteContentResult>;
-	/** Runnable commands, already filtered to those enabled in this context. */
 	commands?: PaletteCommand[];
-	/** Most-recently-run command ids first; used only to break ranking ties. */
 	recentCommandIds?: string[];
 	onRunCommand?: (id: string) => void;
 };
@@ -175,9 +173,7 @@ function GlobalSearchPalette({
 	onRunCommand,
 }: GlobalSearchPaletteProps) {
 	const [query, setQuery] = useState("");
-	// Mode is held rather than derived from the query, because the prefix is
-	// promoted to a chip the moment it is typed and never becomes text. `query`
-	// is always the search terms alone, in either mode.
+	// The slash renders as a chip, so it is not part of the query.
 	const [commandMode, setCommandMode] = useState(false);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const fileQuery = commandMode ? "" : query;
@@ -194,7 +190,6 @@ function GlobalSearchPalette({
 	const commandResults = commandMode ? groupCommands(rankedCommands) : [];
 	const searchCommandResults = commandMode ? [] : rankedCommands;
 
-	/** Typing the prefix into an empty query swaps the chip in, not the text. */
 	const changeQuery = (next: string) => {
 		if (!commandMode && isCommandQuery(next)) {
 			setCommandMode(true);
@@ -204,13 +199,6 @@ function GlobalSearchPalette({
 		setQuery(next);
 	};
 
-	/**
-	 * Backspace on an empty command query removes the chip.
-	 *
-	 * This keeps the chip feeling like the character it replaced: the same
-	 * keystroke that used to delete a leading `/` still leaves command mode,
-	 * so nobody has to discover a different way back to searching notes.
-	 */
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
 		if (event.key === "Backspace" && commandMode && query === "") {
 			event.preventDefault();
@@ -262,8 +250,7 @@ function GlobalSearchPalette({
 		onSelectFile(path);
 	};
 
-	// Close before running: a command that opens another dialog or moves focus
-	// would otherwise fight the palette's own closing focus restore.
+	// Close first so focus restoration cannot fight the command.
 	const runCommand = async (command: PaletteCommand) => {
 		onOpenChange(false);
 		if (await runPaletteCommand(command)) {
@@ -518,7 +505,6 @@ function FileRow({
 	);
 }
 
-/** Command label with its shortcut trailing, matched characters emphasized. */
 function CommandRow({
 	command,
 	query,

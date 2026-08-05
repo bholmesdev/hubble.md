@@ -202,10 +202,6 @@ export type DesktopApi = {
 	setTelemetryConsent(consent: TelemetryChoice): Promise<TelemetryConsent>;
 	recordTelemetryActivity(input: { usedHtmlApp: boolean }): Promise<void>;
 	getFullScreen(): Promise<boolean>;
-	/**
-	 * Zoom stays owned by the main process and keeps its OS-convention
-	 * accelerators; this only lets the renderer dispatch the same actions.
-	 */
 	zoomWindow(direction: ZoomDirection): Promise<void>;
 	checkForUpdates(): Promise<void>;
 	installUpdate(): Promise<void>;

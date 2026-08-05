@@ -41,13 +41,6 @@ import { canGoBack, canGoForward } from "../store/history";
 const CONTRIBUTING_URL =
 	"https://github.com/bholmesdev/hubble.md/blob/main/CONTRIBUTING.md";
 
-/**
- * App state the palette needs, beyond what the registry's `CommandContext`
- * already covers.
- *
- * It includes targets for contextual actions and state used to label toggles
- * by what they will do, such as "Hide Sidebar" instead of "Toggle Sidebar".
- */
 export type AppCommandContext = {
 	currentPath: string | null;
 	newFolderParent: string | null;
@@ -58,17 +51,12 @@ export type AppCommandContext = {
 	isPinned: boolean;
 };
 
-/**
- * Side effects the palette cannot reach on its own, because they live in
- * `App`'s React state rather than in the store.
- */
 export type AppCommandActions = {
 	openSettings: () => void;
 	requestCopyAsMarkdown: () => void;
 	focusSidebar: () => void;
 };
 
-/** The subset of app state the registry's own predicates read. */
 function toRegistryContext(context: AppCommandContext): RegistryContext {
 	const path = context.currentPath;
 	const isRealFile = path !== null && !isChangelogPath(path);
@@ -83,7 +71,6 @@ function toRegistryContext(context: AppCommandContext): RegistryContext {
 	};
 }
 
-/** Rich text is being edited, so an editor command has somewhere to land. */
 function hasRichTextEditor(context: AppCommandContext) {
 	const path = context.currentPath;
 	return (
@@ -94,7 +81,7 @@ function hasRichTextEditor(context: AppCommandContext) {
 	);
 }
 
-type Declaration = Omit<PaletteCommand, "binding" | "shortcut"> & {
+type CommandDeclaration = Omit<PaletteCommand, "binding" | "shortcut"> & {
 	binding?: string;
 	isEnabled: () => boolean;
 };
@@ -102,21 +89,10 @@ type Declaration = Omit<PaletteCommand, "binding" | "shortcut"> & {
 function defineCommands(
 	actions: AppCommandActions,
 	context: AppCommandContext,
-): Declaration[] {
+): CommandDeclaration[] {
 	const path = context.currentPath;
 	const registry = toRegistryContext(context);
 
-	/**
-	 * Projects a registry entry into a palette row.
-	 *
-	 * Label, binding, and enablement come from the registry so the palette can
-	 * never disagree with the menu bar or the key handler about what a command
-	 * is called, what it is bound to, or when it applies. Only the palette's own
-	 * concerns — grouping, search synonyms, and the handler — are supplied here.
-	 *
-	 * `label` is overridden only for toggles, which the registry names by the
-	 * toggle rather than by the outcome.
-	 */
 	const fromRegistry = (
 		id: CommandId,
 		group: string,
@@ -128,7 +104,7 @@ function defineCommands(
 			label?: string;
 			isEnabled?: () => boolean;
 		},
-	): Declaration => {
+	): CommandDeclaration => {
 		const command = getCommand(id);
 		return {
 			id,
@@ -143,8 +119,8 @@ function defineCommands(
 		};
 	};
 
-	/** A palette-only action: real behavior, but no registry entry or binding. */
-	const local = (declaration: Declaration): Declaration => declaration;
+	const paletteOnly = (declaration: CommandDeclaration): CommandDeclaration =>
+		declaration;
 
 	const editorCommand = (
 		id: Extract<CommandId, `editor.${string}`>,
@@ -162,18 +138,17 @@ function defineCommands(
 			},
 			{
 				globalShortcut: false,
-				// Registry editor commands are `always` enabled because the keymap only
-				// fires inside the editor. The palette has no such guard, so it adds one.
+				// The registry assumes editor-local use.
 				isEnabled: () => hasRichTextEditor(context),
 			},
 		);
 
 	return [
-		// ---- File ----
+		// File
 		fromRegistry("app.new-file", "File", ["create", "markdown", "note"], () =>
 			createMarkdownFile(),
 		),
-		local({
+		paletteOnly({
 			id: "app.new-folder",
 			label: "New Folder",
 			group: "File",
@@ -220,9 +195,6 @@ function defineCommands(
 			async () => {
 				if (!path) return;
 				const name = basename(path);
-				// Matches the sidebar's confirm rather than introducing a second
-				// deletion flow. A palette is easy to trigger by accident, and the
-				// undo toast that follows is a safety net, not a substitute.
 				if (!window.confirm(`Delete ${name}?`)) return;
 				await deleteMarkdownFile(path);
 			},
@@ -233,7 +205,7 @@ function defineCommands(
 			},
 		),
 
-		// ---- Navigate ----
+		// Navigate
 		fromRegistry("app.go-back", "Navigate", ["history", "previous"], goBack),
 		fromRegistry("app.go-forward", "Navigate", ["history", "next"], goForward),
 		fromRegistry(
@@ -248,7 +220,7 @@ function defineCommands(
 			["workspace", "vault", "switch", "recent"],
 			() => setWorkspaceSwitcherOpen(true),
 		),
-		local({
+		paletteOnly({
 			id: "app.toggle-pinned",
 			label: context.isPinned ? "Unpin Note" : "Pin Note",
 			group: "Navigate",
@@ -259,7 +231,7 @@ function defineCommands(
 				if (path) await togglePinnedNote(path);
 			},
 		}),
-		local({
+		paletteOnly({
 			id: "app.focus-sidebar",
 			label: "Focus Sidebar",
 			group: "Navigate",
@@ -271,9 +243,8 @@ function defineCommands(
 			},
 		}),
 
-		// ---- Editor ----
-		// `editor.link` is omitted: it opens the link popover, which needs the
-		// selection the palette has just taken focus from.
+		// Editor
+		// The link popover needs the selection that the palette takes focus from.
 		editorCommand("editor.bold", "bold", ["strong", "format"]),
 		editorCommand("editor.italic", "italic", ["emphasis", "format"]),
 		editorCommand("editor.code", "code", ["monospace", "format"]),
@@ -296,7 +267,7 @@ function defineCommands(
 		]),
 		editorCommand("editor.blockquote", "blockquote", ["quote", "citation"]),
 
-		// ---- View ----
+		// View
 		fromRegistry(
 			"app.toggle-sidebar",
 			"View",
@@ -317,7 +288,7 @@ function defineCommands(
 			() => setViewerMode(context.isSourceMode ? "rich" : "source"),
 			{ label: context.isSourceMode ? "Edit Rich Text" : "Edit Source" },
 		),
-		local({
+		paletteOnly({
 			id: "view.toggle-theme",
 			label: context.isDark ? "Switch to Light Theme" : "Switch to Dark Theme",
 			group: "View",
@@ -325,9 +296,8 @@ function defineCommands(
 			isEnabled: () => true,
 			run: () => setThemePreference(context.isDark ? "light" : "dark"),
 		}),
-		// Zoom stays out of the registry by design (#193: OS convention, and `=`
-		// vs `+` differs per platform), so these carry their own hint strings.
-		local({
+		// Zoom bindings differ by platform, so they stay outside the registry.
+		paletteOnly({
 			id: "view.zoom-in",
 			label: "Zoom In",
 			group: "View",
@@ -337,7 +307,7 @@ function defineCommands(
 			isEnabled: () => true,
 			run: () => desktopApi.zoomWindow("in"),
 		}),
-		local({
+		paletteOnly({
 			id: "view.zoom-out",
 			label: "Zoom Out",
 			group: "View",
@@ -347,7 +317,7 @@ function defineCommands(
 			isEnabled: () => true,
 			run: () => desktopApi.zoomWindow("out"),
 		}),
-		local({
+		paletteOnly({
 			id: "view.zoom-reset",
 			label: "Reset Zoom",
 			group: "View",
@@ -358,7 +328,7 @@ function defineCommands(
 			run: () => desktopApi.zoomWindow("reset"),
 		}),
 
-		// ---- App ----
+		// App
 		fromRegistry(
 			"app.settings",
 			"App",
@@ -371,7 +341,7 @@ function defineCommands(
 			["agent", "ai", "claude", "codex", "terminal"],
 			requestChatAboutNote,
 		),
-		local({
+		paletteOnly({
 			id: "app.check-for-updates",
 			label: "Check for Updates",
 			group: "App",
@@ -387,7 +357,7 @@ function defineCommands(
 				}
 			},
 		}),
-		local({
+		paletteOnly({
 			id: "app.whats-new",
 			label: "What's New",
 			group: "App",
@@ -397,7 +367,7 @@ function defineCommands(
 				await openChangelog();
 			},
 		}),
-		local({
+		paletteOnly({
 			id: "app.contributing",
 			label: "Open Contributing Guide",
 			group: "App",
@@ -408,14 +378,6 @@ function defineCommands(
 	];
 }
 
-/**
- * Builds the palette's command list for the current context.
- *
- * Disabled commands are dropped rather than greyed out: a palette is a search
- * surface, and a result you can select but not run reads as a bug. The menu bar
- * still shows them disabled, which is where discoverability of *unavailable*
- * actions belongs.
- */
 export function buildAppCommands(
 	actions: AppCommandActions,
 	context: AppCommandContext,

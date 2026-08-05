@@ -242,8 +242,6 @@ function App() {
 		}));
 	const lastSeenVersion = useStoreValue(lastSeenVersionStore);
 	const pinnedNotes = useStoreValue(workspaceStore).pinnedNotes;
-	// The root class is the resolved theme, including live OS changes while the
-	// preference is "system".
 	const isDark = useSyncExternalStore(
 		subscribeToResolvedTheme,
 		isResolvedThemeDark,
