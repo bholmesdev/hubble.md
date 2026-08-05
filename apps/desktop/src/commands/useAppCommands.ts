@@ -15,6 +15,7 @@ import { createMarkdownFile } from "../fileActions";
 import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
+	basename,
 	hasMarkdownExtension,
 	isEditableFile,
 	supportsSourceToggle,
@@ -155,7 +156,9 @@ function defineCommands(
 			"Editor",
 			keywords,
 			() => {
-				runEditorAction(action);
+				if (!runEditorAction(action)) {
+					throw new Error("No active editor");
+				}
 			},
 			{
 				globalShortcut: false,
@@ -216,7 +219,7 @@ function defineCommands(
 			["remove", "trash"],
 			async () => {
 				if (!path) return;
-				const name = path.split("/").pop() ?? path;
+				const name = basename(path);
 				// Matches the sidebar's confirm rather than introducing a second
 				// deletion flow. A palette is easy to trigger by accident, and the
 				// undo toast that follows is a safety net, not a substitute.
