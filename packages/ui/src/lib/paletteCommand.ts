@@ -20,6 +20,8 @@ export type PaletteCommand = {
 	keywords?: string[];
 	/** Destructive commands require explicit slash-mode intent. */
 	destructive?: boolean;
+	/** The host handles this shortcut even while the palette input has focus. */
+	globalShortcut?: boolean;
 	/** Raw shortcut used to dismiss the palette before the host handles it. */
 	binding?: string;
 	/** Shortcut formatted for display via `formatShortcut`. */
@@ -120,6 +122,7 @@ export function groupCommands(
 }
 
 const COMMAND_PREFIX = "/";
+const OPEN_COMMAND_PALETTE_EVENT = "hubble:open-command-palette";
 
 /**
  * Command mode is entered by a leading `/`, matching the editor's own slash
@@ -133,4 +136,4 @@ export function stripCommandPrefix(query: string): string {
 	return isCommandQuery(query) ? query.slice(COMMAND_PREFIX.length) : query;
 }
 
-export { COMMAND_PREFIX };
+export { COMMAND_PREFIX, OPEN_COMMAND_PALETTE_EVENT };

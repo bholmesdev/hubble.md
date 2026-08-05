@@ -8,8 +8,10 @@ import {
 	classifyHref,
 	EditorView,
 	GlobalSearchPalette,
+	getActiveEditor,
 	Input,
 	MarkdownSourceEditor,
+	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
 	PlainTextEditor,
 	type WikiTarget,
@@ -365,6 +367,13 @@ function App() {
 
 	useEffect(() => {
 		const onKeyDown = async (event: KeyboardEvent) => {
+			if (keymatch(event, getCommand("app.format-menu").defaultBinding)) {
+				const editor = getActiveEditor();
+				if (editor?.isFocused && !editor.state.selection.empty) return;
+				event.preventDefault();
+				window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT));
+				return;
+			}
 			const currentPath = focusedSidebarPath ?? viewerStore.get().currentPath;
 			// Chat targets the note open in the viewer, not the sidebar focus.
 			const viewerPath = viewerStore.get().currentPath;

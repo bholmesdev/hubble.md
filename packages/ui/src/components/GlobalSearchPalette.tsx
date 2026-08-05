@@ -10,6 +10,7 @@ import {
 	COMMAND_PREFIX,
 	groupCommands,
 	isCommandQuery,
+	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteCommand,
 	rankCommands,
 	rankSearchCommands,
@@ -210,7 +211,9 @@ function GlobalSearchPalette({
 		if (
 			commands.some(
 				(command) =>
-					command.binding && keymatch(event.nativeEvent, command.binding),
+					command.globalShortcut &&
+					command.binding &&
+					keymatch(event.nativeEvent, command.binding),
 			)
 		) {
 			onOpenChange(false);
@@ -223,6 +226,17 @@ function GlobalSearchPalette({
 			setCommandMode(false);
 		}
 	}, [open]);
+
+	useEffect(() => {
+		const openCommands = () => {
+			setQuery("");
+			setCommandMode(true);
+			onOpenChange(true);
+		};
+		window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openCommands);
+		return () =>
+			window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, openCommands);
+	}, [onOpenChange]);
 
 	const relativeByPath = new Map(
 		files.map((file) => [file.path, file.relativePath]),
@@ -423,7 +437,7 @@ function GlobalSearchPalette({
 								</Legend>
 								<Legend keys="esc">Close</Legend>
 							</span>
-							{commands.length > 0 && (
+							{commands.length > 0 && (commandMode || query === "") && (
 								<span className="ms-auto flex items-center gap-1.5">
 									<kbd className="flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-inner)] border border-border px-1 font-sans text-[10px] leading-none text-muted-foreground">
 										{commandMode ? formatShortcut("Backspace") : COMMAND_PREFIX}

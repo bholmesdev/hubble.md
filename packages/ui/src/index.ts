@@ -65,8 +65,10 @@ export {
 	COMMAND_PREFIX,
 	groupCommands,
 	isCommandQuery,
+	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteCommand,
 	rankCommands,
+	rankSearchCommands,
 	scoreCommand,
 	stripCommandPrefix,
 } from "./lib/paletteCommand";

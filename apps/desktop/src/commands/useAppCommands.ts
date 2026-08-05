@@ -113,6 +113,7 @@ function defineCommands(
 		run: () => void | Promise<void>,
 		options?: {
 			destructive?: boolean;
+			globalShortcut?: boolean;
 			label?: string;
 			isEnabled?: () => boolean;
 		},
@@ -125,6 +126,7 @@ function defineCommands(
 			keywords,
 			binding: command.defaultBinding,
 			destructive: options?.destructive,
+			globalShortcut: options?.globalShortcut ?? true,
 			isEnabled: options?.isEnabled ?? (() => command.isEnabled(registry)),
 			run,
 		};
@@ -146,6 +148,7 @@ function defineCommands(
 				runEditorAction(action);
 			},
 			{
+				globalShortcut: false,
 				// Registry editor commands are `always` enabled because the keymap only
 				// fires inside the editor. The palette has no such guard, so it adds one.
 				isEnabled: () => hasRichTextEditor(context),
@@ -209,7 +212,11 @@ function defineCommands(
 				if (!window.confirm(`Delete ${name}?`)) return;
 				await deleteMarkdownFile(path);
 			},
-			{ destructive: true, label: "Delete Note" },
+			{
+				destructive: true,
+				globalShortcut: false,
+				label: "Delete Note",
+			},
 		),
 
 		// ---- Navigate ----
@@ -312,6 +319,7 @@ function defineCommands(
 			group: "View",
 			keywords: ["bigger", "larger", "text size"],
 			binding: "CmdOrCtrl+=",
+			globalShortcut: true,
 			isEnabled: () => true,
 			run: () => desktopApi.zoomWindow("in"),
 		}),
@@ -321,6 +329,7 @@ function defineCommands(
 			group: "View",
 			keywords: ["smaller", "text size"],
 			binding: "CmdOrCtrl+-",
+			globalShortcut: true,
 			isEnabled: () => true,
 			run: () => desktopApi.zoomWindow("out"),
 		}),
@@ -330,6 +339,7 @@ function defineCommands(
 			group: "View",
 			keywords: ["actual size", "default"],
 			binding: "CmdOrCtrl+0",
+			globalShortcut: true,
 			isEnabled: () => true,
 			run: () => desktopApi.zoomWindow("reset"),
 		}),

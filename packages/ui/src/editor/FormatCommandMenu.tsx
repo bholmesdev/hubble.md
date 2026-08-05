@@ -217,6 +217,7 @@ export function FormatCommandMenu({
 				if (!keymatch(event, getCommand("app.format-menu").defaultBinding))
 					return;
 				if (!editor.isFocused && !open) return;
+				if (!open && editor.state.selection.empty) return;
 				event.preventDefault();
 				if (open) {
 					closeMenu();
