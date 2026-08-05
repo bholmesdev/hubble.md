@@ -382,6 +382,7 @@ function App() {
 
 	useEffect(() => {
 		const onKeyDown = async (event: KeyboardEvent) => {
+			if (event.defaultPrevented) return;
 			if (keymatch(event, getCommand("app.format-menu").defaultBinding)) {
 				const editor = getActiveEditor();
 				if (editor?.isFocused && !editor.state.selection.empty) return;

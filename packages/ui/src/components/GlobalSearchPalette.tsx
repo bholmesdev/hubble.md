@@ -256,9 +256,9 @@ function GlobalSearchPalette({
 	// would otherwise fight the palette's own closing focus restore.
 	const runCommand = async (command: PaletteCommand) => {
 		onOpenChange(false);
-		onRunCommand?.(command.id);
 		try {
 			await command.run();
+			onRunCommand?.(command.id);
 		} catch (error) {
 			console.error(`Failed to run command "${command.label}":`, error);
 		}
