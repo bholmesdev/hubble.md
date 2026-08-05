@@ -111,7 +111,11 @@ function defineCommands(
 		group: string,
 		keywords: string[],
 		run: () => void | Promise<void>,
-		options?: { label?: string; isEnabled?: () => boolean },
+		options?: {
+			destructive?: boolean;
+			label?: string;
+			isEnabled?: () => boolean;
+		},
 	): Declaration => {
 		const command = getCommand(id);
 		return {
@@ -120,6 +124,7 @@ function defineCommands(
 			group,
 			keywords,
 			binding: command.defaultBinding,
+			destructive: options?.destructive,
 			isEnabled: options?.isEnabled ?? (() => command.isEnabled(registry)),
 			run,
 		};
@@ -204,7 +209,7 @@ function defineCommands(
 				if (!window.confirm(`Delete ${name}?`)) return;
 				await deleteMarkdownFile(path);
 			},
-			{ label: "Delete Note" },
+			{ destructive: true, label: "Delete Note" },
 		),
 
 		// ---- Navigate ----

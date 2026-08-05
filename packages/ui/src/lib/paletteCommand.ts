@@ -18,6 +18,8 @@ export type PaletteCommand = {
 	group: string;
 	/** Search synonyms, so "theme" finds "Toggle Dark Mode". */
 	keywords?: string[];
+	/** Destructive commands require explicit slash-mode intent. */
+	destructive?: boolean;
 	/** Raw shortcut used to dismiss the palette before the host handles it. */
 	binding?: string;
 	/** Shortcut formatted for display via `formatShortcut`. */
@@ -73,6 +75,29 @@ export function rankCommands(
 				a.command.label.localeCompare(b.command.label),
 		)
 		.map((entry) => entry.command);
+}
+
+const MIN_SEARCH_COMMAND_SCORE = 0.63;
+const MAX_SEARCH_COMMANDS = 3;
+
+/** Strong, safe command matches shown alongside note search results. */
+export function rankSearchCommands(
+	query: string,
+	commands: PaletteCommand[],
+	recentIds: string[] = [],
+): PaletteCommand[] {
+	const trimmed = query.trim();
+	if (trimmed.replace(/[\s_-]+/g, "").length < 2) return [];
+
+	return rankCommands(
+		trimmed,
+		commands.filter((command) => !command.destructive),
+		recentIds,
+	)
+		.filter(
+			(command) => scoreCommand(trimmed, command) >= MIN_SEARCH_COMMAND_SCORE,
+		)
+		.slice(0, MAX_SEARCH_COMMANDS);
 }
 
 /**

@@ -12,6 +12,7 @@ import {
 	isCommandQuery,
 	type PaletteCommand,
 	rankCommands,
+	rankSearchCommands,
 	stripCommandPrefix,
 } from "../lib/paletteCommand";
 import { formatShortcut } from "../lib/shortcut";
@@ -169,16 +170,18 @@ function GlobalSearchPalette({
 	const [commandMode, setCommandMode] = useState(false);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const fileQuery = commandMode ? "" : query;
-	const nameResults = getNameResults(files, fileQuery);
+	const nameResults = commandMode ? [] : getNameResults(files, fileQuery);
 	const { result, searching } = useContentResults(
 		fileQuery,
 		open && !commandMode,
 		searchContents,
 	);
 
-	const commandResults = groupCommands(
-		rankCommands(query, commands, recentCommandIds),
-	);
+	const rankedCommands = commandMode
+		? rankCommands(query, commands, recentCommandIds)
+		: rankSearchCommands(query, commands, recentCommandIds);
+	const commandResults = commandMode ? groupCommands(rankedCommands) : [];
+	const searchCommandResults = commandMode ? [] : rankedCommands;
 
 	/** Typing the prefix into an empty query swaps the chip in, not the text. */
 	const changeQuery = (next: string) => {
@@ -246,7 +249,9 @@ function GlobalSearchPalette({
 	const isEmptyQuery = fileQuery.trim() === "";
 	const hasResults = commandMode
 		? commandResults.length > 0
-		: nameResults.length > 0 || contentResults.length > 0;
+		: searchCommandResults.length > 0 ||
+			nameResults.length > 0 ||
+			contentResults.length > 0;
 	return (
 		<Dialog.Root open={open} onOpenChange={onOpenChange}>
 			<Dialog.Portal>
@@ -273,7 +278,7 @@ function GlobalSearchPalette({
 					<Dialog.Description className="sr-only">
 						{commandMode
 							? "Run a Hubble command. Press Backspace on an empty query to search notes instead."
-							: "Find a note by name, path, or content. Type a slash to run a command instead."}
+							: "Find notes and commands. Type a slash to browse all commands."}
 					</Dialog.Description>
 					<Command
 						label={commandMode ? "Run a command" : "Search files"}
@@ -295,9 +300,7 @@ function GlobalSearchPalette({
 								onValueChange={changeQuery}
 								onKeyDown={handleKeyDown}
 								placeholder={
-									commandMode
-										? "Run a command"
-										: "Search notes, or type / for commands"
+									commandMode ? "Run a command" : "Search notes and commands"
 								}
 								className="h-12 w-full border-0 bg-transparent text-[13px] text-foreground outline-hidden placeholder:text-muted-foreground"
 							/>
@@ -337,6 +340,21 @@ function GlobalSearchPalette({
 										))}
 									</ResultGroup>
 								))}
+
+							{!commandMode && searchCommandResults.length > 0 && (
+								<ResultGroup heading="Commands">
+									{searchCommandResults.map((command) => (
+										<Command.Item
+											key={command.id}
+											value={`command:${command.id}`}
+											onSelect={() => runCommand(command)}
+											className={ROW_CLASS}
+										>
+											<CommandRow command={command} query={query} />
+										</Command.Item>
+									))}
+								</ResultGroup>
+							)}
 
 							{!commandMode && nameResults.length > 0 && (
 								<ResultGroup heading={isEmptyQuery ? "Recent" : "Notes"}>
@@ -408,11 +426,9 @@ function GlobalSearchPalette({
 							{commands.length > 0 && (
 								<span className="ms-auto flex items-center gap-1.5">
 									<kbd className="flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-inner)] border border-border px-1 font-sans text-[10px] leading-none text-muted-foreground">
-										{commandMode
-											? formatShortcut("Backspace")
-											: COMMAND_PREFIX}
+										{commandMode ? formatShortcut("Backspace") : COMMAND_PREFIX}
 									</kbd>
-									{commandMode ? "Search notes" : "Commands"}
+									{commandMode ? "Search notes" : "All commands"}
 								</span>
 							)}
 						</div>

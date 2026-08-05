@@ -4,6 +4,7 @@ import {
 	isCommandQuery,
 	type PaletteCommand,
 	rankCommands,
+	rankSearchCommands,
 	scoreCommand,
 	stripCommandPrefix,
 } from "./paletteCommand";
@@ -101,6 +102,41 @@ describe("rankCommands", () => {
 		const tied = [command("a", "Copy Path"), command("b", "Copy Path")];
 		expect(rankCommands("copy path", tied, ["b"])[0].id).toBe("b");
 		expect(rankCommands("copy path", tied)[0].id).toBe("a");
+	});
+});
+
+describe("rankSearchCommands", () => {
+	const commands = [
+		command("a", "Settings"),
+		command("b", "Switch Theme", "View", ["dark mode"]),
+		command("c", "Show Sidebar"),
+		command("d", "Show Source"),
+		command("e", "Show Terminal"),
+		{ ...command("f", "Delete Note"), destructive: true },
+	];
+
+	it("requires a meaningful query", () => {
+		expect(rankSearchCommands("", commands)).toEqual([]);
+		expect(rankSearchCommands("s", commands)).toEqual([]);
+		expect(rankSearchCommands("--", commands)).toEqual([]);
+	});
+
+	it("keeps strong label and synonym matches", () => {
+		expect(rankSearchCommands("set", commands).map(({ id }) => id)).toEqual([
+			"a",
+		]);
+		expect(rankSearchCommands("dark", commands).map(({ id }) => id)).toEqual([
+			"b",
+		]);
+	});
+
+	it("drops loose and destructive matches", () => {
+		expect(rankSearchCommands("ss", commands)).toEqual([]);
+		expect(rankSearchCommands("delete", commands)).toEqual([]);
+	});
+
+	it("shows at most three commands", () => {
+		expect(rankSearchCommands("sh", commands)).toHaveLength(3);
 	});
 });
 
