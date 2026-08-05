@@ -1,6 +1,6 @@
 import { Button, formatShortcut, Input } from "@hubble.md/ui";
 import { isMac } from "keymatch";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 // PROTOTYPE — three variants of the Shortcuts settings page, switchable via
 // `?variant=`, inside the existing Settings dialog. Throw away after #194
@@ -369,14 +369,6 @@ function eventBinding(event: KeyboardEvent): string | null {
 	return normalizeBinding(parts.join("+"));
 }
 
-function isTypingTarget(target: EventTarget | null) {
-	if (!(target instanceof HTMLElement)) return false;
-	return (
-		target.matches("input, textarea, select") ||
-		target.closest("[contenteditable='true']") !== null
-	);
-}
-
 function usePrototypeState() {
 	const [bindings, setBindings] = useState<Bindings>(() => {
 		const initial = initialBindings();
@@ -508,28 +500,12 @@ export function ShortcutsSettingsPrototype({
 	const [page, setPage] = useState<"general" | "shortcuts">("shortcuts");
 	const state = usePrototypeState();
 
-	const chooseVariant = useCallback((next: Variant) => {
+	const chooseVariant = (next: Variant) => {
 		const url = new URL(window.location.href);
 		url.searchParams.set("variant", next);
 		window.history.replaceState(null, "", url);
 		setVariant(next);
-	}, []);
-
-	useEffect(() => {
-		const cycle = (direction: -1 | 1) => {
-			const currentIndex = variants.findIndex(({ id }) => id === variant);
-			const nextIndex =
-				(currentIndex + direction + variants.length) % variants.length;
-			chooseVariant(variants[nextIndex].id);
-		};
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (isTypingTarget(event.target) || state.recordingId) return;
-			if (event.key === "ArrowLeft") cycle(-1);
-			if (event.key === "ArrowRight") cycle(1);
-		};
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [chooseVariant, state.recordingId, variant]);
+	};
 
 	const props = { general, page, setPage, state };
 
@@ -641,6 +617,7 @@ function TabsVariant({ general, page, setPage, state }: PrototypeProps) {
 							</section>
 						))}
 					</div>
+					{filtered.length === 0 ? <EmptySearch /> : null}
 				</div>
 			)}
 		</div>
