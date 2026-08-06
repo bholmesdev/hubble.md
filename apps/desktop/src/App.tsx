@@ -14,6 +14,7 @@ import {
 	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
 	PlainTextEditor,
+	type SpellcheckControls,
 	type WikiTarget,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
@@ -207,6 +208,7 @@ function App() {
 	);
 	const [telemetryConsent, setTelemetryConsent] =
 		useState<TelemetryConsent | null>(null);
+	const [spellcheck, setSpellcheck] = useState<SpellcheckControls | null>(null);
 	const [focusedSidebarItem, setFocusedSidebarItem] =
 		useState<DesktopSidebarFocus>(null);
 	const updateFocusedSidebarItem = (next: DesktopSidebarFocus) => {
@@ -286,6 +288,28 @@ function App() {
 
 	useEffect(() => {
 		void desktopApi.getTelemetryConsent().then(setTelemetryConsent);
+	}, []);
+
+	useEffect(() => {
+		void desktopApi.getSpellcheckState().then((state) => {
+			setSpellcheck({
+				enabled: state.enabled,
+				language: state.languages[0] ?? "en-US",
+				availableLanguages: state.availableLanguages,
+				onChange: (language) => {
+					void desktopApi.setSpellcheck(language);
+					setSpellcheck((prev) =>
+						prev
+							? {
+									...prev,
+									enabled: language !== null,
+									language: language ?? prev.language,
+								}
+							: prev,
+					);
+				},
+			});
+		});
 	}, []);
 
 	const chooseTelemetry = async (choice: TelemetryChoice) => {
@@ -730,6 +754,7 @@ function App() {
 									content={state.content}
 									copyAsMarkdownRequest={copyAsMarkdownRequest}
 									viewMode={state.viewMode}
+									spellcheck={spellcheck}
 									onScrollContainerChange={setScrollContainerEl}
 								/>
 							</div>
@@ -851,12 +876,14 @@ function DocumentViewer({
 	content,
 	copyAsMarkdownRequest,
 	viewMode,
+	spellcheck,
 	onScrollContainerChange,
 }: {
 	path: string;
 	content: string;
 	copyAsMarkdownRequest: number;
 	viewMode: ViewMode;
+	spellcheck?: SpellcheckControls | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	if (viewMode === "source" && supportsSourceToggle(path)) {
@@ -946,6 +973,7 @@ function DocumentViewer({
 			path={path}
 			initialMarkdown={content}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
+			spellcheck={spellcheck}
 			onScrollContainerChange={onScrollContainerChange}
 		/>
 	);
@@ -1025,11 +1053,13 @@ function MarkdownEditor({
 	path,
 	initialMarkdown,
 	copyAsMarkdownRequest,
+	spellcheck,
 	onScrollContainerChange,
 }: {
 	path: string;
 	initialMarkdown: string;
 	copyAsMarkdownRequest: number;
+	spellcheck?: SpellcheckControls | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
@@ -1103,6 +1133,7 @@ function MarkdownEditor({
 				kind === "success" ? toast.success(message) : toast.error(message)
 			}
 			onReviewThreadsChange={setReviewThreads}
+			spellcheck={spellcheck}
 		/>
 	);
 }

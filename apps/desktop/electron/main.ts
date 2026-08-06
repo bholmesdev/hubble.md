@@ -115,6 +115,18 @@ if (devAppName) {
 // chrome and sandboxed HTML apps read `themeSource`. Restore it before the window
 // exists so those are right on the first frame, after the userData override above.
 nativeTheme.themeSource = loadThemeSource();
+const savedSpellcheck = loadSpellcheckConfig();
+if (savedSpellcheck) {
+	session.defaultSession.spellCheckerEnabled = savedSpellcheck.enabled;
+	if (savedSpellcheck.enabled && savedSpellcheck.languages.length > 0) {
+		const valid = savedSpellcheck.languages.filter((lang) =>
+			session.defaultSession.availableSpellCheckerLanguages.includes(lang),
+		);
+		if (valid.length > 0) {
+			session.defaultSession.setSpellCheckerLanguages(valid);
+		}
+	}
+}
 const telemetry = new TelemetryManager({
 	statePath: path.join(app.getPath("userData"), "telemetry.json"),
 	endpoint:
@@ -266,6 +278,52 @@ function saveThemeSource(source: ThemePreference) {
 		);
 	} catch {
 		// Best-effort cache; the renderer resends the preference on every launch.
+	}
+}
+
+// --- Spellcheck preference ---
+// Same persistence pattern as themeSource: a JSON file in userData.
+
+function spellcheckConfigPath(): string {
+	return path.join(app.getPath("userData"), "spellcheck.json");
+}
+
+function loadSpellcheckConfig() {
+	try {
+		const parsed = JSON.parse(
+			fsSync.readFileSync(spellcheckConfigPath(), "utf8"),
+		);
+		if (
+			typeof parsed?.enabled === "boolean" &&
+			Array.isArray(parsed?.languages)
+		) {
+			return {
+				enabled: parsed.enabled,
+				languages: parsed.languages.filter(
+					(lang: unknown) => typeof lang === "string",
+				),
+			};
+		}
+	} catch {
+		// Missing or malformed — fall through to defaults.
+	}
+	return null;
+}
+
+function saveSpellcheckConfig(config: {
+	enabled: boolean;
+	languages: string[];
+}) {
+	try {
+		fsSync.mkdirSync(path.dirname(spellcheckConfigPath()), {
+			recursive: true,
+		});
+		fsSync.writeFileSync(
+			spellcheckConfigPath(),
+			JSON.stringify(config, null, 2),
+		);
+	} catch {
+		// Best-effort cache; the renderer resends on every launch.
 	}
 }
 
@@ -1814,6 +1872,39 @@ function registerIpc() {
 		(_event, { source }: { source: ThemePreference }) => {
 			nativeTheme.themeSource = isThemePreference(source) ? source : "system";
 			saveThemeSource(nativeTheme.themeSource);
+		},
+	);
+
+	ipcMain.handle("desktop:get-spellcheck-state", () => {
+		const saved = loadSpellcheckConfig();
+		return {
+			enabled: saved?.enabled ?? session.defaultSession.spellCheckerEnabled,
+			languages:
+				saved?.languages ?? session.defaultSession.getSpellCheckerLanguages(),
+			availableLanguages: session.defaultSession.availableSpellCheckerLanguages,
+		};
+	});
+
+	ipcMain.handle(
+		"desktop:set-spellcheck",
+		(_event, { language }: { language: string | null }) => {
+			const { defaultSession } = session;
+			if (language === null) {
+				defaultSession.spellCheckerEnabled = false;
+				const saved = loadSpellcheckConfig();
+				saveSpellcheckConfig({
+					enabled: false,
+					languages:
+						saved?.languages ?? defaultSession.getSpellCheckerLanguages(),
+				});
+			} else {
+				const valid =
+					defaultSession.availableSpellCheckerLanguages.includes(language);
+				if (!valid) return;
+				defaultSession.spellCheckerEnabled = true;
+				defaultSession.setSpellCheckerLanguages([language]);
+				saveSpellcheckConfig({ enabled: true, languages: [language] });
+			}
 		},
 	);
 

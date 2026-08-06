@@ -57,7 +57,7 @@ export function ConnectScreen({ onConnected }: Props) {
 					onChange={(event) => setUrl(event.target.value)}
 					placeholder="https://your-deployment.convex.cloud"
 					disabled={busy}
-					className="rounded-sm border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-ring"
+					className="rounded-sm border border-border bg-background px-2.5 py-1.5 text-sm outline-hidden focus:border-ring"
 				/>
 				{error && (
 					<p className="m-0 rounded-sm bg-muted px-2.5 py-1.5 text-xs text-destructive">

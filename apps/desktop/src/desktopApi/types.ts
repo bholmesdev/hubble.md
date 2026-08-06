@@ -135,6 +135,12 @@ export type WorkspaceConfig = {
 	pinnedNotes: string[];
 };
 
+export type SpellcheckState = {
+	enabled: boolean;
+	languages: string[];
+	availableLanguages: string[];
+};
+
 export type DesktopApi = {
 	platform: DesktopPlatform;
 	homeDir: string;
@@ -196,6 +202,8 @@ export type DesktopApi = {
 	getLaunchFilePath(): Promise<string | null>;
 	getLaunchWorkspacePath(): Promise<string | null>;
 	setThemeSource(source: ThemePreference): Promise<void>;
+	getSpellcheckState(): Promise<SpellcheckState>;
+	setSpellcheck(language: string | null): Promise<void>;
 	setMenuState(state: MenuState): Promise<void>;
 	getUpdateState(): Promise<DesktopUpdateState>;
 	getTelemetryConsent(): Promise<TelemetryConsent>;

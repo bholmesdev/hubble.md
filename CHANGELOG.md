@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Spellcheck status label in the footer with a language picker and toggle to disable spellcheck. [#187](https://github.com/bholmesdev/hubble.md/issues/187)
+
 ### Changed
 
 ### Fixed

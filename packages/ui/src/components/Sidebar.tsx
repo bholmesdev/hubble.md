@@ -1370,7 +1370,7 @@ const DroppableSidebarNav = forwardRef<
 			ref={setRefs}
 			role="tree"
 			className={cn(
-				"flex-1 overflow-y-auto overscroll-contain px-1.5 py-1 outline-none",
+				"flex-1 overflow-y-auto overscroll-contain px-1.5 py-1 outline-hidden",
 				"rounded-[var(--radius-row)] inset-ring-1 inset-ring-transparent transition-[box-shadow] duration-150 ease-out motion-reduce:transition-none",
 				active && "inset-ring-sidebar-accent/70",
 			)}
@@ -1781,7 +1781,7 @@ export function SidebarFrame({
 				{children}
 			</div>
 			<div
-				className="group absolute z-20 cursor-col-resize outline-none [inset-block:0]"
+				className="group absolute z-20 cursor-col-resize outline-hidden [inset-block:0]"
 				style={{
 					inlineSize: RESIZE_HANDLE_WIDTH,
 					insetInlineEnd: -(RESIZE_HANDLE_WIDTH / 2),
@@ -2255,7 +2255,7 @@ function FileRenameInput({
 			<input
 				ref={ref}
 				aria-invalid={error ? true : undefined}
-				className="min-w-0 flex-1 rounded-none border-0 bg-muted/70 p-0 text-[13px] text-sidebar-foreground outline-none selection:bg-selected/70 selection:text-sidebar-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+				className="min-w-0 flex-1 rounded-none border-0 bg-muted/70 p-0 text-[13px] text-sidebar-foreground outline-hidden selection:bg-selected/70 selection:text-sidebar-foreground focus:outline-hidden focus-visible:outline-hidden focus-visible:ring-0"
 				value={value}
 				onBlur={() => onCommit()}
 				onChange={(event) => onChange(event.target.value)}

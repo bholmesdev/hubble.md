@@ -164,7 +164,7 @@ export function Toolbar({
 				{editingTitle ? (
 					<input
 						ref={titleInputRef}
-						className="h-6 min-w-0 max-w-full select-text rounded-sm bg-transparent px-1 text-center text-xs text-foreground outline-none focus-visible:outline-none focus-visible:ring-0"
+						className="h-6 min-w-0 max-w-full select-text rounded-sm bg-transparent px-1 text-center text-xs text-foreground outline-hidden focus-visible:outline-hidden focus-visible:ring-0"
 						style={NO_DRAG_STYLE}
 						value={draftTitle}
 						onBlur={() => void commitTitleEdit()}
@@ -182,7 +182,7 @@ export function Toolbar({
 				) : (
 					<button
 						type="button"
-						className="min-w-0 truncate rounded-sm px-1 text-center text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-0"
+						className="min-w-0 truncate rounded-sm px-1 text-center text-xs text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-0"
 						style={NO_DRAG_STYLE}
 						onClick={beginTitleEdit}
 						disabled={!title || !onRenameCurrentPath}
