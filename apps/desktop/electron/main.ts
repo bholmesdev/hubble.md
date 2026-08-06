@@ -49,6 +49,7 @@ import type { ThemePreference } from "../src/theme";
 import { DeleteUndo } from "./deleteUndo";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
+import { readTextFile, writeTextFile } from "./textFile";
 import {
 	collectWorkspaceFiles,
 	listSidebarFiles,
@@ -1335,7 +1336,7 @@ function registerIpc() {
 		"desktop:read-file-text",
 		async (_event, { path: filePath }) => {
 			const resolved = assertGranted(filePath);
-			return await fs.readFile(resolved, "utf8");
+			return await readTextFile(resolved);
 		},
 	);
 
@@ -1371,7 +1372,7 @@ function registerIpc() {
 						const resolved = assertGranted(candidate);
 						const stat = await fs.stat(resolved);
 						if (!stat.isFile() || stat.size > SEARCH_MAX_FILE_BYTES) continue;
-						const content = await fs.readFile(resolved, "utf8");
+						const content = await readTextFile(resolved);
 						const matches = findMatchesInContent(content, needle);
 						if (matches.length > 0) results.push({ path: candidate, matches });
 					} catch {}
@@ -1412,10 +1413,10 @@ function registerIpc() {
 				throw new Error("write-file-text requires encoded bytes");
 			}
 			await fs.mkdir(path.dirname(resolved), { recursive: true });
-			// Text is encoded in preload. Main only writes bytes so it cannot
-			// accidentally shorten UTF-8 content while crossing string encoders.
+			// Preload sends UTF-8 bytes so IPC cannot shorten multibyte text.
+			// The writer restores the existing file's BOM-marked encoding.
 			// See https://github.com/bholmesdev/hubble.md/issues/126 for the repro.
-			await fs.writeFile(resolved, Uint8Array.from(bytes));
+			await writeTextFile(resolved, Uint8Array.from(bytes));
 		},
 	);
 
