@@ -8,8 +8,8 @@ description: Triage an incoming GitHub, Jira, Linear, or other issue-tracker iss
 Assess the issue passed in the user's prompt and decide exactly one triage state:
 
 - `Ready to implement`
-- `Needs discussion`
 - `Duplicate`
+- `Needs discussion`
 
 The goal is to route work honestly, not to make every issue appear actionable. Base the decision on evidence from the issue tracker, current checkout, and related open issues.
 
@@ -73,16 +73,6 @@ Choose when:
 
 Small bugs with clear reproduction steps and straightforward improvements usually belong here.
 
-#### Needs discussion
-
-Choose for everything else:
-
-- Material product or technical decisions remain open
-- Multiple valid designs, broad surface-area changes, or non-trivial dependencies make one-shot implementation risky
-- The expected behavior, problem, scope, or reproduction is ambiguous
-- Critical environment details, evidence, or acceptance criteria are missing
-- The request may not fit the current product direction, conflicts with planned work, or a dependency makes it premature
-
 #### Duplicate
 
 Choose when another issue already tracks the same underlying behavior and scope. Require concrete tracker evidence; similar symptoms or overlapping implementation areas alone are not enough.
@@ -92,18 +82,27 @@ Choose when another issue already tracks the same underlying behavior and scope.
 - If the canonical issue was closed as fixed but the behavior recurs, verify it is not a regression before choosing `Duplicate`
 - Do not close or otherwise mutate the issue; the caller owns tracker changes
 
+#### Needs discussion
+
+Choose when neither implementation nor duplicate status is clear:
+
+- Material product or technical decisions remain open
+- Multiple valid designs, broad surface-area changes, or non-trivial dependencies make one-shot implementation risky
+- The expected behavior, problem, scope, or reproduction is ambiguous
+- Critical environment details, evidence, or acceptance criteria are missing
+- The request may not fit the current product direction, conflicts with planned work, or a dependency makes it premature
+
 ### 5. Return the result
 
-Pick the tracker label that matches the chosen state, preferring an existing label with the same meaning and the tracker's established naming and casing (for example `ready-to-implement`, `needs-discussion`, or `duplicate`). List any existing triage-state labels that should be removed.
+Pick the tracker label that matches the chosen state, preferring an existing label with the same meaning and the tracker's established naming and casing (for example `ready-to-implement`, `needs-discussion`, or `duplicate`).
 
 Return a single raw JSON object as your final response — no prose and no markdown code fences:
 
 ```json
 {
-  "state": "Ready to implement | Needs discussion | Duplicate",
+  "state": "Ready to implement | Duplicate | Needs discussion",
   "label": "exact tracker label matching the chosen state",
   "duplicate_of": "canonical issue URL or tracker key when state is Duplicate; otherwise null",
-  "remove_labels": ["existing triage-state labels that should be removed"],
   "comment": "markdown body for the issue"
 }
 ```
