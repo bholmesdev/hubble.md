@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- See the active spellcheck language beside the word count, change it, or turn spellcheck off. Thanks [@camilom](https://github.com/camilom) for the suggestion! [#233](https://github.com/bholmesdev/hubble.md/pull/233)
+
 ### Changed
 
 ### Fixed
