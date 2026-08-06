@@ -179,8 +179,8 @@ jobs:
                 echo "::error::Duplicate result is missing 'duplicate_of'; keeping seeded needs-triage." >&2
                 exit 1
               fi
-              if ! grep -Fq -- "$DUPLICATE_OF" comment.md; then
-                echo "::error::Duplicate comment does not link 'duplicate_of'; keeping seeded needs-triage." >&2
+              if [ "$(head -n 1 comment.md)" != "Duplicate of $DUPLICATE_OF" ]; then
+                echo "::error::Duplicate comment does not start with 'Duplicate of <duplicate_of>'; keeping seeded needs-triage." >&2
                 exit 1
               fi
               ;;
