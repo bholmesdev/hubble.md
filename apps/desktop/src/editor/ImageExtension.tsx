@@ -3,6 +3,7 @@ import { ReactNodeViewRenderer } from "@tiptap/react";
 import { ImageNodeView } from "./ImageNodeView";
 export function createImageExtension(filePath: string) {
 	return Image.extend({
+		group: "block tableCellContent",
 		addAttributes() {
 			return {
 				...this.parent?.(),

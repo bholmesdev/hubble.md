@@ -9,11 +9,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Find and run Hubble commands alongside note results in the search palette. Thanks [@zcuric](https://github.com/zcuric)! [#209](https://github.com/bholmesdev/hubble.md/pull/209)
+
 ### Changed
 
 ### Fixed
 
-- Keyboard navigation keeps the selected slash command in view. Thanks [@ggbao666](https://github.com/ggbao666) for the suggestion! [#223](https://github.com/bholmesdev/hubble.md/pull/223)
+- Keyboard navigation keeps the selected slash command in view. Thanks [@ggbao666](https://github.com/ggbao666) for the report! [#223](https://github.com/bholmesdev/hubble.md/pull/223)
+- Images in list items and table cells no longer disappear after reopening a note. Thanks [@parthiv-krishna](https://github.com/parthiv-krishna) for the report! [#225](https://github.com/bholmesdev/hubble.md/pull/225)
 
 ## [0.1.24] - 2026-08-02
 

@@ -1,7 +1,8 @@
 name: Review Pull Requests
 
-# The agent checks out only the trusted PR base and reads contributor changes as
-# review data. A separate job validates its review before publishing it.
+# The agent checks out only the workflow's trusted repository revision and reads
+# contributor changes as review data. A separate job validates its review before
+# publishing it.
 
 on:
   pull_request_target:
@@ -71,10 +72,9 @@ jobs:
     outputs:
       artifact_name: ${{ steps.artifact.outputs.name }}
     steps:
-      - name: Checkout trusted PR base
+      - name: Checkout trusted workflow revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve.outputs.base_sha }}
           fetch-depth: 0
           persist-credentials: false
 

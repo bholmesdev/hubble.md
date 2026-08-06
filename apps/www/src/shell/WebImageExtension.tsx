@@ -14,6 +14,7 @@ const uploads = new Map<string, Promise<string>>();
 
 export function createWebImageExtension() {
 	return Image.extend({
+		group: "block tableCellContent",
 		addAttributes() {
 			return {
 				...this.parent?.(),

@@ -33,12 +33,17 @@ import {
 } from "../store/state";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
+export type DesktopSidebarFocus = {
+	kind: "file" | "folder";
+	path: string;
+} | null;
+
 export function Sidebar({
 	footer,
-	onFocusedPathChange,
+	onFocusedItemChange,
 }: {
 	footer?: ReactNode;
-	onFocusedPathChange?: (path: string | null) => void;
+	onFocusedItemChange?: (item: DesktopSidebarFocus) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
@@ -114,12 +119,13 @@ export function Sidebar({
 			}
 			onFocusedItemChange={(item: SidebarFocusedItem) => {
 				if (!item) {
-					onFocusedPathChange?.(null);
+					onFocusedItemChange?.(null);
 					return;
 				}
-				onFocusedPathChange?.(
-					item.kind === "file" ? item.path : absolutePath(item.folderId),
-				);
+				onFocusedItemChange?.({
+					kind: item.kind,
+					path: item.kind === "file" ? item.path : absolutePath(item.folderId),
+				});
 			}}
 			revealLabel={revealFileLabel(desktopApi.platform)}
 			onRenameFile={(path, nextName) => void renameMarkdownFile(path, nextName)}

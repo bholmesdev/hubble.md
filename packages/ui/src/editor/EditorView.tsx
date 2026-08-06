@@ -18,8 +18,6 @@ import {
 import type { Editor } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list";
 import { Table } from "@tiptap/extension-table";
-import { TableCell } from "@tiptap/extension-table-cell";
-import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
 import {
 	EditorContent,
@@ -28,6 +26,7 @@ import {
 	useEditor,
 } from "@tiptap/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { clearActiveEditor, setActiveEditor } from "./activeEditor";
 import { CODE_BLOCK_COPY_EVENT, HubbleCodeBlock } from "./CodeBlockExtension";
 import { copySelectionAsMarkdown } from "./copyAsMarkdown";
 import { LinkClickExtension } from "./LinkClickExtension";
@@ -41,6 +40,10 @@ import {
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { SmartLinkExtension } from "./SmartLinkExtension";
 import { TableCellSelectionExtension } from "./TableCellSelectionExtension";
+import {
+	MarkdownTableCell,
+	MarkdownTableHeader,
+} from "./TableMarkdownExtensions";
 import { VirtualCursor } from "./VirtualCursor";
 import "./EditorView.css";
 import {
@@ -60,11 +63,6 @@ import { SelectionFormattingToolbar } from "./SelectionFormattingToolbar";
 import type { VirtualCursorMode } from "./virtualCursorMode";
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 120;
-
-// Markdown table cells should not hold block content, so cells allow exactly one
-// paragraph (line breaks serialize as <br>)
-const InlineTableCell = TableCell.extend({ content: "paragraph" });
-const InlineTableHeader = TableHeader.extend({ content: "paragraph" });
 
 export type { WikiTarget };
 
@@ -189,8 +187,8 @@ export function EditorView({
 			TaskItem.configure({ nested: true }),
 			Table.configure({ resizable: true }),
 			TableRow,
-			InlineTableHeader,
-			InlineTableCell,
+			MarkdownTableHeader,
+			MarkdownTableCell,
 			TableCellSelectionExtension,
 		],
 		content: initialDoc,
@@ -229,6 +227,8 @@ export function EditorView({
 	});
 	useLayoutEffect(() => {
 		editorRef.current = editor;
+		setActiveEditor(editor);
+		return () => clearActiveEditor(editor);
 	}, [editor]);
 
 	useEffect(() => {

@@ -92,6 +92,8 @@ export type WatchOptions = {
 
 export type Unsubscribe = () => void;
 
+export type ZoomDirection = "in" | "out" | "reset";
+
 export type MenuState = {
 	hasWorkspace: boolean;
 	hasSourceViewOpen: boolean;
@@ -200,6 +202,7 @@ export type DesktopApi = {
 	setTelemetryConsent(consent: TelemetryChoice): Promise<TelemetryConsent>;
 	recordTelemetryActivity(input: { usedHtmlApp: boolean }): Promise<void>;
 	getFullScreen(): Promise<boolean>;
+	zoomWindow(direction: ZoomDirection): Promise<void>;
 	checkForUpdates(): Promise<void>;
 	installUpdate(): Promise<void>;
 	onOpenFile(callback: (path: string) => void): Unsubscribe;

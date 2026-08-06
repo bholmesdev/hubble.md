@@ -1,6 +1,7 @@
 export { ContextMenuSpellcheckExtension } from "./ContextMenuSpellcheckExtension.js";
 export {
 	type AppCommandId,
+	type CommandContext,
 	type CommandId,
 	getCommand,
 	tiptapBinding,

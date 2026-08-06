@@ -143,15 +143,18 @@ function blockToPM(node: Content): JSONContent[] {
 					type: "table",
 					content: tableNode.children.map((row, rowIndex) => ({
 						type: "tableRow",
-						content: row.children.map((cell) => ({
-							type: rowIndex === 0 ? "tableHeader" : "tableCell",
-							content: [
-								{
-									type: "paragraph",
-									content: inlineToPM(cell.children ?? []),
-								},
-							],
-						})),
+						content: row.children.map((cell) => {
+							const blocks = splitParagraphAroundImages(
+								dropBreaksBesideImages(cell.children ?? []),
+							);
+							return {
+								type: rowIndex === 0 ? "tableHeader" : "tableCell",
+								content:
+									blocks.length > 0
+										? blocks
+										: [{ type: "paragraph", content: [] }],
+							};
+						}),
 					})),
 				},
 			];
@@ -223,13 +226,17 @@ function listItemToPM(li: ListItem, allowChecked: boolean): JSONContent[] {
 	// mdast listItem children may be paragraphs and nested lists.
 	const blocks = (li.children ?? []) as Content[];
 	const first = blocks[0];
-	const paragraphContent =
-		first && first.type === "paragraph" ? inlineToPM(first.children ?? []) : [];
+	const firstBlocks =
+		first && first.type === "paragraph"
+			? splitParagraphAroundImages(first.children ?? [])
+			: [];
 	const restBlocks = (
 		first && first.type === "paragraph" ? blocks.slice(1) : blocks
 	).flatMap(blockToPM);
-	const content: JSONContent[] = [];
-	content.push({ type: "paragraph", content: paragraphContent });
+	const content: JSONContent[] =
+		firstBlocks[0]?.type === "paragraph"
+			? firstBlocks
+			: [{ type: "paragraph", content: [] }, ...firstBlocks];
 	content.push(...restBlocks);
 
 	const checkedAttr = allowChecked && li.checked != null ? !!li.checked : null;
@@ -262,6 +269,23 @@ function splitParagraphAroundImages(children: Content[]): JSONContent[] {
 	}
 	flushRun();
 	return blocks;
+}
+
+function dropBreaksBesideImages(children: Content[]): Content[] {
+	return children.filter((child, index) => {
+		if (!isLineBreak(child)) return true;
+		return (
+			children[index - 1]?.type !== "image" &&
+			children[index + 1]?.type !== "image"
+		);
+	});
+}
+
+function isLineBreak(node: Content): boolean {
+	return (
+		node.type === "break" ||
+		(node.type === "html" && isHtmlLineBreak(node.value))
+	);
 }
 
 function trimInlineRun(run: Content[]): Content[] {
