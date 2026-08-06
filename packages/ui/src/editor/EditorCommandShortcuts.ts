@@ -8,8 +8,6 @@ import StarterKit from "@tiptap/starter-kit";
 
 const withoutShortcuts = { addKeyboardShortcuts: () => ({}) };
 
-// The image extension is optional, so table cells target a group that always
-// exists through paragraphs and gains images when an app installs them.
 const MarkdownStarterKit = StarterKit.extend({
 	addExtensions() {
 		return (this.parent?.() ?? []).map((extension) =>
