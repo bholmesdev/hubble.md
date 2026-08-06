@@ -63,6 +63,12 @@ import { SelectionFormattingToolbar } from "./SelectionFormattingToolbar";
 import type { VirtualCursorMode } from "./virtualCursorMode";
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 120;
+export type SpellcheckControl = {
+	enabled: boolean;
+	language: string | null;
+	availableLanguages: string[];
+	onChange: (enabled: boolean, language: string | null) => void;
+};
 
 export type { WikiTarget };
 
@@ -83,6 +89,7 @@ export type EditorViewProps = {
 	onOpenExternalLink: (href: string) => void | Promise<void>;
 	onOpenWikiLink: (target: string) => void | Promise<void>;
 	onMessage?: (message: string, type: "success" | "error") => void;
+	spellcheck?: SpellcheckControl;
 	/** Review threads in the open document, republished on every edit, so an
 	 * app can list them in its own chrome. */
 	onReviewThreadsChange?: (threads: ReviewThread[]) => void;
@@ -105,6 +112,7 @@ export function EditorView({
 	onOpenExternalLink,
 	onOpenWikiLink,
 	onMessage,
+	spellcheck,
 	onReviewThreadsChange,
 }: EditorViewProps) {
 	const initialFrontMatter = parseMarkdownFrontMatter(initialMarkdown);
@@ -374,7 +382,11 @@ export function EditorView({
 				)}
 			</div>
 			<FindBar editor={editor} />
-			<FormattingStatusBar editor={editor} scrollContainer={editorViewportEl} />
+			<FormattingStatusBar
+				editor={editor}
+				scrollContainer={editorViewportEl}
+				spellcheck={spellcheck}
+			/>
 		</div>
 	);
 }

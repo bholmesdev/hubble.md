@@ -124,6 +124,11 @@ export type DesktopPlatform = NodeJS.Platform;
 
 export type TelemetryChoice = "enabled" | "declined";
 export type TelemetryConsent = TelemetryChoice | "unset";
+export type SpellcheckState = {
+	enabled: boolean;
+	language: string | null;
+	availableLanguages: string[];
+};
 
 export type TerminalStartOptions = {
 	notePath?: string;
@@ -196,6 +201,10 @@ export type DesktopApi = {
 	getLaunchFilePath(): Promise<string | null>;
 	getLaunchWorkspacePath(): Promise<string | null>;
 	setThemeSource(source: ThemePreference): Promise<void>;
+	getSpellcheckState(): Promise<SpellcheckState>;
+	setSpellcheck(
+		input: Pick<SpellcheckState, "enabled" | "language">,
+	): Promise<SpellcheckState>;
 	setMenuState(state: MenuState): Promise<void>;
 	getUpdateState(): Promise<DesktopUpdateState>;
 	getTelemetryConsent(): Promise<TelemetryConsent>;

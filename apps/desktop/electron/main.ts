@@ -28,6 +28,7 @@ import type {
 	HtmlAppFileEntry,
 	MenuState,
 	SearchFileResult,
+	SpellcheckState,
 	WorkspaceConfig,
 } from "../src/desktopApi/types";
 import {
@@ -240,6 +241,55 @@ function windowStatePath(): string {
 
 function themeSourcePath(): string {
 	return path.join(app.getPath("userData"), "theme.json");
+}
+
+function spellcheckPath(): string {
+	return path.join(app.getPath("userData"), "spellcheck.json");
+}
+
+function getSpellcheckState(): SpellcheckState {
+	const spellcheckSession = session.defaultSession;
+	return {
+		enabled: spellcheckSession.isSpellCheckerEnabled(),
+		language: spellcheckSession.getSpellCheckerLanguages()[0] ?? null,
+		availableLanguages: spellcheckSession.availableSpellCheckerLanguages,
+	};
+}
+
+function setSpellcheck({
+	enabled,
+	language,
+}: Pick<SpellcheckState, "enabled" | "language">): SpellcheckState {
+	const spellcheckSession = session.defaultSession;
+	const availableLanguages = spellcheckSession.availableSpellCheckerLanguages;
+	const nextLanguage =
+		typeof language === "string" && availableLanguages.includes(language)
+			? language
+			: null;
+	spellcheckSession.setSpellCheckerEnabled(enabled === true);
+	spellcheckSession.setSpellCheckerLanguages(
+		enabled && nextLanguage ? [nextLanguage] : [],
+	);
+	const state = getSpellcheckState();
+	try {
+		fsSync.writeFileSync(spellcheckPath(), JSON.stringify(state, null, 2));
+	} catch {
+		// Best-effort preference; Chromium defaults remain available.
+	}
+	return state;
+}
+
+function loadSpellcheck() {
+	try {
+		const raw = fsSync.readFileSync(spellcheckPath(), "utf8");
+		const saved = JSON.parse(raw) as Partial<SpellcheckState>;
+		setSpellcheck({
+			enabled: saved.enabled === true,
+			language: typeof saved.language === "string" ? saved.language : null,
+		});
+	} catch {
+		// Missing or malformed state keeps Chromium's defaults.
+	}
 }
 
 function isThemePreference(value: unknown): value is ThemePreference {
@@ -1816,6 +1866,13 @@ function registerIpc() {
 			saveThemeSource(nativeTheme.themeSource);
 		},
 	);
+	ipcMain.handle("desktop:get-spellcheck-state", () => getSpellcheckState());
+	ipcMain.handle("desktop:set-spellcheck", (_event, input) =>
+		setSpellcheck({
+			enabled: input?.enabled === true,
+			language: typeof input?.language === "string" ? input.language : null,
+		}),
+	);
 
 	ipcMain.handle("desktop:set-menu-state", (_event, state: MenuState) => {
 		menuState = {
@@ -1872,6 +1929,7 @@ if (!singleInstanceLock) {
 		await telemetry.load();
 		void telemetry.recordActivity(false);
 		await loadGrants();
+		loadSpellcheck();
 		if (launchWorkspacePath) grantRoot(launchWorkspacePath);
 		await saveGrants();
 		protocol.handle("hubble-asset", (request) => {

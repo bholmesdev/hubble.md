@@ -40,6 +40,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { desktopApi } from "./desktopApi";
 import type {
 	DesktopUpdateState,
+	SpellcheckState,
 	TelemetryChoice,
 	TelemetryConsent,
 } from "./desktopApi/types";
@@ -1033,6 +1034,10 @@ function MarkdownEditor({
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
+	const [spellcheck, setSpellcheck] = useState<SpellcheckState | null>(null);
+	useEffect(() => {
+		void desktopApi.getSpellcheckState().then(setSpellcheck);
+	}, []);
 	// External-only files stay out of autocomplete; explicit links still work.
 	const wikiTargets: WikiTarget[] = workspace.files
 		.filter((file) => (file.kind ?? fileKindForPath(file.path)) !== "external")
@@ -1101,6 +1106,18 @@ function MarkdownEditor({
 			}
 			onMessage={(message, kind) =>
 				kind === "success" ? toast.success(message) : toast.error(message)
+			}
+			spellcheck={
+				spellcheck
+					? {
+							...spellcheck,
+							onChange: (enabled, language) => {
+								void desktopApi
+									.setSpellcheck({ enabled, language })
+									.then(setSpellcheck);
+							},
+						}
+					: undefined
 			}
 			onReviewThreadsChange={setReviewThreads}
 		/>
