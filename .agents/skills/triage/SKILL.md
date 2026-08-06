@@ -1,14 +1,15 @@
 ---
 name: triage
-description: Triage an incoming GitHub, Jira, Linear, or other issue-tracker issue against the current codebase and related open issues, then return a structured decision with exactly one implementation-readiness state. Use whenever the user asks to triage, classify, assess, prioritize, or label an issue for implementation readiness, especially when an issue URL, key, or number is supplied in the prompt.
+description: Triage an incoming GitHub, Jira, Linear, or other issue-tracker issue against the current codebase and related issues, then return a structured decision with exactly one triage state. Use whenever the user asks to triage, classify, assess, prioritize, or label an issue for implementation readiness, especially when an issue URL, key, or number is supplied in the prompt.
 ---
 
 # Triage
 
-Assess the issue passed in the user's prompt and decide exactly one implementation-readiness state:
+Assess the issue passed in the user's prompt and decide exactly one triage state:
 
 - `Ready to implement`
 - `Needs discussion`
+- `Duplicate`
 
 The goal is to route work honestly, not to make every issue appear actionable. Base the decision on evidence from the issue tracker, current checkout, and related open issues.
 
@@ -37,7 +38,7 @@ Fetch:
 - Existing labels, status, assignee, project, and linked issues
 - Attachments or screenshots when they materially affect understanding
 - The tracker's available labels
-- Related open issues, including likely duplicates, dependencies, and nearby product work
+- Related open and closed issues, including likely duplicates, dependencies, and nearby product work
 
 Do not classify solely from the title. Do not expose credentials or secrets while fetching tracker data.
 
@@ -80,25 +81,34 @@ Choose for everything else:
 - Multiple valid designs, broad surface-area changes, or non-trivial dependencies make one-shot implementation risky
 - The expected behavior, problem, scope, or reproduction is ambiguous
 - Critical environment details, evidence, or acceptance criteria are missing
-- The request may not fit the current product direction, duplicates or conflicts with planned work, or a dependency makes it premature
+- The request may not fit the current product direction, conflicts with planned work, or a dependency makes it premature
 
+#### Duplicate
+
+Choose when another issue already tracks the same underlying behavior and scope. Require concrete tracker evidence; similar symptoms or overlapping implementation areas alone are not enough.
+
+- Identify the canonical issue in the comment
+- Prefer the issue with clearer acceptance criteria, more discussion, or active implementation
+- If the canonical issue was closed as fixed but the behavior recurs, verify it is not a regression before choosing `Duplicate`
+- Do not close or otherwise mutate the issue; the caller owns tracker changes
 
 ### 5. Return the result
 
-Pick the tracker label that matches the chosen state, preferring an existing label with the same meaning and the tracker's established naming and casing (for example `ready-to-implement` for `Ready to implement` and `needs-discussion` for `Needs discussion`). List any existing triage-state labels that should be removed.
+Pick the tracker label that matches the chosen state, preferring an existing label with the same meaning and the tracker's established naming and casing (for example `ready-to-implement`, `needs-discussion`, or `duplicate`). List any existing triage-state labels that should be removed.
 
 Return a single raw JSON object as your final response — no prose and no markdown code fences:
 
 ```json
 {
-  "state": "Ready to implement | Needs discussion",
+  "state": "Ready to implement | Needs discussion | Duplicate",
   "label": "exact tracker label matching the chosen state",
+  "duplicate_of": "canonical issue URL or tracker key when state is Duplicate; otherwise null",
   "remove_labels": ["existing triage-state labels that should be removed"],
   "comment": "markdown body for the issue"
 }
 ```
 
-Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale, using a brief bullet list where it aids readability. For `Needs discussion`, end the comment with the concrete questions and open decisions from step 4. Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
+Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale, using a brief bullet list where it aids readability. For `Needs discussion`, end with the concrete questions and open decisions from step 4. For `Duplicate`, lead with `Duplicate of <canonical issue>` and briefly state why it covers this report. Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
 
 ## Guardrails
 
