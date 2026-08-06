@@ -8,6 +8,16 @@ import StarterKit from "@tiptap/starter-kit";
 
 const withoutShortcuts = { addKeyboardShortcuts: () => ({}) };
 
+const MarkdownStarterKit = StarterKit.extend({
+	addExtensions() {
+		return (this.parent?.() ?? []).map((extension) =>
+			extension.name === "paragraph"
+				? extension.extend({ group: "block tableCellContent" })
+				: extension,
+		);
+	},
+});
+
 // StarterKit binds its own mark and heading shortcuts. Swap those extensions
 // for shortcut-free versions so EditorCommandShortcuts owns every binding.
 // The code mark is Hubble's own InlineCodeExtension, added by the caller.
@@ -15,7 +25,7 @@ export function starterKitWithRegistryShortcuts(
 	options?: Parameters<typeof StarterKit.configure>[0],
 ) {
 	return [
-		StarterKit.configure({
+		MarkdownStarterKit.configure({
 			...options,
 			blockquote: false,
 			bold: false,
