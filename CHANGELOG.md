@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- BOM-marked UTF-16 text and Markdown files now open, search, and save without corrupting their encoding. [#232](https://github.com/bholmesdev/hubble.md/pull/232)
+
 ## [0.1.25] - 2026-08-06
 
 ### Added
