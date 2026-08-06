@@ -11,7 +11,7 @@ Assess the issue passed in the user's prompt and decide exactly one triage state
 - `Duplicate`
 - `Needs discussion`
 
-The goal is to route work honestly, not to make every issue appear actionable. Base the decision on evidence from the issue tracker, current checkout, and related open issues.
+The goal is to route work honestly, not to make every issue appear actionable. Base the decision on evidence from the issue tracker, current checkout, and related issues.
 
 This is a read-only analysis: inspect the issue and codebase but do not mutate the tracker. Return the structured decision described in step 5; the caller applies the label and comment.
 
@@ -53,7 +53,7 @@ Assess:
 - Whether the issue has a bounded implementation path
 - Dependencies, migrations, platform differences, and testing requirements
 - Existing abstractions that make the change cohesive or indicate it does not fit
-- Whether related open issues or active work change the recommendation
+- Whether related issues or active work change the recommendation
 
 Prefer targeted searches and reads. This is triage, not implementation: do not edit product code.
 
@@ -107,7 +107,7 @@ Return a single raw JSON object as your final response — no prose and no markd
 }
 ```
 
-Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale, using a brief bullet list where it aids readability. For `Needs discussion`, end with the concrete questions and open decisions from step 4. For `Duplicate`, lead with `Duplicate of <canonical issue>` and briefly state why it covers this report. Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
+Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale, using a brief bullet list where it aids readability. For `Needs discussion`, end with the concrete questions and open decisions from step 4. For `Duplicate`, lead with `Duplicate of <duplicate_of>`, using the exact `duplicate_of` value from the result, and briefly state why it covers this report. Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
 
 ## Guardrails
 
