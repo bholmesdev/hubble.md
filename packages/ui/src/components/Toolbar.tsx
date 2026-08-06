@@ -57,7 +57,7 @@ export function Toolbar({
 	currentPath,
 	sidebarOpen,
 	sidebarBadge,
-	scrollContainer,
+	scrollContainer: _scrollContainer,
 	platformInset = true,
 	leftSlot,
 	rightSlot,
@@ -77,22 +77,10 @@ export function Toolbar({
 	rootProps?: HTMLAttributes<HTMLDivElement> &
 		Record<`data-${string}`, unknown>;
 }) {
-	const [showBorder, setShowBorder] = useState(false);
 	const [editingTitle, setEditingTitle] = useState(false);
 	const [draftTitle, setDraftTitle] = useState("");
 	const titleInputRef = useRef<HTMLInputElement | null>(null);
 	const title = currentPath ? fileNameFromPath(currentPath) : "";
-
-	useEffect(() => {
-		if (!scrollContainer) {
-			setShowBorder(false);
-			return;
-		}
-		const update = () => setShowBorder(scrollContainer.scrollTop > 0);
-		update();
-		scrollContainer.addEventListener("scroll", update, { passive: true });
-		return () => scrollContainer.removeEventListener("scroll", update);
-	}, [scrollContainer]);
 
 	useEffect(() => {
 		if (!editingTitle) return;
@@ -118,11 +106,7 @@ export function Toolbar({
 		await onRenameCurrentPath(nextTitle);
 	}
 
-	const borderClass = sidebarOpen
-		? "border-b border-border"
-		: showBorder
-			? "[border-block-end:1px_dashed_var(--border)]"
-			: "border-transparent";
+	const borderClass = "border-b border-border";
 
 	return (
 		<div

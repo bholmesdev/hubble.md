@@ -102,8 +102,8 @@ const updateCheckIntervalMs = 4 * 60 * 60 * 1000;
 // follows the OS appearance instead of staying light in dark mode.
 function titleBarOverlayColors() {
 	return nativeTheme.shouldUseDarkColors
-		? { color: "#181715", symbolColor: "#a6a5a0" }
-		: { color: "#ffffff", symbolColor: "#454545" };
+		? { color: "#181715", symbolColor: "#a6a5a0", height: 35 }
+		: { color: "#ffffff", symbolColor: "#454545", height: 35 };
 }
 
 app.setName(appName);
@@ -1814,6 +1814,13 @@ function registerIpc() {
 		(_event, { source }: { source: ThemePreference }) => {
 			nativeTheme.themeSource = isThemePreference(source) ? source : "system";
 			saveThemeSource(nativeTheme.themeSource);
+			if (
+				process.platform !== "darwin" &&
+				mainWindow &&
+				!mainWindow.isDestroyed()
+			) {
+				mainWindow.setTitleBarOverlay(titleBarOverlayColors());
+			}
 		},
 	);
 
