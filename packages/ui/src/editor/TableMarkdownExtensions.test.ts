@@ -55,7 +55,7 @@ it("loads images in Markdown table cells", () => {
 	});
 });
 
-it("rejects other block types in Markdown table cells", () => {
+it("rejects lists that GFM table cells cannot round-trip", () => {
 	editor = new Editor({
 		element: document.createElement("div"),
 		extensions: [
