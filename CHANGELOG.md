@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Pressing Enter in a list item containing an image now creates a new list item instead of dropping out of the list. Thanks [@ggbao666](https://github.com/ggbao666) for the report!
+
 ## [0.1.25] - 2026-08-06
 
 ### Added

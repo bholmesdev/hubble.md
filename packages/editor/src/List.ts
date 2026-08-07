@@ -5,6 +5,8 @@ import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { canJoin } from "@tiptap/pm/transform";
 import {
+	isAtEndOfListItemWithContent,
+	isInEmptyListItem,
 	isSelectionAtStartOfNode,
 	nearestSharedParentOfType,
 } from "./utils.js";
@@ -219,8 +221,41 @@ export const ListToggleExtension = Extension.create({
 			},
 			Enter: ({ editor }) => {
 				const { selection } = editor.view.state;
-				if (isSelectionAtStartOfNode(selection)) {
+				// Leaving the list is only correct for a genuinely empty item. An item
+				// holding an image also parks the cursor at offset 0 of its trailing
+				// paragraph, and lifting there drops the image out of the list.
+				if (
+					isSelectionAtStartOfNode(selection) &&
+					isInEmptyListItem(selection)
+				) {
 					return editor.commands.liftListItem("listItem");
+				}
+				// splitListItem bails on an empty trailing paragraph and defers to
+				// lifting, so an item holding an image would exit the list instead of
+				// continuing it. Split the item here to keep Enter on the list.
+				if (isAtEndOfListItemWithContent(selection)) {
+					return editor.commands.command(({ tr, dispatch }) => {
+						const { $from } = tr.selection;
+						const itemDepth = $from.depth - 1;
+						const item = $from.node(itemDepth);
+						const nextItem = item.type.createAndFill(
+							isTaskItem(item) ? { ...item.attrs, checked: false } : item.attrs,
+						);
+						if (!nextItem) return false;
+						if (dispatch) {
+							const paragraphStart = $from.before($from.depth);
+							const paragraphEnd = $from.after($from.depth);
+							const insertAt =
+								$from.after(itemDepth) - (paragraphEnd - paragraphStart);
+							// Drop the now-redundant empty paragraph, then continue the
+							// list with a fresh item and put the cursor inside it.
+							tr.delete(paragraphStart, paragraphEnd);
+							tr.insert(insertAt, nextItem);
+							tr.setSelection(TextSelection.near(tr.doc.resolve(insertAt + 1)));
+							dispatch(tr);
+						}
+						return true;
+					});
 				}
 				// Splitting a task item should always start the new item unchecked
 				const { $from } = selection;
