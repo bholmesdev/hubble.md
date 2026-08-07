@@ -1,7 +1,8 @@
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { Schema } from "@tiptap/pm/model";
-import { TextSelection } from "@tiptap/pm/state";
+import { EditorState, TextSelection } from "@tiptap/pm/state";
 import { describe, expect, it } from "vitest";
+import { continueListItem } from "./List.js";
 import {
 	isAtEndOfListItemWithContent,
 	isInEmptyListItem,
@@ -195,5 +196,62 @@ describe("Enter guard in list items", () => {
 		expect(
 			isSelectionAtStartOfNode(selection) && isInEmptyListItem(selection),
 		).toBe(false);
+	});
+});
+
+describe("continueListItem", () => {
+	function applyToImageItem(
+		listType: "bulletList" | "orderedList" = "bulletList",
+		itemAttrs: Record<string, unknown> = {},
+	) {
+		const doc = listDoc(listType, imageItemContent(), itemAttrs);
+		const state = EditorState.create({
+			doc,
+			selection: cursorAtLastParagraphStart(doc),
+		});
+		const tr = state.tr;
+		const handled = continueListItem(tr);
+		return { handled, doc: tr.doc, selection: tr.selection };
+	}
+
+	it("replaces the trailing paragraph with a sibling list item", () => {
+		const { handled, doc } = applyToImageItem();
+		const list = doc.firstChild;
+
+		expect(handled).toBe(true);
+		expect(list?.childCount).toBe(2);
+		// The image stays put, and its item no longer carries the empty paragraph.
+		expect(list?.child(0).childCount).toBe(2);
+		expect(list?.child(0).child(1).type.name).toBe("image");
+		// The new item is an empty list item ready to type into.
+		expect(list?.child(1).childCount).toBe(1);
+		expect(list?.child(1).firstChild?.type.name).toBe("paragraph");
+		expect(list?.child(1).textContent).toBe("");
+	});
+
+	it("leaves the cursor inside the new list item", () => {
+		const { doc, selection } = applyToImageItem();
+		const list = doc.firstChild;
+		const newItemStart = 1 + (list?.child(0).nodeSize ?? 0);
+
+		expect(selection.from).toBeGreaterThan(newItemStart);
+		expect(selection.$from.node(selection.$from.depth - 1).type.name).toBe(
+			"listItem",
+		);
+		expect(selection.$from.parent.type.name).toBe("paragraph");
+	});
+
+	it("keeps the list type when continuing a numbered list", () => {
+		const { doc } = applyToImageItem("orderedList");
+
+		expect(doc.firstChild?.type.name).toBe("orderedList");
+		expect(doc.firstChild?.childCount).toBe(2);
+	});
+
+	it("starts the next task item unchecked", () => {
+		const { doc } = applyToImageItem("bulletList", { checked: true });
+
+		expect(doc.firstChild?.child(0).attrs.checked).toBe(true);
+		expect(doc.firstChild?.child(1).attrs.checked).toBe(false);
 	});
 });

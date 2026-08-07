@@ -235,25 +235,9 @@ export const ListToggleExtension = Extension.create({
 				// continuing it. Split the item here to keep Enter on the list.
 				if (isAtEndOfListItemWithContent(selection)) {
 					return editor.commands.command(({ tr, dispatch }) => {
-						const { $from } = tr.selection;
-						const itemDepth = $from.depth - 1;
-						const item = $from.node(itemDepth);
-						const nextItem = item.type.createAndFill(
-							isTaskItem(item) ? { ...item.attrs, checked: false } : item.attrs,
-						);
-						if (!nextItem) return false;
-						if (dispatch) {
-							const paragraphStart = $from.before($from.depth);
-							const paragraphEnd = $from.after($from.depth);
-							const insertAt =
-								$from.after(itemDepth) - (paragraphEnd - paragraphStart);
-							// Drop the now-redundant empty paragraph, then continue the
-							// list with a fresh item and put the cursor inside it.
-							tr.delete(paragraphStart, paragraphEnd);
-							tr.insert(insertAt, nextItem);
-							tr.setSelection(TextSelection.near(tr.doc.resolve(insertAt + 1)));
-							dispatch(tr);
-						}
+						if (!dispatch) return true;
+						if (!continueListItem(tr)) return false;
+						dispatch(tr);
 						return true;
 					});
 				}
@@ -404,6 +388,31 @@ export const ListAutoJoinExtension = Extension.create({
 
 function isListItem(node: PMNode) {
 	return node.type.name === "listItem";
+}
+
+/**
+ * Continue a list from the empty trailing paragraph of an item that holds other
+ * content, such as the paragraph left behind by an image paste. Drops that
+ * paragraph, appends a sibling item, and puts the cursor inside it.
+ *
+ * Only meaningful for a selection `isAtEndOfListItemWithContent` accepts.
+ */
+export function continueListItem(tr: Transaction) {
+	const { $from } = tr.selection;
+	const itemDepth = $from.depth - 1;
+	const item = $from.node(itemDepth);
+	const nextItem = item.type.createAndFill(
+		isTaskItem(item) ? { ...item.attrs, checked: false } : item.attrs,
+	);
+	if (!nextItem) return false;
+
+	const paragraphStart = $from.before($from.depth);
+	const paragraphEnd = $from.after($from.depth);
+	const insertAt = $from.after(itemDepth) - (paragraphEnd - paragraphStart);
+	tr.delete(paragraphStart, paragraphEnd);
+	tr.insert(insertAt, nextItem);
+	tr.setSelection(TextSelection.near(tr.doc.resolve(insertAt + 1)));
+	return true;
 }
 
 function isTaskItem(node: PMNode) {
