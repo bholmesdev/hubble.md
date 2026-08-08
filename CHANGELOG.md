@@ -11,9 +11,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Open recent workspaces with Ctrl+R, and add folders with Cmd+Shift+O. [#243](https://github.com/bholmesdev/hubble.md/pull/243)
+
 ### Fixed
 
 - Folders in the sidebar no longer take the active-note highlight when clicked; they use the muted hover/focus style instead. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#235](https://github.com/bholmesdev/hubble.md/pull/235)
+- Scrollbars now match the selected light or dark theme. Thanks [@ggbao666](https://github.com/ggbao666) for the suggestion! [#239](https://github.com/bholmesdev/hubble.md/pull/239)
 
 ## [0.1.25] - 2026-08-06
 

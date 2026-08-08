@@ -432,10 +432,10 @@ function App() {
 				"app.go-forward": goForward,
 				"app.new-file": createMarkdownFile,
 				"app.settings": () => setSettingsOpen(true),
-				"app.open-folder": () => setWorkspaceSwitcherOpen(true),
+				"app.open-recent": () => setWorkspaceSwitcherOpen(true),
 				// The File menu accelerator fires too, but opening is idempotent.
 				"app.go-to-file": () => changeSearchOpen(true),
-				"app.add-folder": openWorkspaceWithSidebar,
+				"app.open-folder": openWorkspaceWithSidebar,
 				"app.open-file": openFilePicker,
 				"app.copy-path": () => copyFilePath(currentPath),
 				"app.reveal": () => revealPath(currentPath),
