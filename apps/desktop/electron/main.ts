@@ -96,7 +96,7 @@ const updateCheckErrorMessage =
 	"Couldn't check for updates. Try again shortly.";
 // Check every 4 hours after the initial packaged-app update check.
 const updateCheckIntervalMs = 4 * 60 * 60 * 1000;
-const titleBarOverlayHeight = 35;
+const titleBarOverlayHeight = 36;
 
 // Windows/Linux draw the min/max/close buttons as a native overlay whose colors
 // are static unless we update them. Mirror the app palette so the button strip
