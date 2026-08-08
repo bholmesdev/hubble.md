@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { formatCommandShortcut } from "@hubble.md/ui";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -182,6 +183,8 @@ describe("WorkspaceSwitcher", () => {
 		const addFolder = Array.from(
 			document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
 		).find((item) => item.textContent?.includes("Add folder..."));
-		expect(addFolder?.textContent).toContain("Ctrl+Shift+O");
+		expect(addFolder?.textContent).toContain(
+			formatCommandShortcut("app.open-folder"),
+		);
 	});
 });
