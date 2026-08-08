@@ -9,13 +9,25 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Find and run Hubble commands alongside note results in the search palette. Thanks [@zcuric](https://github.com/zcuric)! [#209](https://github.com/bholmesdev/hubble.md/pull/209)
-
 ### Changed
+
+- Open recent workspaces with Ctrl+R, and add folders with Cmd+Shift+O. [#243](https://github.com/bholmesdev/hubble.md/pull/243)
 
 ### Fixed
 
 - Window controls now align with the app header on Windows and Linux. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#236](https://github.com/bholmesdev/hubble.md/pull/236)
+- Scrollbars now match the selected light or dark theme. Thanks [@ggbao666](https://github.com/ggbao666) for the suggestion! [#239](https://github.com/bholmesdev/hubble.md/pull/239)
+
+## [0.1.25] - 2026-08-06
+
+### Added
+
+- Find and run Hubble commands alongside note results in the search palette. Thanks [@zcuric](https://github.com/zcuric)! [#209](https://github.com/bholmesdev/hubble.md/pull/209)
+
+### Fixed
+
+- Keyboard navigation keeps the selected slash command in view. Thanks [@ggbao666](https://github.com/ggbao666) for the report! [#223](https://github.com/bholmesdev/hubble.md/pull/223)
+- Images in list items and table cells no longer disappear after reopening a note. Thanks [@parthiv-krishna](https://github.com/parthiv-krishna) for the report! [#225](https://github.com/bholmesdev/hubble.md/pull/225)
 
 ## [0.1.24] - 2026-08-02
 

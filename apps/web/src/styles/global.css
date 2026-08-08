@@ -1,6 +1,7 @@
 @import "./fonts.css";
 
 :root {
+	color-scheme: light;
 	/* Brand palette anchors */
 	--forest: #173d2e;
 	--forest-deep: #0f2c20;
@@ -18,6 +19,10 @@
 	--font-hand: "Shantell Sans", "Radon", cursive;
 	--font-serif: "Fraunces", Georgia, serif;
 	--font-mono: "Radon", ui-monospace, monospace;
+}
+
+.dark {
+	color-scheme: dark;
 }
 
 *,

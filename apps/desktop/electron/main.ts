@@ -60,6 +60,7 @@ import {
 	resetWindowZoom,
 	setTrafficLightInset,
 	stepWindowZoom,
+	toolbarHeight,
 	trafficLightPositionForZoom,
 	zoomStep,
 } from "./zoom";
@@ -96,8 +97,6 @@ const updateCheckErrorMessage =
 	"Couldn't check for updates. Try again shortly.";
 // Check every 4 hours after the initial packaged-app update check.
 const updateCheckIntervalMs = 4 * 60 * 60 * 1000;
-const titleBarOverlayHeight = 36;
-
 // Windows/Linux draw the min/max/close buttons as a native overlay whose colors
 // are static unless we update them. Mirror the app palette so the button strip
 // follows the OS appearance instead of staying light in dark mode.
@@ -105,7 +104,7 @@ function titleBarOverlayOptions() {
 	const colors = nativeTheme.shouldUseDarkColors
 		? { color: "#181715", symbolColor: "#a6a5a0" }
 		: { color: "#ffffff", symbolColor: "#454545" };
-	return { ...colors, height: titleBarOverlayHeight };
+	return { ...colors, height: toolbarHeight };
 }
 
 app.setName(appName);
@@ -826,14 +825,14 @@ function buildMenu() {
 					label: "New HTML App",
 					click: () => sendToRenderer("desktop:menu-create-html-file"),
 				},
-				commandMenuItem("app.add-folder", () =>
-					sendToRenderer("desktop:menu-open-folder"),
-				),
 				{ type: "separator" },
 				commandMenuItem("app.open-file", () =>
 					sendToRenderer("desktop:menu-open-file"),
 				),
 				commandMenuItem("app.open-folder", () =>
+					sendToRenderer("desktop:menu-open-folder"),
+				),
+				commandMenuItem("app.open-recent", () =>
 					sendToRenderer("desktop:menu-show-workspace-switcher"),
 				),
 				{ type: "separator" },
@@ -1816,13 +1815,6 @@ function registerIpc() {
 		(_event, { source }: { source: ThemePreference }) => {
 			nativeTheme.themeSource = isThemePreference(source) ? source : "system";
 			saveThemeSource(nativeTheme.themeSource);
-			if (
-				process.platform !== "darwin" &&
-				mainWindow &&
-				!mainWindow.isDestroyed()
-			) {
-				mainWindow.setTitleBarOverlay(titleBarOverlayOptions());
-			}
 		},
 	);
 

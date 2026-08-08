@@ -214,6 +214,12 @@ export function SlashCommandMenu({
 	});
 
 	useEffect(() => {
+		menuRef.current
+			?.querySelector(`[cmdk-item][data-value="${activeKind}"]`)
+			?.scrollIntoView({ block: "nearest" });
+	}, [activeKind]);
+
+	useEffect(() => {
 		if (!editor) return;
 
 		// Keep focus in the editor so typing continues to update the document;

@@ -1,14 +1,14 @@
 name: Triage New Issues
 
-# Guarantees every newly opened issue carries a readiness label, then triages
+# Guarantees every newly opened issue carries a triage-state label, then triages
 # it with a Warp Factory agent when possible.
 #
 # Flow:
-# 1. `seed` always applies `needs-triage` if the issue has no readiness label.
+# 1. `seed` always applies `needs-triage` if the issue has no triage-state label.
 #    This covers blank issues, API/CLI creates, and template misses — so agent
 #    failure still leaves the issue in a known inbox state.
 # 2. `triage` runs the read-only triage skill and emits structured JSON.
-# 3. `apply` replaces `needs-triage` with the agent's readiness label and posts
+# 3. `apply` replaces `needs-triage` with the agent's triage-state label and posts
 #    the triage comment. If triage/apply fail, the seeded `needs-triage` remains.
 # 4. `implement` starts Implement Ready Issues when the applied label is ready-to-implement.
 #
@@ -26,7 +26,7 @@ concurrency:
 env:
   # Exactly one of these should be present on every open issue after triage
   # (or after seed, if triage has not finished yet).
-  READINESS_LABELS: needs-triage,ready-to-implement,needs-discussion,wontfix
+  TRIAGE_LABELS: needs-triage,ready-to-implement,needs-discussion,duplicate,wontfix
 
 jobs:
   seed:
@@ -35,7 +35,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: Ensure a readiness label exists
+      - name: Ensure a triage-state label exists
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -44,26 +44,26 @@ jobs:
         run: |
           set -euo pipefail
 
-          IFS=',' read -r -a readiness <<< "$READINESS_LABELS"
+          IFS=',' read -r -a triage_labels <<< "$TRIAGE_LABELS"
           IFS=',' read -r -a existing <<< "${EXISTING_LABELS:-}"
 
-          has_readiness=false
+          has_triage_state=false
           for label in "${existing[@]}"; do
             [ -z "$label" ] && continue
-            for ready in "${readiness[@]}"; do
-              if [ "$label" = "$ready" ]; then
-                has_readiness=true
+            for triage_label in "${triage_labels[@]}"; do
+              if [ "$label" = "$triage_label" ]; then
+                has_triage_state=true
                 break 2
               fi
             done
           done
 
-          if [ "$has_readiness" = true ]; then
-            echo "Issue already has a readiness label; leaving labels unchanged."
+          if [ "$has_triage_state" = true ]; then
+            echo "Issue already has a triage-state label; leaving labels unchanged."
             exit 0
           fi
 
-          echo "No readiness label present; applying needs-triage."
+          echo "No triage-state label present; applying needs-triage."
           gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "needs-triage"
 
   triage:
@@ -158,10 +158,10 @@ jobs:
 
           STATE="$(jq -r '.state // ""' triage_result.json)"
           LABEL="$(jq -r '.label // ""' triage_result.json)"
+          DUPLICATE_OF="$(jq -r '.duplicate_of // ""' triage_result.json)"
+          jq -r '.comment // ""' triage_result.json > comment.md
 
-          # Require the structured fields the apply step needs. The set of valid
-          # states/labels is owned by the triage skill, so it is intentionally
-          # not duplicated here.
+          # Require the fields and state/label pairs the apply step supports.
           if [ -z "$STATE" ]; then
             echo "::error::Triage result is missing a 'state'; keeping seeded needs-triage." >&2
             exit 1
@@ -172,24 +172,34 @@ jobs:
             exit 1
           fi
 
+          case "$STATE:$LABEL" in
+            "Ready to implement:ready-to-implement"|"Needs discussion:needs-discussion") ;;
+            "Duplicate:duplicate")
+              if [ -z "$DUPLICATE_OF" ]; then
+                echo "::error::Duplicate result is missing 'duplicate_of'; keeping seeded needs-triage." >&2
+                exit 1
+              fi
+              if [ "$(head -n 1 comment.md)" != "Duplicate of $DUPLICATE_OF" ]; then
+                echo "::error::Duplicate comment does not start with 'Duplicate of <duplicate_of>'; keeping seeded needs-triage." >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Invalid triage state/label pair: $STATE / $LABEL; keeping seeded needs-triage." >&2
+              exit 1
+              ;;
+          esac
+
           echo "Triage state: $STATE"
           echo "Applying label: $LABEL"
           echo "label=$LABEL" >> "$GITHUB_OUTPUT"
 
-          # Always clear other readiness labels so exactly one remains after apply.
-          # Agent-listed remove_labels are applied first; then every readiness
-          # label other than the chosen one is removed as a safety net.
-          while IFS= read -r remove_label; do
-            [ -z "$remove_label" ] && continue
-            echo "Removing label: $remove_label"
-            gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "$remove_label" || true
-          done < <(jq -r '(.remove_labels // [])[]' triage_result.json)
-
-          IFS=',' read -r -a readiness <<< "$READINESS_LABELS"
-          for ready in "${readiness[@]}"; do
-            if [ "$ready" != "$LABEL" ]; then
-              echo "Ensuring readiness label removed: $ready"
-              gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "$ready" || true
+          # Always clear other triage-state labels so exactly one remains after apply.
+          IFS=',' read -r -a triage_labels <<< "$TRIAGE_LABELS"
+          for triage_label in "${triage_labels[@]}"; do
+            if [ "$triage_label" != "$LABEL" ]; then
+              echo "Ensuring triage-state label removed: $triage_label"
+              gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "$triage_label" || true
             fi
           done
 
@@ -198,7 +208,6 @@ jobs:
 
           # Post the triage comment to the triggering issue only, signed so it
           # is clear the decision came from a Warp Factory agent.
-          jq -r '.comment // ""' triage_result.json > comment.md
           if [ -s comment.md ]; then
             printf '\n---\n\n_Triaged by a [Warp Factory agent](https://www.warp.dev/oz)._\n' >> comment.md
             gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file comment.md
