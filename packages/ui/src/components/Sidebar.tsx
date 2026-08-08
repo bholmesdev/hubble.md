@@ -958,9 +958,10 @@ export function Sidebar({
 											row.kind === "file" &&
 											"bg-selected text-selected-foreground",
 										!isActive &&
-											(!isSelected || row.kind === "folder") &&
-											isFocused &&
+											isSelected &&
+											row.kind === "folder" &&
 											"bg-accent",
+										!isActive && !isSelected && isFocused && "bg-accent",
 										isActive &&
 											"bg-sidebar-accent text-sidebar-accent-foreground font-medium",
 										dropGroup
