@@ -458,6 +458,8 @@ export function Sidebar({
 		anchorKey: null,
 	});
 	const selectedKeys = selection.selectedKeys;
+	const selectionCountRef = useRef(selectedKeys.size);
+	selectionCountRef.current = selectedKeys.size;
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
 	);
@@ -598,6 +600,7 @@ export function Sidebar({
 		onCollapse: collapseRow,
 		navRef,
 		activeIndex,
+		// Arrow keys leave multi-select mode.
 		onNavigate: replaceSelection,
 	});
 	const handleDeleteSelection = (targetSelection: SidebarActionSelection) => {
@@ -688,7 +691,9 @@ export function Sidebar({
 	useEffect(() => {
 		const selectOpenFile = () => {
 			const index = activeIndexRef.current;
-			setFocusedIndex(selectedKeys.size > 1 ? null : index >= 0 ? index : null);
+			setFocusedIndex(
+				selectionCountRef.current > 1 ? null : index >= 0 ? index : null,
+			);
 			setSelection((current) => snapSidebarSelection(current, highlightPath));
 		};
 		const isEditorTarget = (target: EventTarget | null) =>
@@ -699,7 +704,7 @@ export function Sidebar({
 		if (isEditorTarget(document.activeElement)) selectOpenFile();
 		document.addEventListener("focusin", onFocusIn);
 		return () => document.removeEventListener("focusin", onFocusIn);
-	}, [highlightPath, selectedKeys, setFocusedIndex]);
+	}, [highlightPath, setFocusedIndex]);
 
 	const handleDragStart = (event: DragStartEvent) => {
 		const data = event.active.data.current as DragItemData | undefined;
