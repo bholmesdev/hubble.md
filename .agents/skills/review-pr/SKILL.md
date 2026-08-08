@@ -5,7 +5,9 @@ description: Review a pull request or local branch diff for correctness, securit
 
 # Review PR
 
-Review the requested change set and return one structured JSON review as the final response.
+Review the requested change set and return a structured response.
+
+If asked to use a structured JSON output specifically, follow the "Structured JSON Output" section. Otherwise, respond with your structured review as text, naturally as part of the conversation.
 
 ## Establish scope
 
@@ -47,9 +49,10 @@ For every finding:
 
 Return `REQUEST_CHANGES` only when at least one `critical` or `important` finding remains. Suggestions and nits do not block approval.
 
-## Output
+## Structured JSON Output
 
-Return only valid JSON with this shape. Do not wrap it in a Markdown fence and do not write it to disk.
+If asked to use structured JSON as your output, follow this shape exactly to ensure your response can be parsed in contexts like CI.
+Do not wrap it in a Markdown fence and do not write it to disk.
 
 ```json
 {
