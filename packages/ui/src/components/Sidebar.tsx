@@ -688,7 +688,7 @@ export function Sidebar({
 	useEffect(() => {
 		const selectOpenFile = () => {
 			const index = activeIndexRef.current;
-			setFocusedIndex(index >= 0 ? index : null);
+			setFocusedIndex(selectedKeys.size > 1 ? null : index >= 0 ? index : null);
 			setSelection((current) => snapSidebarSelection(current, highlightPath));
 		};
 		const isEditorTarget = (target: EventTarget | null) =>
@@ -699,7 +699,7 @@ export function Sidebar({
 		if (isEditorTarget(document.activeElement)) selectOpenFile();
 		document.addEventListener("focusin", onFocusIn);
 		return () => document.removeEventListener("focusin", onFocusIn);
-	}, [highlightPath, setFocusedIndex]);
+	}, [highlightPath, selectedKeys, setFocusedIndex]);
 
 	const handleDragStart = (event: DragStartEvent) => {
 		const data = event.active.data.current as DragItemData | undefined;
@@ -880,6 +880,8 @@ export function Sidebar({
 			>
 				{rows.length === 0 && emptyState}
 				{rows.map((row, index) => {
+					const isFocused = focusedIndex === index;
+					const isOpen = row.kind === "file" && row.file.path === highlightPath;
 					const rowKey = sidebarRowKey(row);
 					const isSelected = rowKey ? selectedKeys.has(rowKey) : false;
 					const actionSelection =
@@ -956,6 +958,7 @@ export function Sidebar({
 									aria-expanded={
 										row.kind === "folder" ? row.expanded : undefined
 									}
+									aria-current={isOpen ? "page" : undefined}
 									aria-selected={isSelected}
 									data-selected={isSelected ? "true" : undefined}
 									className={cn(
@@ -963,8 +966,10 @@ export function Sidebar({
 										"transition-[background-color,opacity,filter] duration-150 ease-out motion-reduce:transition-none",
 										isSelected &&
 											"bg-sidebar-accent text-sidebar-accent-foreground",
+										isOpen && "font-medium",
 										// Hover must not move the keyboard cursor.
 										!isSelected && "hover:bg-accent",
+										!isSelected && isFocused && "bg-accent",
 										dropGroup
 											? [
 													"bg-sidebar-accent/40",
