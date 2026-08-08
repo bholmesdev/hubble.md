@@ -52,7 +52,10 @@ import { shouldShowFooterDivider } from "../lib/scrollOverflow";
 import { formatCommandShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
-import { useSidebarKeyboardNav } from "./useSidebarKeyboardNav";
+import {
+	EDITOR_INPUT_SELECTOR,
+	useSidebarKeyboardNav,
+} from "./useSidebarKeyboardNav";
 import {
 	type SidebarFile,
 	type SidebarFolder,
@@ -133,11 +136,6 @@ export function sidebarRowKey(row: SidebarRow): string | null {
 		: `folder:${row.id}`;
 }
 
-/**
- * Snaps the click selection to the active file. A file can become active
- * without a row click (history navigation, note links), and the selection
- * highlight would otherwise stay on the last clicked row.
- */
 export function snapSidebarSelection(
 	selection: SidebarSelectionState,
 	activePath: string | null,
@@ -544,16 +542,7 @@ export function Sidebar({
 		);
 	};
 	const replaceSelection = (row: SidebarRow) => {
-		const targetKey = sidebarRowKey(row);
-		setSelection((current) =>
-			applySidebarSelection({
-				anchorKey: current.anchorKey,
-				mode: "replace",
-				rows,
-				selectedKeys: current.selectedKeys,
-				targetKey,
-			}),
-		);
+		updateSelection(row, "replace");
 	};
 	const handleRowClick = (
 		row: SidebarSelectableRow,
@@ -598,6 +587,8 @@ export function Sidebar({
 	const activeIndex = rows.findIndex(
 		(row) => row.kind === "file" && row.file.path === highlightPath,
 	);
+	const activeIndexRef = useRef(activeIndex);
+	activeIndexRef.current = activeIndex;
 	const { focusedIndex, setFocusedIndex, onKeyDown } = useSidebarKeyboardNav({
 		items: rows,
 		onSelect: activateRow,
@@ -606,6 +597,7 @@ export function Sidebar({
 		onCollapse: collapseRow,
 		navRef,
 		activeIndex,
+		onNavigate: replaceSelection,
 	});
 	const handleDeleteSelection = (targetSelection: SidebarActionSelection) => {
 		const actionable = sidebarDeleteSelection(
@@ -693,8 +685,20 @@ export function Sidebar({
 	}, [rows]);
 
 	useEffect(() => {
-		setSelection((current) => snapSidebarSelection(current, highlightPath));
-	}, [highlightPath]);
+		const selectOpenFile = () => {
+			const index = activeIndexRef.current;
+			setFocusedIndex(index >= 0 ? index : null);
+			setSelection((current) => snapSidebarSelection(current, highlightPath));
+		};
+		const isEditorTarget = (target: EventTarget | null) =>
+			target instanceof Element && target.closest(EDITOR_INPUT_SELECTOR);
+		const onFocusIn = (event: FocusEvent) => {
+			if (isEditorTarget(event.target)) selectOpenFile();
+		};
+		if (isEditorTarget(document.activeElement)) selectOpenFile();
+		document.addEventListener("focusin", onFocusIn);
+		return () => document.removeEventListener("focusin", onFocusIn);
+	}, [highlightPath, setFocusedIndex]);
 
 	const handleDragStart = (event: DragStartEvent) => {
 		const data = event.active.data.current as DragItemData | undefined;
@@ -805,6 +809,7 @@ export function Sidebar({
 				onDeleteFolder(deleteOnCancel.path);
 		}
 		resetRename();
+		requestAnimationFrame(() => navRef.current?.focus());
 	};
 
 	const getRenameError = (item: RenameItem, draft: string) => {
@@ -865,13 +870,15 @@ export function Sidebar({
 				ref={navRef}
 				active={isRootDropTarget(dropTarget)}
 				enabled={Boolean(onMoveItem)}
+				onBlur={(event) => {
+					if (!event.currentTarget.contains(event.relatedTarget)) {
+						setFocusedIndex(null);
+					}
+				}}
 				onKeyDown={handleTreeKeyDown}
 			>
 				{rows.length === 0 && emptyState}
 				{rows.map((row, index) => {
-					const isActive =
-						row.kind === "file" && row.file.path === highlightPath;
-					const isFocused = focusedIndex === index;
 					const rowKey = sidebarRowKey(row);
 					const isSelected = rowKey ? selectedKeys.has(rowKey) : false;
 					const actionSelection =
@@ -948,22 +955,15 @@ export function Sidebar({
 									aria-expanded={
 										row.kind === "folder" ? row.expanded : undefined
 									}
-									aria-selected={isSelected || isActive}
+									aria-selected={isSelected}
 									data-selected={isSelected ? "true" : undefined}
 									className={cn(
 										"group/sidebar-row relative flex w-full items-center text-sidebar-foreground",
 										"transition-[background-color,opacity,filter] duration-150 ease-out motion-reduce:transition-none",
-										!isActive &&
-											isSelected &&
-											row.kind === "file" &&
-											"bg-selected text-selected-foreground",
-										!isActive &&
-											isSelected &&
-											row.kind === "folder" &&
-											"bg-accent",
-										!isActive && !isSelected && isFocused && "bg-accent",
-										isActive &&
-											"bg-sidebar-accent text-sidebar-accent-foreground font-medium",
+										isSelected &&
+											"bg-sidebar-accent text-sidebar-accent-foreground",
+										// Hover must not move the keyboard cursor.
+										!isSelected && "hover:bg-accent",
 										dropGroup
 											? [
 													"bg-sidebar-accent/40",
@@ -992,8 +992,6 @@ export function Sidebar({
 											"opacity-60 grayscale",
 										isDragging && "opacity-50",
 									)}
-									onPointerEnter={() => setFocusedIndex(index)}
-									onPointerLeave={() => setFocusedIndex(null)}
 									onContextMenu={(event) => {
 										if (
 											row.kind === "file" &&
@@ -1016,6 +1014,7 @@ export function Sidebar({
 										)
 											return;
 										event.preventDefault();
+										setFocusedIndex(index);
 										if (!isSelected) replaceSelection(row);
 										setOpenActionsPath(
 											row.kind === "file" ? row.file.path : row.id,
@@ -1067,7 +1066,10 @@ export function Sidebar({
 												"truncate border-none bg-transparent",
 											)}
 											style={rowStyle}
-											onClick={(event) => handleRowClick(row, event)}
+											onClick={(event) => {
+												setFocusedIndex(index);
+												handleRowClick(row, event);
+											}}
 											onDoubleClick={(event) => {
 												if (row.kind !== "file" || !onRenameFile) return;
 												event.preventDefault();
@@ -1102,11 +1104,9 @@ export function Sidebar({
 										<span
 											className={cn(
 												"pointer-events-none absolute inset-y-0 end-0 w-16 rounded-e-[var(--radius-row)] opacity-0 transition-opacity group-hover/sidebar-row:opacity-100",
-												isActive
+												isSelected
 													? "bg-linear-to-r from-transparent from-0% via-sidebar-accent via-25% to-sidebar-accent"
-													: isSelected
-														? "bg-linear-to-r from-transparent from-0% via-selected via-25% to-selected"
-														: "bg-linear-to-r from-transparent from-0% via-accent via-25% to-accent",
+													: "bg-linear-to-r from-transparent from-0% via-accent via-25% to-accent",
 											)}
 										/>
 									)}
@@ -1357,9 +1357,13 @@ const DroppableSidebarNav = forwardRef<
 		active: boolean;
 		children: ReactNode;
 		enabled: boolean;
+		onBlur: (event: React.FocusEvent<HTMLDivElement>) => void;
 		onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 	}
->(function DroppableSidebarNav({ active, children, enabled, onKeyDown }, ref) {
+>(function DroppableSidebarNav(
+	{ active, children, enabled, onBlur, onKeyDown },
+	ref,
+) {
 	const { setNodeRef } = useDroppable({
 		id: "sidebar-drop:root",
 		data: { folderId: null } satisfies DropTargetData,
@@ -1380,6 +1384,7 @@ const DroppableSidebarNav = forwardRef<
 				active && "inset-ring-sidebar-accent/70",
 			)}
 			tabIndex={0}
+			onBlur={onBlur}
 			onKeyDown={onKeyDown}
 			data-sidebar-nav
 		>

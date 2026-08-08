@@ -11,6 +11,7 @@ export function useSidebarKeyboardNav<T>({
 	onCollapse,
 	navRef,
 	activeIndex = -1,
+	onNavigate,
 }: {
 	items: T[];
 	onSelect: (item: T) => void;
@@ -19,6 +20,7 @@ export function useSidebarKeyboardNav<T>({
 	onCollapse?: (item: T) => void;
 	navRef: RefObject<HTMLElement | null>;
 	activeIndex?: number;
+	onNavigate?: (item: T) => void;
 }) {
 	const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 	const getActionIndex = () =>
@@ -40,10 +42,10 @@ export function useSidebarKeyboardNav<T>({
 			case "ArrowUp": {
 				event.preventDefault();
 				const delta = event.key === "ArrowDown" ? 1 : -1;
-				setFocusedIndex((prev) => {
-					const start = prev ?? (activeIndex >= 0 ? activeIndex : -1);
-					return Math.max(0, Math.min(start + delta, items.length - 1));
-				});
+				const start = focusedIndex ?? (activeIndex >= 0 ? activeIndex : -1);
+				const next = Math.max(0, Math.min(start + delta, items.length - 1));
+				setFocusedIndex(next);
+				if (items[next]) onNavigate?.(items[next]);
 				break;
 			}
 			case "Enter": {

@@ -13,7 +13,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
-- Folders in the sidebar no longer take the active-note highlight when clicked; they use the muted hover/focus style instead. [#207](https://github.com/bholmesdev/hubble.md/issues/207)
+- Folders in the sidebar no longer take the active-note highlight when clicked; they use the muted hover/focus style instead. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#235](https://github.com/bholmesdev/hubble.md/pull/235)
 
 ## [0.1.25] - 2026-08-06
 
