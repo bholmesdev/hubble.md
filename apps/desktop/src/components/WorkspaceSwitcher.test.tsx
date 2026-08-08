@@ -157,4 +157,31 @@ describe("WorkspaceSwitcher", () => {
 			document.body.querySelector('[role="menuitem"][title="/workspace-a"]'),
 		);
 	});
+
+	it("shows the Open Folder shortcut on Add folder", async () => {
+		const { appStore, WorkspaceSwitcher } = await loadWorkspaceSwitcher();
+
+		appStore.set((state) => ({
+			...state,
+			workspace: {
+				...state.workspace,
+				workspacePath: "/workspace-a",
+				recentWorkspaces: ["/workspace-a"],
+			},
+			ui: {
+				...state.ui,
+				isSwitcherOpen: true,
+			},
+		}));
+
+		await act(async () => {
+			root.render(<WorkspaceSwitcher />);
+			await flush();
+		});
+
+		const addFolder = Array.from(
+			document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+		).find((item) => item.textContent?.includes("Add folder..."));
+		expect(addFolder?.textContent).toContain("Ctrl+Shift+O");
+	});
 });

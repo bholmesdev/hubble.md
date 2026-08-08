@@ -13,6 +13,17 @@ describe("commandRegistry", () => {
 		expect(new Set(bindings).size).toBe(bindings.length);
 	});
 
+	it("maps open folder and recent shortcuts", () => {
+		expect(getCommand("app.open-folder")).toMatchObject({
+			defaultBinding: "CmdOrCtrl+Shift+O",
+			label: "Open Folder...",
+		});
+		expect(getCommand("app.open-recent")).toMatchObject({
+			defaultBinding: "Ctrl+R",
+			label: "Open Recent",
+		});
+	});
+
 	it("resolves context-dependent enablement", () => {
 		expect(getCommand("app.go-back").isEnabled({ canGoBack: false })).toBe(
 			false,
