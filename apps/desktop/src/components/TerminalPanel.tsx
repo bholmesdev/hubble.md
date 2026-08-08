@@ -460,7 +460,7 @@ export function TerminalPanel() {
 						aria-label="New Terminal"
 						title="New Terminal"
 					>
-						<MingcuteAddLine className="size-3.5" />
+						<MingcuteAddLine className="size-4" />
 					</Button>
 				</div>
 				<div className="flex items-center gap-1 pl-4">
@@ -471,7 +471,7 @@ export function TerminalPanel() {
 						aria-label="Close Terminal Panel"
 						title="Close Terminal Panel"
 					>
-						<MingcuteCloseLine className="size-3.5" />
+						<MingcuteCloseLine className="size-4" />
 					</Button>
 				</div>
 			</TerminalRibbonMenu>
