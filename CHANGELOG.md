@@ -15,6 +15,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Window controls now align with the app header on Windows and Linux. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#236](https://github.com/bholmesdev/hubble.md/pull/236)
+
 ## [0.1.24] - 2026-08-02
 
 ### Added
