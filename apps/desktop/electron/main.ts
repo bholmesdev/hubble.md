@@ -824,14 +824,14 @@ function buildMenu() {
 					label: "New HTML App",
 					click: () => sendToRenderer("desktop:menu-create-html-file"),
 				},
-				commandMenuItem("app.add-folder", () =>
-					sendToRenderer("desktop:menu-open-folder"),
-				),
 				{ type: "separator" },
 				commandMenuItem("app.open-file", () =>
 					sendToRenderer("desktop:menu-open-file"),
 				),
 				commandMenuItem("app.open-folder", () =>
+					sendToRenderer("desktop:menu-open-folder"),
+				),
+				commandMenuItem("app.open-recent", () =>
 					sendToRenderer("desktop:menu-show-workspace-switcher"),
 				),
 				{ type: "separator" },
