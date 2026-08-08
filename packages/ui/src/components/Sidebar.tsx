@@ -140,6 +140,7 @@ export function snapSidebarSelection(
 	selection: SidebarSelectionState,
 	activePath: string | null,
 ): SidebarSelectionState {
+	if (selection.selectedKeys.size > 1) return selection;
 	const key = activePath ? sidebarFileKey(activePath) : null;
 	const unchanged = key
 		? selection.selectedKeys.size === 1 && selection.selectedKeys.has(key)
