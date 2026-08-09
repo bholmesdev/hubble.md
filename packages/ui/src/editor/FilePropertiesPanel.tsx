@@ -136,7 +136,7 @@ function InvalidFrontMatter({
 	const [raw, setRaw] = useState(state.raw);
 	return (
 		<div className="editorPropertiesPanel border-b border-border/70">
-			<div className="flex flex-col gap-2 text-xs">
+			<div className="flex flex-col gap-2 text-[12px]">
 				<p className="m-0 text-muted-foreground">Properties unavailable</p>
 				<details className="rounded-sm border border-border bg-muted/30">
 					<summary className="cursor-pointer px-2 py-1 text-[11px] text-muted-foreground">
@@ -302,7 +302,7 @@ function PropertyValue({
 	}
 	if (property.type === "checkbox") {
 		return (
-			<label className="flex h-7 items-center text-xs">
+			<label className="flex h-7 items-center text-[12px]">
 				<input
 					type="checkbox"
 					checked={property.value}
@@ -503,7 +503,7 @@ function DateValue({
 	return (
 		<div
 			className={cn(
-				"flex h-7 w-fit items-center rounded-sm px-2 text-xs",
+				"flex h-7 w-fit items-center rounded-sm px-2 text-[12px]",
 				ghostBoxClass,
 			)}
 		>
@@ -600,7 +600,7 @@ function TagsValue({
 			<input
 				value={draft}
 				placeholder={values.length === 0 ? "Empty" : ""}
-				className="min-w-20 flex-1 bg-transparent text-xs outline-none"
+				className="min-w-20 flex-1 bg-transparent text-[12px] outline-none"
 				onChange={(event) => setDraft(event.target.value)}
 				onBlur={addDraft}
 				onKeyDown={(event) => {
