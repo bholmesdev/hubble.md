@@ -26,6 +26,7 @@ def signed_reviews(reviews):
         review
         for review in reviews
         if SIGNATURE in (review.get("body") or "") and review.get("commit_id")
+        and (review.get("user") or {}).get("login") == "github-actions[bot]"
     ]
 
 

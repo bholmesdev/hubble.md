@@ -47,7 +47,10 @@ jobs:
           review_count="$(
             gh api --paginate --slurp \
               "repos/$REPO/pulls/$PR_NUMBER/reviews?per_page=100" |
-              jq '[.[][] | select((.body // "") | contains("Reviewed by a [Warp Factory agent]"))] | length'
+              jq '[.[][] | select(
+                .user.login == "github-actions[bot]" and
+                ((.body // "") | contains("Reviewed by a [Warp Factory agent]"))
+              )] | length'
           )"
           echo "pr_number=$(jq -r '.number' pr.json)" >> "$GITHUB_OUTPUT"
           echo "base_sha=$(jq -r '.base.sha' pr.json)" >> "$GITHUB_OUTPUT"
