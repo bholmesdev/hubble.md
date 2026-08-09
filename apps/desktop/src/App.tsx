@@ -238,6 +238,8 @@ function App() {
 		focusedSidebarItem,
 		workspacePath,
 	);
+	const focusedCreationFolder =
+		focusedSidebarItem?.kind === "folder" ? focusedSidebarItem.path : null;
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
 		setSearchOpen(open);
@@ -430,7 +432,7 @@ function App() {
 			> = {
 				"app.go-back": goBack,
 				"app.go-forward": goForward,
-				"app.new-file": createMarkdownFile,
+				"app.new-file": () => createMarkdownFile(focusedCreationFolder),
 				"app.settings": () => setSettingsOpen(true),
 				"app.open-folder": () => setWorkspaceSwitcherOpen(true),
 				// The File menu accelerator fires too, but opening is idempotent.
@@ -464,7 +466,7 @@ function App() {
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen, focusedSidebarPath]);
+	}, [changeSearchOpen, focusedCreationFolder, focusedSidebarPath]);
 
 	useEffect(() => {
 		let active = true;
@@ -496,8 +498,12 @@ function App() {
 					if (!undone) void desktopApi.undoText();
 				});
 			}),
-			desktopApi.onMenuCreateMarkdownFile(() => void createMarkdownFile()),
-			desktopApi.onMenuCreateHtmlFile(() => void createHtmlFile()),
+			desktopApi.onMenuCreateMarkdownFile(
+				() => void createMarkdownFile(focusedCreationFolder),
+			),
+			desktopApi.onMenuCreateHtmlFile(
+				() => void createHtmlFile(focusedCreationFolder),
+			),
 			desktopApi.onMenuOpenFile(() => void openFilePicker()),
 			desktopApi.onMenuOpenFolder(() => void openWorkspaceWithSidebar()),
 			desktopApi.onMenuOpenSettings(() => setSettingsOpen(true)),
@@ -531,7 +537,7 @@ function App() {
 			for (const dispose of disposers) dispose();
 		};
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen]);
+	}, [changeSearchOpen, focusedCreationFolder]);
 
 	useEffect(() => {
 		// Window focus can fire in bursts when switching apps, so debounce the

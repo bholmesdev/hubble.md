@@ -133,6 +133,27 @@ export function sidebarRowKey(row: SidebarRow): string | null {
 		: `folder:${row.id}`;
 }
 
+export function sidebarCreationFolderId({
+	rows,
+	focusedIndex,
+	selectedKeys,
+}: {
+	rows: SidebarRow[];
+	focusedIndex: number | null;
+	selectedKeys: Set<string>;
+}) {
+	if (focusedIndex !== null) {
+		const row = rows[focusedIndex];
+		return row?.kind === "folder" ? row.id : null;
+	}
+	if (selectedKeys.size !== 1) return null;
+	const row = rows.find((candidate) => {
+		const key = sidebarRowKey(candidate);
+		return key !== null && selectedKeys.has(key);
+	});
+	return row?.kind === "folder" ? row.id : null;
+}
+
 /**
  * Snaps the click selection to the active file. A file can become active
  * without a row click (history navigation, note links), and the selection
@@ -606,6 +627,11 @@ export function Sidebar({
 		onCollapse: collapseRow,
 		navRef,
 		activeIndex,
+	});
+	const creationFolderId = sidebarCreationFolderId({
+		rows,
+		focusedIndex,
+		selectedKeys,
 	});
 	const handleDeleteSelection = (targetSelection: SidebarActionSelection) => {
 		const actionable = sidebarDeleteSelection(
@@ -1233,9 +1259,11 @@ export function Sidebar({
 				<div className="flex items-center gap-1">
 					{onCreateFile && (
 						<NewFileMenu
-							onCreateFile={() => void createFile(null)}
+							onCreateFile={() => void createFile(creationFolderId)}
 							onCreateHtmlFile={
-								onCreateHtmlFile ? () => void createHtmlFile(null) : undefined
+								onCreateHtmlFile
+									? () => void createHtmlFile(creationFolderId)
+									: undefined
 							}
 						/>
 					)}
