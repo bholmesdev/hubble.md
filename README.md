@@ -91,7 +91,7 @@ pnpm typecheck        # typecheck all packages
 
 Hubble's repository automation runs on [Warp Factory agents](https://www.warp.dev/oz). When you open an issue or a pull request, an agent handles it:
 
-- **Triage.** New issues get a readiness label and a comment explaining the decision.
+- **Triage.** New issues get a triage-state label and a comment explaining the decision.
 - **Implementation.** Issues labeled `ready-to-implement` get a draft pull request.
 - **Review.** Pull requests get a code review before a human looks at them.
 

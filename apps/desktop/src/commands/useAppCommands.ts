@@ -207,16 +207,16 @@ function defineCommands(
 		fromRegistry("app.go-back", "Navigate", ["history", "previous"], goBack),
 		fromRegistry("app.go-forward", "Navigate", ["history", "next"], goForward),
 		fromRegistry(
-			"app.add-folder",
+			"app.open-recent",
 			"Navigate",
-			["workspace", "vault", "directory", "open"],
-			openWorkspaceWithSidebar,
+			["workspace", "vault", "switch", "recent"],
+			() => setWorkspaceSwitcherOpen(true),
 		),
 		fromRegistry(
 			"app.open-folder",
 			"Navigate",
-			["workspace", "vault", "switch", "recent"],
-			() => setWorkspaceSwitcherOpen(true),
+			["workspace", "vault", "directory", "open", "add folder"],
+			openWorkspaceWithSidebar,
 		),
 		paletteOnly({
 			id: "app.toggle-pinned",

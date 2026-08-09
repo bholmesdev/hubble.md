@@ -182,6 +182,13 @@ describe("sidebar selection helpers", () => {
 		expect(snapSidebarSelection(selection, "/workspace/a.md")).toBe(selection);
 	});
 
+	it("keeps multi-selection when the editor regains focus", () => {
+		let selection = select(emptySelection, 1, "toggle");
+		selection = select(selection, 5, "toggle");
+
+		expect(snapSidebarSelection(selection, "/workspace/a.md")).toBe(selection);
+	});
+
 	it("clears the selection when no file is active", () => {
 		const selection = select(emptySelection, 1, "replace");
 		const snapped = snapSidebarSelection(selection, null);

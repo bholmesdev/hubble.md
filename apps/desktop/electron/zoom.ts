@@ -12,7 +12,7 @@ const trafficLightWidth = 54;
 const trafficLightGap = 4;
 const trafficLightHeight = 14;
 const trafficLightYOffset = -1;
-const toolbarHeight = 36;
+export const toolbarHeight = 36;
 
 const zoomStateSchema = z.object({
 	factor: z.number().min(minZoomFactor).max(maxZoomFactor),

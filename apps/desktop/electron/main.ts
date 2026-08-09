@@ -60,6 +60,7 @@ import {
 	resetWindowZoom,
 	setTrafficLightInset,
 	stepWindowZoom,
+	toolbarHeight,
 	trafficLightPositionForZoom,
 	zoomStep,
 } from "./zoom";
@@ -96,14 +97,14 @@ const updateCheckErrorMessage =
 	"Couldn't check for updates. Try again shortly.";
 // Check every 4 hours after the initial packaged-app update check.
 const updateCheckIntervalMs = 4 * 60 * 60 * 1000;
-
 // Windows/Linux draw the min/max/close buttons as a native overlay whose colors
 // are static unless we update them. Mirror the app palette so the button strip
 // follows the OS appearance instead of staying light in dark mode.
-function titleBarOverlayColors() {
-	return nativeTheme.shouldUseDarkColors
+function titleBarOverlayOptions() {
+	const colors = nativeTheme.shouldUseDarkColors
 		? { color: "#181715", symbolColor: "#a6a5a0" }
 		: { color: "#ffffff", symbolColor: "#454545" };
+	return { ...colors, height: toolbarHeight };
 }
 
 app.setName(appName);
@@ -138,7 +139,7 @@ let saveWindowStateTimer: ReturnType<typeof setTimeout> | null = null;
 if (process.platform !== "darwin") {
 	nativeTheme.on("updated", () => {
 		if (mainWindow && !mainWindow.isDestroyed()) {
-			mainWindow.setTitleBarOverlay(titleBarOverlayColors());
+			mainWindow.setTitleBarOverlay(titleBarOverlayOptions());
 		}
 	});
 }
@@ -824,14 +825,14 @@ function buildMenu() {
 					label: "New HTML App",
 					click: () => sendToRenderer("desktop:menu-create-html-file"),
 				},
-				commandMenuItem("app.add-folder", () =>
-					sendToRenderer("desktop:menu-open-folder"),
-				),
 				{ type: "separator" },
 				commandMenuItem("app.open-file", () =>
 					sendToRenderer("desktop:menu-open-file"),
 				),
 				commandMenuItem("app.open-folder", () =>
+					sendToRenderer("desktop:menu-open-folder"),
+				),
+				commandMenuItem("app.open-recent", () =>
 					sendToRenderer("desktop:menu-show-workspace-switcher"),
 				),
 				{ type: "separator" },
@@ -1115,7 +1116,7 @@ async function createWindow() {
 		show: false,
 		titleBarStyle: "hidden",
 		...(process.platform !== "darwin"
-			? { titleBarOverlay: titleBarOverlayColors() }
+			? { titleBarOverlay: titleBarOverlayOptions() }
 			: {}),
 		trafficLightPosition: trafficLightPositionForZoom(zoomFactor),
 		webPreferences: {
