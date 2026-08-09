@@ -16,6 +16,8 @@ const SourceDocument = Document.extend({ content: "codeBlock" });
 
 export type MarkdownSourceEditorProps = {
 	path: string;
+	/** Stable note identity; physical paths may change without replacing a note. */
+	documentId?: string;
 	initialMarkdown: string;
 	sourceLanguage?: string;
 	/** Focus on mount; wanted for the source-mode toggle, not for navigation. */
@@ -28,6 +30,7 @@ export type MarkdownSourceEditorProps = {
 
 export function MarkdownSourceEditor({
 	path,
+	documentId = path,
 	initialMarkdown,
 	sourceLanguage = "md",
 	autoFocus = true,
@@ -103,12 +106,12 @@ export function MarkdownSourceEditor({
 	}, [editor, initialMarkdown, sourceLanguage]);
 
 	useEffect(() => {
-		// Path changes flush the pending edit before the next document takes over.
-		void path;
+		// Flush the pending edit before the next document takes over.
+		void documentId;
 		return () => {
 			flushPendingSave(pendingSaveRef);
 		};
-	}, [path]);
+	}, [documentId]);
 
 	return (
 		<div

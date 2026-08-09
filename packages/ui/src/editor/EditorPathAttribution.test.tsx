@@ -31,6 +31,39 @@ afterEach(() => {
 });
 
 describe("editor path attribution", () => {
+	it("preserves rich-editor history when only the physical path changes", async () => {
+		const onLocalChange = vi.fn();
+		const onSave = vi.fn();
+		const root = createTestRoot();
+		const getEditor = captureEditorCreation();
+
+		await renderRichEditor(
+			root,
+			"/old.md",
+			"before",
+			onLocalChange,
+			onSave,
+			getEditor,
+			null,
+			"note-1",
+		);
+		const editor = getEditor();
+		act(() => changeEditorText(editor, "after"));
+		await renderRichEditor(
+			root,
+			"/renamed.md",
+			"after",
+			onLocalChange,
+			onSave,
+			getEditor,
+			null,
+			"note-1",
+		);
+
+		act(() => editor.commands.undo());
+		expect(editor.getText()).toBe("before");
+	});
+
 	it("attributes a rich editor change and save to the new path", async () => {
 		const onLocalChange = vi.fn();
 		const onSave = vi.fn();
@@ -116,12 +149,14 @@ async function renderRichEditor(
 	onSave: ReturnType<typeof vi.fn>,
 	getEditor: () => Editor,
 	editText: string | null = null,
+	documentId?: string,
 ) {
 	await act(async () => {
 		root.render(
 			<EditAfterChildLayout editText={editText} getEditor={getEditor}>
 				<EditorView
 					path={path}
+					documentId={documentId}
 					initialMarkdown={initialMarkdown}
 					editable={false}
 					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}

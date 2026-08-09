@@ -68,6 +68,8 @@ export type { WikiTarget };
 
 export type EditorViewProps = {
 	path: string;
+	/** Stable note identity; physical paths may change without replacing a note. */
+	documentId?: string;
 	initialMarkdown: string;
 	editable?: boolean;
 	wikiTargets?: WikiTarget[];
@@ -90,6 +92,7 @@ export type EditorViewProps = {
 
 export function EditorView({
 	path,
+	documentId = path,
 	initialMarkdown,
 	editable = true,
 	wikiTargets = [],
@@ -267,20 +270,20 @@ export function EditorView({
 	}, [editor, initialMarkdown]);
 
 	useEffect(() => {
-		// One editor instance serves every file, so each new path starts its own
+		// One editor instance can serve every file, so each new document starts its own
 		// undo stack. Otherwise undo replays the last file's edits into this one.
-		void path;
+		void documentId;
 		if (!editor) return;
 		resetEditorHistory(editor);
-	}, [editor, path]);
+	}, [editor, documentId]);
 
 	useEffect(() => {
-		// Path changes flush the pending edit before the next document takes over.
-		void path;
+		// Flush the pending edit before the next document takes over.
+		void documentId;
 		return () => {
 			flushPendingSave(pendingSaveRef);
 		};
-	}, [path]);
+	}, [documentId]);
 
 	useEffect(() => {
 		if (!onMessage) return;
