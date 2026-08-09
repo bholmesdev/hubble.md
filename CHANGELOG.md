@@ -11,6 +11,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- New notes and HTML Apps are created inside the focused sidebar folder. [#247](https://github.com/bholmesdev/hubble.md/pull/247)
+
 ### Fixed
 
 ## [0.1.25] - 2026-08-06
