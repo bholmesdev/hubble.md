@@ -23,6 +23,10 @@ const NO_DRAG_STYLE = {
 	WebkitAppRegion: "no-drag",
 } as CSSProperties;
 
+/**
+ * Tracks title drags by hand because an Electron drag region would block the
+ * title's click-to-rename behavior.
+ */
 type TitleDrag = {
 	pointerX: number;
 	pointerY: number;
