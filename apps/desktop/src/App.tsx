@@ -242,6 +242,9 @@ function App() {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
 		setSearchOpen(open);
 	};
+	const newItemParent = searchOpen
+		? searchFolderParent
+		: (focusedFolderParent ?? null);
 	const paletteCommands = buildAppCommands(
 		{
 			openSettings: () => setSettingsOpen(true),
@@ -251,9 +254,8 @@ function App() {
 		},
 		{
 			currentPath: state.currentPath ?? null,
-			newFolderParent: searchOpen
-				? searchFolderParent
-				: (focusedFolderParent ?? null),
+			newFileParent: newItemParent,
+			newFolderParent: newItemParent,
 			workspacePath: workspacePath ?? null,
 			isSourceMode: state.viewMode === "source",
 			sidebarOpen,
@@ -430,7 +432,7 @@ function App() {
 			> = {
 				"app.go-back": goBack,
 				"app.go-forward": goForward,
-				"app.new-file": createMarkdownFile,
+				"app.new-file": () => createMarkdownFile(focusedFolderParent),
 				"app.settings": () => setSettingsOpen(true),
 				"app.open-recent": () => setWorkspaceSwitcherOpen(true),
 				// The File menu accelerator fires too, but opening is idempotent.
@@ -464,7 +466,7 @@ function App() {
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen, focusedSidebarPath]);
+	}, [changeSearchOpen, focusedFolderParent, focusedSidebarPath]);
 
 	useEffect(() => {
 		let active = true;
@@ -496,8 +498,12 @@ function App() {
 					if (!undone) void desktopApi.undoText();
 				});
 			}),
-			desktopApi.onMenuCreateMarkdownFile(() => void createMarkdownFile()),
-			desktopApi.onMenuCreateHtmlFile(() => void createHtmlFile()),
+			desktopApi.onMenuCreateMarkdownFile(
+				() => void createMarkdownFile(focusedFolderParent),
+			),
+			desktopApi.onMenuCreateHtmlFile(
+				() => void createHtmlFile(focusedFolderParent),
+			),
 			desktopApi.onMenuOpenFile(() => void openFilePicker()),
 			desktopApi.onMenuOpenFolder(() => void openWorkspaceWithSidebar()),
 			desktopApi.onMenuOpenSettings(() => setSettingsOpen(true)),
@@ -531,7 +537,7 @@ function App() {
 			for (const dispose of disposers) dispose();
 		};
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen]);
+	}, [changeSearchOpen, focusedFolderParent]);
 
 	useEffect(() => {
 		// Window focus can fire in bursts when switching apps, so debounce the
@@ -647,6 +653,7 @@ function App() {
 			/>
 			<div className="flex min-h-0 flex-1 overflow-hidden">
 				<Sidebar
+					newFileParent={focusedFolderParent}
 					onFocusedItemChange={updateFocusedSidebarItem}
 					footer={
 						showReadyCallout ? (

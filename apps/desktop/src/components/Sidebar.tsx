@@ -40,9 +40,11 @@ export type DesktopSidebarFocus = {
 
 export function Sidebar({
 	footer,
+	newFileParent,
 	onFocusedItemChange,
 }: {
 	footer?: ReactNode;
+	newFileParent?: string | null;
 	onFocusedItemChange?: (item: DesktopSidebarFocus) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
@@ -90,6 +92,10 @@ export function Sidebar({
 			: `${workspacePath}/${normalized}`;
 	};
 	const copyFilePath = (path: string) => copyText(path, "File path");
+	const newFileFolderId =
+		newFileParent && newFileParent !== workspacePath
+			? `${relativePath(newFileParent).replace(/\/+$/, "")}/`
+			: null;
 
 	return (
 		<SharedSidebar
@@ -147,6 +153,7 @@ export function Sidebar({
 				)
 			}
 			onTogglePinnedFile={(path) => void togglePinnedNote(path)}
+			newFileFolderId={newFileFolderId}
 			onCreateFile={(folderId) =>
 				createMarkdownFileInFolder(absolutePath(folderId))
 			}

@@ -4,14 +4,14 @@ import {
 } from "./store/actions";
 import { workspaceStore } from "./store/state";
 
-export async function createMarkdownFile() {
+export async function createMarkdownFile(folderPath?: string | null) {
 	const workspacePath = workspaceStore.get().workspacePath;
 	if (!workspacePath) return;
-	await createMarkdownFileInFolder(workspacePath);
+	await createMarkdownFileInFolder(folderPath ?? workspacePath);
 }
 
-export async function createHtmlFile() {
+export async function createHtmlFile(folderPath?: string | null) {
 	const workspacePath = workspaceStore.get().workspacePath;
 	if (!workspacePath) return;
-	await createHtmlFileInFolder(workspacePath);
+	await createHtmlFileInFolder(folderPath ?? workspacePath);
 }

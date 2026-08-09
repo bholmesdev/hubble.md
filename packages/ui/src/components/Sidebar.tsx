@@ -383,6 +383,7 @@ export function Sidebar({
 	onDeleteFile,
 	onDeleteItems,
 	onTogglePinnedFile,
+	newFileFolderId,
 	onCreateFile,
 	onCreateHtmlFile,
 	onCreateFolder,
@@ -418,6 +419,7 @@ export function Sidebar({
 	onDeleteFile?: (path: string) => void;
 	onDeleteItems?: (items: SidebarDeleteItem[]) => void;
 	onTogglePinnedFile?: (path: string) => void;
+	newFileFolderId?: string | null;
 	onCreateFile?: (folderId: string | null) => Promise<string | null>;
 	onCreateHtmlFile?: (folderId: string | null) => Promise<string | null>;
 	onCreateFolder?: (folderId: string | null) => Promise<string | null>;
@@ -882,7 +884,13 @@ export function Sidebar({
 				active={isRootDropTarget(dropTarget)}
 				enabled={Boolean(onMoveItem)}
 				onBlur={(event) => {
-					if (!event.currentTarget.contains(event.relatedTarget)) {
+					if (
+						!event.currentTarget.contains(event.relatedTarget) &&
+						!(
+							event.relatedTarget instanceof Element &&
+							event.relatedTarget.closest("[data-sidebar-root]")
+						)
+					) {
 						setFocusedIndex(null);
 					}
 				}}
@@ -1254,9 +1262,11 @@ export function Sidebar({
 				<div className="flex items-center gap-1">
 					{onCreateFile && (
 						<NewFileMenu
-							onCreateFile={() => void createFile(null)}
+							onCreateFile={() => void createFile(newFileFolderId ?? null)}
 							onCreateHtmlFile={
-								onCreateHtmlFile ? () => void createHtmlFile(null) : undefined
+								onCreateHtmlFile
+									? () => void createHtmlFile(newFileFolderId ?? null)
+									: undefined
 							}
 						/>
 					)}
