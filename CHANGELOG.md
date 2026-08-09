@@ -13,6 +13,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- New notes and HTML Apps are created inside the focused sidebar folder. [#247](https://github.com/bholmesdev/hubble.md/pull/247)
 - Open recent workspaces with Ctrl+R, and add folders with Cmd+Shift+O. [#243](https://github.com/bholmesdev/hubble.md/pull/243)
 
 ### Fixed

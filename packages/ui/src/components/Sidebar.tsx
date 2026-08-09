@@ -137,6 +137,37 @@ export function sidebarRowKey(row: SidebarRow): string | null {
 		: `folder:${row.id}`;
 }
 
+export function sidebarFocusTarget({
+	rows,
+	focusedIndex,
+	selectedKeys,
+}: {
+	rows: SidebarRow[];
+	focusedIndex: number | null;
+	selectedKeys: Set<string>;
+}) {
+	let row = focusedIndex !== null ? rows[focusedIndex] : undefined;
+	if (!row && selectedKeys.size === 1) {
+		row = rows.find((candidate) => {
+			const key = sidebarRowKey(candidate);
+			return key !== null && selectedKeys.has(key);
+		});
+	}
+	if (!row || row.kind === "section") return null;
+	return row.kind === "file"
+		? { kind: "file" as const, path: row.file.path }
+		: { kind: "folder" as const, folderId: row.id };
+}
+
+export function sidebarCreationFolderId(input: {
+	rows: SidebarRow[];
+	focusedIndex: number | null;
+	selectedKeys: Set<string>;
+}) {
+	const item = sidebarFocusTarget(input);
+	return item?.kind === "folder" ? item.folderId : null;
+}
+
 export function snapSidebarSelection(
 	selection: SidebarSelectionState,
 	activePath: string | null,
@@ -608,6 +639,11 @@ export function Sidebar({
 		// Arrow keys leave multi-select mode.
 		onNavigate: replaceSelection,
 	});
+	const creationFolderId = sidebarCreationFolderId({
+		rows,
+		focusedIndex,
+		selectedKeys,
+	});
 	const handleDeleteSelection = (targetSelection: SidebarActionSelection) => {
 		const actionable = sidebarDeleteSelection(
 			targetSelection,
@@ -664,17 +700,10 @@ export function Sidebar({
 		onKeyDown(event);
 	};
 	useEffect(() => {
-		const row = focusedIndex === null ? null : rows[focusedIndex];
-		if (!row || row.kind === "section") {
-			onFocusedItemChange?.(null);
-			return;
-		}
 		onFocusedItemChange?.(
-			row.kind === "file"
-				? { kind: "file", path: row.file.path }
-				: { kind: "folder", folderId: row.id },
+			sidebarFocusTarget({ rows, focusedIndex, selectedKeys }),
 		);
-	}, [focusedIndex, onFocusedItemChange, rows]);
+	}, [focusedIndex, onFocusedItemChange, rows, selectedKeys]);
 
 	useEffect(() => {
 		if (!pendingFocusDisplayPath) return;
@@ -1254,9 +1283,11 @@ export function Sidebar({
 				<div className="flex items-center gap-1">
 					{onCreateFile && (
 						<NewFileMenu
-							onCreateFile={() => void createFile(null)}
+							onCreateFile={() => void createFile(creationFolderId)}
 							onCreateHtmlFile={
-								onCreateHtmlFile ? () => void createHtmlFile(null) : undefined
+								onCreateHtmlFile
+									? () => void createHtmlFile(creationFolderId)
+									: undefined
 							}
 						/>
 					)}
