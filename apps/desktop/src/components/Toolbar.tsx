@@ -23,11 +23,11 @@ import type { AgentClient } from "../desktopApi/types";
 import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
-	fileStem,
 	hasHtmlExtension,
 	hasMarkdownExtension,
 	hasTextExtension,
 	isEditableFile,
+	pathEquals,
 	relativeWorkspacePath,
 	supportsSourceToggle,
 } from "../lib/filePath";
@@ -57,6 +57,18 @@ const dragRegionStyle = {
 	WebkitAppRegion: "drag",
 } as CSSProperties;
 
+type TitlePreview = { path: string; previewPath: string } | null;
+
+export function toolbarPathForTitlePreview(
+	currentPath: string | null | undefined,
+	titlePreview: TitlePreview,
+) {
+	if (!currentPath || titlePreview?.path !== currentPath) return currentPath;
+	return pathEquals(currentPath, titlePreview.previewPath)
+		? currentPath
+		: titlePreview.previewPath;
+}
+
 // Traffic lights are hidden in fullscreen, so drop their reserved inset.
 function useIsFullScreen() {
 	const [isFullScreen, setIsFullScreen] = useState(false);
@@ -83,15 +95,7 @@ export function Toolbar({
 	// The changelog note is virtual: show a friendly title and disable the
 	// file actions (rename, reveal, copy path) that assume a file on disk.
 	const isChangelog = isChangelogPath(currentPath);
-	const previewIsSaved =
-		currentPath && titlePreview?.path === currentPath
-			? fileStem(currentPath).replace(/-\d+$/, "") ===
-				fileStem(titlePreview.previewPath)
-			: false;
-	const toolbarPath =
-		currentPath && titlePreview?.path === currentPath && !previewIsSaved
-			? titlePreview.previewPath
-			: currentPath;
+	const toolbarPath = toolbarPathForTitlePreview(currentPath, titlePreview);
 
 	return (
 		<SharedToolbar

@@ -768,6 +768,7 @@ async function runTitleRename(session: TitleSession) {
 		session.pendingTitle?.markdown === markdown
 			? await session.pendingTitle.path
 			: await generatedTitlePath(previousPath, markdown);
+	if (!isLiveTitleSession(session)) return;
 	if (!nextPath || pathEquals(nextPath, previousPath)) return;
 
 	session.running = true;
@@ -776,7 +777,7 @@ async function runTitleRename(session: TitleSession) {
 	} finally {
 		session.running = false;
 	}
-	if (session.markdown !== markdown) {
+	if (isLiveTitleSession(session) && session.markdown !== markdown) {
 		scheduleTitleRename(session, session.markdown);
 	}
 }
@@ -797,13 +798,19 @@ async function renameGeneratedFile(
 			return;
 		}
 		try {
-			renamedPath = await renameGeneratedFileWithRetry(
+			const retryPath = await renameGeneratedFileWithRetry(
 				previousPath,
 				nextPath,
 				session.markdown,
+				() =>
+					titleSessions.get(previousPath) === session &&
+					viewerStore.get().currentPath === previousPath,
 			);
+			if (!retryPath) return;
+			renamedPath = retryPath;
 			const movedFiles = [{ fromPath: previousPath, toPath: renamedPath }];
 			publishGeneratedRename(session, previousPath, renamedPath);
+			if (!isLiveTitleSession(session)) stopTitleRenames(renamedPath);
 			renamed = true;
 			const movedAssetFolder = await moveAssociatedAssetFolder(
 				previousPath,
@@ -820,13 +827,7 @@ async function renameGeneratedFile(
 				});
 			}
 
-			appStore.set((state) => ({
-				...state,
-				document: {
-					...state.document,
-					content: session.markdown,
-				},
-			}));
+			updateGeneratedContentIfLive(session, session.markdown);
 			await updateMovedLinks(movedFiles, filesBeforeRename);
 			if (workspaceStore.get().pinnedNotes.includes(renamedPath)) {
 				void syncPinnedNotes();
@@ -841,16 +842,20 @@ async function renameGeneratedFile(
 
 	if (!renamed) return;
 	// Flush link rewrites at the path that won, including retry suffixes.
-	await savePathContent(renamedPath, session.markdown, { force: true });
+	if (isLiveTitleSession(session)) {
+		await savePathContent(renamedPath, session.markdown, { force: true });
+	}
 }
 
 async function renameGeneratedFileWithRetry(
 	previousPath: string,
 	initialNextPath: string,
 	markdown: string,
+	isLive: () => boolean,
 ) {
 	let nextPath = initialNextPath;
 	for (let attempt = 0; ; attempt++) {
+		if (!isLive()) return null;
 		try {
 			pendingRenames.set(previousPath, nextPath);
 			await desktopApi.renameFile(previousPath, nextPath);
@@ -860,6 +865,7 @@ async function renameGeneratedFileWithRetry(
 				throw err;
 			}
 			const retryPath = await generatedTitlePath(previousPath, markdown);
+			if (!isLive()) return null;
 			if (
 				!retryPath ||
 				pathEquals(retryPath, previousPath) ||
@@ -925,6 +931,31 @@ function publishGeneratedRename(
 				: state.document.lastOpenedPath,
 		},
 	}));
+}
+
+function isLiveTitleSession(session: TitleSession) {
+	return (
+		titleSessions.get(session.path) === session &&
+		viewerStore.get().currentPath === session.path
+	);
+}
+
+function updateGeneratedContentIfLive(session: TitleSession, content: string) {
+	appStore.set((state) => {
+		if (
+			state.document.currentPath !== session.path ||
+			titleSessions.get(session.path) !== session
+		) {
+			return state;
+		}
+		return {
+			...state,
+			document: {
+				...state.document,
+				content,
+			},
+		};
+	});
 }
 
 function stopTitleRenames(path: string) {
