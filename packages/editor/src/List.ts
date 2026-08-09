@@ -219,8 +219,17 @@ export const ListToggleExtension = Extension.create({
 			},
 			Enter: ({ editor }) => {
 				const { selection } = editor.view.state;
-				if (isSelectionAtStartOfNode(selection)) {
+				const action = emptyItemAction(selection);
+				if (action === "exit") {
 					return editor.commands.liftListItem("listItem");
+				}
+				if (action === "continue") {
+					return editor.commands.command(({ tr, dispatch }) => {
+						if (!dispatch) return true;
+						if (!continueList(tr)) return false;
+						dispatch(tr);
+						return true;
+					});
 				}
 				// Splitting a task item should always start the new item unchecked
 				const { $from } = selection;
@@ -369,6 +378,48 @@ export const ListAutoJoinExtension = Extension.create({
 
 function isListItem(node: PMNode) {
 	return node.type.name === "listItem";
+}
+
+/**
+ * `splitListItem` lifts an empty tail. Replace it when the item still holds
+ * content so Enter stays in the list.
+ */
+export function continueList(tr: Transaction) {
+	const { $from } = tr.selection;
+	const itemDepth = $from.depth - 1;
+	const item = $from.node(itemDepth);
+	const nextItem = item.type.createAndFill(
+		isTaskItem(item) ? { ...item.attrs, checked: false } : item.attrs,
+	);
+	if (!nextItem) return false;
+
+	const paragraphStart = $from.before($from.depth);
+	const paragraphEnd = $from.after($from.depth);
+	const insertAt = $from.after(itemDepth) - $from.parent.nodeSize;
+	tr.delete(paragraphStart, paragraphEnd);
+	tr.insert(insertAt, nextItem);
+	tr.setSelection(TextSelection.near(tr.doc.resolve(insertAt + 1)));
+	return true;
+}
+
+export function emptyItemAction(
+	selection: EditorState["selection"],
+): "exit" | "continue" | null {
+	if (
+		!isSelectionAtStartOfNode(selection) ||
+		selection.$from.parent.type.name !== "paragraph" ||
+		selection.$from.parent.content.size
+	) {
+		return null;
+	}
+
+	const { $from } = selection;
+	const itemDepth = $from.depth - 1;
+	if (itemDepth < 1) return null;
+	const item = $from.node(itemDepth);
+	if (!isListItem(item)) return null;
+	if (item.childCount === 1) return "exit";
+	return $from.index(itemDepth) === item.childCount - 1 ? "continue" : null;
 }
 
 function isTaskItem(node: PMNode) {

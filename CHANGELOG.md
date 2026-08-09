@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Pressing Enter in a list item containing an image now creates a new list item instead of dropping out of the list. Thanks [@MonisMS](https://github.com/MonisMS)! [#241](https://github.com/bholmesdev/hubble.md/pull/241)
+
 ## [0.1.26] - 2026-08-09
 
 ### Added
