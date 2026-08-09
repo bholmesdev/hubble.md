@@ -779,6 +779,13 @@ function App() {
 				onRunCommand={recordRecentCommand}
 			/>
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+				{updateState ? (
+					<UpdatesSection
+						state={updateState}
+						onPrimaryAction={() => void triggerPrimaryUpdateAction()}
+						onViewChangelog={openWhatsNew}
+					/>
+				) : null}
 				<GeneralSettingsSection />
 				{spellcheck ? (
 					<SpellcheckSettingsSection
@@ -793,13 +800,6 @@ function App() {
 					<TelemetrySettingsSection
 						consent={telemetryConsent}
 						onChoose={(choice) => void chooseTelemetry(choice)}
-					/>
-				) : null}
-				{updateState ? (
-					<UpdatesSection
-						state={updateState}
-						onPrimaryAction={() => void triggerPrimaryUpdateAction()}
-						onViewChangelog={openWhatsNew}
 					/>
 				) : null}
 			</SettingsDialog>
