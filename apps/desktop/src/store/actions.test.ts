@@ -1043,6 +1043,46 @@ describe("desktop title generation", () => {
 		);
 	});
 
+	it("moves a new note's assets when its title changes the filename", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		api.listDirectory.mockResolvedValue({
+			files: [{ path: "/workspace/new-file.md", modified_at: 1 }],
+			folders: [],
+		});
+		api.pathExists.mockImplementation(
+			async (path: string) => path === "/workspace/new-file.assets",
+		);
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		api.writeFileText.mockClear();
+		const markdown = "![Diagram](new-file.assets/diagram.png)\n# First Title";
+		updateEditorContent(path, markdown);
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(api.renameFile).toHaveBeenCalledWith(
+			"/workspace/new-file.assets",
+			"/workspace/first-title.assets",
+		);
+		const renamedMarkdown =
+			"![Diagram](first-title.assets/diagram.png)\n# First Title";
+		expect(viewerStore.get().content).toBe(renamedMarkdown);
+		expect(api.writeFileText).toHaveBeenLastCalledWith(
+			"/workspace/first-title.md",
+			renamedMarkdown,
+		);
+	});
+
 	it("captures edits made before note creation finishes", async () => {
 		const api = createDesktopApi();
 		api.readFileText.mockResolvedValue("");

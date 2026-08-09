@@ -758,6 +758,7 @@ async function renameGeneratedFile(
 	previousPath: string,
 	nextPath: string,
 ) {
+	const { files: filesBeforeRename, workspacePath } = workspaceStore.get();
 	let renamed = false;
 	await saves.run(previousPath, async () => {
 		if (
@@ -769,6 +770,21 @@ async function renameGeneratedFile(
 		try {
 			pendingRenames.set(previousPath, nextPath);
 			await desktopApi.renameFile(previousPath, nextPath);
+			const movedFiles = [{ fromPath: previousPath, toPath: nextPath }];
+			const movedAssetFolder = await moveAssociatedAssetFolder(
+				previousPath,
+				nextPath,
+			);
+			if (movedAssetFolder) movedFiles.push(movedAssetFolder);
+			if (workspacePath) {
+				session.markdown = rewriteMovedLinks({
+					content: session.markdown,
+					filePath: previousPath,
+					nextPath,
+					workspacePath,
+					movedByOldPath: indexMovedFiles(movedFiles),
+				});
+			}
 
 			// Migrate the session before publishing the new path. The next React
 			// render can then retain this note's editor identity.
@@ -805,6 +821,7 @@ async function renameGeneratedFile(
 				document: {
 					...state.document,
 					currentPath: nextPath,
+					content: session.markdown,
 					lastOpenedPath: pathEquals(
 						state.document.lastOpenedPath ?? "",
 						previousPath,
@@ -813,6 +830,7 @@ async function renameGeneratedFile(
 						: state.document.lastOpenedPath,
 				},
 			}));
+			await updateMovedLinks(movedFiles, filesBeforeRename);
 			renamed = true;
 			if (wasPinned) void syncPinnedNotes();
 		} catch (err) {
