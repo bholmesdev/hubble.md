@@ -1,4 +1,10 @@
-import { type RefObject, useEffect, useState } from "react";
+import {
+	type RefObject,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { isEditableEventTarget } from "../lib/dom";
 
 export const EDITOR_INPUT_SELECTOR = "[data-editor-input]";
@@ -11,6 +17,7 @@ export function useSidebarKeyboardNav<T>({
 	onCollapse,
 	navRef,
 	activeIndex = -1,
+	onNavigate,
 }: {
 	items: T[];
 	onSelect: (item: T) => void;
@@ -19,10 +26,15 @@ export function useSidebarKeyboardNav<T>({
 	onCollapse?: (item: T) => void;
 	navRef: RefObject<HTMLElement | null>;
 	activeIndex?: number;
+	onNavigate?: (item: T) => void;
 }) {
 	const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+	const focusedIndexRef = useRef(focusedIndex);
+	useLayoutEffect(() => {
+		focusedIndexRef.current = focusedIndex;
+	}, [focusedIndex]);
 	const getActionIndex = () =>
-		focusedIndex ?? (activeIndex >= 0 ? activeIndex : null);
+		focusedIndexRef.current ?? (activeIndex >= 0 ? activeIndex : null);
 
 	useEffect(() => {
 		if (focusedIndex === null) return;
@@ -40,10 +52,12 @@ export function useSidebarKeyboardNav<T>({
 			case "ArrowUp": {
 				event.preventDefault();
 				const delta = event.key === "ArrowDown" ? 1 : -1;
-				setFocusedIndex((prev) => {
-					const start = prev ?? (activeIndex >= 0 ? activeIndex : -1);
-					return Math.max(0, Math.min(start + delta, items.length - 1));
-				});
+				const start =
+					focusedIndexRef.current ?? (activeIndex >= 0 ? activeIndex : -1);
+				const next = Math.max(0, Math.min(start + delta, items.length - 1));
+				focusedIndexRef.current = next;
+				setFocusedIndex(next);
+				if (items[next]) onNavigate?.(items[next]);
 				break;
 			}
 			case "Enter": {
@@ -80,6 +94,7 @@ export function useSidebarKeyboardNav<T>({
 			}
 			case "Escape": {
 				event.preventDefault();
+				focusedIndexRef.current = null;
 				setFocusedIndex(null);
 				document.querySelector<HTMLElement>(EDITOR_INPUT_SELECTOR)?.focus();
 				break;

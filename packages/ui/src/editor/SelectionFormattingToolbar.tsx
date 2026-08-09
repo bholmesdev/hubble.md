@@ -11,8 +11,8 @@ import { keymatch } from "keymatch";
 import {
 	type ComponentType,
 	type CSSProperties,
-	type RefObject,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -45,9 +45,9 @@ type ToolbarPosition = {
 };
 
 type ToolbarAction = {
-	kind: FormatCommandKind;
+	kind: FormatCommandKind | "comment";
 	label: string;
-	shortcut: string;
+	shortcut?: string;
 	icon: ComponentType<{ className?: string }>;
 };
 
@@ -117,6 +117,61 @@ const BLOCK_ACTIONS: ToolbarAction[] = [
 	},
 ];
 
+const COMMENT_ACTION: ToolbarAction = {
+	kind: "comment",
+	label: "Comment",
+	icon: MingcuteChat3Line,
+};
+const ACTION_GROUPS = [INLINE_ACTIONS, HEADING_ACTIONS, BLOCK_ACTIONS] as const;
+const TOOLBAR_EDGE_GAP = 16;
+const TOOLBAR_FRAME_WIDTH = 10;
+const TOOLBAR_BUTTON_WIDTH = 28;
+const TOOLBAR_GAP_WIDTH = 2;
+const TOOLBAR_SEPARATOR_WIDTH = 5;
+
+type ActionGroups = readonly (readonly ToolbarAction[])[];
+
+// The bar floats, so it never shrinks on its own. Keep Comment in place and
+// drop formatting actions from the right until the bar fits.
+function fittingGroups(width: number, hasComment: boolean): ActionGroups {
+	for (let count = countActions(ACTION_GROUPS); count >= 0; count -= 1) {
+		const shown = [
+			...takeActions(ACTION_GROUPS, count),
+			...(hasComment ? [[COMMENT_ACTION]] : []),
+		];
+		if (toolbarWidth(shown) <= width - TOOLBAR_EDGE_GAP) return shown;
+	}
+	return [];
+}
+
+function takeActions(groups: ActionGroups, count: number): ActionGroups {
+	let left = count;
+	return groups
+		.map((group) => {
+			const shown = group.slice(0, left);
+			left -= shown.length;
+			return shown;
+		})
+		.filter((group) => group.length > 0);
+}
+
+// Must track the render below, including the trailing "More" button.
+function toolbarWidth(groups: ActionGroups) {
+	const actions = countActions(groups);
+	if (actions === 0) return TOOLBAR_FRAME_WIDTH + TOOLBAR_BUTTON_WIDTH;
+	const elements = actions + groups.length + 1;
+	return (
+		TOOLBAR_FRAME_WIDTH +
+		TOOLBAR_BUTTON_WIDTH * (actions + 1) +
+		TOOLBAR_SEPARATOR_WIDTH * groups.length +
+		TOOLBAR_GAP_WIDTH * (elements - 1)
+	);
+}
+
+function countActions(groups: ActionGroups) {
+	return groups.reduce((sum, group) => sum + group.length, 0);
+}
+
 function shouldShowToolbar(editor: Editor) {
 	const { selection } = editor.state;
 	if (!editor.isFocused) return false;
@@ -135,11 +190,11 @@ function shouldShowToolbar(editor: Editor) {
  */
 export function SelectionFormattingToolbar({
 	editor,
-	viewportRef,
+	viewport,
 	onComment,
 }: {
 	editor: Editor | null;
-	viewportRef: RefObject<HTMLDivElement | null>;
+	viewport: HTMLDivElement | null;
 	onComment?: () => void;
 }) {
 	const [position, setPosition] = useState<ToolbarPosition | null>(null);
@@ -155,7 +210,21 @@ export function SelectionFormattingToolbar({
 	// even when the toolbar's position does not move.
 	const [, setRevision] = useState(0);
 	const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
+	// Show everything until the viewport has been measured.
+	const [viewportWidth, setViewportWidth] = useState(Number.POSITIVE_INFINITY);
+	const shownGroups = fittingGroups(viewportWidth, Boolean(onComment));
 	const openRef = useRef(false);
+
+	useLayoutEffect(() => {
+		if (!viewport) return;
+		const measure = () => {
+			if (viewport.clientWidth > 0) setViewportWidth(viewport.clientWidth);
+		};
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(viewport);
+		return () => observer.disconnect();
+	}, [viewport]);
 
 	useEffect(() => {
 		if (!editor) return;
@@ -178,7 +247,6 @@ export function SelectionFormattingToolbar({
 		};
 
 		const positionToolbar = () => {
-			const viewport = viewportRef.current;
 			if (!viewport || !toolbarEl) return;
 
 			const reference: VirtualElement = {
@@ -315,7 +383,6 @@ export function SelectionFormattingToolbar({
 		};
 
 		update();
-		const viewport = viewportRef.current;
 		const editorDom = editor.view.dom;
 		editor.on("selectionUpdate", handleUpdate);
 		editor.on("transaction", handleUpdate);
@@ -341,7 +408,7 @@ export function SelectionFormattingToolbar({
 			viewport?.removeEventListener("scroll", handleUpdate);
 			window.removeEventListener("resize", handleUpdate);
 		};
-	}, [editor, viewportRef, toolbarEl]);
+	}, [editor, viewport, toolbarEl]);
 
 	if (!editor) return null;
 
@@ -357,7 +424,7 @@ export function SelectionFormattingToolbar({
 			// Menu.Popup / Select.Popup classes). fill-mode-forwards keeps the
 			// exit's final frame (opacity 0) applied until React unmounts the
 			// bar, so it never flashes back to visible after animating out.
-			className="absolute z-[4] flex origin-(--transform-origin) items-center gap-0.5 rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-popover-foreground shadow-overlay transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:fill-mode-forwards"
+			className="absolute z-[4] flex max-w-[calc(100%-1rem)] origin-(--transform-origin) items-center gap-0.5 overflow-hidden rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-popover-foreground shadow-overlay transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:fill-mode-forwards"
 			style={
 				{
 					insetInlineStart: `${position?.x ?? 0}px`,
@@ -375,35 +442,24 @@ export function SelectionFormattingToolbar({
 				if (!openRef.current) setPresent(false);
 			}}
 		>
-			{INLINE_ACTIONS.map((action) => (
-				<ToolbarButton key={action.kind} editor={editor} action={action} />
+			{shownGroups.map((group, groupIndex) => (
+				<div key={group[0].kind} className="contents">
+					{groupIndex > 0 && (
+						<Separator orientation="vertical" className="mx-0.5" />
+					)}
+					{group.map((action) => (
+						<ToolbarButton
+							key={action.kind}
+							editor={editor}
+							action={action}
+							onComment={onComment}
+						/>
+					))}
+				</div>
 			))}
-			<Separator orientation="vertical" className="mx-0.5" />
-			{HEADING_ACTIONS.map((action) => (
-				<ToolbarButton key={action.kind} editor={editor} action={action} />
-			))}
-			<Separator orientation="vertical" className="mx-0.5" />
-			{BLOCK_ACTIONS.map((action) => (
-				<ToolbarButton key={action.kind} editor={editor} action={action} />
-			))}
-			{onComment && (
-				<>
-					<Separator orientation="vertical" className="mx-0.5" />
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon-sm"
-						aria-label="Comment"
-						title="Comment"
-						className="text-muted-foreground"
-						onMouseDown={(event) => event.preventDefault()}
-						onClick={onComment}
-					>
-						<MingcuteChat3Line className="size-4" />
-					</Button>
-				</>
+			{shownGroups.length > 0 && (
+				<Separator orientation="vertical" className="mx-0.5" />
 			)}
-			<Separator orientation="vertical" className="mx-0.5" />
 			<Button
 				type="button"
 				variant="ghost"
@@ -425,27 +481,37 @@ export function SelectionFormattingToolbar({
 function ToolbarButton({
 	editor,
 	action,
+	onComment,
 }: {
 	editor: Editor;
 	action: ToolbarAction;
+	onComment?: () => void;
 }) {
 	const Icon = action.icon;
-	const active = isFormatActive(editor, action.kind);
+	const active =
+		action.kind !== "comment" && isFormatActive(editor, action.kind);
+	const title = action.shortcut
+		? `${action.label} (${action.shortcut})`
+		: action.label;
 	return (
 		<Button
 			type="button"
 			variant="ghost"
 			size="icon-sm"
 			aria-label={action.label}
-			aria-pressed={active}
-			title={`${action.label} (${action.shortcut})`}
+			aria-pressed={action.kind === "comment" ? undefined : active}
+			title={title}
 			className={cn(
 				"text-muted-foreground",
 				active && "bg-muted text-foreground",
 			)}
 			// Keep the editor selection intact when pressing a toolbar button.
 			onMouseDown={(event) => event.preventDefault()}
-			onClick={() => applyFormatCommand(editor, action.kind)}
+			onClick={() =>
+				action.kind === "comment"
+					? onComment?.()
+					: applyFormatCommand(editor, action.kind)
+			}
 		>
 			<Icon className="size-4" />
 		</Button>

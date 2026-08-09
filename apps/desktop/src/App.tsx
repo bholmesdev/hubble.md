@@ -63,11 +63,13 @@ import {
 	sourceLanguageForPath,
 	supportsSourceToggle,
 } from "./lib/filePath";
+import { isCompactWindow, useCompactWindow } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
 import {
 	createWorkspaceWithSidebar,
+	editorDocumentId,
 	forceKeepLocalEdits,
 	getPendingRenameTarget,
 	goBack,
@@ -169,6 +171,13 @@ async function openFilePicker() {
 	}
 }
 
+const SIDEBAR_OVERLAY =
+	"max-sm:absolute max-sm:inset-y-0 max-sm:start-0 max-sm:z-30 max-sm:flex max-sm:shadow-overlay max-sm:transition-transform max-sm:motion-reduce:transition-none";
+const SIDEBAR_OVERLAY_SHOWN =
+	"contents max-sm:translate-x-0 max-sm:duration-[180ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
+const SIDEBAR_OVERLAY_HIDDEN =
+	"hidden max-sm:-translate-x-full max-sm:pointer-events-none max-sm:duration-[140ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
+
 let nextSearchRequestId = 0;
 
 /**
@@ -192,6 +201,7 @@ async function searchFileContents(query: string) {
 
 function App() {
 	const state = useStoreValue(viewerStore);
+	const compact = useCompactWindow();
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
@@ -238,6 +248,17 @@ function App() {
 		focusedSidebarItem,
 		workspacePath,
 	);
+	const focusedCreationFolder =
+		focusedSidebarItem?.kind === "folder" ? focusedSidebarItem.path : null;
+	const closeSidebarOverlay = () => {
+		if (sidebarOpen && compact) {
+			setSidebarOpen(false);
+		}
+	};
+
+	useEffect(() => {
+		if (compact) setSidebarOpen(false);
+	}, [compact]);
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
 		setSearchOpen(open);
@@ -251,6 +272,7 @@ function App() {
 		},
 		{
 			currentPath: state.currentPath ?? null,
+			newFileParent: focusedCreationFolder,
 			newFolderParent: searchOpen
 				? searchFolderParent
 				: (focusedFolderParent ?? null),
@@ -430,12 +452,12 @@ function App() {
 			> = {
 				"app.go-back": goBack,
 				"app.go-forward": goForward,
-				"app.new-file": createMarkdownFile,
+				"app.new-file": () => createMarkdownFile(focusedCreationFolder),
 				"app.settings": () => setSettingsOpen(true),
-				"app.open-folder": () => setWorkspaceSwitcherOpen(true),
+				"app.open-recent": () => setWorkspaceSwitcherOpen(true),
 				// The File menu accelerator fires too, but opening is idempotent.
 				"app.go-to-file": () => changeSearchOpen(true),
-				"app.add-folder": openWorkspaceWithSidebar,
+				"app.open-folder": openWorkspaceWithSidebar,
 				"app.open-file": openFilePicker,
 				"app.copy-path": () => copyFilePath(currentPath),
 				"app.reveal": () => revealPath(currentPath),
@@ -464,7 +486,7 @@ function App() {
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen, focusedSidebarPath]);
+	}, [changeSearchOpen, focusedCreationFolder, focusedSidebarPath]);
 
 	useEffect(() => {
 		let active = true;
@@ -496,8 +518,12 @@ function App() {
 					if (!undone) void desktopApi.undoText();
 				});
 			}),
-			desktopApi.onMenuCreateMarkdownFile(() => void createMarkdownFile()),
-			desktopApi.onMenuCreateHtmlFile(() => void createHtmlFile()),
+			desktopApi.onMenuCreateMarkdownFile(
+				() => void createMarkdownFile(focusedCreationFolder),
+			),
+			desktopApi.onMenuCreateHtmlFile(
+				() => void createHtmlFile(focusedCreationFolder),
+			),
 			desktopApi.onMenuOpenFile(() => void openFilePicker()),
 			desktopApi.onMenuOpenFolder(() => void openWorkspaceWithSidebar()),
 			desktopApi.onMenuOpenSettings(() => setSettingsOpen(true)),
@@ -531,7 +557,7 @@ function App() {
 			for (const dispose of disposers) dispose();
 		};
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen]);
+	}, [changeSearchOpen, focusedCreationFolder]);
 
 	useEffect(() => {
 		// Window focus can fire in bursts when switching apps, so debounce the
@@ -609,7 +635,9 @@ function App() {
 				launchWorkspacePath.length > 0
 			) {
 				await openWorkspace(launchWorkspacePath);
-				setSidebarOpen(true);
+				if (!isCompactWindow()) {
+					setSidebarOpen(true);
+				}
 				return;
 			}
 			const nextState = viewerStore.get();
@@ -635,7 +663,30 @@ function App() {
 	}, []);
 
 	return (
-		<main className="flex h-dvh flex-col bg-background text-foreground">
+		<main
+			className="flex h-dvh flex-col bg-background text-foreground"
+			onPointerDownCapture={(event) => {
+				if (
+					event.target instanceof Element &&
+					!event.target.closest(
+						"[data-sidebar-overlay], [data-sidebar-portal], [data-sidebar-toggle]",
+					)
+				) {
+					closeSidebarOverlay();
+				}
+			}}
+			onKeyDown={(event) => {
+				if (
+					!event.defaultPrevented &&
+					event.key === "Escape" &&
+					sidebarOpen &&
+					isCompactWindow()
+				) {
+					event.preventDefault();
+					setSidebarOpen(false);
+				}
+			}}
+		>
 			<Toolbar
 				scrollContainer={scrollContainerEl}
 				showSidebarBadge={
@@ -645,49 +696,57 @@ function App() {
 						telemetryConsent === "unset")
 				}
 			/>
-			<div className="flex min-h-0 flex-1 overflow-hidden">
-				<Sidebar
-					onFocusedItemChange={updateFocusedSidebarItem}
-					footer={
-						showReadyCallout ? (
-							<SidebarCallout
-								message={
-									<>
-										<span className="font-semibold">A new version</span> is
-										ready to install.
-									</>
-								}
-								primaryLabel="Restart"
-								onPrimary={installUpdate}
-								onDismiss={() =>
-									setDismissedVersion(readyVersion ?? "__unknown__")
-								}
-							/>
-						) : whatsNewVersion !== null ? (
-							<SidebarCallout
-								message={
-									<>
-										<span className="font-semibold">Hubble updated</span> to{" "}
-										{whatsNewVersion}.
-									</>
-								}
-								primaryLabel="See what's new"
-								onPrimary={() => {
-									// Only consume the one-shot callout once the changelog is
-									// actually showing; openChangelog can bail on a conflict.
-									void openChangelog().then((opened) => {
-										if (opened) markWhatsNewSeen();
-									});
-								}}
-								onDismiss={markWhatsNewSeen}
-							/>
-						) : telemetryConsent === "unset" ? (
-							<TelemetryConsentCallout
-								onChoose={(choice) => void chooseTelemetry(choice)}
-							/>
-						) : undefined
-					}
-				/>
+			<div className="relative flex min-h-0 flex-1 overflow-hidden">
+				{/* Compact sidebar stays mounted while closed so it can slide out. */}
+				<div
+					data-sidebar-overlay
+					aria-hidden={!sidebarOpen}
+					inert={!sidebarOpen}
+					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
+				>
+					<Sidebar
+						onFocusedItemChange={updateFocusedSidebarItem}
+						footer={
+							showReadyCallout ? (
+								<SidebarCallout
+									message={
+										<>
+											<span className="font-semibold">A new version</span> is
+											ready to install.
+										</>
+									}
+									primaryLabel="Restart"
+									onPrimary={installUpdate}
+									onDismiss={() =>
+										setDismissedVersion(readyVersion ?? "__unknown__")
+									}
+								/>
+							) : whatsNewVersion !== null ? (
+								<SidebarCallout
+									message={
+										<>
+											<span className="font-semibold">Hubble updated</span> to{" "}
+											{whatsNewVersion}.
+										</>
+									}
+									primaryLabel="See what's new"
+									onPrimary={() => {
+										// Only consume the one-shot callout once the changelog is
+										// actually showing; openChangelog can bail on a conflict.
+										void openChangelog().then((opened) => {
+											if (opened) markWhatsNewSeen();
+										});
+									}}
+									onDismiss={markWhatsNewSeen}
+								/>
+							) : telemetryConsent === "unset" ? (
+								<TelemetryConsentCallout
+									onChoose={(choice) => void chooseTelemetry(choice)}
+								/>
+							) : undefined
+						}
+					/>
+				</div>
 				<section
 					className={
 						terminalPosition === "right"
@@ -695,6 +754,7 @@ function App() {
 							: "flex-1 flex flex-col overflow-hidden"
 					}
 					aria-live="polite"
+					onFocusCapture={closeSidebarOverlay}
 				>
 					<div className="flex-1 min-h-0 min-w-0 relative">
 						{state.status === "loading" && <p>Loading…</p>}
@@ -859,12 +919,15 @@ function DocumentViewer({
 	viewMode: ViewMode;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
+	const documentId = editorDocumentId(path);
 	if (viewMode === "source" && supportsSourceToggle(path)) {
 		const isHtml = hasHtmlExtension(path);
 		return (
 			<MarkdownSourceEditor
-				key={`${path}:source:${HMR_REV}`}
+				key={`${documentId}:source:${HMR_REV}`}
 				path={path}
+				documentId={documentId}
+				preserveHistoryOnUpdate={documentId !== path}
 				initialMarkdown={content}
 				sourceLanguage={
 					isHtml ? "html" : hasTextExtension(path) ? "text" : "md"
@@ -942,8 +1005,9 @@ function DocumentViewer({
 
 	return (
 		<MarkdownEditor
-			key={`${path}:rich:${HMR_REV}`}
+			key={`${documentId}:rich:${HMR_REV}`}
 			path={path}
+			documentId={documentId}
 			initialMarkdown={content}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
 			onScrollContainerChange={onScrollContainerChange}
@@ -1023,16 +1087,19 @@ function ExternalChangeBanner({
 
 function MarkdownEditor({
 	path,
+	documentId,
 	initialMarkdown,
 	copyAsMarkdownRequest,
 	onScrollContainerChange,
 }: {
 	path: string;
+	documentId: string;
 	initialMarkdown: string;
 	copyAsMarkdownRequest: number;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
+	const getPath = () => viewerStore.get().currentPath ?? path;
 	// External-only files stay out of autocomplete; explicit links still work.
 	const wikiTargets: WikiTarget[] = workspace.files
 		.filter((file) => (file.kind ?? fileKindForPath(file.path)) !== "external")
@@ -1073,14 +1140,16 @@ function MarkdownEditor({
 	return (
 		<EditorView
 			path={path}
+			documentId={documentId}
+			preserveHistoryOnUpdate={documentId !== path}
 			initialMarkdown={initialMarkdown}
 			editable={!isChangelogPath(path)}
 			wikiTargets={wikiTargets}
 			extensions={[
-				createImageExtension(path),
+				createImageExtension(getPath),
 				createEmbedExtension({
 					workspacePath: workspace.workspacePath,
-					filePath: path,
+					getFilePath: getPath,
 				}),
 			]}
 			onPaste={(editor, event) => handleImagePaste({ editor, event })}

@@ -19,6 +19,7 @@
 
 /* Desktop-only shadcn token extensions; shared light tokens live in theme.css. */
 :root {
+	color-scheme: light;
 	--destructive-foreground: oklch(0.985 0 0);
 	--sidebar-primary: var(--primary);
 	--sidebar-primary-foreground: var(--primary-foreground);
@@ -46,6 +47,7 @@
 }
 
 .dark {
+	color-scheme: dark;
 	--background: oklch(0.2 0.004 60);
 	--foreground: oklch(0.945 0.002 60);
 	--card: oklch(0.24 0.005 60);
@@ -71,8 +73,7 @@
 	--sidebar-foreground: var(--foreground);
 	--sidebar-primary: var(--primary);
 	--sidebar-primary-foreground: var(--primary-foreground);
-	/* gray until sidebar focused; :focus-within (theme.css) swaps to --selected */
-	--sidebar-accent: oklch(0.32 0.006 60);
+	--sidebar-accent: var(--accent);
 	--sidebar-accent-foreground: var(--foreground);
 	--sidebar-border: var(--border);
 	--sidebar-ring: var(--ring);

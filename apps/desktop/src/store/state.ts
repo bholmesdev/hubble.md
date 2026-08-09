@@ -168,6 +168,12 @@ export const historyStore = store<HistoryState>({
 // Derived from the open document, so it stays out of the persisted app store
 export const reviewThreadsStore = store<ReviewThread[]>([]);
 
+// Keep title previews out of appStore so they do not survive a relaunch.
+export const titleGenerationPreviewStore = store<{
+	path: string;
+	previewPath: string;
+} | null>(null);
+
 export const workspaceStore = appStore.select("workspace");
 export const viewerStore = appStore.select("document");
 export const uiStore = appStore.select("ui");

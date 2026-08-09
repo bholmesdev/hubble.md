@@ -43,8 +43,7 @@
 	--cursor-motion-easing: linear(0, 0.44 25%, 0.75 50%, 0.94 75%, 1);
 	--sidebar: oklch(0.989 0.004 95); /* faint tint vs the white editor */
 	--sidebar-foreground: var(--foreground);
-	/* gray until the sidebar is focused (yellow via :focus-within below) */
-	--sidebar-accent: oklch(0.915 0.004 95);
+	--sidebar-accent: var(--accent);
 	--sidebar-accent-foreground: var(--selected-foreground);
 	--sidebar-border: var(--border);
 }
@@ -96,7 +95,6 @@
 	box-sizing: border-box;
 }
 
-/* Selected row goes yellow only while the sidebar pane is focused (else gray). */
 [data-sidebar-root]:focus-within {
 	--sidebar-accent: var(--selected);
 	--sidebar-accent-foreground: var(--selected-foreground);

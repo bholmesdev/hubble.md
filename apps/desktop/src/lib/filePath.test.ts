@@ -3,6 +3,7 @@ import {
 	dirname,
 	duplicateBasenames,
 	fileKindForPath,
+	fileStem,
 	hasDocumentExtension,
 	hasImageExtension,
 	isCodeFile,
@@ -29,6 +30,13 @@ describe("duplicateBasenames", () => {
 				"C:\\projects\\beta\\plans",
 			]),
 		).toEqual(new Set(["plans"]));
+	});
+});
+
+describe("fileStem", () => {
+	it("drops only the last extension", () => {
+		expect(fileStem("/notes/draft.post.md")).toBe("draft.post");
+		expect(fileStem("/notes/README")).toBe("README");
 	});
 });
 

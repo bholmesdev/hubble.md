@@ -27,7 +27,7 @@ export function WorkspaceSwitcher() {
 	return (
 		<WorkspaceSwitcherMenu
 			label={workspaceName}
-			title={`${tildePath(workspacePath)} (${formatCommandShortcut("app.open-folder")})`}
+			title={`${tildePath(workspacePath)} (${formatCommandShortcut("app.open-recent")})`}
 			open={open}
 			onOpenChange={setWorkspaceSwitcherOpen}
 		>
@@ -102,7 +102,7 @@ export function WorkspaceSwitcher() {
 					className="ms-auto shrink-0 text-[11px] leading-none text-muted-foreground/60"
 					aria-hidden="true"
 				>
-					{formatCommandShortcut("app.add-folder")}
+					{formatCommandShortcut("app.open-folder")}
 				</span>
 			</WorkspaceSwitcherMenu.Item>
 		</WorkspaceSwitcherMenu>

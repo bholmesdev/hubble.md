@@ -1,5 +1,7 @@
 Check work: `pnpm build:desktop` (builds packages, runs biome check, tsc, vite build, cargo check). For quick iteration use `pnpm check` and desktop tsc.
 
+After React changes, run `pnpm check:react-compiler`; CI rejects components the compiler skips.
+
 When asked why you made a decision, answer why. Don't take it as a challenge to your approach, or pressure to change your solution.
 
 ## Agent skills

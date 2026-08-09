@@ -12,7 +12,7 @@ type EmbedAttrs = {
 
 type EmbedExtensionOptions = {
 	workspacePath: string | null;
-	filePath: string;
+	getFilePath: () => string;
 };
 
 export function createEmbedExtension(options: EmbedExtensionOptions) {
@@ -39,7 +39,7 @@ export function createEmbedExtension(options: EmbedExtensionOptions) {
 			return ReactNodeViewRenderer((props) => (
 				<IframeEmbedNodeView
 					attrs={props.node.attrs as EmbedAttrs}
-					filePath={options.filePath}
+					filePath={options.getFilePath()}
 					workspacePath={options.workspacePath}
 				/>
 			));

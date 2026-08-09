@@ -271,7 +271,7 @@ export function SlashCommandMenu({
 	return (
 		<div
 			ref={menuRef}
-			className="absolute z-[4] w-[250px] overflow-hidden rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay"
+			className="absolute z-[4] w-[250px] max-h-[var(--command-menu-height)] max-w-[calc(100%-1rem)] overflow-hidden rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay"
 			style={{
 				insetInlineStart: `${position?.x ?? 0}px`,
 				insetBlockStart: `${position?.y ?? 0}px`,
@@ -279,6 +279,7 @@ export function SlashCommandMenu({
 			}}
 		>
 			<Command
+				className="flex max-h-[var(--command-menu-height)] flex-col"
 				label="Slash commands"
 				value={activeKind}
 				onValueChange={(value) => setSelectedKind(value as SlashCommandKind)}
@@ -293,7 +294,7 @@ export function SlashCommandMenu({
 					aria-hidden="true"
 					tabIndex={-1}
 				/>
-				<Command.List className="max-h-64 overflow-y-auto p-1">
+				<Command.List className="min-h-0 max-h-64 overflow-y-auto p-1">
 					{visibleCommands.map((command) => {
 						const Icon = command.icon;
 						return (

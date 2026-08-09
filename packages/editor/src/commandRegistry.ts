@@ -32,10 +32,10 @@ export const commandRegistry = {
 		label: "New File",
 		isEnabled: always,
 	},
-	"app.add-folder": {
-		defaultBinding: "CmdOrCtrl+Shift+N",
-		label: "Add Folder...",
-		isEnabled: always,
+	"app.open-recent": {
+		defaultBinding: "Ctrl+R",
+		label: "Open Recent",
+		isEnabled: hasWorkspace,
 	},
 	"app.open-file": {
 		defaultBinding: "CmdOrCtrl+O",
@@ -45,7 +45,7 @@ export const commandRegistry = {
 	"app.open-folder": {
 		defaultBinding: "CmdOrCtrl+Shift+O",
 		label: "Open Folder...",
-		isEnabled: hasWorkspace,
+		isEnabled: always,
 	},
 	"app.go-to-file": {
 		defaultBinding: "CmdOrCtrl+P",

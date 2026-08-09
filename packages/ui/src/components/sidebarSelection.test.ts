@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
 	applySidebarSelection,
 	type SidebarSelectionState,
+	sidebarCreationFolderId,
 	sidebarDeleteSelection,
+	sidebarFocusTarget,
 	sidebarMoveCandidateFromRow,
 	sidebarMoveItemsForDrag,
 	sidebarRowKey,
@@ -81,6 +83,52 @@ function candidate(index: number) {
 	return item;
 }
 
+describe("sidebarCreationFolderId", () => {
+	it("uses the focused folder", () => {
+		expect(
+			sidebarCreationFolderId({
+				rows,
+				focusedIndex: 2,
+				selectedKeys: new Set(),
+			}),
+		).toBe("project/");
+	});
+
+	it("uses a selected folder after focus moves to the header", () => {
+		expect(
+			sidebarFocusTarget({
+				rows,
+				focusedIndex: null,
+				selectedKeys: new Set(["folder:project/archive/"]),
+			}),
+		).toEqual({ kind: "folder", folderId: "project/archive/" });
+		expect(
+			sidebarCreationFolderId({
+				rows,
+				focusedIndex: null,
+				selectedKeys: new Set(["folder:project/archive/"]),
+			}),
+		).toBe("project/archive/");
+	});
+
+	it("falls back to root for files and multi-selection", () => {
+		expect(
+			sidebarCreationFolderId({
+				rows,
+				focusedIndex: 1,
+				selectedKeys: new Set(["folder:project/"]),
+			}),
+		).toBeNull();
+		expect(
+			sidebarCreationFolderId({
+				rows,
+				focusedIndex: null,
+				selectedKeys: new Set(["folder:project/", "file:/workspace/a.md"]),
+			}),
+		).toBeNull();
+	});
+});
+
 describe("sidebar selection helpers", () => {
 	it("toggles a single row in and out of the selection", () => {
 		let selection = select(emptySelection, 1, "toggle");
@@ -130,6 +178,13 @@ describe("sidebar selection helpers", () => {
 
 	it("keeps the same selection object when already on the active file", () => {
 		const selection = select(emptySelection, 1, "replace");
+
+		expect(snapSidebarSelection(selection, "/workspace/a.md")).toBe(selection);
+	});
+
+	it("keeps multi-selection when the editor regains focus", () => {
+		let selection = select(emptySelection, 1, "toggle");
+		selection = select(selection, 5, "toggle");
 
 		expect(snapSidebarSelection(selection, "/workspace/a.md")).toBe(selection);
 	});
