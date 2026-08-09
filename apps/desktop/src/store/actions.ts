@@ -16,6 +16,7 @@ import {
 	dirname,
 	extname,
 	fileKindForPath,
+	fileStem,
 	hasMarkdownExtension,
 	isCodeFile,
 	isEditableFile,
@@ -34,6 +35,7 @@ import {
 	pathAfterMove,
 	rewriteMovedLinks,
 } from "../lib/markdownLinkRewrite";
+import { generatedTitleStem } from "../lib/titleGeneration";
 import {
 	setThemePreference as applyThemePreference,
 	initTheme,
@@ -72,6 +74,7 @@ import {
 	sidebarOpenStore,
 	switcherOpenStore,
 	themePreferenceStore,
+	titleGenerationPreviewStore,
 	uiStore,
 	type ViewMode,
 	viewerStore,
@@ -95,6 +98,15 @@ const workspaceSidebarQueues = new Map<string, Promise<void>>();
 // conflict; it is just the disk baseline catching up to a save we started.
 const selfSaves = new Map<string, Map<string, number>>();
 const saves = keyedQueue<string>();
+const TITLE_RENAME_DELAY_MS = 500;
+type TitleSession = {
+	path: string;
+	documentId: string;
+	markdown: string;
+	timer?: number;
+	running: boolean;
+};
+const titleSessions = new Map<string, TitleSession>();
 
 type SidebarMoveItem =
 	| { kind: "file"; path: string }
@@ -689,6 +701,145 @@ export function updateEditorContent(path: string, content: string) {
 			error: null,
 		};
 	});
+	scheduleTitleRename(path, content);
+}
+
+function scheduleTitleRename(path: string, markdown: string) {
+	const session = titleSessions.get(path);
+	if (!session) return;
+	session.markdown = markdown;
+	const stem = generatedTitleStem(markdown);
+	const previewPath = stem
+		? joinPath(dirname(session.path) ?? "", `${stem}${extname(session.path)}`)
+		: null;
+	titleGenerationPreviewStore.set(
+		previewPath ? { path: session.path, previewPath } : null,
+	);
+	if (session.timer !== undefined) window.clearTimeout(session.timer);
+	session.timer = window.setTimeout(() => {
+		session.timer = undefined;
+		void runTitleRename(session);
+	}, TITLE_RENAME_DELAY_MS);
+}
+
+async function generatedTitlePath(path: string, markdown: string) {
+	const stem = generatedTitleStem(markdown);
+	if (!stem) return null;
+	const parent = dirname(path) ?? "";
+	const extension = extname(path);
+	for (let index = 1; ; index++) {
+		const name = index === 1 ? stem : `${stem}-${index}`;
+		const candidate = joinPath(parent, `${name}${extension}`);
+		if (pathEquals(candidate, path)) return path;
+		if (!(await desktopApi.pathExists(candidate))) return candidate;
+	}
+}
+
+async function runTitleRename(session: TitleSession) {
+	if (session.running || titleSessions.get(session.path) !== session) return;
+	const markdown = session.markdown;
+	const previousPath = session.path;
+	const nextPath = await generatedTitlePath(previousPath, markdown);
+	if (!nextPath || pathEquals(nextPath, previousPath)) return;
+
+	session.running = true;
+	try {
+		await renameGeneratedFile(session, previousPath, nextPath);
+	} finally {
+		session.running = false;
+	}
+	if (session.markdown !== markdown) {
+		scheduleTitleRename(session.path, session.markdown);
+	}
+}
+
+async function renameGeneratedFile(
+	session: TitleSession,
+	previousPath: string,
+	nextPath: string,
+) {
+	let renamed = false;
+	await saves.run(previousPath, async () => {
+		if (
+			titleSessions.get(previousPath) !== session ||
+			viewerStore.get().currentPath !== previousPath
+		) {
+			return;
+		}
+		try {
+			pendingRenames.set(previousPath, nextPath);
+			await desktopApi.renameFile(previousPath, nextPath);
+
+			// Migrate the session before publishing the new path. The next React
+			// render can then retain this note's editor identity.
+			titleSessions.delete(previousPath);
+			session.path = nextPath;
+			titleSessions.set(nextPath, session);
+			titleGenerationPreviewStore.set({
+				path: nextPath,
+				previewPath: nextPath,
+			});
+			rewriteHistory(previousPath, nextPath);
+			const wasPinned = workspaceStore.get().pinnedNotes.includes(previousPath);
+			appStore.set((state) => ({
+				...state,
+				workspace: {
+					...state.workspace,
+					files: state.workspace.files.map((file) =>
+						pathEquals(file.path, previousPath)
+							? { ...file, path: nextPath }
+							: file,
+					),
+					pinnedNotes: state.workspace.pinnedNotes.map((path) =>
+						pathEquals(path, previousPath) ? nextPath : path,
+					),
+					lastOpenedPaths: Object.fromEntries(
+						Object.entries(state.workspace.lastOpenedPaths).map(
+							([workspacePath, openedPath]) => [
+								workspacePath,
+								pathEquals(openedPath, previousPath) ? nextPath : openedPath,
+							],
+						),
+					),
+				},
+				document: {
+					...state.document,
+					currentPath: nextPath,
+					lastOpenedPath: pathEquals(
+						state.document.lastOpenedPath ?? "",
+						previousPath,
+					)
+						? nextPath
+						: state.document.lastOpenedPath,
+				},
+			}));
+			renamed = true;
+			if (wasPinned) void syncPinnedNotes();
+		} catch (err) {
+			const message = handleFileError(err);
+			toast.error("Failed to rename file", { description: message });
+		} finally {
+			window.setTimeout(() => pendingRenames.delete(previousPath), 1000);
+		}
+	});
+
+	if (!renamed) return;
+	// Write the newest body after the move. Old-path saves queued during the move
+	// now fail their current-path guard instead of recreating the old file.
+	await savePathContent(nextPath, session.markdown, { force: true });
+}
+
+function stopTitleRenames(path: string) {
+	const session = titleSessions.get(path);
+	if (!session) return;
+	if (session.timer !== undefined) window.clearTimeout(session.timer);
+	titleSessions.delete(path);
+	const preview = titleGenerationPreviewStore.get();
+	if (preview?.path === path) titleGenerationPreviewStore.set(null);
+}
+
+export function editorDocumentId(path: string) {
+	return titleSessions.get(path)?.documentId ?? path;
 }
 
 export function setViewerMode(viewMode: ViewMode) {
@@ -820,6 +971,10 @@ export const {
 } = deletionActions;
 
 export async function renameMarkdownFile(path: string, nextName: string) {
+	const currentExt = extname(path);
+	if (renameStem(nextName, currentExt) !== fileStem(path)) {
+		stopTitleRenames(path);
+	}
 	const current = viewerStore.get();
 	const isCurrentFile = current.currentPath === path;
 	const { files: filesBeforeRename, workspacePath } = workspaceStore.get();
@@ -830,13 +985,7 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 	const parent = dirname(path);
 	if (!parent) return;
 
-	const currentExt = extname(path);
-	const proposedExt = extname(trimmedName);
-	const proposedStem =
-		proposedExt.length > 0 &&
-		proposedExt.toLocaleLowerCase() === currentExt.toLocaleLowerCase()
-			? trimmedName.slice(0, -proposedExt.length)
-			: trimmedName;
+	const proposedStem = renameStem(trimmedName, currentExt);
 	const nextNameWithExt = `${proposedStem}${currentExt}`;
 	// Slash paths are relative to the current file's folder, matching sidebar
 	// rename behavior for nested notes.
@@ -899,6 +1048,15 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 	} finally {
 		window.setTimeout(() => pendingRenames.delete(path), 1000);
 	}
+}
+
+function renameStem(name: string, currentExt: string) {
+	const trimmed = name.trim();
+	const proposedExt = extname(trimmed);
+	return proposedExt.length > 0 &&
+		proposedExt.toLocaleLowerCase() === currentExt.toLocaleLowerCase()
+		? trimmed.slice(0, -proposedExt.length)
+		: trimmed;
 }
 
 export async function renameCurrentMarkdownFile(nextName: string) {
@@ -1148,6 +1306,14 @@ async function createEmptyFileInFolder(
 	const path = uniqueFilePath(parentPath, stem, extension);
 	try {
 		await desktopApi.writeFileText(path, "");
+		if (extension === ".md") {
+			titleSessions.set(path, {
+				path,
+				documentId: path,
+				markdown: "",
+				running: false,
+			});
+		}
 		const modified_at = Math.floor(Date.now() / 1000);
 		workspaceStore.set((state) => ({
 			...state,
@@ -1160,6 +1326,7 @@ async function createEmptyFileInFolder(
 		await refreshFileList();
 		return path;
 	} catch (err) {
+		stopTitleRenames(path);
 		const message = handleFileError(err);
 		toast.error("Failed to create file", { description: message });
 		return null;

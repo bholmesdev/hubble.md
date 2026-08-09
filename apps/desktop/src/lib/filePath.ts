@@ -86,6 +86,12 @@ export function extname(filePath: string): string {
 	return dot > 0 ? name.slice(dot) : "";
 }
 
+export function fileStem(filePath: string): string {
+	const extension = extname(filePath);
+	const name = basename(filePath);
+	return extension ? name.slice(0, -extension.length) : name;
+}
+
 export function hasMarkdownExtension(path: string): boolean {
 	return MARKDOWN_EXTENSION_RE.test(path);
 }
@@ -162,11 +168,7 @@ export function withMarkdownExtension(path: string): string {
 export function markdownAssetFolderPath(path: string): string | null {
 	const parent = dirname(path);
 	if (!parent) return null;
-	const extension = extname(path);
-	const stem = extension
-		? basename(path).slice(0, -extension.length)
-		: basename(path);
-	return joinPath(parent, `${stem}.assets`);
+	return joinPath(parent, `${fileStem(path)}.assets`);
 }
 
 export function joinPath(parent: string, name: string): string {

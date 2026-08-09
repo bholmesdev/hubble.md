@@ -23,6 +23,7 @@ import type { AgentClient } from "../desktopApi/types";
 import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
+	fileStem,
 	hasHtmlExtension,
 	hasMarkdownExtension,
 	hasTextExtension,
@@ -46,6 +47,7 @@ import {
 	currentPathStore,
 	reviewThreadsStore,
 	sidebarOpenStore,
+	titleGenerationPreviewStore,
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
@@ -75,15 +77,25 @@ export function Toolbar({
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
+	const titlePreview = useStoreValue(titleGenerationPreviewStore);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const isFullScreen = useIsFullScreen();
 	// The changelog note is virtual: show a friendly title and disable the
 	// file actions (rename, reveal, copy path) that assume a file on disk.
 	const isChangelog = isChangelogPath(currentPath);
+	const previewIsSaved =
+		currentPath && titlePreview?.path === currentPath
+			? fileStem(currentPath).replace(/-\d+$/, "") ===
+				fileStem(titlePreview.previewPath)
+			: false;
+	const toolbarPath =
+		currentPath && titlePreview?.path === currentPath && !previewIsSaved
+			? titlePreview.previewPath
+			: currentPath;
 
 	return (
 		<SharedToolbar
-			currentPath={isChangelog ? "What's new" : (currentPath ?? null)}
+			currentPath={isChangelog ? "What's new" : (toolbarPath ?? null)}
 			sidebarOpen={sidebarOpen}
 			sidebarBadge={showSidebarBadge}
 			scrollContainer={scrollContainer}
