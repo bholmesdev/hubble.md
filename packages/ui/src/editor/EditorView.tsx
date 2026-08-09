@@ -361,7 +361,7 @@ export function EditorView({
 						<SlashCommandMenu editor={editor} viewportRef={editorViewportRef} />
 						<SelectionFormattingToolbar
 							editor={editor}
-							viewportRef={editorViewportRef}
+							viewport={editorViewportEl}
 							onComment={() => setReviewCommentRequest((value) => value + 1)}
 						/>
 						<ReviewCommentPopover

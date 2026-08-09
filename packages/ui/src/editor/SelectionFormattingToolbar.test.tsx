@@ -190,7 +190,7 @@ function renderToolbar(
 		root.render(
 			<SelectionFormattingToolbar
 				editor={editor}
-				viewportRef={{ current: viewport }}
+				viewport={viewport}
 				onComment={onComment}
 			/>,
 		);

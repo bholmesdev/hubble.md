@@ -11,7 +11,6 @@ import { keymatch } from "keymatch";
 import {
 	type ComponentType,
 	type CSSProperties,
-	type RefObject,
 	useEffect,
 	useLayoutEffect,
 	useRef,
@@ -191,11 +190,11 @@ function shouldShowToolbar(editor: Editor) {
  */
 export function SelectionFormattingToolbar({
 	editor,
-	viewportRef,
+	viewport,
 	onComment,
 }: {
 	editor: Editor | null;
-	viewportRef: RefObject<HTMLDivElement | null>;
+	viewport: HTMLDivElement | null;
 	onComment?: () => void;
 }) {
 	const [position, setPosition] = useState<ToolbarPosition | null>(null);
@@ -217,7 +216,6 @@ export function SelectionFormattingToolbar({
 	const openRef = useRef(false);
 
 	useLayoutEffect(() => {
-		const viewport = viewportRef.current;
 		if (!viewport) return;
 		const measure = () => {
 			if (viewport.clientWidth > 0) setViewportWidth(viewport.clientWidth);
@@ -226,7 +224,7 @@ export function SelectionFormattingToolbar({
 		const observer = new ResizeObserver(measure);
 		observer.observe(viewport);
 		return () => observer.disconnect();
-	}, [viewportRef]);
+	}, [viewport]);
 
 	useEffect(() => {
 		if (!editor) return;
@@ -249,7 +247,6 @@ export function SelectionFormattingToolbar({
 		};
 
 		const positionToolbar = () => {
-			const viewport = viewportRef.current;
 			if (!viewport || !toolbarEl) return;
 
 			const reference: VirtualElement = {
@@ -386,7 +383,6 @@ export function SelectionFormattingToolbar({
 		};
 
 		update();
-		const viewport = viewportRef.current;
 		const editorDom = editor.view.dom;
 		editor.on("selectionUpdate", handleUpdate);
 		editor.on("transaction", handleUpdate);
@@ -412,7 +408,7 @@ export function SelectionFormattingToolbar({
 			viewport?.removeEventListener("scroll", handleUpdate);
 			window.removeEventListener("resize", handleUpdate);
 		};
-	}, [editor, viewportRef, toolbarEl]);
+	}, [editor, viewport, toolbarEl]);
 
 	if (!editor) return null;
 
