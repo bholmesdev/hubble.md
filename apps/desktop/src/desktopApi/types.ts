@@ -139,6 +139,7 @@ export type SpellcheckState = {
 	enabled: boolean;
 	languages: string[];
 	availableLanguages: string[];
+	systemLanguage: string;
 };
 
 export type DesktopApi = {
@@ -203,7 +204,8 @@ export type DesktopApi = {
 	getLaunchWorkspacePath(): Promise<string | null>;
 	setThemeSource(source: ThemePreference): Promise<void>;
 	getSpellcheckState(): Promise<SpellcheckState>;
-	setSpellcheck(language: string | null): Promise<void>;
+	setSpellcheckEnabled(enabled: boolean): Promise<void>;
+	setSpellcheckLanguages(languages: string[]): Promise<void>;
 	setMenuState(state: MenuState): Promise<void>;
 	getUpdateState(): Promise<DesktopUpdateState>;
 	getTelemetryConsent(): Promise<TelemetryConsent>;

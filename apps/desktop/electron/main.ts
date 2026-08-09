@@ -115,18 +115,6 @@ if (devAppName) {
 // chrome and sandboxed HTML apps read `themeSource`. Restore it before the window
 // exists so those are right on the first frame, after the userData override above.
 nativeTheme.themeSource = loadThemeSource();
-const savedSpellcheck = loadSpellcheckConfig();
-if (savedSpellcheck) {
-	session.defaultSession.spellCheckerEnabled = savedSpellcheck.enabled;
-	if (savedSpellcheck.enabled && savedSpellcheck.languages.length > 0) {
-		const valid = savedSpellcheck.languages.filter((lang) =>
-			session.defaultSession.availableSpellCheckerLanguages.includes(lang),
-		);
-		if (valid.length > 0) {
-			session.defaultSession.setSpellCheckerLanguages(valid);
-		}
-	}
-}
 const telemetry = new TelemetryManager({
 	statePath: path.join(app.getPath("userData"), "telemetry.json"),
 	endpoint:
@@ -281,14 +269,16 @@ function saveThemeSource(source: ThemePreference) {
 	}
 }
 
-// --- Spellcheck preference ---
-// Same persistence pattern as themeSource: a JSON file in userData.
+type SpellcheckConfig = {
+	enabled: boolean;
+	languages: string[];
+};
 
 function spellcheckConfigPath(): string {
 	return path.join(app.getPath("userData"), "spellcheck.json");
 }
 
-function loadSpellcheckConfig() {
+function loadSpellcheckConfig(): SpellcheckConfig | null {
 	try {
 		const parsed = JSON.parse(
 			fsSync.readFileSync(spellcheckConfigPath(), "utf8"),
@@ -305,26 +295,48 @@ function loadSpellcheckConfig() {
 			};
 		}
 	} catch {
-		// Missing or malformed — fall through to defaults.
+		// Missing or malformed, so fall through to defaults.
 	}
 	return null;
 }
 
-function saveSpellcheckConfig(config: {
-	enabled: boolean;
-	languages: string[];
-}) {
+function getSpellcheckConfig(): SpellcheckConfig {
+	const { defaultSession } = session;
+	return {
+		enabled: defaultSession.spellCheckerEnabled,
+		languages: defaultSession.getSpellCheckerLanguages(),
+	};
+}
+
+function saveSpellcheckConfig() {
 	try {
 		fsSync.mkdirSync(path.dirname(spellcheckConfigPath()), {
 			recursive: true,
 		});
 		fsSync.writeFileSync(
 			spellcheckConfigPath(),
-			JSON.stringify(config, null, 2),
+			JSON.stringify(getSpellcheckConfig(), null, 2),
 		);
 	} catch {
-		// Best-effort cache; the renderer resends on every launch.
+		// Best-effort cache; the session keeps the live values either way.
 	}
+}
+
+function restoreSpellcheckConfig() {
+	const saved = loadSpellcheckConfig();
+	if (!saved) return;
+	session.defaultSession.spellCheckerEnabled = saved.enabled;
+	applySpellcheckLanguages(saved.languages);
+}
+
+function applySpellcheckLanguages(languages: string[]) {
+	// macOS picks languages itself and ignores setSpellCheckerLanguages.
+	if (process.platform === "darwin") return;
+	const valid = languages.filter((lang) =>
+		session.defaultSession.availableSpellCheckerLanguages.includes(lang),
+	);
+	if (valid.length === 0) return;
+	session.defaultSession.setSpellCheckerLanguages(valid);
 }
 
 function workspaceConfigPath(workspacePath: string): string {
@@ -1876,35 +1888,27 @@ function registerIpc() {
 	);
 
 	ipcMain.handle("desktop:get-spellcheck-state", () => {
-		const saved = loadSpellcheckConfig();
+		const { defaultSession } = session;
 		return {
-			enabled: saved?.enabled ?? session.defaultSession.spellCheckerEnabled,
-			languages:
-				saved?.languages ?? session.defaultSession.getSpellCheckerLanguages(),
-			availableLanguages: session.defaultSession.availableSpellCheckerLanguages,
+			...getSpellcheckConfig(),
+			availableLanguages: defaultSession.availableSpellCheckerLanguages,
+			systemLanguage: app.getSystemLocale(),
 		};
 	});
 
 	ipcMain.handle(
-		"desktop:set-spellcheck",
-		(_event, { language }: { language: string | null }) => {
-			const { defaultSession } = session;
-			if (language === null) {
-				defaultSession.spellCheckerEnabled = false;
-				const saved = loadSpellcheckConfig();
-				saveSpellcheckConfig({
-					enabled: false,
-					languages:
-						saved?.languages ?? defaultSession.getSpellCheckerLanguages(),
-				});
-			} else {
-				const valid =
-					defaultSession.availableSpellCheckerLanguages.includes(language);
-				if (!valid) return;
-				defaultSession.spellCheckerEnabled = true;
-				defaultSession.setSpellCheckerLanguages([language]);
-				saveSpellcheckConfig({ enabled: true, languages: [language] });
-			}
+		"desktop:set-spellcheck-enabled",
+		(_event, { enabled }: { enabled: boolean }) => {
+			session.defaultSession.spellCheckerEnabled = enabled;
+			saveSpellcheckConfig();
+		},
+	);
+
+	ipcMain.handle(
+		"desktop:set-spellcheck-languages",
+		(_event, { languages }: { languages: string[] }) => {
+			applySpellcheckLanguages(languages);
+			saveSpellcheckConfig();
 		},
 	);
 
@@ -1962,6 +1966,7 @@ if (!singleInstanceLock) {
 	app.whenReady().then(async () => {
 		await telemetry.load();
 		void telemetry.recordActivity(false);
+		restoreSpellcheckConfig();
 		await loadGrants();
 		if (launchWorkspacePath) grantRoot(launchWorkspacePath);
 		await saveGrants();

@@ -110,8 +110,10 @@ const desktopApi = {
 	setThemeSource: (source) =>
 		ipcRenderer.invoke("desktop:set-theme-source", { source }),
 	getSpellcheckState: () => ipcRenderer.invoke("desktop:get-spellcheck-state"),
-	setSpellcheck: (language) =>
-		ipcRenderer.invoke("desktop:set-spellcheck", { language }),
+	setSpellcheckEnabled: (enabled) =>
+		ipcRenderer.invoke("desktop:set-spellcheck-enabled", { enabled }),
+	setSpellcheckLanguages: (languages) =>
+		ipcRenderer.invoke("desktop:set-spellcheck-languages", { languages }),
 	setMenuState: (state) => ipcRenderer.invoke("desktop:set-menu-state", state),
 	getUpdateState: () => ipcRenderer.invoke("desktop:get-update-state"),
 	getTelemetryConsent: () =>

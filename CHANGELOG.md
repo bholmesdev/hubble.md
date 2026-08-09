@@ -9,7 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Spellcheck status label in the footer with a language picker and toggle to disable spellcheck. [#187](https://github.com/bholmesdev/hubble.md/issues/187)
+- Choose spellcheck languages on Windows and Linux, and turn spellcheck on or off from Settings. The footer flags when spellcheck uses a different language from your system. [#234](https://github.com/bholmesdev/hubble.md/pull/234)
 
 ### Changed
 

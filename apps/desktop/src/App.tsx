@@ -14,7 +14,7 @@ import {
 	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
 	PlainTextEditor,
-	type SpellcheckControls,
+	type SpellcheckMismatch,
 	type WikiTarget,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
@@ -30,6 +30,7 @@ import { buildAppCommands } from "./commands/useAppCommands";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
+import { SpellcheckSettingsSection } from "./components/SpellcheckSection";
 import {
 	TelemetryConsentCallout,
 	TelemetrySettingsSection,
@@ -41,6 +42,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { desktopApi } from "./desktopApi";
 import type {
 	DesktopUpdateState,
+	SpellcheckState,
 	TelemetryChoice,
 	TelemetryConsent,
 } from "./desktopApi/types";
@@ -65,6 +67,7 @@ import {
 	supportsSourceToggle,
 } from "./lib/filePath";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
+import { languageName, matchesSystemLanguage } from "./lib/spellcheckLanguages";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
 import {
@@ -208,7 +211,7 @@ function App() {
 	);
 	const [telemetryConsent, setTelemetryConsent] =
 		useState<TelemetryConsent | null>(null);
-	const [spellcheck, setSpellcheck] = useState<SpellcheckControls | null>(null);
+	const [spellcheck, setSpellcheck] = useState<SpellcheckState | null>(null);
 	const [focusedSidebarItem, setFocusedSidebarItem] =
 		useState<DesktopSidebarFocus>(null);
 	const updateFocusedSidebarItem = (next: DesktopSidebarFocus) => {
@@ -291,26 +294,28 @@ function App() {
 	}, []);
 
 	useEffect(() => {
-		void desktopApi.getSpellcheckState().then((state) => {
-			setSpellcheck({
-				enabled: state.enabled,
-				language: state.languages[0] ?? "en-US",
-				availableLanguages: state.availableLanguages,
-				onChange: (language) => {
-					void desktopApi.setSpellcheck(language);
-					setSpellcheck((prev) =>
-						prev
-							? {
-									...prev,
-									enabled: language !== null,
-									language: language ?? prev.language,
-								}
-							: prev,
-					);
-				},
-			});
-		});
+		void desktopApi.getSpellcheckState().then(setSpellcheck);
 	}, []);
+
+	const changeSpellcheckEnabled = (enabled: boolean) => {
+		void desktopApi.setSpellcheckEnabled(enabled);
+		setSpellcheck((prev) => (prev ? { ...prev, enabled } : prev));
+	};
+
+	const changeSpellcheckLanguages = (languages: string[]) => {
+		void desktopApi.setSpellcheckLanguages(languages);
+		setSpellcheck((prev) => (prev ? { ...prev, languages } : prev));
+	};
+
+	const spellcheckMismatch: SpellcheckMismatch | null =
+		spellcheck?.enabled &&
+		desktopApi.platform !== "darwin" &&
+		!matchesSystemLanguage(spellcheck.languages, spellcheck.systemLanguage)
+			? {
+					language: languageName(spellcheck.languages[0] ?? "en-US"),
+					openSettings: () => setSettingsOpen(true),
+				}
+			: null;
 
 	const chooseTelemetry = async (choice: TelemetryChoice) => {
 		setTelemetryConsent(await desktopApi.setTelemetryConsent(choice));
@@ -754,7 +759,7 @@ function App() {
 									content={state.content}
 									copyAsMarkdownRequest={copyAsMarkdownRequest}
 									viewMode={state.viewMode}
-									spellcheck={spellcheck}
+									spellcheckMismatch={spellcheckMismatch}
 									onScrollContainerChange={setScrollContainerEl}
 								/>
 							</div>
@@ -775,6 +780,13 @@ function App() {
 			/>
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
 				<GeneralSettingsSection />
+				{spellcheck ? (
+					<SpellcheckSettingsSection
+						state={spellcheck}
+						onEnabledChange={changeSpellcheckEnabled}
+						onLanguagesChange={changeSpellcheckLanguages}
+					/>
+				) : null}
 				<CodeFilesSettingsSection />
 				<ChatAboutNoteSettingsSection />
 				{telemetryConsent ? (
@@ -876,14 +888,14 @@ function DocumentViewer({
 	content,
 	copyAsMarkdownRequest,
 	viewMode,
-	spellcheck,
+	spellcheckMismatch,
 	onScrollContainerChange,
 }: {
 	path: string;
 	content: string;
 	copyAsMarkdownRequest: number;
 	viewMode: ViewMode;
-	spellcheck?: SpellcheckControls | null;
+	spellcheckMismatch?: SpellcheckMismatch | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	if (viewMode === "source" && supportsSourceToggle(path)) {
@@ -973,7 +985,7 @@ function DocumentViewer({
 			path={path}
 			initialMarkdown={content}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
-			spellcheck={spellcheck}
+			spellcheckMismatch={spellcheckMismatch}
 			onScrollContainerChange={onScrollContainerChange}
 		/>
 	);
@@ -1053,13 +1065,13 @@ function MarkdownEditor({
 	path,
 	initialMarkdown,
 	copyAsMarkdownRequest,
-	spellcheck,
+	spellcheckMismatch,
 	onScrollContainerChange,
 }: {
 	path: string;
 	initialMarkdown: string;
 	copyAsMarkdownRequest: number;
-	spellcheck?: SpellcheckControls | null;
+	spellcheckMismatch?: SpellcheckMismatch | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
@@ -1133,7 +1145,7 @@ function MarkdownEditor({
 				kind === "success" ? toast.success(message) : toast.error(message)
 			}
 			onReviewThreadsChange={setReviewThreads}
-			spellcheck={spellcheck}
+			spellcheckMismatch={spellcheckMismatch}
 		/>
 	);
 }

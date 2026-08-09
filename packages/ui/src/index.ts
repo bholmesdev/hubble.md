@@ -33,7 +33,7 @@ export {
 	type EditorViewProps,
 	type WikiTarget,
 } from "./editor/EditorView";
-export type { SpellcheckControls } from "./editor/FormattingStatusBar";
+export type { SpellcheckMismatch } from "./editor/FormattingStatusBar";
 export { FormattingStatusBar } from "./editor/FormattingStatusBar";
 export { classifyHref } from "./editor/href";
 export { LinkCreationGhostExtension } from "./editor/LinkCreationGhostExtension";
