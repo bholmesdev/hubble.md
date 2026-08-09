@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- New notes name themselves from the first meaningful line as you type, until you choose a name yourself. [#244](https://github.com/bholmesdev/hubble.md/pull/244)
+
 ### Changed
 
 - Open recent workspaces with Ctrl+R, and add folders with Cmd+Shift+O. [#243](https://github.com/bholmesdev/hubble.md/pull/243)
