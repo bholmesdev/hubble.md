@@ -81,7 +81,7 @@ export function WorkspaceSwitcher() {
 						<WorkspaceSwitcherMenu.Action
 							title="Remove from list"
 							data-remove-workspace={path}
-							className="pointer-events-none absolute -translate-y-1/2 opacity-0 [inset-block-start:50%] [inset-inline-end:0.25rem] group-data-highlighted:pointer-events-auto group-data-highlighted:opacity-100"
+							className="pointer-events-none absolute end-1 -translate-y-1/2 opacity-0 [inset-block-start:50%] group-data-highlighted:pointer-events-auto group-data-highlighted:opacity-100"
 							onClick={(event) => {
 								// Do not let the row's own click open the workspace.
 								event.stopPropagation();

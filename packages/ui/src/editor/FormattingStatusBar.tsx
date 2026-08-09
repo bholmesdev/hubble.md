@@ -100,7 +100,7 @@ export function FormattingStatusBar({
 
 	return (
 		<div
-			className={`z-[3] flex h-8 items-center justify-between bg-background/95 px-2 text-[12px] backdrop-blur-[2px] ${dividerClass}`}
+			className={`z-3 flex h-8 items-center justify-between bg-background/95 px-2 text-[12px] backdrop-blur-[2px] ${dividerClass}`}
 		>
 			<Button
 				variant="ghost"

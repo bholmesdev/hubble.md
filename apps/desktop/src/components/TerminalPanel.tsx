@@ -373,8 +373,8 @@ export function TerminalPanel() {
 				className={cn(
 					"group absolute outline-none z-30",
 					isRight
-						? "-left-[5px] top-0 bottom-0 w-2.5 cursor-col-resize"
-						: "-top-[5px] left-0 right-0 h-2.5 cursor-row-resize",
+						? "-left-1.25 top-0 bottom-0 w-2.5 cursor-col-resize"
+						: "-top-1.25 left-0 right-0 h-2.5 cursor-row-resize",
 				)}
 				{...separatorProps}
 			>
@@ -406,7 +406,7 @@ export function TerminalPanel() {
 									// biome-ignore lint/a11y/noAutofocus: rename input appears on explicit double click
 									autoFocus
 									aria-label="Rename terminal session"
-									className="w-40 min-w-0 bg-transparent [padding-block:0.25rem] [padding-inline:0.75rem] text-xs outline-none"
+									className="w-40 min-w-0 bg-transparent px-3 py-1 text-xs outline-none"
 									value={renameDraft}
 									onFocus={(event) => event.currentTarget.select()}
 									onChange={(event) => setRenameDraft(event.target.value)}
@@ -425,7 +425,7 @@ export function TerminalPanel() {
 								<button
 									type="button"
 									aria-pressed={activeSessionId === session.id}
-									className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[inherit] [padding-block:0.25rem] [padding-inline:0.75rem]"
+									className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[inherit] px-3 py-1"
 									title="Double click to rename"
 									onClick={() =>
 										dispatch({ type: "activate", sessionId: session.id })
@@ -440,7 +440,7 @@ export function TerminalPanel() {
 									type="button"
 									aria-label={`Close terminal session ${session.title}`}
 									className={cn(
-										"pointer-events-none absolute z-10 -translate-y-1/2 rounded-sm p-0.5 opacity-0 transition-opacity [inset-block-start:50%] [inset-inline-end:0.25rem] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-ring",
+										"pointer-events-none absolute end-1 z-10 -translate-y-1/2 rounded-sm p-0.5 opacity-0 transition-opacity [inset-block-start:50%] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-ring",
 										activeSessionId === session.id
 											? "bg-background"
 											: "bg-muted",
@@ -559,7 +559,7 @@ function TerminalPositionItem({
 }) {
 	return (
 		<ContextMenu.Item
-			className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+			className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 			onClick={() => setTerminalPosition(position)}
 		>
 			{icon}

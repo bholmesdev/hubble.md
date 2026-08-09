@@ -179,7 +179,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 	return (
 		<div
 			className={cn(
-				"absolute z-[6] grid w-[min(22rem,calc(100%-1rem))] origin-(--transform-origin) items-center gap-x-1 gap-y-1.5 rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 [--transform-origin:top_right] [inset-block-start:0.5rem] [inset-inline-end:0.5rem]",
+				"absolute z-6 grid w-[min(22rem,calc(100%-1rem))] origin-(--transform-origin) items-center gap-x-1 gap-y-1.5 rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 [--transform-origin:top_right] [inset-block-start:0.5rem] [inset-inline-end:0.5rem]",
 				canReplace ? "grid-cols-[auto_1fr_auto]" : "grid-cols-[1fr_auto]",
 			)}
 			data-open

@@ -66,7 +66,7 @@ function Highlight({ text, ranges }: { text: string; ranges: MatchRange[] }) {
 		parts.push(
 			<mark
 				key={`${start}-${end}`}
-				className="rounded-[2px] bg-selected/30 font-semibold text-foreground"
+				className="rounded-xs bg-selected/30 font-semibold text-foreground"
 			>
 				{text.slice(start, end)}
 			</mark>,
@@ -403,7 +403,7 @@ function GlobalSearchPalette({
 													{entry.matches.map((match) => (
 														<span
 															key={`${entry.path}:${match.line}`}
-															className="block truncate text-[11px] leading-[16px] text-muted-foreground"
+															className="block truncate text-[11px] leading-4 text-muted-foreground"
 														>
 															<Highlight
 																text={match.excerpt}

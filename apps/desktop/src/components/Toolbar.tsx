@@ -266,7 +266,7 @@ function ActionsMenu({
 						{showTerminal && (
 							<>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 									onClick={toggleTerminal}
 								>
 									<MingcuteTerminalLine className="size-3 shrink-0" />
@@ -279,7 +279,7 @@ function ActionsMenu({
 						{path && workspacePath && (
 							<>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 									onClick={requestChatAboutNote}
 								>
 									<MingcuteTerminalLine className="size-3 shrink-0" />
@@ -287,14 +287,14 @@ function ActionsMenu({
 									<ShortcutHint commandId="app.chat-about-note" />
 								</Menu.Item>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 									onClick={() => void openInAgent("codex")}
 								>
 									<CodexLogo className="size-3 shrink-0" />
 									<span className="min-w-0 flex-1">Open in Codex</span>
 								</Menu.Item>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 									onClick={() => void openInAgent("claude")}
 								>
 									<ClaudeLogo className="size-3 shrink-0" />
@@ -305,7 +305,7 @@ function ActionsMenu({
 						)}
 						{path && supportsSourceToggle(path) && (
 							<Menu.Item
-								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+								className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 								onClick={() => setViewerMode(isSourceMode ? "rich" : "source")}
 							>
 								<MingcuteCodeLine className="size-3 shrink-0" />
@@ -316,14 +316,14 @@ function ActionsMenu({
 						{path && (
 							<>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 									onClick={() => void openPathInDefaultApp(path)}
 								>
 									<MingcuteExternalLinkLine className="size-3 shrink-0" />
 									<span className="min-w-0 flex-1">Open in default app</span>
 								</Menu.Item>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 									onClick={() => void revealFile()}
 								>
 									<MingcuteFolderOpenLine className="size-3 shrink-0" />
@@ -333,7 +333,7 @@ function ActionsMenu({
 									<ShortcutHint commandId="app.reveal" />
 								</Menu.Item>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 									onClick={() => void copyFilePath()}
 								>
 									<MingcuteCopy2Line className="size-3 shrink-0" />
