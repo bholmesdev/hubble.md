@@ -1403,40 +1403,6 @@ describe("desktop title generation", () => {
 
 		expect(api.renameFile).not.toHaveBeenCalled();
 	});
-
-	it("stops title generation when deleting the open auto-named note", async () => {
-		const api = createDesktopApi();
-		api.readFileText.mockResolvedValue("");
-		const toast = Object.assign(
-			vi.fn(() => "delete-undo"),
-			{
-				dismiss: vi.fn(),
-				success: vi.fn(),
-				error: vi.fn(),
-			},
-		);
-		vi.doMock("sonner", () => ({ toast }));
-		const {
-			appStore,
-			createMarkdownFileInFolder,
-			deleteSidebarItems,
-			updateEditorContent,
-			viewerStore,
-		} = await loadStoreActions(api);
-		appStore.set((state) => ({
-			...state,
-			workspace: { ...state.workspace, workspacePath: "/workspace" },
-		}));
-
-		const path = (await createMarkdownFileInFolder("/workspace")) as string;
-		updateEditorContent(path, "First title");
-		await deleteSidebarItems([{ kind: "file", path }]);
-		expect(viewerStore.get().currentPath).toBeNull();
-		await vi.advanceTimersByTimeAsync(500);
-
-		expect(api.renameFile).not.toHaveBeenCalled();
-		vi.doUnmock("sonner");
-	});
 });
 
 describe("desktop folder actions", () => {

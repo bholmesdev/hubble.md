@@ -35,7 +35,6 @@ import {
 	pathAfterMove,
 	rewriteMovedLinks,
 } from "../lib/markdownLinkRewrite";
-import { generatedTitleStem } from "../lib/titleGeneration";
 import {
 	setThemePreference as applyThemePreference,
 	initTheme,
@@ -74,19 +73,18 @@ import {
 	sidebarOpenStore,
 	switcherOpenStore,
 	themePreferenceStore,
-	titleGenerationPreviewStore,
 	uiStore,
 	type ViewMode,
 	viewerStore,
 	withOpenedDoc,
 	workspaceStore,
 } from "./state";
+import { createTitleManager } from "./titleManagement";
 import { applyWorkspaceDelta } from "./workspaceDelta";
 
 const REFRESH_FILES_DEBOUNCE_MS = 250;
 const SELF_SAVE_TTL_MS = 5000;
 const missingPathErrorPattern = /\bENOENT\b|\bENOTDIR\b/;
-const existingPathErrorPattern = /\bEEXIST\b|\balready exists\b/i;
 let refreshFilesTimer: ReturnType<typeof setTimeout> | null = null;
 type RefreshRun = {
 	reloadActive: boolean;
@@ -99,16 +97,6 @@ const workspaceSidebarQueues = new Map<string, Promise<void>>();
 // conflict; it is just the disk baseline catching up to a save we started.
 const selfSaves = new Map<string, Map<string, number>>();
 const saves = keyedQueue<string>();
-const TITLE_RENAME_DELAY_MS = 500;
-type TitleSession = {
-	path: string;
-	documentId: string;
-	markdown: string;
-	pendingTitle?: { markdown: string; path: Promise<string | null> };
-	timer?: number;
-	running: boolean;
-};
-const titleSessions = new Map<string, TitleSession>();
 
 type SidebarMoveItem =
 	| { kind: "file"; path: string }
@@ -494,6 +482,16 @@ function uniqueFolderPath(parent: string): string {
 }
 
 const pendingRenames = new Map<string, string>();
+const titleManager = createTitleManager({
+	pendingRenames,
+	runFileTask: saves.run,
+	savePathContent,
+	moveAssociatedAssetFolder,
+	updateMovedLinks,
+	syncPinnedNotes,
+	errorMessage,
+	handleFileError,
+});
 
 type LoadPathOptions = {
 	history?: "push" | "none";
@@ -608,7 +606,7 @@ export function clearPendingTerminalCommand() {
 
 export function clearViewer() {
 	const path = viewerStore.get().currentPath;
-	if (path) stopTitleRenames(path);
+	if (path) titleManager.stop(path);
 	viewerStore.set((state) => emptyDoc(state.lastOpenedPath));
 }
 
@@ -683,8 +681,7 @@ export async function openWorkspace(path?: string) {
 }
 
 export function updateEditorContent(path: string, content: string) {
-	const session = titleSessions.get(path);
-	const currentPath = session?.path ?? path;
+	const currentPath = titleManager.currentPath(path);
 	const current = viewerStore.get();
 	if (current.currentPath !== currentPath || current.content === content)
 		return;
@@ -708,269 +705,11 @@ export function updateEditorContent(path: string, content: string) {
 			error: null,
 		};
 	});
-	if (session) scheduleTitleRename(session, content);
-}
-
-function scheduleTitleRename(session: TitleSession, markdown: string) {
-	session.markdown = markdown;
-	const stem = generatedTitleStem(markdown);
-	const previewPath = stem
-		? joinPath(dirname(session.path) ?? "", `${stem}${extname(session.path)}`)
-		: null;
-	titleGenerationPreviewStore.set(
-		previewPath ? { path: session.path, previewPath } : null,
-	);
-	const pendingTitle = {
-		markdown,
-		path: generatedTitlePath(session.path, markdown),
-	};
-	session.pendingTitle = pendingTitle;
-	void pendingTitle.path.then((previewPath) => {
-		if (
-			session.pendingTitle !== pendingTitle ||
-			titleSessions.get(session.path) !== session
-		) {
-			return;
-		}
-		titleGenerationPreviewStore.set(
-			previewPath ? { path: session.path, previewPath } : null,
-		);
-	});
-	if (session.timer !== undefined) window.clearTimeout(session.timer);
-	session.timer = window.setTimeout(() => {
-		session.timer = undefined;
-		void runTitleRename(session);
-	}, TITLE_RENAME_DELAY_MS);
-}
-
-async function generatedTitlePath(path: string, markdown: string) {
-	const stem = generatedTitleStem(markdown);
-	if (!stem) return null;
-	const parent = dirname(path) ?? "";
-	const extension = extname(path);
-	for (let index = 1; ; index++) {
-		const name = index === 1 ? stem : `${stem}-${index}`;
-		const candidate = joinPath(parent, `${name}${extension}`);
-		if (pathEquals(candidate, path)) return path;
-		if (!(await desktopApi.pathExists(candidate))) return candidate;
-	}
-}
-
-async function runTitleRename(session: TitleSession) {
-	if (session.running || titleSessions.get(session.path) !== session) return;
-	if (viewerStore.get().currentPath !== session.path) {
-		stopTitleRenames(session.path);
-		return;
-	}
-	const markdown = session.markdown;
-	const previousPath = session.path;
-	const nextPath =
-		session.pendingTitle?.markdown === markdown
-			? await session.pendingTitle.path
-			: await generatedTitlePath(previousPath, markdown);
-	if (!isLiveTitleSession(session)) return;
-	if (!nextPath || pathEquals(nextPath, previousPath)) return;
-
-	session.running = true;
-	try {
-		await renameGeneratedFile(session, previousPath, nextPath);
-	} finally {
-		session.running = false;
-	}
-	if (isLiveTitleSession(session) && session.markdown !== markdown) {
-		scheduleTitleRename(session, session.markdown);
-	}
-}
-
-async function renameGeneratedFile(
-	session: TitleSession,
-	previousPath: string,
-	nextPath: string,
-) {
-	const { files: filesBeforeRename, workspacePath } = workspaceStore.get();
-	let renamed = false;
-	let renamedPath = nextPath;
-	await saves.run(previousPath, async () => {
-		if (
-			titleSessions.get(previousPath) !== session ||
-			viewerStore.get().currentPath !== previousPath
-		) {
-			return;
-		}
-		try {
-			const retryPath = await renameGeneratedFileWithRetry(
-				previousPath,
-				nextPath,
-				session.markdown,
-				() =>
-					titleSessions.get(previousPath) === session &&
-					viewerStore.get().currentPath === previousPath,
-			);
-			if (!retryPath) return;
-			renamedPath = retryPath;
-			const movedFiles = [{ fromPath: previousPath, toPath: renamedPath }];
-			publishGeneratedRename(session, previousPath, renamedPath);
-			if (!isLiveTitleSession(session)) stopTitleRenames(renamedPath);
-			renamed = true;
-			const movedAssetFolder = await moveAssociatedAssetFolder(
-				previousPath,
-				renamedPath,
-			);
-			if (movedAssetFolder) movedFiles.push(movedAssetFolder);
-			if (workspacePath) {
-				session.markdown = rewriteMovedLinks({
-					content: session.markdown,
-					filePath: previousPath,
-					nextPath: renamedPath,
-					workspacePath,
-					movedByOldPath: indexMovedFiles(movedFiles),
-				});
-			}
-
-			updateGeneratedContentIfLive(session, session.markdown);
-			await updateMovedLinks(movedFiles, filesBeforeRename);
-			if (workspaceStore.get().pinnedNotes.includes(renamedPath)) {
-				void syncPinnedNotes();
-			}
-		} catch (err) {
-			const message = handleFileError(err);
-			toast.error("Failed to rename file", { description: message });
-		} finally {
-			window.setTimeout(() => pendingRenames.delete(previousPath), 1000);
-		}
-	});
-
-	if (!renamed) return;
-	// Flush link rewrites at the path that won, including retry suffixes.
-	if (isLiveTitleSession(session)) {
-		await savePathContent(renamedPath, session.markdown, { force: true });
-	}
-}
-
-async function renameGeneratedFileWithRetry(
-	previousPath: string,
-	initialNextPath: string,
-	markdown: string,
-	isLive: () => boolean,
-) {
-	let nextPath = initialNextPath;
-	for (let attempt = 0; ; attempt++) {
-		if (!isLive()) return null;
-		try {
-			pendingRenames.set(previousPath, nextPath);
-			await desktopApi.renameFile(previousPath, nextPath);
-			return nextPath;
-		} catch (err) {
-			if (attempt >= 4 || !existingPathErrorPattern.test(errorMessage(err))) {
-				throw err;
-			}
-			const retryPath = await generatedTitlePath(previousPath, markdown);
-			if (!isLive()) return null;
-			if (
-				!retryPath ||
-				pathEquals(retryPath, previousPath) ||
-				pathEquals(retryPath, nextPath)
-			) {
-				throw err;
-			}
-			nextPath = retryPath;
-		}
-	}
-}
-
-function publishGeneratedRename(
-	session: TitleSession,
-	previousPath: string,
-	nextPath: string,
-) {
-	// Keep the prior path for events from the pre-rename render, but drop
-	// older aliases so the session stays bounded.
-	for (const [sessionPath, candidate] of titleSessions) {
-		if (candidate === session && sessionPath !== previousPath) {
-			titleSessions.delete(sessionPath);
-		}
-	}
-	session.path = nextPath;
-	titleSessions.set(nextPath, session);
-	titleGenerationPreviewStore.set({
-		path: nextPath,
-		previewPath: nextPath,
-	});
-	rewriteHistory(previousPath, nextPath);
-	appStore.set((state) => ({
-		...state,
-		workspace: {
-			...state.workspace,
-			files: state.workspace.files.map((file) =>
-				pathEquals(file.path, previousPath)
-					? { ...file, path: nextPath }
-					: file,
-			),
-			pinnedNotes: state.workspace.pinnedNotes.map((path) =>
-				pathEquals(path, previousPath) ? nextPath : path,
-			),
-			lastOpenedPaths: Object.fromEntries(
-				Object.entries(state.workspace.lastOpenedPaths).map(
-					([workspacePath, openedPath]) => [
-						workspacePath,
-						pathEquals(openedPath, previousPath) ? nextPath : openedPath,
-					],
-				),
-			),
-		},
-		document: {
-			...state.document,
-			currentPath: pathEquals(state.document.currentPath ?? "", previousPath)
-				? nextPath
-				: state.document.currentPath,
-			lastOpenedPath: pathEquals(
-				state.document.lastOpenedPath ?? "",
-				previousPath,
-			)
-				? nextPath
-				: state.document.lastOpenedPath,
-		},
-	}));
-}
-
-function isLiveTitleSession(session: TitleSession) {
-	return (
-		titleSessions.get(session.path) === session &&
-		viewerStore.get().currentPath === session.path
-	);
-}
-
-function updateGeneratedContentIfLive(session: TitleSession, content: string) {
-	appStore.set((state) => {
-		if (
-			state.document.currentPath !== session.path ||
-			titleSessions.get(session.path) !== session
-		) {
-			return state;
-		}
-		return {
-			...state,
-			document: {
-				...state.document,
-				content,
-			},
-		};
-	});
-}
-
-function stopTitleRenames(path: string) {
-	const session = titleSessions.get(path);
-	if (!session) return;
-	if (session.timer !== undefined) window.clearTimeout(session.timer);
-	for (const [sessionPath, candidate] of titleSessions) {
-		if (candidate === session) titleSessions.delete(sessionPath);
-	}
-	const preview = titleGenerationPreviewStore.get();
-	if (preview?.path === session.path) titleGenerationPreviewStore.set(null);
+	titleManager.update(path, content);
 }
 
 export function editorDocumentId(path: string) {
-	return titleSessions.get(path)?.documentId ?? path;
+	return titleManager.editorDocumentId(path);
 }
 
 export function setViewerMode(viewMode: ViewMode) {
@@ -1073,7 +812,7 @@ export function savePathContent(
 	content: string,
 	options?: { force?: boolean; throwOnError?: boolean },
 ) {
-	const currentPath = titleSessions.get(path)?.path ?? path;
+	const currentPath = titleManager.currentPath(path);
 	return saves.run(currentPath, () =>
 		savePathContentNow(currentPath, content, options),
 	);
@@ -1093,7 +832,7 @@ const deletionActions = createDeleteActions({
 	refreshFileList,
 	loadPath,
 	syncPins: syncPinnedNotes,
-	stopTitleRenames,
+	stopTitleRenames: titleManager.stop,
 	handleError: handleFileError,
 });
 
@@ -1108,7 +847,7 @@ export const {
 export async function renameMarkdownFile(path: string, nextName: string) {
 	const currentExt = extname(path);
 	if (renameStem(nextName, currentExt) !== fileStem(path)) {
-		stopTitleRenames(path);
+		titleManager.stop(path);
 	}
 	const current = viewerStore.get();
 	const isCurrentFile = current.currentPath === path;
@@ -1442,12 +1181,7 @@ async function createEmptyFileInFolder(
 	try {
 		await desktopApi.writeFileText(path, "");
 		if (extension === ".md") {
-			titleSessions.set(path, {
-				path,
-				documentId: path,
-				markdown: "",
-				running: false,
-			});
+			titleManager.start(path);
 		}
 		const modified_at = Math.floor(Date.now() / 1000);
 		workspaceStore.set((state) => ({
@@ -1461,7 +1195,7 @@ async function createEmptyFileInFolder(
 		await refreshFileList();
 		return path;
 	} catch (err) {
-		stopTitleRenames(path);
+		titleManager.stop(path);
 		const message = handleFileError(err);
 		toast.error("Failed to create file", { description: message });
 		return null;
@@ -1556,7 +1290,7 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 			if (isStale()) return;
 			const currentPath = viewerStore.get().currentPath;
 			if (currentPath && !pathEquals(currentPath, path)) {
-				stopTitleRenames(currentPath);
+				titleManager.stop(currentPath);
 			}
 			appStore.set((state) => withOpenedDoc(state, path, content));
 			if (historyMode === "push") pushHistory(path);
