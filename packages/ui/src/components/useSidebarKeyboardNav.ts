@@ -1,4 +1,10 @@
-import { type RefObject, useEffect, useRef, useState } from "react";
+import {
+	type RefObject,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { isEditableEventTarget } from "../lib/dom";
 
 export const EDITOR_INPUT_SELECTOR = "[data-editor-input]";
@@ -24,7 +30,9 @@ export function useSidebarKeyboardNav<T>({
 }) {
 	const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 	const focusedIndexRef = useRef(focusedIndex);
-	focusedIndexRef.current = focusedIndex;
+	useLayoutEffect(() => {
+		focusedIndexRef.current = focusedIndex;
+	}, [focusedIndex]);
 	const getActionIndex = () =>
 		focusedIndexRef.current ?? (activeIndex >= 0 ? activeIndex : null);
 

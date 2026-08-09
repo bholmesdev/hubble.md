@@ -23,6 +23,7 @@ import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -459,7 +460,9 @@ export function Sidebar({
 	});
 	const selectedKeys = selection.selectedKeys;
 	const selectionCountRef = useRef(selectedKeys.size);
-	selectionCountRef.current = selectedKeys.size;
+	useLayoutEffect(() => {
+		selectionCountRef.current = selectedKeys.size;
+	}, [selectedKeys.size]);
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
 	);
@@ -591,7 +594,9 @@ export function Sidebar({
 		(row) => row.kind === "file" && row.file.path === highlightPath,
 	);
 	const activeIndexRef = useRef(activeIndex);
-	activeIndexRef.current = activeIndex;
+	useLayoutEffect(() => {
+		activeIndexRef.current = activeIndex;
+	}, [activeIndex]);
 	const { focusedIndex, setFocusedIndex, onKeyDown } = useSidebarKeyboardNav({
 		items: rows,
 		onSelect: activateRow,
