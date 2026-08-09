@@ -110,15 +110,14 @@ export function useCommandMenuPosition({
 		update();
 		viewport.addEventListener("scroll", update, { passive: true });
 		window.addEventListener("resize", update);
-		const observer =
-			typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
-		observer?.observe(viewport);
-		observer?.observe(floatingEl);
+		const observer = new ResizeObserver(update);
+		observer.observe(viewport);
+		observer.observe(floatingEl);
 
 		return () => {
 			viewport.removeEventListener("scroll", update);
 			window.removeEventListener("resize", update);
-			observer?.disconnect();
+			observer.disconnect();
 		};
 	}, [editor, floatingRef, pos, setPosition, viewportRef]);
 }

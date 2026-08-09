@@ -132,7 +132,7 @@ describe("SelectionFormattingToolbar", () => {
 	});
 
 	it("hides actions from the right as the viewport narrows", async () => {
-		vi.stubGlobal("ResizeObserver", undefined);
+		const resize = stubResizeObserver();
 		const editor = createEditor(docWithParagraph("hello world"));
 		const viewport = document.createElement("div");
 		viewport.append(editor.view.dom);
@@ -149,7 +149,7 @@ describe("SelectionFormattingToolbar", () => {
 
 		act(() => {
 			width = 360;
-			window.dispatchEvent(new Event("resize"));
+			resize();
 		});
 
 		expect(
@@ -163,6 +163,22 @@ describe("SelectionFormattingToolbar", () => {
 		).not.toBeNull();
 	});
 });
+
+// Happy DOM's ResizeObserver never fires, so hand the test its callback.
+function stubResizeObserver() {
+	let notify = () => {};
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			constructor(callback: () => void) {
+				notify = callback;
+			}
+			observe() {}
+			disconnect() {}
+		},
+	);
+	return () => notify();
+}
 
 function renderToolbar(
 	editor: Editor,
