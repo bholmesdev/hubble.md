@@ -5,8 +5,6 @@ import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { canJoin } from "@tiptap/pm/transform";
 import {
-	isAtEndOfListItemWithContent,
-	isInEmptyListItem,
 	isSelectionAtStartOfNode,
 	nearestSharedParentOfType,
 } from "./utils.js";
@@ -221,22 +219,14 @@ export const ListToggleExtension = Extension.create({
 			},
 			Enter: ({ editor }) => {
 				const { selection } = editor.view.state;
-				// Leaving the list is only correct for a genuinely empty item. An item
-				// holding an image also parks the cursor at offset 0 of its trailing
-				// paragraph, and lifting there drops the image out of the list.
-				if (
-					isSelectionAtStartOfNode(selection) &&
-					isInEmptyListItem(selection)
-				) {
+				const action = emptyItemAction(selection);
+				if (action === "exit") {
 					return editor.commands.liftListItem("listItem");
 				}
-				// splitListItem bails on an empty trailing paragraph and defers to
-				// lifting, so an item holding an image would exit the list instead of
-				// continuing it. Split the item here to keep Enter on the list.
-				if (isAtEndOfListItemWithContent(selection)) {
+				if (action === "continue") {
 					return editor.commands.command(({ tr, dispatch }) => {
 						if (!dispatch) return true;
-						if (!continueListItem(tr)) return false;
+						if (!continueList(tr)) return false;
 						dispatch(tr);
 						return true;
 					});
@@ -391,13 +381,10 @@ function isListItem(node: PMNode) {
 }
 
 /**
- * Continue a list from the empty trailing paragraph of an item that holds other
- * content, such as the paragraph left behind by an image paste. Drops that
- * paragraph, appends a sibling item, and puts the cursor inside it.
- *
- * Only meaningful for a selection `isAtEndOfListItemWithContent` accepts.
+ * `splitListItem` lifts an empty tail. Replace it when the item still holds
+ * content so Enter stays in the list.
  */
-export function continueListItem(tr: Transaction) {
+export function continueList(tr: Transaction) {
 	const { $from } = tr.selection;
 	const itemDepth = $from.depth - 1;
 	const item = $from.node(itemDepth);
@@ -408,11 +395,31 @@ export function continueListItem(tr: Transaction) {
 
 	const paragraphStart = $from.before($from.depth);
 	const paragraphEnd = $from.after($from.depth);
-	const insertAt = $from.after(itemDepth) - (paragraphEnd - paragraphStart);
+	const insertAt = $from.after(itemDepth) - $from.parent.nodeSize;
 	tr.delete(paragraphStart, paragraphEnd);
 	tr.insert(insertAt, nextItem);
 	tr.setSelection(TextSelection.near(tr.doc.resolve(insertAt + 1)));
 	return true;
+}
+
+export function emptyItemAction(
+	selection: EditorState["selection"],
+): "exit" | "continue" | null {
+	if (
+		!isSelectionAtStartOfNode(selection) ||
+		selection.$from.parent.type.name !== "paragraph" ||
+		selection.$from.parent.content.size
+	) {
+		return null;
+	}
+
+	const { $from } = selection;
+	const itemDepth = $from.depth - 1;
+	if (itemDepth < 1) return null;
+	const item = $from.node(itemDepth);
+	if (!isListItem(item)) return null;
+	if (item.childCount === 1) return "exit";
+	return $from.index(itemDepth) === item.childCount - 1 ? "continue" : null;
 }
 
 function isTaskItem(node: PMNode) {
