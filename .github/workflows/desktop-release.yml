@@ -217,6 +217,37 @@ jobs:
         shell: pwsh
         run: Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
 
+      - name: Sync WinGet fork
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
+        run: |
+          if (-not $env:GH_TOKEN) {
+            throw "WINGET_CREATE_GITHUB_TOKEN is required"
+          }
+
+          $forkOwner = gh api user --jq .login
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not identify the WinGet fork owner"
+          }
+
+          $forkOwner = $forkOwner.Trim()
+          $maxAttempts = 5
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            gh repo sync "$forkOwner/winget-pkgs" --source microsoft/winget-pkgs
+            if ($LASTEXITCODE -eq 0) {
+              break
+            }
+
+            if ($attempt -eq $maxAttempts) {
+              throw "Could not sync $forkOwner/winget-pkgs after $maxAttempts attempts"
+            }
+
+            $delaySeconds = [math]::Pow(2, $attempt)
+            Write-Warning "WinGet fork sync failed; retrying in $delaySeconds seconds"
+            Start-Sleep -Seconds $delaySeconds
+          }
+
       - name: Submit manifest update
         shell: pwsh
         env:
