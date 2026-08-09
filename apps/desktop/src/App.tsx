@@ -18,7 +18,7 @@ import {
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import {
@@ -1039,8 +1039,7 @@ function MarkdownEditor({
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
-	const pathRef = useRef(path);
-	pathRef.current = path;
+	const getPath = () => viewerStore.get().currentPath ?? path;
 	// External-only files stay out of autocomplete; explicit links still work.
 	const wikiTargets: WikiTarget[] = workspace.files
 		.filter((file) => (file.kind ?? fileKindForPath(file.path)) !== "external")
@@ -1082,14 +1081,15 @@ function MarkdownEditor({
 		<EditorView
 			path={path}
 			documentId={documentId}
+			preserveHistoryOnUpdate={documentId !== path}
 			initialMarkdown={initialMarkdown}
 			editable={!isChangelogPath(path)}
 			wikiTargets={wikiTargets}
 			extensions={[
-				createImageExtension(() => pathRef.current),
+				createImageExtension(getPath),
 				createEmbedExtension({
 					workspacePath: workspace.workspacePath,
-					getFilePath: () => pathRef.current,
+					getFilePath: getPath,
 				}),
 			]}
 			onPaste={(editor, event) => handleImagePaste({ editor, event })}

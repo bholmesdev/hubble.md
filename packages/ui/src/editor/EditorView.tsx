@@ -70,6 +70,8 @@ export type EditorViewProps = {
 	path: string;
 	/** Stable note identity; physical paths may change without replacing a note. */
 	documentId?: string;
+	/** Keep undo history when the same note receives rewritten Markdown. */
+	preserveHistoryOnUpdate?: boolean;
 	initialMarkdown: string;
 	editable?: boolean;
 	wikiTargets?: WikiTarget[];
@@ -93,6 +95,7 @@ export type EditorViewProps = {
 export function EditorView({
 	path,
 	documentId = path,
+	preserveHistoryOnUpdate = false,
 	initialMarkdown,
 	editable = true,
 	wikiTargets = [],
@@ -265,9 +268,9 @@ export function EditorView({
 				.setMeta("addToHistory", false)
 				.setContent(markdownToTiptapDoc(parsed.body), { emitUpdate: false })
 				.run();
-			resetEditorHistory(editor);
+			if (!preserveHistoryOnUpdate) resetEditorHistory(editor);
 		}
-	}, [editor, initialMarkdown]);
+	}, [editor, initialMarkdown, preserveHistoryOnUpdate]);
 
 	useEffect(() => {
 		// One editor instance can serve every file, so each new document starts its own
