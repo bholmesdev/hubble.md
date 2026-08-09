@@ -29,6 +29,8 @@ type TitleDrag = {
 	windowX: number;
 	windowY: number;
 	moved: boolean;
+	frame: number | null;
+	pending: { x: number; y: number } | null;
 };
 
 // Clusters shrink from ACTIONS_BASIS by default; passing `width` pins them to
@@ -115,6 +117,16 @@ export function Toolbar({
 		titleInputRef.current?.select();
 	}, [editingTitle]);
 
+	useEffect(
+		() => () => {
+			const frame = titleDragRef.current?.frame;
+			if (frame != null) {
+				cancelAnimationFrame(frame);
+			}
+		},
+		[],
+	);
+
 	function beginTitleEdit() {
 		if (!title || !onRenameCurrentPath) return;
 		setDraftTitle(title);
@@ -142,6 +154,8 @@ export function Toolbar({
 			windowX: window.screenX,
 			windowY: window.screenY,
 			moved: false,
+			frame: null,
+			pending: null,
 		};
 	}
 
@@ -154,14 +168,32 @@ export function Toolbar({
 			return;
 		}
 		drag.moved = true;
-		void onMoveWindow(
-			Math.round(drag.windowX + dx),
-			Math.round(drag.windowY + dy),
-		);
+		drag.pending = {
+			x: Math.round(drag.windowX + dx),
+			y: Math.round(drag.windowY + dy),
+		};
+		if (drag.frame === null) {
+			drag.frame = requestAnimationFrame(flushTitleMove);
+		}
+	}
+
+	function flushTitleMove() {
+		const drag = titleDragRef.current;
+		if (!drag) return;
+		drag.frame = null;
+		const position = drag.pending;
+		drag.pending = null;
+		if (position && onMoveWindow) {
+			void onMoveWindow(position.x, position.y);
+		}
 	}
 
 	function endTitleDrag() {
 		const drag = titleDragRef.current;
+		if (drag?.frame != null) {
+			cancelAnimationFrame(drag.frame);
+			flushTitleMove();
+		}
 		titleDragRef.current = null;
 		if (drag?.moved) skipTitleClickRef.current = true;
 	}

@@ -40,6 +40,14 @@ describe("Toolbar", () => {
 
 	it("moves the window from the title without starting rename", () => {
 		const onMoveWindow = vi.fn();
+		let frame: FrameRequestCallback | undefined;
+		vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+			frame = callback;
+			return 1;
+		});
+		vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {
+			frame = undefined;
+		});
 		renderToolbar({ onMoveWindow });
 		Object.defineProperty(window, "screenX", {
 			value: 100,
@@ -58,10 +66,14 @@ describe("Toolbar", () => {
 		expect(onMoveWindow).not.toHaveBeenCalled();
 
 		dispatchPointer(button, "pointermove", { screenX: 20, screenY: 25 });
-		dispatchPointer(button, "pointerup", { screenX: 20, screenY: 25 });
+		dispatchPointer(button, "pointermove", { screenX: 24, screenY: 28 });
+		expect(onMoveWindow).not.toHaveBeenCalled();
+		act(() => frame?.(0));
+		dispatchPointer(button, "pointerup", { screenX: 24, screenY: 28 });
 		act(() => button.click());
 
-		expect(onMoveWindow).toHaveBeenCalledWith(110, 205);
+		expect(onMoveWindow).toHaveBeenCalledTimes(1);
+		expect(onMoveWindow).toHaveBeenCalledWith(114, 208);
 		expect(document.querySelector("input")).toBeNull();
 	});
 });
