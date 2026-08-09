@@ -9,6 +9,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.1.26] - 2026-08-09
+
+### Added
+
 - New notes name themselves from the first meaningful line as you type, until you choose a name yourself. [#244](https://github.com/bholmesdev/hubble.md/pull/244)
 
 ### Changed
