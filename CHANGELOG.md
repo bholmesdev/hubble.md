@@ -15,6 +15,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Window controls now align with the app header on Windows and Linux. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#236](https://github.com/bholmesdev/hubble.md/pull/236)
 - Scrollbars now match the selected light or dark theme. Thanks [@ggbao666](https://github.com/ggbao666) for the suggestion! [#239](https://github.com/bholmesdev/hubble.md/pull/239)
 
 ## [0.1.25] - 2026-08-06

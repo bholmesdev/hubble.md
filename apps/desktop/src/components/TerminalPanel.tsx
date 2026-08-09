@@ -1,5 +1,5 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
-import { useResizeSeparator } from "@hubble.md/ui";
+import { Button, useResizeSeparator } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
@@ -447,29 +447,32 @@ export function TerminalPanel() {
 									)}
 									onClick={() => void handleCloseSession(session.id)}
 								>
-									<MingcuteCloseLine className="w-3 h-3" />
+									<MingcuteCloseLine className="size-3" />
 								</button>
 							) : null}
 						</div>
 					))}
-					<button
-						type="button"
-						className="p-1 ml-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="ml-1"
 						onClick={() => void startSession("bash")}
+						aria-label="New Terminal"
 						title="New Terminal"
 					>
-						<MingcuteAddLine className="w-4 h-4" />
-					</button>
+						<MingcuteAddLine className="size-4" />
+					</Button>
 				</div>
-				<div className="flex items-center gap-2 pl-4">
-					<button
-						type="button"
-						className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+				<div className="flex items-center gap-1 pl-4">
+					<Button
+						variant="ghost"
+						size="icon-sm"
 						onClick={toggleTerminal}
+						aria-label="Close Terminal Panel"
 						title="Close Terminal Panel"
 					>
-						<MingcuteCloseLine className="w-4 h-4" />
-					</button>
+						<MingcuteCloseLine className="size-4" />
+					</Button>
 				</div>
 			</TerminalRibbonMenu>
 
