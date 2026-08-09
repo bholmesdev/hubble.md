@@ -68,6 +68,7 @@ import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
 import {
 	createWorkspaceWithSidebar,
+	editorDocumentId,
 	forceKeepLocalEdits,
 	getPendingRenameTarget,
 	goBack,
@@ -859,12 +860,15 @@ function DocumentViewer({
 	viewMode: ViewMode;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
+	const documentId = editorDocumentId(path);
 	if (viewMode === "source" && supportsSourceToggle(path)) {
 		const isHtml = hasHtmlExtension(path);
 		return (
 			<MarkdownSourceEditor
-				key={`${path}:source:${HMR_REV}`}
+				key={`${documentId}:source:${HMR_REV}`}
 				path={path}
+				documentId={documentId}
+				preserveHistoryOnUpdate={documentId !== path}
 				initialMarkdown={content}
 				sourceLanguage={
 					isHtml ? "html" : hasTextExtension(path) ? "text" : "md"
@@ -942,8 +946,9 @@ function DocumentViewer({
 
 	return (
 		<MarkdownEditor
-			key={`${path}:rich:${HMR_REV}`}
+			key={`${documentId}:rich:${HMR_REV}`}
 			path={path}
+			documentId={documentId}
 			initialMarkdown={content}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
 			onScrollContainerChange={onScrollContainerChange}
@@ -1023,16 +1028,19 @@ function ExternalChangeBanner({
 
 function MarkdownEditor({
 	path,
+	documentId,
 	initialMarkdown,
 	copyAsMarkdownRequest,
 	onScrollContainerChange,
 }: {
 	path: string;
+	documentId: string;
 	initialMarkdown: string;
 	copyAsMarkdownRequest: number;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
+	const getPath = () => viewerStore.get().currentPath ?? path;
 	// External-only files stay out of autocomplete; explicit links still work.
 	const wikiTargets: WikiTarget[] = workspace.files
 		.filter((file) => (file.kind ?? fileKindForPath(file.path)) !== "external")
@@ -1073,14 +1081,16 @@ function MarkdownEditor({
 	return (
 		<EditorView
 			path={path}
+			documentId={documentId}
+			preserveHistoryOnUpdate={documentId !== path}
 			initialMarkdown={initialMarkdown}
 			editable={!isChangelogPath(path)}
 			wikiTargets={wikiTargets}
 			extensions={[
-				createImageExtension(path),
+				createImageExtension(getPath),
 				createEmbedExtension({
 					workspacePath: workspace.workspacePath,
-					filePath: path,
+					getFilePath: getPath,
 				}),
 			]}
 			onPaste={(editor, event) => handleImagePaste({ editor, event })}

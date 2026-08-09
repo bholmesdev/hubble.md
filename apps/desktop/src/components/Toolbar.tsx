@@ -27,6 +27,7 @@ import {
 	hasMarkdownExtension,
 	hasTextExtension,
 	isEditableFile,
+	pathEquals,
 	relativeWorkspacePath,
 	supportsSourceToggle,
 } from "../lib/filePath";
@@ -46,6 +47,7 @@ import {
 	currentPathStore,
 	reviewThreadsStore,
 	sidebarOpenStore,
+	titleGenerationPreviewStore,
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
@@ -54,6 +56,18 @@ import { ClaudeLogo, CodexLogo } from "./AgentLogos";
 const dragRegionStyle = {
 	WebkitAppRegion: "drag",
 } as CSSProperties;
+
+type TitlePreview = { path: string; previewPath: string } | null;
+
+export function toolbarPathForTitlePreview(
+	currentPath: string | null | undefined,
+	titlePreview: TitlePreview,
+) {
+	if (!currentPath || titlePreview?.path !== currentPath) return currentPath;
+	return pathEquals(currentPath, titlePreview.previewPath)
+		? currentPath
+		: titlePreview.previewPath;
+}
 
 // Traffic lights are hidden in fullscreen, so drop their reserved inset.
 function useIsFullScreen() {
@@ -75,15 +89,17 @@ export function Toolbar({
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
+	const titlePreview = useStoreValue(titleGenerationPreviewStore);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const isFullScreen = useIsFullScreen();
 	// The changelog note is virtual: show a friendly title and disable the
 	// file actions (rename, reveal, copy path) that assume a file on disk.
 	const isChangelog = isChangelogPath(currentPath);
+	const toolbarPath = toolbarPathForTitlePreview(currentPath, titlePreview);
 
 	return (
 		<SharedToolbar
-			currentPath={isChangelog ? "What's new" : (currentPath ?? null)}
+			currentPath={isChangelog ? "What's new" : (toolbarPath ?? null)}
 			sidebarOpen={sidebarOpen}
 			sidebarBadge={showSidebarBadge}
 			scrollContainer={scrollContainer}

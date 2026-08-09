@@ -16,6 +16,7 @@ import {
 	dirname,
 	extname,
 	fileKindForPath,
+	fileStem,
 	hasMarkdownExtension,
 	isCodeFile,
 	isEditableFile,
@@ -78,6 +79,7 @@ import {
 	withOpenedDoc,
 	workspaceStore,
 } from "./state";
+import { createTitleManager } from "./titleManagement";
 import { applyWorkspaceDelta } from "./workspaceDelta";
 
 const REFRESH_FILES_DEBOUNCE_MS = 250;
@@ -480,6 +482,16 @@ function uniqueFolderPath(parent: string): string {
 }
 
 const pendingRenames = new Map<string, string>();
+const titleManager = createTitleManager({
+	pendingRenames,
+	runFileTask: saves.run,
+	savePathContent,
+	moveAssociatedAssetFolder,
+	updateMovedLinks,
+	syncPinnedNotes,
+	errorMessage,
+	handleFileError,
+});
 
 type LoadPathOptions = {
 	history?: "push" | "none";
@@ -593,6 +605,8 @@ export function clearPendingTerminalCommand() {
 }
 
 export function clearViewer() {
+	const path = viewerStore.get().currentPath;
+	if (path) titleManager.stop(path);
 	viewerStore.set((state) => emptyDoc(state.lastOpenedPath));
 }
 
@@ -667,12 +681,14 @@ export async function openWorkspace(path?: string) {
 }
 
 export function updateEditorContent(path: string, content: string) {
+	const currentPath = titleManager.currentPath(path);
 	const current = viewerStore.get();
-	if (current.currentPath !== path || current.content === content) return;
+	if (current.currentPath !== currentPath || current.content === content)
+		return;
 	void expireDeleteUndo();
 
 	viewerStore.set((state) => {
-		if (state.currentPath !== path) return state;
+		if (state.currentPath !== currentPath) return state;
 		if (
 			state.externalChange.kind === "conflict" &&
 			content === state.externalChange.diskContent
@@ -689,6 +705,11 @@ export function updateEditorContent(path: string, content: string) {
 			error: null,
 		};
 	});
+	titleManager.update(path, content);
+}
+
+export function editorDocumentId(path: string) {
+	return titleManager.editorDocumentId(path);
 }
 
 export function setViewerMode(viewMode: ViewMode) {
@@ -791,7 +812,10 @@ export function savePathContent(
 	content: string,
 	options?: { force?: boolean; throwOnError?: boolean },
 ) {
-	return saves.run(path, () => savePathContentNow(path, content, options));
+	const currentPath = titleManager.currentPath(path);
+	return saves.run(currentPath, () =>
+		savePathContentNow(currentPath, content, options),
+	);
 }
 
 const deletionActions = createDeleteActions({
@@ -808,6 +832,7 @@ const deletionActions = createDeleteActions({
 	refreshFileList,
 	loadPath,
 	syncPins: syncPinnedNotes,
+	stopTitleRenames: titleManager.stop,
 	handleError: handleFileError,
 });
 
@@ -820,6 +845,10 @@ export const {
 } = deletionActions;
 
 export async function renameMarkdownFile(path: string, nextName: string) {
+	const currentExt = extname(path);
+	if (renameStem(nextName, currentExt) !== fileStem(path)) {
+		titleManager.stop(path);
+	}
 	const current = viewerStore.get();
 	const isCurrentFile = current.currentPath === path;
 	const { files: filesBeforeRename, workspacePath } = workspaceStore.get();
@@ -830,13 +859,7 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 	const parent = dirname(path);
 	if (!parent) return;
 
-	const currentExt = extname(path);
-	const proposedExt = extname(trimmedName);
-	const proposedStem =
-		proposedExt.length > 0 &&
-		proposedExt.toLocaleLowerCase() === currentExt.toLocaleLowerCase()
-			? trimmedName.slice(0, -proposedExt.length)
-			: trimmedName;
+	const proposedStem = renameStem(trimmedName, currentExt);
 	const nextNameWithExt = `${proposedStem}${currentExt}`;
 	// Slash paths are relative to the current file's folder, matching sidebar
 	// rename behavior for nested notes.
@@ -899,6 +922,15 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 	} finally {
 		window.setTimeout(() => pendingRenames.delete(path), 1000);
 	}
+}
+
+function renameStem(name: string, currentExt: string) {
+	const trimmed = name.trim();
+	const proposedExt = extname(trimmed);
+	return proposedExt.length > 0 &&
+		proposedExt.toLocaleLowerCase() === currentExt.toLocaleLowerCase()
+		? trimmed.slice(0, -proposedExt.length)
+		: trimmed;
 }
 
 export async function renameCurrentMarkdownFile(nextName: string) {
@@ -1148,6 +1180,9 @@ async function createEmptyFileInFolder(
 	const path = uniqueFilePath(parentPath, stem, extension);
 	try {
 		await desktopApi.writeFileText(path, "");
+		if (extension === ".md") {
+			titleManager.start(path);
+		}
 		const modified_at = Math.floor(Date.now() / 1000);
 		workspaceStore.set((state) => ({
 			...state,
@@ -1160,6 +1195,7 @@ async function createEmptyFileInFolder(
 		await refreshFileList();
 		return path;
 	} catch (err) {
+		titleManager.stop(path);
 		const message = handleFileError(err);
 		toast.error("Failed to create file", { description: message });
 		return null;
@@ -1252,6 +1288,10 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 				content = await desktopApi.readFileText(path);
 			}
 			if (isStale()) return;
+			const currentPath = viewerStore.get().currentPath;
+			if (currentPath && !pathEquals(currentPath, path)) {
+				titleManager.stop(currentPath);
+			}
 			appStore.set((state) => withOpenedDoc(state, path, content));
 			if (historyMode === "push") pushHistory(path);
 		} catch (err) {

@@ -1,3 +1,4 @@
+import { resetEditorHistory } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import Document from "@tiptap/extension-document";
 import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
@@ -16,10 +17,13 @@ const SourceDocument = Document.extend({ content: "codeBlock" });
 
 export type MarkdownSourceEditorProps = {
 	path: string;
+	/** Stable note identity; physical paths may change without replacing a note. */
+	documentId?: string;
 	initialMarkdown: string;
 	sourceLanguage?: string;
 	/** Focus on mount; wanted for the source-mode toggle, not for navigation. */
 	autoFocus?: boolean;
+	preserveHistoryOnUpdate?: boolean;
 	saveDebounceMs?: number;
 	onLocalChange: (path: string, markdown: string) => void;
 	onSave: (path: string, markdown: string) => void | Promise<void>;
@@ -28,9 +32,11 @@ export type MarkdownSourceEditorProps = {
 
 export function MarkdownSourceEditor({
 	path,
+	documentId = path,
 	initialMarkdown,
 	sourceLanguage = "md",
 	autoFocus = true,
+	preserveHistoryOnUpdate = false,
 	saveDebounceMs = DEFAULT_SAVE_DEBOUNCE_MS,
 	onLocalChange,
 	onSave,
@@ -94,21 +100,29 @@ export function MarkdownSourceEditor({
 		if (!editor) return;
 		if (initialMarkdown === latestMarkdownRef.current) return;
 		latestMarkdownRef.current = initialMarkdown;
-		editor.commands.setContent(
-			sourceDocFromMarkdown(initialMarkdown, sourceLanguage),
-			{
+		editor
+			.chain()
+			.setMeta("addToHistory", false)
+			.setContent(sourceDocFromMarkdown(initialMarkdown, sourceLanguage), {
 				emitUpdate: false,
-			},
-		);
-	}, [editor, initialMarkdown, sourceLanguage]);
+			})
+			.run();
+		if (!preserveHistoryOnUpdate) resetEditorHistory(editor);
+	}, [editor, initialMarkdown, preserveHistoryOnUpdate, sourceLanguage]);
 
 	useEffect(() => {
-		// Path changes flush the pending edit before the next document takes over.
-		void path;
+		void documentId;
+		if (!editor) return;
+		resetEditorHistory(editor);
+	}, [editor, documentId]);
+
+	useEffect(() => {
+		// Flush the pending edit before the next document takes over.
+		void documentId;
 		return () => {
 			flushPendingSave(pendingSaveRef);
 		};
-	}, [path]);
+	}, [documentId]);
 
 	return (
 		<div

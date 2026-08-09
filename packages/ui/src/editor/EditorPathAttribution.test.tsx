@@ -31,6 +31,71 @@ afterEach(() => {
 });
 
 describe("editor path attribution", () => {
+	it("preserves rich-editor history when only the physical path changes", async () => {
+		const onLocalChange = vi.fn();
+		const onSave = vi.fn();
+		const root = createTestRoot();
+		const getEditor = captureEditorCreation();
+
+		await renderRichEditor(
+			root,
+			"/old.md",
+			"before",
+			onLocalChange,
+			onSave,
+			getEditor,
+			null,
+			"note-1",
+			true,
+		);
+		const editor = getEditor();
+		act(() => changeEditorText(editor, "after"));
+		await renderRichEditor(
+			root,
+			"/renamed.md",
+			"after",
+			onLocalChange,
+			onSave,
+			getEditor,
+			null,
+			"note-1",
+		);
+
+		act(() => editor.commands.undo());
+		expect(editor.getText()).toBe("before");
+	});
+
+	it("preserves rich-editor history when a rename rewrites the body", async () => {
+		const root = createTestRoot();
+		const getEditor = captureEditorCreation();
+
+		await renderRichEditor(
+			root,
+			"/old.md",
+			"before",
+			vi.fn(),
+			vi.fn(),
+			getEditor,
+			null,
+			"note-1",
+		);
+		const editor = getEditor();
+		act(() => changeEditorText(editor, "after"));
+		await renderRichEditor(
+			root,
+			"/renamed.md",
+			"rewritten after",
+			vi.fn(),
+			vi.fn(),
+			getEditor,
+			null,
+			"note-1",
+			true,
+		);
+
+		expect(editor.can().undo()).toBe(true);
+	});
+
 	it("attributes a rich editor change and save to the new path", async () => {
 		const onLocalChange = vi.fn();
 		const onSave = vi.fn();
@@ -98,6 +163,37 @@ describe("editor path attribution", () => {
 		expect(onSave).toHaveBeenNthCalledWith(1, "/old.md", "old edited");
 		expect(onSave).toHaveBeenNthCalledWith(2, "/new.md", "edited");
 	});
+
+	it("preserves source-editor history when a rename rewrites the body", async () => {
+		const root = createTestRoot();
+		const getEditor = captureEditorCreation();
+
+		await renderSourceEditor(
+			root,
+			"/old.md",
+			"before",
+			vi.fn(),
+			vi.fn(),
+			getEditor,
+			null,
+			"note-1",
+		);
+		const editor = getEditor();
+		act(() => changeEditorText(editor, "after"));
+		await renderSourceEditor(
+			root,
+			"/renamed.md",
+			"rewritten after",
+			vi.fn(),
+			vi.fn(),
+			getEditor,
+			null,
+			"note-1",
+			true,
+		);
+
+		expect(editor.can().undo()).toBe(true);
+	});
 });
 
 function createTestRoot() {
@@ -116,12 +212,16 @@ async function renderRichEditor(
 	onSave: ReturnType<typeof vi.fn>,
 	getEditor: () => Editor,
 	editText: string | null = null,
+	documentId?: string,
+	preserveHistoryOnUpdate = false,
 ) {
 	await act(async () => {
 		root.render(
 			<EditAfterChildLayout editText={editText} getEditor={getEditor}>
 				<EditorView
 					path={path}
+					documentId={documentId}
+					preserveHistoryOnUpdate={preserveHistoryOnUpdate}
 					initialMarkdown={initialMarkdown}
 					editable={false}
 					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
@@ -143,12 +243,16 @@ async function renderSourceEditor(
 	onSave: ReturnType<typeof vi.fn>,
 	getEditor: () => Editor,
 	editText: string | null = null,
+	documentId?: string,
+	preserveHistoryOnUpdate = false,
 ) {
 	await act(async () => {
 		root.render(
 			<EditAfterChildLayout editText={editText} getEditor={getEditor}>
 				<MarkdownSourceEditor
 					path={path}
+					documentId={documentId}
+					preserveHistoryOnUpdate={preserveHistoryOnUpdate}
 					initialMarkdown={initialMarkdown}
 					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
 					onLocalChange={onLocalChange}

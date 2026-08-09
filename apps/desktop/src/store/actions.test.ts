@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type MockDesktopApi = {
 	readFileText: ReturnType<typeof vi.fn>;
@@ -975,6 +975,433 @@ describe("desktop renameMarkdownFile", () => {
 		expect(viewerStore.get().content).toBe(
 			"[Target](renamed.md)\nunsaved edit",
 		);
+	});
+});
+
+describe("desktop title generation", () => {
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("keeps a new note filename synced to its first meaningful line", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			editorDocumentId,
+			renameMarkdownFile,
+			titleGenerationPreviewStore,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		expect(path).toBe("/workspace/new-file.md");
+		await renameMarkdownFile(path, "new-file");
+		updateEditorContent(path, "![Diagram](diagram.png)\n# First Title");
+		expect(titleGenerationPreviewStore.get()).toEqual({
+			path: "/workspace/new-file.md",
+			previewPath: "/workspace/first-title.md",
+		});
+		expect(editorDocumentId("/workspace/new-file.md")).toBe(
+			"/workspace/new-file.md",
+		);
+		api.listDirectory.mockClear();
+		api.readFileText.mockClear();
+		await vi.advanceTimersByTimeAsync(499);
+		expect(api.renameFile).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(1);
+
+		expect(api.renameFile).toHaveBeenCalledWith(
+			"/workspace/new-file.md",
+			"/workspace/first-title.md",
+		);
+		expect(viewerStore.get().currentPath).toBe("/workspace/first-title.md");
+		expect(editorDocumentId("/workspace/first-title.md")).toBe(
+			"/workspace/new-file.md",
+		);
+		expect(api.listDirectory).not.toHaveBeenCalled();
+		expect(api.readFileText).not.toHaveBeenCalled();
+		expect(api.pathExists).toHaveBeenCalledWith("/workspace/first-title.md");
+
+		updateEditorContent("/workspace/first-title.md", "Second title");
+		await vi.advanceTimersByTimeAsync(500);
+		expect(api.renameFile).toHaveBeenLastCalledWith(
+			"/workspace/first-title.md",
+			"/workspace/second-title.md",
+		);
+	});
+
+	it("previews the collision suffix used for the generated filename", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		api.pathExists.mockImplementation(
+			async (path: string) => path === "/workspace/first-title.md",
+		);
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			titleGenerationPreviewStore,
+			updateEditorContent,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		updateEditorContent(path, "First title");
+		await vi.waitFor(() => {
+			expect(titleGenerationPreviewStore.get()?.previewPath).toBe(
+				"/workspace/first-title-2.md",
+			);
+		});
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(api.renameFile).toHaveBeenCalledWith(
+			"/workspace/new-file.md",
+			"/workspace/first-title-2.md",
+		);
+	});
+
+	it("retries with a new suffix when a generated rename target appears late", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		api.renameFile
+			.mockRejectedValueOnce(new Error("EEXIST"))
+			.mockResolvedValue(undefined);
+		let firstTitleChecks = 0;
+		api.pathExists.mockImplementation(async (path: string) => {
+			if (path !== "/workspace/first-title.md") return false;
+			firstTitleChecks += 1;
+			return firstTitleChecks > 1;
+		});
+		const { appStore, createMarkdownFileInFolder, updateEditorContent } =
+			await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		updateEditorContent(path, "First title");
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(api.renameFile).toHaveBeenNthCalledWith(
+			1,
+			"/workspace/new-file.md",
+			"/workspace/first-title.md",
+		);
+		expect(api.renameFile).toHaveBeenNthCalledWith(
+			2,
+			"/workspace/new-file.md",
+			"/workspace/first-title-2.md",
+		);
+	});
+
+	it("moves a new note's assets when its title changes the filename", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		api.listDirectory.mockResolvedValue({
+			files: [{ path: "/workspace/new-file.md", modified_at: 1 }],
+			folders: [],
+		});
+		api.pathExists.mockImplementation(
+			async (path: string) => path === "/workspace/new-file.assets",
+		);
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		api.writeFileText.mockClear();
+		const markdown = "![Diagram](new-file.assets/diagram.png)\n# First Title";
+		updateEditorContent(path, markdown);
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(api.renameFile).toHaveBeenCalledWith(
+			"/workspace/new-file.assets",
+			"/workspace/first-title.assets",
+		);
+		const renamedMarkdown =
+			"![Diagram](first-title.assets/diagram.png)\n# First Title";
+		expect(viewerStore.get().content).toBe(renamedMarkdown);
+		expect(api.writeFileText).toHaveBeenLastCalledWith(
+			"/workspace/first-title.md",
+			renamedMarkdown,
+		);
+	});
+
+	it("publishes the new path before generated asset moves finish", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		let finishAssetCheck: (() => void) | undefined;
+		api.pathExists.mockImplementation(async (path: string) => {
+			if (path === "/workspace/new-file.assets") {
+				return new Promise<boolean>((resolve) => {
+					finishAssetCheck = () => resolve(false);
+				});
+			}
+			return false;
+		});
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		updateEditorContent(path, "First title");
+		const rename = vi.advanceTimersByTimeAsync(500);
+		await vi.waitFor(() => {
+			expect(api.pathExists).toHaveBeenCalledWith("/workspace/new-file.assets");
+		});
+
+		expect(viewerStore.get().currentPath).toBe("/workspace/first-title.md");
+
+		finishAssetCheck?.();
+		await rename;
+	});
+
+	it("does not clobber a newly opened note after generated rename publish", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockImplementation(async (path: string) =>
+			path === "/workspace/other.md" ? "other content" : "",
+		);
+		let finishAssetCheck: (() => void) | undefined;
+		api.pathExists.mockImplementation(async (path: string) => {
+			if (path === "/workspace/new-file.assets") {
+				return new Promise<boolean>((resolve) => {
+					finishAssetCheck = () => resolve(true);
+				});
+			}
+			return false;
+		});
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			loadPath,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: {
+				...state.workspace,
+				workspacePath: "/workspace",
+				files: [{ path: "/workspace/other.md", modified_at: 1 }],
+			},
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		updateEditorContent(
+			path,
+			"![Diagram](new-file.assets/diagram.png)\nFirst title",
+		);
+		const rename = vi.advanceTimersByTimeAsync(500);
+		await vi.waitFor(() => {
+			expect(api.pathExists).toHaveBeenCalledWith("/workspace/new-file.assets");
+		});
+		expect(viewerStore.get().currentPath).toBe("/workspace/first-title.md");
+
+		await loadPath("/workspace/other.md");
+		finishAssetCheck?.();
+		await rename;
+
+		expect(viewerStore.get().currentPath).toBe("/workspace/other.md");
+		expect(viewerStore.get().content).toBe("other content");
+	});
+
+	it("captures edits made before note creation finishes", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		let finishRefresh: (() => void) | undefined;
+		api.listDirectory.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					finishRefresh = () => resolve({ files: [], folders: [] });
+				}),
+		);
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const creation = createMarkdownFileInFolder("/workspace");
+		await vi.waitFor(() => {
+			expect(viewerStore.get().currentPath).toBe("/workspace/new-file.md");
+		});
+		updateEditorContent("/workspace/new-file.md", "Typed right away");
+		finishRefresh?.();
+		await creation;
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(api.renameFile).toHaveBeenCalledWith(
+			"/workspace/new-file.md",
+			"/workspace/typed-right-away.md",
+		);
+	});
+
+	it("writes edits made while a generated rename is in flight to the new path", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		let finishRename: (() => void) | undefined;
+		api.renameFile.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					finishRename = resolve;
+				}),
+		);
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			savePathContent,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		api.writeFileText.mockClear();
+		updateEditorContent(path, "First title");
+		await vi.advanceTimersByTimeAsync(500);
+		updateEditorContent(path, "Second title");
+		const oldPathSave = savePathContent(path, "Second title");
+		finishRename?.();
+		await oldPathSave;
+		await vi.waitFor(() => {
+			expect(viewerStore.get().currentPath).toBe("/workspace/first-title.md");
+			expect(api.writeFileText).toHaveBeenCalledWith(
+				"/workspace/first-title.md",
+				"Second title",
+			);
+		});
+		expect(api.writeFileText).not.toHaveBeenCalledWith(
+			"/workspace/new-file.md",
+			"Second title",
+		);
+	});
+
+	it("accepts an edit emitted with the old path after a generated rename", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			savePathContent,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const oldPath = (await createMarkdownFileInFolder("/workspace")) as string;
+		updateEditorContent(oldPath, "First title");
+		await vi.advanceTimersByTimeAsync(500);
+		expect(viewerStore.get().currentPath).toBe("/workspace/first-title.md");
+
+		updateEditorContent(oldPath, "Late edit");
+		expect(viewerStore.get().content).toBe("Late edit");
+		api.writeFileText.mockClear();
+		api.readFileText.mockResolvedValue("First title");
+		await savePathContent(oldPath, "Late edit");
+		expect(api.writeFileText).toHaveBeenCalledWith(
+			"/workspace/first-title.md",
+			"Late edit",
+		);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(api.renameFile).toHaveBeenLastCalledWith(
+			"/workspace/first-title.md",
+			"/workspace/late-edit.md",
+		);
+	});
+
+	it("stops syncing after a manual title edit", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			renameMarkdownFile,
+			titleGenerationPreviewStore,
+			updateEditorContent,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		updateEditorContent(path, "Generated title");
+		expect(titleGenerationPreviewStore.get()?.previewPath).toBe(
+			"/workspace/generated-title.md",
+		);
+		await renameMarkdownFile(path, "chosen-title");
+		expect(titleGenerationPreviewStore.get()).toBeNull();
+		updateEditorContent("/workspace/chosen-title.md", "Generated title");
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(api.renameFile).toHaveBeenCalledTimes(1);
+		expect(api.renameFile).toHaveBeenCalledWith(
+			"/workspace/new-file.md",
+			"/workspace/chosen-title.md",
+		);
+	});
+
+	it("does not enable title generation for notes reopened this session", async () => {
+		const api = createDesktopApi();
+		const { appStore, updateEditorContent } = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: {
+				...state.workspace,
+				workspacePath: "/workspace",
+				files: [{ path: "/workspace/new-file.md", modified_at: 1 }],
+			},
+			document: {
+				...state.document,
+				currentPath: "/workspace/new-file.md",
+				content: "",
+			},
+		}));
+
+		updateEditorContent("/workspace/new-file.md", "Reopened note");
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(api.renameFile).not.toHaveBeenCalled();
 	});
 });
 

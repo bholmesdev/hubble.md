@@ -37,6 +37,7 @@ type DeleteDeps = {
 		options: { history: "none"; launchExternal: false },
 	) => Promise<void>;
 	syncPins: () => Promise<void>;
+	stopTitleRenames: (path: string) => void;
 	handleError: (error: unknown) => string;
 };
 
@@ -210,6 +211,8 @@ export function createDeleteActions(deps: DeleteDeps) {
 			),
 		);
 		if (deletedCurrent) {
+			if (viewerBefore.currentPath)
+				deps.stopTitleRenames(viewerBefore.currentPath);
 			clearHistory();
 		} else {
 			for (const item of items) {
@@ -300,8 +303,10 @@ export function createDeleteActions(deps: DeleteDeps) {
 	) => {
 		try {
 			await desktopApi.deleteFile(path);
-			if (viewerStore.get().currentPath === path) clearHistory();
-			else pruneHistory(path);
+			if (viewerStore.get().currentPath === path) {
+				deps.stopTitleRenames(path);
+				clearHistory();
+			} else pruneHistory(path);
 			appStore.set((state) => ({
 				...state,
 				workspace: {
