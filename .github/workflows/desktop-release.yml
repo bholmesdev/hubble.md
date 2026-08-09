@@ -86,6 +86,8 @@ jobs:
       - name: Build and publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          # Electron Builder otherwise skips releases published over two hours ago.
+          EP_GH_IGNORE_TIME: "true"
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
