@@ -253,6 +253,7 @@ function App() {
 		},
 		{
 			currentPath: state.currentPath ?? null,
+			newFileParent: focusedCreationFolder,
 			newFolderParent: searchOpen
 				? searchFolderParent
 				: (focusedFolderParent ?? null),

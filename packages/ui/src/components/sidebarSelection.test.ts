@@ -4,6 +4,7 @@ import {
 	type SidebarSelectionState,
 	sidebarCreationFolderId,
 	sidebarDeleteSelection,
+	sidebarFocusTarget,
 	sidebarMoveCandidateFromRow,
 	sidebarMoveItemsForDrag,
 	sidebarRowKey,
@@ -94,6 +95,13 @@ describe("sidebarCreationFolderId", () => {
 	});
 
 	it("uses a selected folder after focus moves to the header", () => {
+		expect(
+			sidebarFocusTarget({
+				rows,
+				focusedIndex: null,
+				selectedKeys: new Set(["folder:project/archive/"]),
+			}),
+		).toEqual({ kind: "folder", folderId: "project/archive/" });
 		expect(
 			sidebarCreationFolderId({
 				rows,

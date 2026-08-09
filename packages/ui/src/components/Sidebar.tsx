@@ -133,7 +133,7 @@ export function sidebarRowKey(row: SidebarRow): string | null {
 		: `folder:${row.id}`;
 }
 
-export function sidebarCreationFolderId({
+export function sidebarFocusTarget({
 	rows,
 	focusedIndex,
 	selectedKeys,
@@ -142,16 +142,26 @@ export function sidebarCreationFolderId({
 	focusedIndex: number | null;
 	selectedKeys: Set<string>;
 }) {
-	if (focusedIndex !== null) {
-		const row = rows[focusedIndex];
-		return row?.kind === "folder" ? row.id : null;
+	let row = focusedIndex !== null ? rows[focusedIndex] : undefined;
+	if (!row && selectedKeys.size === 1) {
+		row = rows.find((candidate) => {
+			const key = sidebarRowKey(candidate);
+			return key !== null && selectedKeys.has(key);
+		});
 	}
-	if (selectedKeys.size !== 1) return null;
-	const row = rows.find((candidate) => {
-		const key = sidebarRowKey(candidate);
-		return key !== null && selectedKeys.has(key);
-	});
-	return row?.kind === "folder" ? row.id : null;
+	if (!row || row.kind === "section") return null;
+	return row.kind === "file"
+		? { kind: "file" as const, path: row.file.path }
+		: { kind: "folder" as const, folderId: row.id };
+}
+
+export function sidebarCreationFolderId(input: {
+	rows: SidebarRow[];
+	focusedIndex: number | null;
+	selectedKeys: Set<string>;
+}) {
+	const item = sidebarFocusTarget(input);
+	return item?.kind === "folder" ? item.folderId : null;
 }
 
 /**
@@ -689,17 +699,10 @@ export function Sidebar({
 		onKeyDown(event);
 	};
 	useEffect(() => {
-		const row = focusedIndex === null ? null : rows[focusedIndex];
-		if (!row || row.kind === "section") {
-			onFocusedItemChange?.(null);
-			return;
-		}
 		onFocusedItemChange?.(
-			row.kind === "file"
-				? { kind: "file", path: row.file.path }
-				: { kind: "folder", folderId: row.id },
+			sidebarFocusTarget({ rows, focusedIndex, selectedKeys }),
 		);
-	}, [focusedIndex, onFocusedItemChange, rows]);
+	}, [focusedIndex, onFocusedItemChange, rows, selectedKeys]);
 
 	useEffect(() => {
 		if (!pendingFocusDisplayPath) return;

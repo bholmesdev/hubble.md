@@ -43,6 +43,7 @@ const CONTRIBUTING_URL =
 
 export type AppCommandContext = {
 	currentPath: string | null;
+	newFileParent: string | null;
 	newFolderParent: string | null;
 	workspacePath: string | null;
 	isSourceMode: boolean;
@@ -144,7 +145,7 @@ function defineCommands(
 	return [
 		// File
 		fromRegistry("app.new-file", "File", ["create", "markdown", "note"], () =>
-			createMarkdownFile(),
+			createMarkdownFile(context.newFileParent),
 		),
 		paletteOnly({
 			id: "app.new-folder",
