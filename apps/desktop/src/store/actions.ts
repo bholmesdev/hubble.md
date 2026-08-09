@@ -606,6 +606,8 @@ export function clearPendingTerminalCommand() {
 }
 
 export function clearViewer() {
+	const path = viewerStore.get().currentPath;
+	if (path) stopTitleRenames(path);
 	viewerStore.set((state) => emptyDoc(state.lastOpenedPath));
 }
 
@@ -755,6 +757,10 @@ async function generatedTitlePath(path: string, markdown: string) {
 
 async function runTitleRename(session: TitleSession) {
 	if (session.running || titleSessions.get(session.path) !== session) return;
+	if (viewerStore.get().currentPath !== session.path) {
+		stopTitleRenames(session.path);
+		return;
+	}
 	const markdown = session.markdown;
 	const previousPath = session.path;
 	const nextPath =
@@ -807,8 +813,13 @@ async function renameGeneratedFile(
 				});
 			}
 
-			// Add the new path before publishing it. The next React
-			// render can then retain this note's editor identity.
+			// Keep the prior path for events from the pre-rename render, but drop
+			// older aliases so the session stays bounded.
+			for (const [sessionPath, candidate] of titleSessions) {
+				if (candidate === session && sessionPath !== previousPath) {
+					titleSessions.delete(sessionPath);
+				}
+			}
 			session.path = nextPath;
 			titleSessions.set(nextPath, session);
 			titleGenerationPreviewStore.set({
@@ -982,7 +993,10 @@ export function savePathContent(
 	content: string,
 	options?: { force?: boolean; throwOnError?: boolean },
 ) {
-	return saves.run(path, () => savePathContentNow(path, content, options));
+	const currentPath = titleSessions.get(path)?.path ?? path;
+	return saves.run(currentPath, () =>
+		savePathContentNow(currentPath, content, options),
+	);
 }
 
 const deletionActions = createDeleteActions({
@@ -1459,6 +1473,10 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 				content = await desktopApi.readFileText(path);
 			}
 			if (isStale()) return;
+			const currentPath = viewerStore.get().currentPath;
+			if (currentPath && !pathEquals(currentPath, path)) {
+				stopTitleRenames(currentPath);
+			}
 			appStore.set((state) => withOpenedDoc(state, path, content));
 			if (historyMode === "push") pushHistory(path);
 		} catch (err) {

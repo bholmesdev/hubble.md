@@ -1199,6 +1199,7 @@ describe("desktop title generation", () => {
 		const {
 			appStore,
 			createMarkdownFileInFolder,
+			savePathContent,
 			updateEditorContent,
 			viewerStore,
 		} = await loadStoreActions(api);
@@ -1214,6 +1215,13 @@ describe("desktop title generation", () => {
 
 		updateEditorContent(oldPath, "Late edit");
 		expect(viewerStore.get().content).toBe("Late edit");
+		api.writeFileText.mockClear();
+		api.readFileText.mockResolvedValue("First title");
+		await savePathContent(oldPath, "Late edit");
+		expect(api.writeFileText).toHaveBeenCalledWith(
+			"/workspace/first-title.md",
+			"Late edit",
+		);
 		await vi.advanceTimersByTimeAsync(500);
 		expect(api.renameFile).toHaveBeenLastCalledWith(
 			"/workspace/first-title.md",
