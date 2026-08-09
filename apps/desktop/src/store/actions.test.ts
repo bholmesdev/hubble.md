@@ -1018,7 +1018,6 @@ describe("desktop title generation", () => {
 		);
 		api.listDirectory.mockClear();
 		api.readFileText.mockClear();
-		api.pathExists.mockClear();
 		await vi.advanceTimersByTimeAsync(499);
 		expect(api.renameFile).not.toHaveBeenCalled();
 		await vi.advanceTimersByTimeAsync(1);
@@ -1040,6 +1039,38 @@ describe("desktop title generation", () => {
 		expect(api.renameFile).toHaveBeenLastCalledWith(
 			"/workspace/first-title.md",
 			"/workspace/second-title.md",
+		);
+	});
+
+	it("previews the collision suffix used for the generated filename", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		api.pathExists.mockImplementation(
+			async (path: string) => path === "/workspace/first-title.md",
+		);
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			titleGenerationPreviewStore,
+			updateEditorContent,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = (await createMarkdownFileInFolder("/workspace")) as string;
+		updateEditorContent(path, "First title");
+		await vi.waitFor(() => {
+			expect(titleGenerationPreviewStore.get()?.previewPath).toBe(
+				"/workspace/first-title-2.md",
+			);
+		});
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(api.renameFile).toHaveBeenCalledWith(
+			"/workspace/new-file.md",
+			"/workspace/first-title-2.md",
 		);
 	});
 
@@ -1159,6 +1190,34 @@ describe("desktop title generation", () => {
 		expect(api.writeFileText).not.toHaveBeenCalledWith(
 			"/workspace/new-file.md",
 			"Second title",
+		);
+	});
+
+	it("accepts an edit emitted with the old path after a generated rename", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("");
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const oldPath = (await createMarkdownFileInFolder("/workspace")) as string;
+		updateEditorContent(oldPath, "First title");
+		await vi.advanceTimersByTimeAsync(500);
+		expect(viewerStore.get().currentPath).toBe("/workspace/first-title.md");
+
+		updateEditorContent(oldPath, "Late edit");
+		expect(viewerStore.get().content).toBe("Late edit");
+		await vi.advanceTimersByTimeAsync(500);
+		expect(api.renameFile).toHaveBeenLastCalledWith(
+			"/workspace/first-title.md",
+			"/workspace/late-edit.md",
 		);
 	});
 

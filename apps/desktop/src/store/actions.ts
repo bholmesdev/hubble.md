@@ -103,6 +103,7 @@ type TitleSession = {
 	path: string;
 	documentId: string;
 	markdown: string;
+	pendingTitle?: { markdown: string; path: Promise<string | null> };
 	timer?: number;
 	running: boolean;
 };
@@ -679,12 +680,15 @@ export async function openWorkspace(path?: string) {
 }
 
 export function updateEditorContent(path: string, content: string) {
+	const session = titleSessions.get(path);
+	const currentPath = session?.path ?? path;
 	const current = viewerStore.get();
-	if (current.currentPath !== path || current.content === content) return;
+	if (current.currentPath !== currentPath || current.content === content)
+		return;
 	void expireDeleteUndo();
 
 	viewerStore.set((state) => {
-		if (state.currentPath !== path) return state;
+		if (state.currentPath !== currentPath) return state;
 		if (
 			state.externalChange.kind === "conflict" &&
 			content === state.externalChange.diskContent
@@ -701,12 +705,10 @@ export function updateEditorContent(path: string, content: string) {
 			error: null,
 		};
 	});
-	scheduleTitleRename(path, content);
+	if (session) scheduleTitleRename(session, content);
 }
 
-function scheduleTitleRename(path: string, markdown: string) {
-	const session = titleSessions.get(path);
-	if (!session) return;
+function scheduleTitleRename(session: TitleSession, markdown: string) {
 	session.markdown = markdown;
 	const stem = generatedTitleStem(markdown);
 	const previewPath = stem
@@ -715,6 +717,22 @@ function scheduleTitleRename(path: string, markdown: string) {
 	titleGenerationPreviewStore.set(
 		previewPath ? { path: session.path, previewPath } : null,
 	);
+	const pendingTitle = {
+		markdown,
+		path: generatedTitlePath(session.path, markdown),
+	};
+	session.pendingTitle = pendingTitle;
+	void pendingTitle.path.then((previewPath) => {
+		if (
+			session.pendingTitle !== pendingTitle ||
+			titleSessions.get(session.path) !== session
+		) {
+			return;
+		}
+		titleGenerationPreviewStore.set(
+			previewPath ? { path: session.path, previewPath } : null,
+		);
+	});
 	if (session.timer !== undefined) window.clearTimeout(session.timer);
 	session.timer = window.setTimeout(() => {
 		session.timer = undefined;
@@ -739,7 +757,10 @@ async function runTitleRename(session: TitleSession) {
 	if (session.running || titleSessions.get(session.path) !== session) return;
 	const markdown = session.markdown;
 	const previousPath = session.path;
-	const nextPath = await generatedTitlePath(previousPath, markdown);
+	const nextPath =
+		session.pendingTitle?.markdown === markdown
+			? await session.pendingTitle.path
+			: await generatedTitlePath(previousPath, markdown);
 	if (!nextPath || pathEquals(nextPath, previousPath)) return;
 
 	session.running = true;
@@ -749,7 +770,7 @@ async function runTitleRename(session: TitleSession) {
 		session.running = false;
 	}
 	if (session.markdown !== markdown) {
-		scheduleTitleRename(session.path, session.markdown);
+		scheduleTitleRename(session, session.markdown);
 	}
 }
 
@@ -786,9 +807,8 @@ async function renameGeneratedFile(
 				});
 			}
 
-			// Migrate the session before publishing the new path. The next React
+			// Add the new path before publishing it. The next React
 			// render can then retain this note's editor identity.
-			titleSessions.delete(previousPath);
 			session.path = nextPath;
 			titleSessions.set(nextPath, session);
 			titleGenerationPreviewStore.set({
@@ -851,9 +871,11 @@ function stopTitleRenames(path: string) {
 	const session = titleSessions.get(path);
 	if (!session) return;
 	if (session.timer !== undefined) window.clearTimeout(session.timer);
-	titleSessions.delete(path);
+	for (const [sessionPath, candidate] of titleSessions) {
+		if (candidate === session) titleSessions.delete(sessionPath);
+	}
 	const preview = titleGenerationPreviewStore.get();
-	if (preview?.path === path) titleGenerationPreviewStore.set(null);
+	if (preview?.path === session.path) titleGenerationPreviewStore.set(null);
 }
 
 export function editorDocumentId(path: string) {
