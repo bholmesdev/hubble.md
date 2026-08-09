@@ -163,6 +163,37 @@ describe("editor path attribution", () => {
 		expect(onSave).toHaveBeenNthCalledWith(1, "/old.md", "old edited");
 		expect(onSave).toHaveBeenNthCalledWith(2, "/new.md", "edited");
 	});
+
+	it("preserves source-editor history when a rename rewrites the body", async () => {
+		const root = createTestRoot();
+		const getEditor = captureEditorCreation();
+
+		await renderSourceEditor(
+			root,
+			"/old.md",
+			"before",
+			vi.fn(),
+			vi.fn(),
+			getEditor,
+			null,
+			"note-1",
+		);
+		const editor = getEditor();
+		act(() => changeEditorText(editor, "after"));
+		await renderSourceEditor(
+			root,
+			"/renamed.md",
+			"rewritten after",
+			vi.fn(),
+			vi.fn(),
+			getEditor,
+			null,
+			"note-1",
+			true,
+		);
+
+		expect(editor.can().undo()).toBe(true);
+	});
 });
 
 function createTestRoot() {
@@ -212,12 +243,16 @@ async function renderSourceEditor(
 	onSave: ReturnType<typeof vi.fn>,
 	getEditor: () => Editor,
 	editText: string | null = null,
+	documentId?: string,
+	preserveHistoryOnUpdate = false,
 ) {
 	await act(async () => {
 		root.render(
 			<EditAfterChildLayout editText={editText} getEditor={getEditor}>
 				<MarkdownSourceEditor
 					path={path}
+					documentId={documentId}
+					preserveHistoryOnUpdate={preserveHistoryOnUpdate}
 					initialMarkdown={initialMarkdown}
 					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
 					onLocalChange={onLocalChange}

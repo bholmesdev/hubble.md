@@ -868,6 +868,7 @@ function DocumentViewer({
 				key={`${documentId}:source:${HMR_REV}`}
 				path={path}
 				documentId={documentId}
+				preserveHistoryOnUpdate={documentId !== path}
 				initialMarkdown={content}
 				sourceLanguage={
 					isHtml ? "html" : hasTextExtension(path) ? "text" : "md"

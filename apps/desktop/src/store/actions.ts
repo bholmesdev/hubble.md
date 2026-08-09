@@ -86,6 +86,7 @@ import { applyWorkspaceDelta } from "./workspaceDelta";
 const REFRESH_FILES_DEBOUNCE_MS = 250;
 const SELF_SAVE_TTL_MS = 5000;
 const missingPathErrorPattern = /\bENOENT\b|\bENOTDIR\b/;
+const existingPathErrorPattern = /\bEEXIST\b|\balready exists\b/i;
 let refreshFilesTimer: ReturnType<typeof setTimeout> | null = null;
 type RefreshRun = {
 	reloadActive: boolean;
@@ -787,6 +788,7 @@ async function renameGeneratedFile(
 ) {
 	const { files: filesBeforeRename, workspacePath } = workspaceStore.get();
 	let renamed = false;
+	let renamedPath = nextPath;
 	await saves.run(previousPath, async () => {
 		if (
 			titleSessions.get(previousPath) !== session ||
@@ -795,75 +797,40 @@ async function renameGeneratedFile(
 			return;
 		}
 		try {
-			pendingRenames.set(previousPath, nextPath);
-			await desktopApi.renameFile(previousPath, nextPath);
-			const movedFiles = [{ fromPath: previousPath, toPath: nextPath }];
-			const movedAssetFolder = await moveAssociatedAssetFolder(
+			renamedPath = await renameGeneratedFileWithRetry(
 				previousPath,
 				nextPath,
+				session.markdown,
+			);
+			const movedFiles = [{ fromPath: previousPath, toPath: renamedPath }];
+			publishGeneratedRename(session, previousPath, renamedPath);
+			renamed = true;
+			const movedAssetFolder = await moveAssociatedAssetFolder(
+				previousPath,
+				renamedPath,
 			);
 			if (movedAssetFolder) movedFiles.push(movedAssetFolder);
 			if (workspacePath) {
 				session.markdown = rewriteMovedLinks({
 					content: session.markdown,
 					filePath: previousPath,
-					nextPath,
+					nextPath: renamedPath,
 					workspacePath,
 					movedByOldPath: indexMovedFiles(movedFiles),
 				});
 			}
 
-			// Keep the prior path for events from the pre-rename render, but drop
-			// older aliases so the session stays bounded.
-			for (const [sessionPath, candidate] of titleSessions) {
-				if (candidate === session && sessionPath !== previousPath) {
-					titleSessions.delete(sessionPath);
-				}
-			}
-			session.path = nextPath;
-			titleSessions.set(nextPath, session);
-			titleGenerationPreviewStore.set({
-				path: nextPath,
-				previewPath: nextPath,
-			});
-			rewriteHistory(previousPath, nextPath);
-			const wasPinned = workspaceStore.get().pinnedNotes.includes(previousPath);
 			appStore.set((state) => ({
 				...state,
-				workspace: {
-					...state.workspace,
-					files: state.workspace.files.map((file) =>
-						pathEquals(file.path, previousPath)
-							? { ...file, path: nextPath }
-							: file,
-					),
-					pinnedNotes: state.workspace.pinnedNotes.map((path) =>
-						pathEquals(path, previousPath) ? nextPath : path,
-					),
-					lastOpenedPaths: Object.fromEntries(
-						Object.entries(state.workspace.lastOpenedPaths).map(
-							([workspacePath, openedPath]) => [
-								workspacePath,
-								pathEquals(openedPath, previousPath) ? nextPath : openedPath,
-							],
-						),
-					),
-				},
 				document: {
 					...state.document,
-					currentPath: nextPath,
 					content: session.markdown,
-					lastOpenedPath: pathEquals(
-						state.document.lastOpenedPath ?? "",
-						previousPath,
-					)
-						? nextPath
-						: state.document.lastOpenedPath,
 				},
 			}));
 			await updateMovedLinks(movedFiles, filesBeforeRename);
-			renamed = true;
-			if (wasPinned) void syncPinnedNotes();
+			if (workspaceStore.get().pinnedNotes.includes(renamedPath)) {
+				void syncPinnedNotes();
+			}
 		} catch (err) {
 			const message = handleFileError(err);
 			toast.error("Failed to rename file", { description: message });
@@ -873,9 +840,91 @@ async function renameGeneratedFile(
 	});
 
 	if (!renamed) return;
-	// Write the newest body after the move. Old-path saves queued during the move
-	// now fail their current-path guard instead of recreating the old file.
-	await savePathContent(nextPath, session.markdown, { force: true });
+	// Flush link rewrites at the path that won, including retry suffixes.
+	await savePathContent(renamedPath, session.markdown, { force: true });
+}
+
+async function renameGeneratedFileWithRetry(
+	previousPath: string,
+	initialNextPath: string,
+	markdown: string,
+) {
+	let nextPath = initialNextPath;
+	for (let attempt = 0; ; attempt++) {
+		try {
+			pendingRenames.set(previousPath, nextPath);
+			await desktopApi.renameFile(previousPath, nextPath);
+			return nextPath;
+		} catch (err) {
+			if (attempt >= 4 || !existingPathErrorPattern.test(errorMessage(err))) {
+				throw err;
+			}
+			const retryPath = await generatedTitlePath(previousPath, markdown);
+			if (
+				!retryPath ||
+				pathEquals(retryPath, previousPath) ||
+				pathEquals(retryPath, nextPath)
+			) {
+				throw err;
+			}
+			nextPath = retryPath;
+		}
+	}
+}
+
+function publishGeneratedRename(
+	session: TitleSession,
+	previousPath: string,
+	nextPath: string,
+) {
+	// Keep the prior path for events from the pre-rename render, but drop
+	// older aliases so the session stays bounded.
+	for (const [sessionPath, candidate] of titleSessions) {
+		if (candidate === session && sessionPath !== previousPath) {
+			titleSessions.delete(sessionPath);
+		}
+	}
+	session.path = nextPath;
+	titleSessions.set(nextPath, session);
+	titleGenerationPreviewStore.set({
+		path: nextPath,
+		previewPath: nextPath,
+	});
+	rewriteHistory(previousPath, nextPath);
+	appStore.set((state) => ({
+		...state,
+		workspace: {
+			...state.workspace,
+			files: state.workspace.files.map((file) =>
+				pathEquals(file.path, previousPath)
+					? { ...file, path: nextPath }
+					: file,
+			),
+			pinnedNotes: state.workspace.pinnedNotes.map((path) =>
+				pathEquals(path, previousPath) ? nextPath : path,
+			),
+			lastOpenedPaths: Object.fromEntries(
+				Object.entries(state.workspace.lastOpenedPaths).map(
+					([workspacePath, openedPath]) => [
+						workspacePath,
+						pathEquals(openedPath, previousPath) ? nextPath : openedPath,
+					],
+				),
+			),
+		},
+		document: {
+			...state.document,
+			currentPath: pathEquals(state.document.currentPath ?? "", previousPath)
+				? nextPath
+				: state.document.currentPath,
+			lastOpenedPath: pathEquals(
+				state.document.lastOpenedPath ?? "",
+				previousPath,
+			)
+				? nextPath
+				: state.document.lastOpenedPath,
+		},
+	}));
 }
 
 function stopTitleRenames(path: string) {
@@ -1013,6 +1062,7 @@ const deletionActions = createDeleteActions({
 	refreshFileList,
 	loadPath,
 	syncPins: syncPinnedNotes,
+	stopTitleRenames,
 	handleError: handleFileError,
 });
 
