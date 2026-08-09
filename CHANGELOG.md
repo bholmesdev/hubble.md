@@ -12,6 +12,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Changed
 
 - Open recent workspaces with Ctrl+R, and add folders with Cmd+Shift+O. [#243](https://github.com/bholmesdev/hubble.md/pull/243)
+- Create new Markdown files and HTML Apps in the focused sidebar folder. [#248](https://github.com/bholmesdev/hubble.md/pull/248)
 
 ### Fixed
 
