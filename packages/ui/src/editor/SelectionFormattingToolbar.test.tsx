@@ -152,12 +152,9 @@ describe("SelectionFormattingToolbar", () => {
 			resize();
 		});
 
-		expect(
-			document.querySelector('[aria-label="Numbered list"]'),
-		).not.toBeNull();
 		expect(document.querySelector('[aria-label="To-do list"]')).toBeNull();
 		expect(document.querySelector('[aria-label="Quote"]')).toBeNull();
-		expect(document.querySelector('[aria-label="Comment"]')).toBeNull();
+		expect(document.querySelector('[aria-label="Comment"]')).not.toBeNull();
 		expect(
 			document.querySelector('[aria-label="More formatting"]'),
 		).not.toBeNull();

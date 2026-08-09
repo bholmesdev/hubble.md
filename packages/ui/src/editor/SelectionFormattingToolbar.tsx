@@ -132,14 +132,14 @@ const TOOLBAR_SEPARATOR_WIDTH = 5;
 
 type ActionGroups = readonly (readonly ToolbarAction[])[];
 
-// The bar floats, so it never shrinks on its own: predict its width and drop
-// actions from the right until it fits.
+// The bar floats, so it never shrinks on its own. Keep Comment in place and
+// drop formatting actions from the right until the bar fits.
 function fittingGroups(width: number, hasComment: boolean): ActionGroups {
-	const groups = hasComment
-		? [...ACTION_GROUPS, [COMMENT_ACTION]]
-		: ACTION_GROUPS;
-	for (let count = countActions(groups); count > 0; count -= 1) {
-		const shown = takeActions(groups, count);
+	for (let count = countActions(ACTION_GROUPS); count >= 0; count -= 1) {
+		const shown = [
+			...takeActions(ACTION_GROUPS, count),
+			...(hasComment ? [[COMMENT_ACTION]] : []),
+		];
 		if (toolbarWidth(shown) <= width - TOOLBAR_EDGE_GAP) return shown;
 	}
 	return [];
