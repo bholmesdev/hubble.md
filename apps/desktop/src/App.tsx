@@ -63,6 +63,7 @@ import {
 	sourceLanguageForPath,
 	supportsSourceToggle,
 } from "./lib/filePath";
+import { compactWindowQuery } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
@@ -241,6 +242,20 @@ function App() {
 	);
 	const focusedCreationFolder =
 		focusedSidebarItem?.kind === "folder" ? focusedSidebarItem.path : null;
+	const closeCompactSidebarFromEditor = (target: EventTarget | null) => {
+		if (
+			sidebarOpen &&
+			window.matchMedia(compactWindowQuery).matches &&
+			target instanceof Element &&
+			target.closest("[data-hubble-editor]")
+		) {
+			setSidebarOpen(false);
+		}
+	};
+
+	useEffect(() => {
+		if (window.matchMedia(compactWindowQuery).matches) setSidebarOpen(false);
+	}, []);
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
 		setSearchOpen(open);
@@ -617,7 +632,9 @@ function App() {
 				launchWorkspacePath.length > 0
 			) {
 				await openWorkspace(launchWorkspacePath);
-				setSidebarOpen(true);
+				if (!window.matchMedia(compactWindowQuery).matches) {
+					setSidebarOpen(true);
+				}
 				return;
 			}
 			const nextState = viewerStore.get();
@@ -653,49 +670,55 @@ function App() {
 						telemetryConsent === "unset")
 				}
 			/>
-			<div className="flex min-h-0 flex-1 overflow-hidden">
-				<Sidebar
-					onFocusedItemChange={updateFocusedSidebarItem}
-					footer={
-						showReadyCallout ? (
-							<SidebarCallout
-								message={
-									<>
-										<span className="font-semibold">A new version</span> is
-										ready to install.
-									</>
-								}
-								primaryLabel="Restart"
-								onPrimary={installUpdate}
-								onDismiss={() =>
-									setDismissedVersion(readyVersion ?? "__unknown__")
-								}
-							/>
-						) : whatsNewVersion !== null ? (
-							<SidebarCallout
-								message={
-									<>
-										<span className="font-semibold">Hubble updated</span> to{" "}
-										{whatsNewVersion}.
-									</>
-								}
-								primaryLabel="See what's new"
-								onPrimary={() => {
-									// Only consume the one-shot callout once the changelog is
-									// actually showing; openChangelog can bail on a conflict.
-									void openChangelog().then((opened) => {
-										if (opened) markWhatsNewSeen();
-									});
-								}}
-								onDismiss={markWhatsNewSeen}
-							/>
-						) : telemetryConsent === "unset" ? (
-							<TelemetryConsentCallout
-								onChoose={(choice) => void chooseTelemetry(choice)}
-							/>
-						) : undefined
-					}
-				/>
+			<div className="relative flex min-h-0 flex-1 overflow-hidden">
+				<div
+					aria-hidden={!sidebarOpen}
+					className={`${sidebarOpen ? "contents max-[639px]:translate-x-0" : "hidden max-[639px]:flex max-[639px]:-translate-x-full max-[639px]:pointer-events-none"} max-[639px]:absolute max-[639px]:inset-y-0 max-[639px]:start-0 max-[639px]:z-30 max-[639px]:flex max-[639px]:shadow-overlay max-[639px]:transition-transform max-[639px]:duration-200 max-[639px]:ease-out max-[639px]:motion-reduce:transition-none`}
+				>
+					<Sidebar
+						keepMounted
+						onFocusedItemChange={updateFocusedSidebarItem}
+						footer={
+							showReadyCallout ? (
+								<SidebarCallout
+									message={
+										<>
+											<span className="font-semibold">A new version</span> is
+											ready to install.
+										</>
+									}
+									primaryLabel="Restart"
+									onPrimary={installUpdate}
+									onDismiss={() =>
+										setDismissedVersion(readyVersion ?? "__unknown__")
+									}
+								/>
+							) : whatsNewVersion !== null ? (
+								<SidebarCallout
+									message={
+										<>
+											<span className="font-semibold">Hubble updated</span> to{" "}
+											{whatsNewVersion}.
+										</>
+									}
+									primaryLabel="See what's new"
+									onPrimary={() => {
+										// Only consume the one-shot callout once the changelog is
+										// actually showing; openChangelog can bail on a conflict.
+										void openChangelog().then((opened) => {
+											if (opened) markWhatsNewSeen();
+										});
+									}}
+									onDismiss={markWhatsNewSeen}
+								/>
+							) : telemetryConsent === "unset" ? (
+								<TelemetryConsentCallout
+									onChoose={(choice) => void chooseTelemetry(choice)}
+								/>
+							) : undefined
+						}
+					/>
+				</div>
 				<section
 					className={
 						terminalPosition === "right"
@@ -703,6 +726,12 @@ function App() {
 							: "flex-1 flex flex-col overflow-hidden"
 					}
 					aria-live="polite"
+					onFocusCapture={(event) =>
+						closeCompactSidebarFromEditor(event.target)
+					}
+					onPointerDownCapture={(event) =>
+						closeCompactSidebarFromEditor(event.target)
+					}
 				>
 					<div className="flex-1 min-h-0 min-w-0 relative">
 						{state.status === "loading" && <p>Loading…</p>}

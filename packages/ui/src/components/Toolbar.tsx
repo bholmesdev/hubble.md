@@ -56,6 +56,7 @@ function ToolbarCluster({
 export function Toolbar({
 	currentPath,
 	sidebarOpen,
+	sidebarOverlays = false,
 	sidebarBadge,
 	scrollContainer,
 	platformInset = true,
@@ -67,6 +68,7 @@ export function Toolbar({
 }: {
 	currentPath: string | null;
 	sidebarOpen: boolean;
+	sidebarOverlays?: boolean;
 	sidebarBadge?: boolean;
 	scrollContainer?: HTMLDivElement | null;
 	platformInset?: boolean;
@@ -127,11 +129,11 @@ export function Toolbar({
 	return (
 		<div
 			{...rootProps}
-			className={`flex h-9 select-none items-center ${borderClass} ${rootProps?.className ?? ""}`}
+			className={`flex h-9 min-w-0 select-none items-center overflow-hidden ${borderClass} ${rootProps?.className ?? ""}`}
 		>
 			<ToolbarCluster
 				width={
-					sidebarOpen
+					sidebarOpen && !sidebarOverlays
 						? `var(--sidebar-width, ${DEFAULT_SIDEBAR_WIDTH})`
 						: undefined
 				}

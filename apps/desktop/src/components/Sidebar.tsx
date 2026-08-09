@@ -41,9 +41,11 @@ export type DesktopSidebarFocus = {
 export function Sidebar({
 	footer,
 	onFocusedItemChange,
+	keepMounted = false,
 }: {
 	footer?: ReactNode;
 	onFocusedItemChange?: (item: DesktopSidebarFocus) => void;
+	keepMounted?: boolean;
 }) {
 	const workspace = useStoreValue(workspaceStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
@@ -51,7 +53,7 @@ export function Sidebar({
 	const { workspacePath, files, folders, pinnedNotes, sortMode } = workspace;
 	const pinnedSet = new Set(pinnedNotes);
 
-	if (!sidebarOpen) return null;
+	if (!sidebarOpen && !keepMounted) return null;
 	const collapseSidebar = () => setSidebarOpen(false);
 	if (!workspacePath) {
 		return (

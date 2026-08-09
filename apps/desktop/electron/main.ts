@@ -203,9 +203,10 @@ const workspaceConfigSchema = z.object({
 			),
 	),
 });
+const minWindowWidth = 360;
 const defaultWindowState: WindowState = { width: 920, height: 720 };
 const windowStateSchema = z.object({
-	width: z.number().int().min(640).max(4096),
+	width: z.number().int().min(minWindowWidth).max(4096),
 	height: z.number().int().min(480).max(4096),
 	x: z.number().int().optional(),
 	y: z.number().int().optional(),
@@ -1113,6 +1114,7 @@ async function createWindow() {
 			: {}),
 		width: windowState.width,
 		height: windowState.height,
+		minWidth: minWindowWidth,
 		show: false,
 		titleBarStyle: "hidden",
 		...(process.platform !== "darwin"

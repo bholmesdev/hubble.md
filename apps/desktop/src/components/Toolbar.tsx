@@ -31,6 +31,7 @@ import {
 	relativeWorkspacePath,
 	supportsSourceToggle,
 } from "../lib/filePath";
+import { compactWindowQuery } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
 	goBack,
@@ -79,6 +80,23 @@ function useIsFullScreen() {
 	return isFullScreen;
 }
 
+function useCompactWindow() {
+	const [compact, setCompact] = useState(
+		() => window.matchMedia(compactWindowQuery).matches,
+	);
+	useEffect(() => {
+		const query = window.matchMedia(compactWindowQuery);
+		const update = () => setCompact(query.matches);
+		query.addEventListener("change", update);
+		window.addEventListener("resize", update);
+		return () => {
+			query.removeEventListener("change", update);
+			window.removeEventListener("resize", update);
+		};
+	}, []);
+	return compact;
+}
+
 export function Toolbar({
 	scrollContainer,
 	showSidebarBadge = false,
@@ -92,21 +110,24 @@ export function Toolbar({
 	const titlePreview = useStoreValue(titleGenerationPreviewStore);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const isFullScreen = useIsFullScreen();
+	const compact = useCompactWindow();
 	// The changelog note is virtual: show a friendly title and disable the
 	// file actions (rename, reveal, copy path) that assume a file on disk.
 	const isChangelog = isChangelogPath(currentPath);
 	const toolbarPath = toolbarPathForTitlePreview(currentPath, titlePreview);
+	const actionPath = currentPath && !isChangelog ? currentPath : null;
 
 	return (
 		<SharedToolbar
 			currentPath={isChangelog ? "What's new" : (toolbarPath ?? null)}
 			sidebarOpen={sidebarOpen}
+			sidebarOverlays={compact}
 			sidebarBadge={showSidebarBadge}
 			scrollContainer={scrollContainer}
 			platformInset={!isFullScreen}
 			rootProps={{ style: dragRegionStyle }}
 			onToggleSidebar={toggleSidebar}
-			leftSlot={<NavigationControls />}
+			leftSlot={compact ? null : <NavigationControls />}
 			onRenameCurrentPath={
 				isChangelog
 					? undefined
@@ -114,15 +135,17 @@ export function Toolbar({
 			}
 			rightSlot={
 				<div className="flex items-center gap-1">
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						aria-label="Toggle terminal"
-						title="Toggle terminal"
-						onClick={toggleTerminal}
-					>
-						<MingcuteTerminalLine className="size-3.5" />
-					</Button>
+					{!compact && (
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label="Toggle terminal"
+							title="Toggle terminal"
+							onClick={toggleTerminal}
+						>
+							<MingcuteTerminalLine className="size-3.5" />
+						</Button>
+					)}
 					{currentPath && hasMarkdownExtension(currentPath) && (
 						<ReviewCommentSummary
 							filePath={currentPath}
@@ -135,11 +158,12 @@ export function Toolbar({
 							}
 						/>
 					)}
-					{currentPath && !isChangelog && (
-						<NoteActionsMenu
-							path={currentPath}
+					{(compact || actionPath) && (
+						<ActionsMenu
+							path={actionPath}
+							showTerminal={compact}
 							workspacePath={
-								workspacePath && isEditableFile(currentPath)
+								workspacePath && actionPath && isEditableFile(actionPath)
 									? workspacePath
 									: null
 							}
@@ -156,7 +180,7 @@ function NavigationControls() {
 	const backLabel = `Go Back (${formatCommandShortcut("app.go-back")})`;
 	const forwardLabel = `Go Forward (${formatCommandShortcut("app.go-forward")})`;
 	return (
-		<>
+		<div className="flex items-center gap-1">
 			<Button
 				variant="ghost"
 				size="icon-sm"
@@ -177,29 +201,34 @@ function NavigationControls() {
 			>
 				<MingcuteArrowRightLine className="size-4" />
 			</Button>
-		</>
+		</div>
 	);
 }
 
-function NoteActionsMenu({
+function ActionsMenu({
 	path,
 	workspacePath,
+	showTerminal,
 }: {
-	path: string;
+	path: string | null;
 	workspacePath: string | null;
+	showTerminal: boolean;
 }) {
 	const { viewMode } = useStoreValue(viewerStore);
 	const isSourceMode = viewMode === "source";
-	const isHtml = hasHtmlExtension(path);
-	const sourceModeLabel = isSourceMode
-		? isHtml
-			? "View app"
-			: hasTextExtension(path)
-				? "Edit plain text"
-				: "Edit rich text"
-		: "Edit source";
+	const isHtml = path ? hasHtmlExtension(path) : false;
+	const sourceModeLabel = !path
+		? "Edit source"
+		: isSourceMode
+			? isHtml
+				? "View app"
+				: hasTextExtension(path)
+					? "Edit plain text"
+					: "Edit rich text"
+			: "Edit source";
 
 	async function revealFile() {
+		if (!path) return;
 		try {
 			await desktopApi.revealFile(path);
 		} catch {
@@ -208,11 +237,12 @@ function NoteActionsMenu({
 	}
 
 	async function copyFilePath() {
+		if (!path) return;
 		await copyText(path, "File path");
 	}
 
 	async function openInAgent(client: AgentClient) {
-		if (!workspacePath) return;
+		if (!path || !workspacePath) return;
 		const clientName = client === "codex" ? "Codex" : "Claude";
 		try {
 			await desktopApi.openAgentClient({
@@ -249,7 +279,20 @@ function NoteActionsMenu({
 					className="isolate z-50"
 				>
 					<Menu.Popup className="z-50 w-52 origin-(--transform-origin) rounded-sm border border-border bg-popover p-1 text-[11px] text-popover-foreground outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-						{workspacePath && (
+						{showTerminal && (
+							<>
+								<Menu.Item
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									onClick={toggleTerminal}
+								>
+									<MingcuteTerminalLine className="size-3 shrink-0" />
+									<span className="min-w-0 flex-1">Toggle terminal</span>
+									<ShortcutHint commandId="app.toggle-terminal" />
+								</Menu.Item>
+								<Menu.Separator className="my-1 h-px bg-border" />
+							</>
+						)}
+						{path && workspacePath && (
 							<>
 								<Menu.Item
 									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
@@ -276,7 +319,7 @@ function NoteActionsMenu({
 								<Menu.Separator className="my-1 h-px bg-border" />
 							</>
 						)}
-						{supportsSourceToggle(path) && (
+						{path && supportsSourceToggle(path) && (
 							<Menu.Item
 								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
 								onClick={() => setViewerMode(isSourceMode ? "rich" : "source")}
@@ -286,31 +329,37 @@ function NoteActionsMenu({
 								<ShortcutHint commandId="app.toggle-source-mode" />
 							</Menu.Item>
 						)}
-						<Menu.Item
-							className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
-							onClick={() => void openPathInDefaultApp(path)}
-						>
-							<MingcuteExternalLinkLine className="size-3 shrink-0" />
-							<span className="min-w-0 flex-1">Open in default app</span>
-						</Menu.Item>
-						<Menu.Item
-							className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
-							onClick={() => void revealFile()}
-						>
-							<MingcuteFolderOpenLine className="size-3 shrink-0" />
-							<span className="min-w-0 flex-1">
-								{revealFileLabel(desktopApi.platform)}
-							</span>
-							<ShortcutHint commandId="app.reveal" />
-						</Menu.Item>
-						<Menu.Item
-							className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
-							onClick={() => void copyFilePath()}
-						>
-							<MingcuteCopy2Line className="size-3 shrink-0" />
-							<span className="min-w-0 flex-1">Copy file path</span>
-							<ShortcutHint commandId="app.copy-path" />
-						</Menu.Item>
+						{path && (
+							<Menu.Item
+								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+								onClick={() => void openPathInDefaultApp(path)}
+							>
+								<MingcuteExternalLinkLine className="size-3 shrink-0" />
+								<span className="min-w-0 flex-1">Open in default app</span>
+							</Menu.Item>
+						)}
+						{path && (
+							<Menu.Item
+								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+								onClick={() => void revealFile()}
+							>
+								<MingcuteFolderOpenLine className="size-3 shrink-0" />
+								<span className="min-w-0 flex-1">
+									{revealFileLabel(desktopApi.platform)}
+								</span>
+								<ShortcutHint commandId="app.reveal" />
+							</Menu.Item>
+						)}
+						{path && (
+							<Menu.Item
+								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+								onClick={() => void copyFilePath()}
+							>
+								<MingcuteCopy2Line className="size-3 shrink-0" />
+								<span className="min-w-0 flex-1">Copy file path</span>
+								<ShortcutHint commandId="app.copy-path" />
+							</Menu.Item>
+						)}
 					</Menu.Popup>
 				</Menu.Positioner>
 			</Menu.Portal>
