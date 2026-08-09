@@ -164,6 +164,17 @@ export function Toolbar({
 		};
 	}
 
+	function flushTitleMove() {
+		const drag = titleDragRef.current;
+		if (!drag) return;
+		drag.frame = null;
+		const position = drag.pending;
+		drag.pending = null;
+		if (position && onMoveWindow) {
+			void onMoveWindow(position.x, position.y);
+		}
+	}
+
 	function onTitlePointerMove(event: React.PointerEvent<HTMLButtonElement>) {
 		const drag = titleDragRef.current;
 		if (!drag || !onMoveWindow) return;
@@ -179,17 +190,6 @@ export function Toolbar({
 		};
 		if (drag.frame === null) {
 			drag.frame = requestAnimationFrame(flushTitleMove);
-		}
-	}
-
-	function flushTitleMove() {
-		const drag = titleDragRef.current;
-		if (!drag) return;
-		drag.frame = null;
-		const position = drag.pending;
-		drag.pending = null;
-		if (position && onMoveWindow) {
-			void onMoveWindow(position.x, position.y);
 		}
 	}
 
