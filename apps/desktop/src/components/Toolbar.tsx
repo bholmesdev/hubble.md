@@ -209,6 +209,7 @@ function ActionsMenu({
 					: "Edit rich text"
 			: "Edit source"
 		: null;
+	const menuLabel = path ? "Note actions" : "More actions";
 
 	async function revealFile() {
 		if (!path) return;
@@ -247,8 +248,8 @@ function ActionsMenu({
 					<Button
 						variant="ghost"
 						size="icon-sm"
-						aria-label="Note actions"
-						title="Note actions"
+						aria-label={menuLabel}
+						title={menuLabel}
 					/>
 				}
 			>

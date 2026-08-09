@@ -82,6 +82,7 @@ export function WorkspaceSwitcherMenu({
 			</Menu.Trigger>
 			<Menu.Portal>
 				<Menu.Positioner
+					data-sidebar-portal
 					align="start"
 					side="bottom"
 					sideOffset={4}

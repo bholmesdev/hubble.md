@@ -1882,6 +1882,7 @@ function NewFileMenu({
 			</Menu.Trigger>
 			<Menu.Portal>
 				<Menu.Positioner
+					data-sidebar-portal
 					align="end"
 					side="bottom"
 					sideOffset={4}
@@ -2238,6 +2239,7 @@ function ActionsMenu({
 			</Menu.Trigger>
 			<Menu.Portal>
 				<Menu.Positioner
+					data-sidebar-portal
 					align="end"
 					side="bottom"
 					sideOffset={4}

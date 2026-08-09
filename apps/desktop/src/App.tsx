@@ -63,7 +63,7 @@ import {
 	sourceLanguageForPath,
 	supportsSourceToggle,
 } from "./lib/filePath";
-import { isCompactWindow } from "./lib/layout";
+import { isCompactWindow, useCompactWindow } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
@@ -201,6 +201,7 @@ async function searchFileContents(query: string) {
 
 function App() {
 	const state = useStoreValue(viewerStore);
+	const compact = useCompactWindow();
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
@@ -250,14 +251,14 @@ function App() {
 	const focusedCreationFolder =
 		focusedSidebarItem?.kind === "folder" ? focusedSidebarItem.path : null;
 	const closeSidebarOverlay = () => {
-		if (sidebarOpen && isCompactWindow()) {
+		if (sidebarOpen && compact) {
 			setSidebarOpen(false);
 		}
 	};
 
 	useEffect(() => {
-		if (isCompactWindow()) setSidebarOpen(false);
-	}, []);
+		if (compact) setSidebarOpen(false);
+	}, [compact]);
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
 		setSearchOpen(open);
@@ -667,7 +668,9 @@ function App() {
 			onPointerDownCapture={(event) => {
 				if (
 					event.target instanceof Element &&
-					!event.target.closest("[data-sidebar-overlay], [data-sidebar-toggle]")
+					!event.target.closest(
+						"[data-sidebar-overlay], [data-sidebar-portal], [data-sidebar-toggle]",
+					)
 				) {
 					closeSidebarOverlay();
 				}
