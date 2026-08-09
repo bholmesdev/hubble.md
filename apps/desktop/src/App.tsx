@@ -176,7 +176,7 @@ const SIDEBAR_OVERLAY =
 const SIDEBAR_OVERLAY_SHOWN =
 	"contents max-sm:translate-x-0 max-sm:duration-[180ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
 const SIDEBAR_OVERLAY_HIDDEN =
-	"hidden max-sm:-translate-x-full max-sm:pointer-events-none max-sm:duration-[140ms] max-sm:ease-[cubic-bezier(0.5,0,0.75,0)]";
+	"hidden max-sm:-translate-x-full max-sm:pointer-events-none max-sm:duration-[140ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
 
 let nextSearchRequestId = 0;
 
