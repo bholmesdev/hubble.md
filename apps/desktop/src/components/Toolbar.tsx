@@ -145,9 +145,9 @@ export function Toolbar({
 					{comments && !compact ? <ReviewCommentSummary {...comments} /> : null}
 					{(compact || actionPath) && (
 						<ActionsMenu
+							compact={compact}
 							comments={compact ? comments : null}
 							path={actionPath}
-							showTerminal={compact}
 							workspacePath={
 								workspacePath && actionPath && isEditableFile(actionPath)
 									? workspacePath
@@ -192,17 +192,18 @@ function NavigationControls() {
 }
 
 function ActionsMenu({
+	compact,
 	comments,
 	path,
 	workspacePath,
-	showTerminal,
 }: {
+	compact: boolean;
 	comments: ReviewCommentSummaryProps | null;
 	path: string | null;
 	workspacePath: string | null;
-	showTerminal: boolean;
 }) {
 	const { viewMode } = useStoreValue(viewerStore);
+	const { canGoBack, canGoForward } = useHistoryNav();
 	const isSourceMode = viewMode === "source";
 	const sourceModeLabel = path
 		? isSourceMode
@@ -266,6 +267,29 @@ function ActionsMenu({
 					className="isolate z-50"
 				>
 					<Menu.Popup className="z-50 w-52 origin-(--transform-origin) rounded-sm border border-border bg-popover p-1 text-[11px] text-popover-foreground outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+						{compact ? (
+							<>
+								<Menu.Item
+									disabled={!canGoBack}
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent"
+									onClick={() => void goBack()}
+								>
+									<MingcuteArrowLeftLine className="size-3 shrink-0" />
+									<span className="min-w-0 flex-1">Back</span>
+									<ShortcutHint commandId="app.go-back" />
+								</Menu.Item>
+								<Menu.Item
+									disabled={!canGoForward}
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent"
+									onClick={() => void goForward()}
+								>
+									<MingcuteArrowRightLine className="size-3 shrink-0" />
+									<span className="min-w-0 flex-1">Forward</span>
+									<ShortcutHint commandId="app.go-forward" />
+								</Menu.Item>
+								<Menu.Separator className="my-1 h-px bg-border" />
+							</>
+						) : null}
 						{comments ? (
 							<ReviewCommentSummary
 								{...comments}
@@ -285,7 +309,7 @@ function ActionsMenu({
 								}
 							/>
 						) : null}
-						{showTerminal && (
+						{compact && (
 							<>
 								<Menu.Item
 									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
