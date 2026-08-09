@@ -504,8 +504,12 @@ export function getPendingRenameTarget(path: string) {
 	return pendingRenames.get(path) ?? null;
 }
 
-if (workspaceStore.get().workspacePath) {
-	void refreshFiles();
+const initialWorkspacePath = workspaceStore.get().workspacePath;
+if (initialWorkspacePath) {
+	void Promise.all([
+		refreshFiles(initialWorkspacePath),
+		loadPinnedNotes(initialWorkspacePath),
+	]);
 }
 
 export function setSortMode(mode: SortMode) {
