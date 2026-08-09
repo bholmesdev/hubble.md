@@ -13,6 +13,7 @@ import {
 	type CSSProperties,
 	type RefObject,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -117,6 +118,50 @@ const BLOCK_ACTIONS: ToolbarAction[] = [
 	},
 ];
 
+const ACTION_GROUPS = [INLINE_ACTIONS, HEADING_ACTIONS, BLOCK_ACTIONS] as const;
+const ACTION_GROUP_KEYS = ["inline", "headings", "blocks", "comment"];
+const TOOLBAR_EDGE_GAP = 16;
+const TOOLBAR_FRAME_WIDTH = 10;
+const TOOLBAR_BUTTON_WIDTH = 28;
+const TOOLBAR_GAP_WIDTH = 2;
+const TOOLBAR_SEPARATOR_WIDTH = 5;
+
+function toolbarWidth(actionCount: number, groupCounts: number[]) {
+	if (actionCount === 0) return TOOLBAR_FRAME_WIDTH + TOOLBAR_BUTTON_WIDTH;
+	const visibleGroups = groupCounts.filter((count) => count > 0).length;
+	const separators = visibleGroups;
+	const elements = actionCount + separators + 1;
+	return (
+		TOOLBAR_FRAME_WIDTH +
+		TOOLBAR_BUTTON_WIDTH * (actionCount + 1) +
+		TOOLBAR_SEPARATOR_WIDTH * separators +
+		TOOLBAR_GAP_WIDTH * (elements - 1)
+	);
+}
+
+function visibleActionCount(width: number, groupSizes: number[]) {
+	const total = groupSizes.reduce((sum, size) => sum + size, 0);
+	for (let count = total; count >= 0; count -= 1) {
+		let left = count;
+		const groupCounts = groupSizes.map((size) => {
+			const visible = Math.min(size, left);
+			left -= visible;
+			return visible;
+		});
+		if (toolbarWidth(count, groupCounts) <= width - TOOLBAR_EDGE_GAP) {
+			return count;
+		}
+	}
+	return 0;
+}
+
+function toolbarGroupSizes(hasComment: boolean) {
+	return [
+		...ACTION_GROUPS.map((group) => group.length),
+		...(hasComment ? [1] : []),
+	];
+}
+
 function shouldShowToolbar(editor: Editor) {
 	const { selection } = editor.state;
 	if (!editor.isFocused) return false;
@@ -155,7 +200,35 @@ export function SelectionFormattingToolbar({
 	// even when the toolbar's position does not move.
 	const [, setRevision] = useState(0);
 	const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
+	const actionGroups: readonly (readonly ToolbarAction[])[] = onComment
+		? [...ACTION_GROUPS, []]
+		: ACTION_GROUPS;
+	const groupSizes = toolbarGroupSizes(Boolean(onComment));
+	const totalActions = groupSizes.reduce((sum, size) => sum + size, 0);
+	const [shownActions, setShownActions] = useState(() => totalActions);
 	const openRef = useRef(false);
+
+	useLayoutEffect(() => {
+		const viewport = viewportRef.current;
+		if (!viewport) return;
+		const update = () => {
+			if (viewport.clientWidth === 0) return;
+			setShownActions(
+				visibleActionCount(
+					viewport.clientWidth,
+					toolbarGroupSizes(Boolean(onComment)),
+				),
+			);
+		};
+		update();
+		if (typeof ResizeObserver === "undefined") {
+			window.addEventListener("resize", update);
+			return () => window.removeEventListener("resize", update);
+		}
+		const observer = new ResizeObserver(update);
+		observer.observe(viewport);
+		return () => observer.disconnect();
+	}, [onComment, viewportRef]);
 
 	useEffect(() => {
 		if (!editor) return;
@@ -357,7 +430,7 @@ export function SelectionFormattingToolbar({
 			// Menu.Popup / Select.Popup classes). fill-mode-forwards keeps the
 			// exit's final frame (opacity 0) applied until React unmounts the
 			// bar, so it never flashes back to visible after animating out.
-			className="absolute z-[4] flex origin-(--transform-origin) items-center gap-0.5 rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-popover-foreground shadow-overlay transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:fill-mode-forwards"
+			className="absolute z-[4] flex max-w-[calc(100%-1rem)] origin-(--transform-origin) items-center gap-0.5 overflow-hidden rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-popover-foreground shadow-overlay transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:fill-mode-forwards"
 			style={
 				{
 					insetInlineStart: `${position?.x ?? 0}px`,
@@ -375,35 +448,47 @@ export function SelectionFormattingToolbar({
 				if (!openRef.current) setPresent(false);
 			}}
 		>
-			{INLINE_ACTIONS.map((action) => (
-				<ToolbarButton key={action.kind} editor={editor} action={action} />
-			))}
-			<Separator orientation="vertical" className="mx-0.5" />
-			{HEADING_ACTIONS.map((action) => (
-				<ToolbarButton key={action.kind} editor={editor} action={action} />
-			))}
-			<Separator orientation="vertical" className="mx-0.5" />
-			{BLOCK_ACTIONS.map((action) => (
-				<ToolbarButton key={action.kind} editor={editor} action={action} />
-			))}
-			{onComment && (
-				<>
-					<Separator orientation="vertical" className="mx-0.5" />
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon-sm"
-						aria-label="Comment"
-						title="Comment"
-						className="text-muted-foreground"
-						onMouseDown={(event) => event.preventDefault()}
-						onClick={onComment}
-					>
-						<MingcuteChat3Line className="size-4" />
-					</Button>
-				</>
+			{actionGroups.map((group, groupIndex) => {
+				const priorActions = groupSizes
+					.slice(0, groupIndex)
+					.reduce((sum, size) => sum + size, 0);
+				const visible = Math.min(
+					groupSizes[groupIndex],
+					Math.max(0, shownActions - priorActions),
+				);
+				if (visible === 0) return null;
+				return (
+					<div key={ACTION_GROUP_KEYS[groupIndex]} className="contents">
+						{groupIndex > 0 && (
+							<Separator orientation="vertical" className="mx-0.5" />
+						)}
+						{group.slice(0, visible).map((action) => (
+							<ToolbarButton
+								key={action.kind}
+								editor={editor}
+								action={action}
+							/>
+						))}
+						{groupIndex === ACTION_GROUPS.length && onComment && (
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-sm"
+								aria-label="Comment"
+								title="Comment"
+								className="text-muted-foreground"
+								onMouseDown={(event) => event.preventDefault()}
+								onClick={onComment}
+							>
+								<MingcuteChat3Line className="size-4" />
+							</Button>
+						)}
+					</div>
+				);
+			})}
+			{shownActions > 0 && (
+				<Separator orientation="vertical" className="mx-0.5" />
 			)}
-			<Separator orientation="vertical" className="mx-0.5" />
 			<Button
 				type="button"
 				variant="ghost"

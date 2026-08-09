@@ -3,6 +3,7 @@ import {
 	flip,
 	offset,
 	shift,
+	size,
 	type VirtualElement,
 } from "@floating-ui/dom";
 import type { Editor } from "@tiptap/core";
@@ -59,6 +60,17 @@ function updateCommandMenuPosition({
 			shift({
 				boundary: viewport,
 				padding: 8,
+				crossAxis: true,
+			}),
+			size({
+				boundary: viewport,
+				padding: 8,
+				apply({ availableHeight, elements }) {
+					elements.floating.style.setProperty(
+						"--command-menu-height",
+						`${Math.max(0, availableHeight)}px`,
+					);
+				},
 			}),
 		],
 	}).then(({ x, y }) => {
@@ -98,10 +110,15 @@ export function useCommandMenuPosition({
 		update();
 		viewport.addEventListener("scroll", update, { passive: true });
 		window.addEventListener("resize", update);
+		const observer =
+			typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+		observer?.observe(viewport);
+		observer?.observe(floatingEl);
 
 		return () => {
 			viewport.removeEventListener("scroll", update);
 			window.removeEventListener("resize", update);
+			observer?.disconnect();
 		};
 	}, [editor, floatingRef, pos, setPosition, viewportRef]);
 }

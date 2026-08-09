@@ -375,6 +375,7 @@ export function EditorView({
 						<FormatCommandMenu
 							editor={editor}
 							viewportRef={editorViewportRef}
+							onComment={() => setReviewCommentRequest((value) => value + 1)}
 						/>
 					</>
 				)}

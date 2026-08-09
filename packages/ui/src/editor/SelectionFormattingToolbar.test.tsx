@@ -31,6 +31,7 @@ afterEach(() => {
 	editors.length = 0;
 	document.body.replaceChildren();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
 
 describe("SelectionFormattingToolbar", () => {
@@ -128,6 +129,38 @@ describe("SelectionFormattingToolbar", () => {
 			(button as HTMLButtonElement).click();
 		});
 		expect(onComment).toHaveBeenCalledOnce();
+	});
+
+	it("hides actions from the right as the viewport narrows", async () => {
+		vi.stubGlobal("ResizeObserver", undefined);
+		const editor = createEditor(docWithParagraph("hello world"));
+		const viewport = document.createElement("div");
+		viewport.append(editor.view.dom);
+		document.body.append(viewport);
+		let width = 500;
+		Object.defineProperty(viewport, "clientWidth", { get: () => width });
+
+		selectText(editor, 1, 6);
+		renderToolbar(editor, viewport, () => {});
+		await waitForToolbarToShow();
+
+		expect(document.querySelector('[aria-label="Quote"]')).not.toBeNull();
+		expect(document.querySelector('[aria-label="Comment"]')).not.toBeNull();
+
+		act(() => {
+			width = 360;
+			window.dispatchEvent(new Event("resize"));
+		});
+
+		expect(
+			document.querySelector('[aria-label="Numbered list"]'),
+		).not.toBeNull();
+		expect(document.querySelector('[aria-label="To-do list"]')).toBeNull();
+		expect(document.querySelector('[aria-label="Quote"]')).toBeNull();
+		expect(document.querySelector('[aria-label="Comment"]')).toBeNull();
+		expect(
+			document.querySelector('[aria-label="More formatting"]'),
+		).not.toBeNull();
 	});
 });
 

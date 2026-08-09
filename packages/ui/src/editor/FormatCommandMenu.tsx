@@ -11,6 +11,7 @@ import {
 } from "react";
 import MingcuteBoldLine from "~icons/mingcute/bold-line";
 import MingcuteBorderHorizontalLine from "~icons/mingcute/border-horizontal-line";
+import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
 import MingcuteHeading1Line from "~icons/mingcute/heading-1-line";
 import MingcuteHeading2Line from "~icons/mingcute/heading-2-line";
@@ -35,8 +36,10 @@ import {
 /** Opens the `Cmd+/` format command menu from elsewhere (e.g. the selection toolbar's "More" button). */
 export const OPEN_FORMAT_COMMAND_MENU_EVENT = "hubble:open-format-command-menu";
 
+type MenuCommandKind = FormatCommandKind | "comment";
+
 type FormatCommand = {
-	kind: FormatCommandKind;
+	kind: MenuCommandKind;
 	title: string;
 	description: string;
 	aliases: string[];
@@ -163,24 +166,36 @@ const FORMAT_COMMANDS: FormatCommand[] = [
 		group: "Inline",
 		shortcut: "editor.link",
 	},
+	{
+		kind: "comment",
+		title: "Comment",
+		description: "Comment on selection",
+		aliases: ["review", "feedback", "note"],
+		icon: MingcuteChat3Line,
+		group: "Inline",
+	},
 ];
 
 export function FormatCommandMenu({
 	editor,
 	viewportRef,
+	onComment,
 }: {
 	editor: Editor | null;
 	viewportRef: RefObject<HTMLDivElement | null>;
+	onComment?: () => void;
 }) {
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const [position, setPosition] = useState<MenuPosition | null>(null);
 	const [selectedKind, setSelectedKind] =
-		useState<FormatCommandKind>("paragraph");
+		useState<MenuCommandKind>("paragraph");
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const menuRef = useRef<HTMLDivElement | null>(null);
-	const visibleCommands = FORMAT_COMMANDS.filter((command) =>
-		matchesCommand(command, query),
+	const visibleCommands = FORMAT_COMMANDS.filter(
+		(command) =>
+			(command.kind !== "comment" || onComment) &&
+			matchesCommand(command, query),
 	);
 	const activeKind = visibleCommands.some(
 		(command) => command.kind === selectedKind,
@@ -262,15 +277,19 @@ export function FormatCommandMenu({
 
 	if (!editor || !open) return null;
 
-	const runCommand = (kind: FormatCommandKind) => {
+	const runCommand = (kind: MenuCommandKind) => {
 		closeMenu();
+		if (kind === "comment") {
+			onComment?.();
+			return;
+		}
 		applyFormatCommand(editor, kind);
 	};
 
 	return (
 		<div
 			ref={menuRef}
-			className="absolute z-[5] w-[250px] overflow-hidden rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay"
+			className="absolute z-[5] w-[250px] max-h-[var(--command-menu-height)] max-w-[calc(100%-1rem)] overflow-hidden rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay"
 			style={{
 				insetInlineStart: `${position?.x ?? 0}px`,
 				insetBlockStart: `${position?.y ?? 0}px`,
@@ -278,9 +297,10 @@ export function FormatCommandMenu({
 			}}
 		>
 			<Command
+				className="flex max-h-[var(--command-menu-height)] flex-col"
 				label="Format commands"
 				value={activeKind}
-				onValueChange={(value) => setSelectedKind(value as FormatCommandKind)}
+				onValueChange={(value) => setSelectedKind(value as MenuCommandKind)}
 				shouldFilter={false}
 				loop
 			>
@@ -298,7 +318,7 @@ export function FormatCommandMenu({
 						}
 					}}
 				/>
-				<Command.List className="max-h-64 overflow-y-auto p-1">
+				<Command.List className="min-h-0 max-h-64 overflow-y-auto p-1">
 					{visibleCommands.length === 0 ? (
 						<div className="px-2 py-2 text-[11px] text-muted-foreground">
 							No commands
@@ -318,7 +338,7 @@ export function FormatCommandMenu({
 function renderGroup(
 	group: FormatCommand["group"],
 	commands: FormatCommand[],
-	runCommand: (kind: FormatCommandKind) => void,
+	runCommand: (kind: MenuCommandKind) => void,
 	editor: Editor,
 ) {
 	const groupCommands = commands.filter((command) => command.group === group);
@@ -332,7 +352,8 @@ function renderGroup(
 		>
 			{groupCommands.map((command) => {
 				const Icon = command.icon;
-				const isApplied = isFormatActive(editor, command.kind);
+				const isApplied =
+					command.kind !== "comment" && isFormatActive(editor, command.kind);
 				return (
 					<Command.Item
 						key={command.kind}
