@@ -1786,6 +1786,21 @@ function registerIpc() {
 		() => mainWindow?.isFullScreen() ?? false,
 	);
 
+	ipcMain.handle("desktop:move-window", (_event, input: unknown) => {
+		const x =
+			typeof input === "object" && input !== null && "x" in input
+				? input.x
+				: undefined;
+		const y =
+			typeof input === "object" && input !== null && "y" in input
+				? input.y
+				: undefined;
+		if (typeof x !== "number" || typeof y !== "number") {
+			throw new Error("Invalid window position");
+		}
+		mainWindow?.setPosition(x, y);
+	});
+
 	ipcMain.handle("desktop:zoom-window", (_event, input: unknown) => {
 		const direction =
 			typeof input === "object" && input !== null && "direction" in input

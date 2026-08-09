@@ -202,6 +202,7 @@ export type DesktopApi = {
 	setTelemetryConsent(consent: TelemetryChoice): Promise<TelemetryConsent>;
 	recordTelemetryActivity(input: { usedHtmlApp: boolean }): Promise<void>;
 	getFullScreen(): Promise<boolean>;
+	moveWindow(x: number, y: number): Promise<void>;
 	zoomWindow(direction: ZoomDirection): Promise<void>;
 	checkForUpdates(): Promise<void>;
 	installUpdate(): Promise<void>;

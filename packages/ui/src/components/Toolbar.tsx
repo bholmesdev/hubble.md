@@ -18,9 +18,18 @@ const END_INSET = isMac()
 	: "calc(100vw - env(titlebar-area-width, calc(100vw - 138px)))";
 const ACTIONS_BASIS = "114px";
 const DEFAULT_SIDEBAR_WIDTH = "220px";
+const TITLE_CLICK_SLOP_PX = 4;
 const NO_DRAG_STYLE = {
 	WebkitAppRegion: "no-drag",
 } as CSSProperties;
+
+type TitleDrag = {
+	pointerX: number;
+	pointerY: number;
+	windowX: number;
+	windowY: number;
+	moved: boolean;
+};
 
 // Clusters shrink from ACTIONS_BASIS by default; passing `width` pins them to
 // an exact size instead (used to match the sidebar seam).
@@ -64,6 +73,7 @@ export function Toolbar({
 	rightSlot,
 	onToggleSidebar,
 	onRenameCurrentPath,
+	onMoveWindow,
 	rootProps,
 }: {
 	currentPath: string | null;
@@ -76,6 +86,7 @@ export function Toolbar({
 	rightSlot?: React.ReactNode;
 	onToggleSidebar?: () => void;
 	onRenameCurrentPath?: (nextName: string) => void | Promise<void>;
+	onMoveWindow?: (x: number, y: number) => void | Promise<void>;
 	rootProps?: HTMLAttributes<HTMLDivElement> &
 		Record<`data-${string}`, unknown>;
 }) {
@@ -83,6 +94,8 @@ export function Toolbar({
 	const [editingTitle, setEditingTitle] = useState(false);
 	const [draftTitle, setDraftTitle] = useState("");
 	const titleInputRef = useRef<HTMLInputElement | null>(null);
+	const titleDragRef = useRef<TitleDrag | null>(null);
+	const skipTitleClickRef = useRef(false);
 	const title = currentPath ? fileNameFromPath(currentPath) : "";
 
 	useEffect(() => {
@@ -118,6 +131,47 @@ export function Toolbar({
 		cancelTitleEdit();
 		if (!nextTitle || nextTitle === title || !onRenameCurrentPath) return;
 		await onRenameCurrentPath(nextTitle);
+	}
+
+	function onTitlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+		if (!onMoveWindow || event.button !== 0) return;
+		event.currentTarget.setPointerCapture(event.pointerId);
+		titleDragRef.current = {
+			pointerX: event.screenX,
+			pointerY: event.screenY,
+			windowX: window.screenX,
+			windowY: window.screenY,
+			moved: false,
+		};
+	}
+
+	function onTitlePointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+		const drag = titleDragRef.current;
+		if (!drag || !onMoveWindow) return;
+		const dx = event.screenX - drag.pointerX;
+		const dy = event.screenY - drag.pointerY;
+		if (!drag.moved && Math.abs(dx) + Math.abs(dy) < TITLE_CLICK_SLOP_PX) {
+			return;
+		}
+		drag.moved = true;
+		void onMoveWindow(
+			Math.round(drag.windowX + dx),
+			Math.round(drag.windowY + dy),
+		);
+	}
+
+	function endTitleDrag() {
+		const drag = titleDragRef.current;
+		titleDragRef.current = null;
+		if (drag?.moved) skipTitleClickRef.current = true;
+	}
+
+	function onTitleClick() {
+		if (skipTitleClickRef.current) {
+			skipTitleClickRef.current = false;
+			return;
+		}
+		beginTitleEdit();
 	}
 
 	const borderClass = sidebarOpen
@@ -184,10 +238,15 @@ export function Toolbar({
 				) : (
 					<button
 						type="button"
-						className="min-w-0 truncate rounded-sm px-1 text-center text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-0"
+						className="min-w-0 cursor-default truncate rounded-sm px-1 text-center text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-0"
 						style={NO_DRAG_STYLE}
-						onClick={beginTitleEdit}
-						disabled={!title || !onRenameCurrentPath}
+						onClick={onTitleClick}
+						onPointerDown={onTitlePointerDown}
+						onPointerMove={onTitlePointerMove}
+						onPointerUp={endTitleDrag}
+						onPointerCancel={endTitleDrag}
+						disabled={!title || (!onRenameCurrentPath && !onMoveWindow)}
+						tabIndex={onRenameCurrentPath ? undefined : -1}
 					>
 						{title || "\u00A0"}
 					</button>

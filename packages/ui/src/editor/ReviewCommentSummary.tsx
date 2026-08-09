@@ -1,6 +1,11 @@
 import { Popover } from "@base-ui/react/popover";
 import { Tabs } from "@base-ui/react/tabs";
-import { useState } from "react";
+import {
+	type AriaRole,
+	type ReactElement,
+	type ReactNode,
+	useState,
+} from "react";
 import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import { Button } from "../primitives/button";
@@ -32,6 +37,10 @@ export type ReviewCommentSummaryProps = {
 	threads: ReviewThread[];
 	onCommand: (kind: ReviewThreadCommand["kind"], id: string) => void;
 	onMessage?: (message: string, type: "success" | "error") => void;
+	trigger?: ReactElement;
+	triggerChildren?: ReactNode;
+	triggerNativeButton?: boolean;
+	triggerRole?: AriaRole;
 };
 
 /** Toolbar entry point for the document's review threads. The gutter badges
@@ -45,6 +54,10 @@ export function ReviewCommentSummary({
 	threads,
 	onCommand,
 	onMessage,
+	trigger,
+	triggerChildren,
+	triggerNativeButton = true,
+	triggerRole,
 }: ReviewCommentSummaryProps) {
 	const [open, setOpen] = useState(false);
 	const [filter, setFilter] = useState<Filter>("unresolved");
@@ -68,16 +81,20 @@ export function ReviewCommentSummary({
 	return (
 		<Popover.Root open={open} onOpenChange={setOpen}>
 			<Popover.Trigger
+				nativeButton={triggerNativeButton}
+				role={triggerRole}
 				render={
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						aria-label="Comments"
-						title="Comments"
-					/>
+					trigger ?? (
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label="Comments"
+							title="Comments"
+						/>
+					)
 				}
 			>
-				<MingcuteChat3Line className="size-3.5" />
+				{triggerChildren ?? <MingcuteChat3Line className="size-3.5" />}
 			</Popover.Trigger>
 			<Popover.Portal>
 				<Popover.Positioner

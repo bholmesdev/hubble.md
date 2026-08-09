@@ -63,7 +63,7 @@ import {
 	sourceLanguageForPath,
 	supportsSourceToggle,
 } from "./lib/filePath";
-import { compactWindowQuery } from "./lib/layout";
+import { isCompactWindow } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
@@ -171,6 +171,13 @@ async function openFilePicker() {
 	}
 }
 
+const SIDEBAR_OVERLAY =
+	"max-sm:absolute max-sm:inset-y-0 max-sm:start-0 max-sm:z-30 max-sm:flex max-sm:shadow-overlay max-sm:transition-transform max-sm:motion-reduce:transition-none";
+const SIDEBAR_OVERLAY_SHOWN =
+	"contents max-sm:translate-x-0 max-sm:duration-[180ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
+const SIDEBAR_OVERLAY_HIDDEN =
+	"hidden max-sm:-translate-x-full max-sm:pointer-events-none max-sm:duration-[140ms] max-sm:ease-[cubic-bezier(0.5,0,0.75,0)]";
+
 let nextSearchRequestId = 0;
 
 /**
@@ -242,10 +249,10 @@ function App() {
 	);
 	const focusedCreationFolder =
 		focusedSidebarItem?.kind === "folder" ? focusedSidebarItem.path : null;
-	const closeCompactSidebarFromEditor = (target: EventTarget | null) => {
+	const closeSidebarOverlay = (target: EventTarget | null) => {
 		if (
 			sidebarOpen &&
-			window.matchMedia(compactWindowQuery).matches &&
+			isCompactWindow() &&
 			target instanceof Element &&
 			target.closest("[data-hubble-editor]")
 		) {
@@ -254,7 +261,7 @@ function App() {
 	};
 
 	useEffect(() => {
-		if (window.matchMedia(compactWindowQuery).matches) setSidebarOpen(false);
+		if (isCompactWindow()) setSidebarOpen(false);
 	}, []);
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
@@ -632,7 +639,7 @@ function App() {
 				launchWorkspacePath.length > 0
 			) {
 				await openWorkspace(launchWorkspacePath);
-				if (!window.matchMedia(compactWindowQuery).matches) {
+				if (!isCompactWindow()) {
 					setSidebarOpen(true);
 				}
 				return;
@@ -671,9 +678,10 @@ function App() {
 				}
 			/>
 			<div className="relative flex min-h-0 flex-1 overflow-hidden">
+				{/* Stays mounted while closed so the overlay slide can animate. */}
 				<div
 					aria-hidden={!sidebarOpen}
-					className={`${sidebarOpen ? "contents max-[639px]:translate-x-0" : "hidden max-[639px]:flex max-[639px]:-translate-x-full max-[639px]:pointer-events-none"} max-[639px]:absolute max-[639px]:inset-y-0 max-[639px]:start-0 max-[639px]:z-30 max-[639px]:flex max-[639px]:shadow-overlay max-[639px]:transition-transform max-[639px]:duration-200 max-[639px]:ease-out max-[639px]:motion-reduce:transition-none`}
+					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
 				>
 					<Sidebar
 						keepMounted
@@ -726,12 +734,8 @@ function App() {
 							: "flex-1 flex flex-col overflow-hidden"
 					}
 					aria-live="polite"
-					onFocusCapture={(event) =>
-						closeCompactSidebarFromEditor(event.target)
-					}
-					onPointerDownCapture={(event) =>
-						closeCompactSidebarFromEditor(event.target)
-					}
+					onFocusCapture={(event) => closeSidebarOverlay(event.target)}
+					onPointerDownCapture={(event) => closeSidebarOverlay(event.target)}
 				>
 					<div className="flex-1 min-h-0 min-w-0 relative">
 						{state.status === "loading" && <p>Loading…</p>}

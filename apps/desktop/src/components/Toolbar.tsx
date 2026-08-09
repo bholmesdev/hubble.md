@@ -5,6 +5,7 @@ import {
 	commandReviewThread,
 	formatCommandShortcut,
 	ReviewCommentSummary,
+	type ReviewCommentSummaryProps,
 	Toolbar as SharedToolbar,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
@@ -12,6 +13,7 @@ import { type CSSProperties, useEffect, useState } from "react";
 import { toast } from "sonner";
 import MingcuteArrowLeftLine from "~icons/mingcute/arrow-left-line";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
+import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
@@ -31,7 +33,7 @@ import {
 	relativeWorkspacePath,
 	supportsSourceToggle,
 } from "../lib/filePath";
-import { compactWindowQuery } from "../lib/layout";
+import { useCompactWindow } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
 	goBack,
@@ -80,23 +82,6 @@ function useIsFullScreen() {
 	return isFullScreen;
 }
 
-function useCompactWindow() {
-	const [compact, setCompact] = useState(
-		() => window.matchMedia(compactWindowQuery).matches,
-	);
-	useEffect(() => {
-		const query = window.matchMedia(compactWindowQuery);
-		const update = () => setCompact(query.matches);
-		query.addEventListener("change", update);
-		window.addEventListener("resize", update);
-		return () => {
-			query.removeEventListener("change", update);
-			window.removeEventListener("resize", update);
-		};
-	}, []);
-	return compact;
-}
-
 export function Toolbar({
 	scrollContainer,
 	showSidebarBadge = false,
@@ -116,6 +101,16 @@ export function Toolbar({
 	const isChangelog = isChangelogPath(currentPath);
 	const toolbarPath = toolbarPathForTitlePreview(currentPath, titlePreview);
 	const actionPath = currentPath && !isChangelog ? currentPath : null;
+	const comments: ReviewCommentSummaryProps | null =
+		currentPath && hasMarkdownExtension(currentPath)
+			? {
+					filePath: currentPath,
+					threads: reviewThreads,
+					onCommand: commandReviewThread,
+					onMessage: (message, kind) =>
+						kind === "success" ? toast.success(message) : toast.error(message),
+				}
+			: null;
 
 	return (
 		<SharedToolbar
@@ -128,6 +123,7 @@ export function Toolbar({
 			rootProps={{ style: dragRegionStyle }}
 			onToggleSidebar={toggleSidebar}
 			leftSlot={compact ? null : <NavigationControls />}
+			onMoveWindow={(x, y) => void desktopApi.moveWindow(x, y)}
 			onRenameCurrentPath={
 				isChangelog
 					? undefined
@@ -146,20 +142,10 @@ export function Toolbar({
 							<MingcuteTerminalLine className="size-3.5" />
 						</Button>
 					)}
-					{currentPath && hasMarkdownExtension(currentPath) && (
-						<ReviewCommentSummary
-							filePath={currentPath}
-							threads={reviewThreads}
-							onCommand={commandReviewThread}
-							onMessage={(message, kind) =>
-								kind === "success"
-									? toast.success(message)
-									: toast.error(message)
-							}
-						/>
-					)}
+					{comments && !compact ? <ReviewCommentSummary {...comments} /> : null}
 					{(compact || actionPath) && (
 						<ActionsMenu
+							comments={compact ? comments : null}
 							path={actionPath}
 							showTerminal={compact}
 							workspacePath={
@@ -206,26 +192,27 @@ function NavigationControls() {
 }
 
 function ActionsMenu({
+	comments,
 	path,
 	workspacePath,
 	showTerminal,
 }: {
+	comments: ReviewCommentSummaryProps | null;
 	path: string | null;
 	workspacePath: string | null;
 	showTerminal: boolean;
 }) {
 	const { viewMode } = useStoreValue(viewerStore);
 	const isSourceMode = viewMode === "source";
-	const isHtml = path ? hasHtmlExtension(path) : false;
-	const sourceModeLabel = !path
-		? "Edit source"
-		: isSourceMode
-			? isHtml
+	const sourceModeLabel = path
+		? isSourceMode
+			? hasHtmlExtension(path)
 				? "View app"
 				: hasTextExtension(path)
 					? "Edit plain text"
 					: "Edit rich text"
-			: "Edit source";
+			: "Edit source"
+		: null;
 
 	async function revealFile() {
 		if (!path) return;
@@ -279,6 +266,25 @@ function ActionsMenu({
 					className="isolate z-50"
 				>
 					<Menu.Popup className="z-50 w-52 origin-(--transform-origin) rounded-sm border border-border bg-popover p-1 text-[11px] text-popover-foreground outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+						{comments ? (
+							<ReviewCommentSummary
+								{...comments}
+								triggerChildren={
+									<>
+										<MingcuteChat3Line className="size-3 shrink-0" />
+										<span className="min-w-0 flex-1">Comments</span>
+									</>
+								}
+								triggerNativeButton={false}
+								triggerRole="menuitem"
+								trigger={
+									<Menu.Item
+										closeOnClick={false}
+										className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									/>
+								}
+							/>
+						) : null}
 						{showTerminal && (
 							<>
 								<Menu.Item
@@ -330,35 +336,33 @@ function ActionsMenu({
 							</Menu.Item>
 						)}
 						{path && (
-							<Menu.Item
-								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
-								onClick={() => void openPathInDefaultApp(path)}
-							>
-								<MingcuteExternalLinkLine className="size-3 shrink-0" />
-								<span className="min-w-0 flex-1">Open in default app</span>
-							</Menu.Item>
-						)}
-						{path && (
-							<Menu.Item
-								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
-								onClick={() => void revealFile()}
-							>
-								<MingcuteFolderOpenLine className="size-3 shrink-0" />
-								<span className="min-w-0 flex-1">
-									{revealFileLabel(desktopApi.platform)}
-								</span>
-								<ShortcutHint commandId="app.reveal" />
-							</Menu.Item>
-						)}
-						{path && (
-							<Menu.Item
-								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
-								onClick={() => void copyFilePath()}
-							>
-								<MingcuteCopy2Line className="size-3 shrink-0" />
-								<span className="min-w-0 flex-1">Copy file path</span>
-								<ShortcutHint commandId="app.copy-path" />
-							</Menu.Item>
+							<>
+								<Menu.Item
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									onClick={() => void openPathInDefaultApp(path)}
+								>
+									<MingcuteExternalLinkLine className="size-3 shrink-0" />
+									<span className="min-w-0 flex-1">Open in default app</span>
+								</Menu.Item>
+								<Menu.Item
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									onClick={() => void revealFile()}
+								>
+									<MingcuteFolderOpenLine className="size-3 shrink-0" />
+									<span className="min-w-0 flex-1">
+										{revealFileLabel(desktopApi.platform)}
+									</span>
+									<ShortcutHint commandId="app.reveal" />
+								</Menu.Item>
+								<Menu.Item
+									className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									onClick={() => void copyFilePath()}
+								>
+									<MingcuteCopy2Line className="size-3 shrink-0" />
+									<span className="min-w-0 flex-1">Copy file path</span>
+									<ShortcutHint commandId="app.copy-path" />
+								</Menu.Item>
+							</>
 						)}
 					</Menu.Popup>
 				</Menu.Positioner>

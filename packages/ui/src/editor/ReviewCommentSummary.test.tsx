@@ -42,6 +42,20 @@ const CLOSED: ReviewThread = {
 const ALSO_OPEN: ReviewThread = { ...CLOSED, resolved: false };
 
 describe("ReviewCommentSummary", () => {
+	it("opens from a menu item trigger", async () => {
+		render([], {
+			trigger: createElement("div"),
+			triggerChildren: "Comments",
+			triggerNativeButton: false,
+			triggerRole: "menuitem",
+		});
+
+		const trigger = document.querySelector<HTMLElement>('[role="menuitem"]');
+		expect(trigger?.textContent).toBe("Comments");
+		await act(async () => trigger?.click());
+		expect(panelText()).toContain("No comments yet");
+	});
+
 	it("teaches the feature when the document has no comments", async () => {
 		render([]);
 
