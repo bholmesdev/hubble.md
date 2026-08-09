@@ -31,6 +31,7 @@ afterEach(() => {
 	editors.length = 0;
 	document.body.replaceChildren();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
 
 describe("SelectionFormattingToolbar", () => {
@@ -129,7 +130,52 @@ describe("SelectionFormattingToolbar", () => {
 		});
 		expect(onComment).toHaveBeenCalledOnce();
 	});
+
+	it("hides actions from the right as the viewport narrows", async () => {
+		const resize = stubResizeObserver();
+		const editor = createEditor(docWithParagraph("hello world"));
+		const viewport = document.createElement("div");
+		viewport.append(editor.view.dom);
+		document.body.append(viewport);
+		let width = 500;
+		Object.defineProperty(viewport, "clientWidth", { get: () => width });
+
+		selectText(editor, 1, 6);
+		renderToolbar(editor, viewport, () => {});
+		await waitForToolbarToShow();
+
+		expect(document.querySelector('[aria-label="Quote"]')).not.toBeNull();
+		expect(document.querySelector('[aria-label="Comment"]')).not.toBeNull();
+
+		act(() => {
+			width = 360;
+			resize();
+		});
+
+		expect(document.querySelector('[aria-label="To-do list"]')).toBeNull();
+		expect(document.querySelector('[aria-label="Quote"]')).toBeNull();
+		expect(document.querySelector('[aria-label="Comment"]')).not.toBeNull();
+		expect(
+			document.querySelector('[aria-label="More formatting"]'),
+		).not.toBeNull();
+	});
 });
+
+// Happy DOM's ResizeObserver never fires, so hand the test its callback.
+function stubResizeObserver() {
+	let notify = () => {};
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			constructor(callback: () => void) {
+				notify = callback;
+			}
+			observe() {}
+			disconnect() {}
+		},
+	);
+	return () => notify();
+}
 
 function renderToolbar(
 	editor: Editor,
@@ -144,7 +190,7 @@ function renderToolbar(
 		root.render(
 			<SelectionFormattingToolbar
 				editor={editor}
-				viewportRef={{ current: viewport }}
+				viewport={viewport}
 				onComment={onComment}
 			/>,
 		);

@@ -8,6 +8,7 @@ import { useStoreValue } from "@simplestack/store/react";
 import type { ReactNode } from "react";
 import { desktopApi } from "../desktopApi";
 import { copyText } from "../lib/clipboard";
+import { useCompactWindow } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
 	createFolderInFolder,
@@ -48,10 +49,11 @@ export function Sidebar({
 	const workspace = useStoreValue(workspaceStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
+	const compact = useCompactWindow();
 	const { workspacePath, files, folders, pinnedNotes, sortMode } = workspace;
 	const pinnedSet = new Set(pinnedNotes);
 
-	if (!sidebarOpen) return null;
+	if (!sidebarOpen && !compact) return null;
 	const collapseSidebar = () => setSidebarOpen(false);
 	if (!workspacePath) {
 		return (
@@ -110,7 +112,10 @@ export function Sidebar({
 			getDisplayPath={relativePath}
 			onCollapse={collapseSidebar}
 			onSortModeChange={setSortMode}
-			onSelectFile={(path) => void loadPath(path)}
+			onSelectFile={(path) => {
+				void loadPath(path);
+				if (compact) collapseSidebar();
+			}}
 			onOpenFileInDefaultApp={(path) => void openPathInDefaultApp(path)}
 			onRevealFile={(path) => void desktopApi.revealFile(path)}
 			onCopyFilePath={(path) => void copyFilePath(path)}

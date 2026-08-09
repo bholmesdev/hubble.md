@@ -63,6 +63,7 @@ import {
 	sourceLanguageForPath,
 	supportsSourceToggle,
 } from "./lib/filePath";
+import { isCompactWindow, useCompactWindow } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
@@ -170,6 +171,13 @@ async function openFilePicker() {
 	}
 }
 
+const SIDEBAR_OVERLAY =
+	"max-sm:absolute max-sm:inset-y-0 max-sm:start-0 max-sm:z-30 max-sm:flex max-sm:shadow-overlay max-sm:transition-transform max-sm:motion-reduce:transition-none";
+const SIDEBAR_OVERLAY_SHOWN =
+	"contents max-sm:translate-x-0 max-sm:duration-[180ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
+const SIDEBAR_OVERLAY_HIDDEN =
+	"hidden max-sm:-translate-x-full max-sm:pointer-events-none max-sm:duration-[140ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
+
 let nextSearchRequestId = 0;
 
 /**
@@ -193,6 +201,7 @@ async function searchFileContents(query: string) {
 
 function App() {
 	const state = useStoreValue(viewerStore);
+	const compact = useCompactWindow();
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
@@ -241,6 +250,15 @@ function App() {
 	);
 	const focusedCreationFolder =
 		focusedSidebarItem?.kind === "folder" ? focusedSidebarItem.path : null;
+	const closeSidebarOverlay = () => {
+		if (sidebarOpen && compact) {
+			setSidebarOpen(false);
+		}
+	};
+
+	useEffect(() => {
+		if (compact) setSidebarOpen(false);
+	}, [compact]);
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
 		setSearchOpen(open);
@@ -617,7 +635,9 @@ function App() {
 				launchWorkspacePath.length > 0
 			) {
 				await openWorkspace(launchWorkspacePath);
-				setSidebarOpen(true);
+				if (!isCompactWindow()) {
+					setSidebarOpen(true);
+				}
 				return;
 			}
 			const nextState = viewerStore.get();
@@ -643,7 +663,30 @@ function App() {
 	}, []);
 
 	return (
-		<main className="flex h-dvh flex-col bg-background text-foreground">
+		<main
+			className="flex h-dvh flex-col bg-background text-foreground"
+			onPointerDownCapture={(event) => {
+				if (
+					event.target instanceof Element &&
+					!event.target.closest(
+						"[data-sidebar-overlay], [data-sidebar-portal], [data-sidebar-toggle]",
+					)
+				) {
+					closeSidebarOverlay();
+				}
+			}}
+			onKeyDown={(event) => {
+				if (
+					!event.defaultPrevented &&
+					event.key === "Escape" &&
+					sidebarOpen &&
+					isCompactWindow()
+				) {
+					event.preventDefault();
+					setSidebarOpen(false);
+				}
+			}}
+		>
 			<Toolbar
 				scrollContainer={scrollContainerEl}
 				showSidebarBadge={
@@ -653,49 +696,57 @@ function App() {
 						telemetryConsent === "unset")
 				}
 			/>
-			<div className="flex min-h-0 flex-1 overflow-hidden">
-				<Sidebar
-					onFocusedItemChange={updateFocusedSidebarItem}
-					footer={
-						showReadyCallout ? (
-							<SidebarCallout
-								message={
-									<>
-										<span className="font-semibold">A new version</span> is
-										ready to install.
-									</>
-								}
-								primaryLabel="Restart"
-								onPrimary={installUpdate}
-								onDismiss={() =>
-									setDismissedVersion(readyVersion ?? "__unknown__")
-								}
-							/>
-						) : whatsNewVersion !== null ? (
-							<SidebarCallout
-								message={
-									<>
-										<span className="font-semibold">Hubble updated</span> to{" "}
-										{whatsNewVersion}.
-									</>
-								}
-								primaryLabel="See what's new"
-								onPrimary={() => {
-									// Only consume the one-shot callout once the changelog is
-									// actually showing; openChangelog can bail on a conflict.
-									void openChangelog().then((opened) => {
-										if (opened) markWhatsNewSeen();
-									});
-								}}
-								onDismiss={markWhatsNewSeen}
-							/>
-						) : telemetryConsent === "unset" ? (
-							<TelemetryConsentCallout
-								onChoose={(choice) => void chooseTelemetry(choice)}
-							/>
-						) : undefined
-					}
-				/>
+			<div className="relative flex min-h-0 flex-1 overflow-hidden">
+				{/* Compact sidebar stays mounted while closed so it can slide out. */}
+				<div
+					data-sidebar-overlay
+					aria-hidden={!sidebarOpen}
+					inert={!sidebarOpen}
+					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
+				>
+					<Sidebar
+						onFocusedItemChange={updateFocusedSidebarItem}
+						footer={
+							showReadyCallout ? (
+								<SidebarCallout
+									message={
+										<>
+											<span className="font-semibold">A new version</span> is
+											ready to install.
+										</>
+									}
+									primaryLabel="Restart"
+									onPrimary={installUpdate}
+									onDismiss={() =>
+										setDismissedVersion(readyVersion ?? "__unknown__")
+									}
+								/>
+							) : whatsNewVersion !== null ? (
+								<SidebarCallout
+									message={
+										<>
+											<span className="font-semibold">Hubble updated</span> to{" "}
+											{whatsNewVersion}.
+										</>
+									}
+									primaryLabel="See what's new"
+									onPrimary={() => {
+										// Only consume the one-shot callout once the changelog is
+										// actually showing; openChangelog can bail on a conflict.
+										void openChangelog().then((opened) => {
+											if (opened) markWhatsNewSeen();
+										});
+									}}
+									onDismiss={markWhatsNewSeen}
+								/>
+							) : telemetryConsent === "unset" ? (
+								<TelemetryConsentCallout
+									onChoose={(choice) => void chooseTelemetry(choice)}
+								/>
+							) : undefined
+						}
+					/>
+				</div>
 				<section
 					className={
 						terminalPosition === "right"
@@ -703,6 +754,7 @@ function App() {
 							: "flex-1 flex flex-col overflow-hidden"
 					}
 					aria-live="polite"
+					onFocusCapture={closeSidebarOverlay}
 				>
 					<div className="flex-1 min-h-0 min-w-0 relative">
 						{state.status === "loading" && <p>Loading…</p>}

@@ -203,9 +203,10 @@ const workspaceConfigSchema = z.object({
 			),
 	),
 });
+const minWindowWidth = 360;
 const defaultWindowState: WindowState = { width: 920, height: 720 };
 const windowStateSchema = z.object({
-	width: z.number().int().min(640).max(4096),
+	width: z.number().int().min(minWindowWidth).max(4096),
 	height: z.number().int().min(480).max(4096),
 	x: z.number().int().optional(),
 	y: z.number().int().optional(),
@@ -1113,6 +1114,7 @@ async function createWindow() {
 			: {}),
 		width: windowState.width,
 		height: windowState.height,
+		minWidth: minWindowWidth,
 		show: false,
 		titleBarStyle: "hidden",
 		...(process.platform !== "darwin"
@@ -1783,6 +1785,26 @@ function registerIpc() {
 		"desktop:get-fullscreen",
 		() => mainWindow?.isFullScreen() ?? false,
 	);
+
+	ipcMain.handle("desktop:move-window", (_event, input: unknown) => {
+		const x =
+			typeof input === "object" && input !== null && "x" in input
+				? input.x
+				: undefined;
+		const y =
+			typeof input === "object" && input !== null && "y" in input
+				? input.y
+				: undefined;
+		if (
+			typeof x !== "number" ||
+			!Number.isFinite(x) ||
+			typeof y !== "number" ||
+			!Number.isFinite(y)
+		) {
+			throw new Error("Invalid window position");
+		}
+		mainWindow?.setPosition(x, y);
+	});
 
 	ipcMain.handle("desktop:zoom-window", (_event, input: unknown) => {
 		const direction =

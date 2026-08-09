@@ -118,6 +118,7 @@ const desktopApi = {
 	recordTelemetryActivity: (input) =>
 		ipcRenderer.invoke("desktop:record-telemetry-activity", input),
 	getFullScreen: () => ipcRenderer.invoke("desktop:get-fullscreen"),
+	moveWindow: (x, y) => ipcRenderer.invoke("desktop:move-window", { x, y }),
 	zoomWindow: (direction) =>
 		ipcRenderer.invoke("desktop:zoom-window", { direction }),
 	checkForUpdates: () => ipcRenderer.invoke("desktop:check-for-updates"),
