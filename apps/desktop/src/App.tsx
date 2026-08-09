@@ -14,7 +14,7 @@ import {
 	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
 	PlainTextEditor,
-	type SpellcheckMismatch,
+	type SpellcheckStatus,
 	type WikiTarget,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
@@ -67,7 +67,7 @@ import {
 	supportsSourceToggle,
 } from "./lib/filePath";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
-import { languageName, matchesSystemLanguage } from "./lib/spellcheckLanguages";
+import { isDefaultLanguage, languageName } from "./lib/spellcheckLanguages";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
 import {
@@ -307,12 +307,15 @@ function App() {
 		setSpellcheck((prev) => (prev ? { ...prev, languages } : prev));
 	};
 
-	const spellcheckMismatch: SpellcheckMismatch | null =
+	const spellcheckStatus: SpellcheckStatus | null =
 		spellcheck?.enabled &&
 		desktopApi.platform !== "darwin" &&
-		!matchesSystemLanguage(spellcheck.languages, spellcheck.systemLanguage)
+		!isDefaultLanguage(spellcheck.languages, spellcheck.systemLanguage)
 			? {
-					language: languageName(spellcheck.languages[0] ?? "en-US"),
+					languages: (spellcheck.languages.length
+						? spellcheck.languages
+						: ["en-US"]
+					).map(languageName),
 					openSettings: () => setSettingsOpen(true),
 				}
 			: null;
@@ -759,7 +762,7 @@ function App() {
 									content={state.content}
 									copyAsMarkdownRequest={copyAsMarkdownRequest}
 									viewMode={state.viewMode}
-									spellcheckMismatch={spellcheckMismatch}
+									spellcheckStatus={spellcheckStatus}
 									onScrollContainerChange={setScrollContainerEl}
 								/>
 							</div>
@@ -888,14 +891,14 @@ function DocumentViewer({
 	content,
 	copyAsMarkdownRequest,
 	viewMode,
-	spellcheckMismatch,
+	spellcheckStatus,
 	onScrollContainerChange,
 }: {
 	path: string;
 	content: string;
 	copyAsMarkdownRequest: number;
 	viewMode: ViewMode;
-	spellcheckMismatch?: SpellcheckMismatch | null;
+	spellcheckStatus?: SpellcheckStatus | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	if (viewMode === "source" && supportsSourceToggle(path)) {
@@ -985,7 +988,7 @@ function DocumentViewer({
 			path={path}
 			initialMarkdown={content}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
-			spellcheckMismatch={spellcheckMismatch}
+			spellcheckStatus={spellcheckStatus}
 			onScrollContainerChange={onScrollContainerChange}
 		/>
 	);
@@ -1065,13 +1068,13 @@ function MarkdownEditor({
 	path,
 	initialMarkdown,
 	copyAsMarkdownRequest,
-	spellcheckMismatch,
+	spellcheckStatus,
 	onScrollContainerChange,
 }: {
 	path: string;
 	initialMarkdown: string;
 	copyAsMarkdownRequest: number;
-	spellcheckMismatch?: SpellcheckMismatch | null;
+	spellcheckStatus?: SpellcheckStatus | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
@@ -1145,7 +1148,7 @@ function MarkdownEditor({
 				kind === "success" ? toast.success(message) : toast.error(message)
 			}
 			onReviewThreadsChange={setReviewThreads}
-			spellcheckMismatch={spellcheckMismatch}
+			spellcheckStatus={spellcheckStatus}
 		/>
 	);
 }

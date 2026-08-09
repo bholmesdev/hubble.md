@@ -12,9 +12,11 @@ function baseLanguage(tag: string): string {
 	return tag.split("-")[0]?.toLowerCase() ?? tag;
 }
 
-export function matchesSystemLanguage(tags: string[], systemLanguage: string) {
-	const system = baseLanguage(systemLanguage);
-	return tags.some((tag) => baseLanguage(tag) === system);
+export function isDefaultLanguage(tags: string[], systemLanguage: string) {
+	return (
+		tags.length === 1 &&
+		baseLanguage(tags[0] ?? "") === baseLanguage(systemLanguage)
+	);
 }
 
 export function sortLanguages(tags: string[]): string[] {

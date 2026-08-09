@@ -1,6 +1,7 @@
 import { Select } from "@base-ui/react/select";
 import { Button, Switch } from "@hubble.md/ui";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
+import MingcuteDownLine from "~icons/mingcute/down-line";
 import { desktopApi } from "../desktopApi";
 import type { SpellcheckState } from "../desktopApi/types";
 import { languageName, sortLanguages } from "../lib/spellcheckLanguages";
@@ -32,7 +33,12 @@ export function SpellcheckSettingsSection({
 					macOS detects the language you are writing in automatically.
 				</p>
 			) : (
-				<LanguagePicker state={state} onLanguagesChange={onLanguagesChange} />
+				<div className="flex flex-col gap-1.5">
+					<LanguagePicker state={state} onLanguagesChange={onLanguagesChange} />
+					<p className="text-xs text-muted-foreground">
+						A word passes if any selected language knows it.
+					</p>
+				</div>
 			)}
 		</SettingsSection>
 	);
@@ -64,12 +70,16 @@ function LanguagePicker({
 						variant="outline"
 						disabled={!state.enabled}
 						aria-label="Spellcheck languages"
+						className="w-full justify-between"
 					/>
 				}
 			>
-				<span className="max-w-72 truncate">
+				<Select.Value className="truncate">
 					{state.languages.map(languageName).join(", ") || "Choose a language"}
-				</span>
+				</Select.Value>
+				<Select.Icon className="text-muted-foreground">
+					<MingcuteDownLine className="size-3.5" />
+				</Select.Icon>
 			</Select.Trigger>
 			<Select.Portal>
 				<Select.Positioner

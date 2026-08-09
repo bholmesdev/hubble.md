@@ -58,7 +58,7 @@ import { FindBar } from "./FindBar";
 import { FormatCommandMenu } from "./FormatCommandMenu";
 import {
 	FormattingStatusBar,
-	type SpellcheckMismatch,
+	type SpellcheckStatus,
 } from "./FormattingStatusBar";
 import { ReviewCommentPopover } from "./ReviewCommentPopover";
 import type { ReviewThread } from "./reviewComments";
@@ -89,8 +89,8 @@ export type EditorViewProps = {
 	/** Review threads in the open document, republished on every edit, so an
 	 * app can list them in its own chrome. */
 	onReviewThreadsChange?: (threads: ReviewThread[]) => void;
-	/** Footer notice for an unexpected spellcheck language. Desktop-only. */
-	spellcheckMismatch?: SpellcheckMismatch | null;
+	/** Footer status for non-default spellcheck languages. Desktop-only. */
+	spellcheckStatus?: SpellcheckStatus | null;
 };
 
 export function EditorView({
@@ -111,7 +111,7 @@ export function EditorView({
 	onOpenWikiLink,
 	onMessage,
 	onReviewThreadsChange,
-	spellcheckMismatch,
+	spellcheckStatus,
 }: EditorViewProps) {
 	const initialFrontMatter = parseMarkdownFrontMatter(initialMarkdown);
 	const initialFrontMatterRaw =
@@ -383,7 +383,7 @@ export function EditorView({
 			<FormattingStatusBar
 				editor={editor}
 				scrollContainer={editorViewportEl}
-				spellcheckMismatch={spellcheckMismatch}
+				spellcheckStatus={spellcheckStatus}
 			/>
 		</div>
 	);

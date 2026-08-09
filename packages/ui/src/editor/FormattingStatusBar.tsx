@@ -23,19 +23,19 @@ type PaletteState = CountState & {
 	showDashedDivider: boolean;
 };
 
-export type SpellcheckMismatch = {
-	language: string;
+export type SpellcheckStatus = {
+	languages: string[];
 	openSettings: () => void;
 };
 
 export function FormattingStatusBar({
 	editor,
 	scrollContainer,
-	spellcheckMismatch,
+	spellcheckStatus,
 }: {
 	editor: Editor | null;
 	scrollContainer: HTMLDivElement | null;
-	spellcheckMismatch?: SpellcheckMismatch | null;
+	spellcheckStatus?: SpellcheckStatus | null;
 }) {
 	const [countMode, setCountMode] = useState<CountMode>("words");
 	const [paletteState, setPaletteState] = useState<PaletteState>({
@@ -124,9 +124,7 @@ export function FormattingStatusBar({
 				>
 					{formatCountLabel(countMode, paletteState)}
 				</Button>
-				{spellcheckMismatch && (
-					<SpellcheckMismatchLabel mismatch={spellcheckMismatch} />
-				)}
+				{spellcheckStatus && <SpellcheckLabel status={spellcheckStatus} />}
 			</div>
 			<div className="flex items-center gap-2 text-muted-foreground">
 				{paletteState.canEscapeBoundary && (
@@ -178,23 +176,23 @@ function countWords(text: string) {
 	return trimmed.split(/\s+/).length;
 }
 
-function SpellcheckMismatchLabel({
-	mismatch,
-}: {
-	mismatch: SpellcheckMismatch;
-}) {
+function SpellcheckLabel({ status }: { status: SpellcheckStatus }) {
+	const label =
+		status.languages.length > 2
+			? `${status.languages[0]} +${status.languages.length - 1}`
+			: status.languages.join(", ");
 	return (
 		<Button
 			type="button"
 			variant="ghost"
 			size="xs"
 			className="text-muted-foreground"
-			title={`Spellcheck is running ${mismatch.language}, which is not your system language. Open settings to change it.`}
-			onClick={mismatch.openSettings}
+			title={`Spellcheck: ${status.languages.join(", ")}. Click to change.`}
+			onClick={status.openSettings}
 		>
 			<span className="inline-flex items-center gap-1">
 				<MingcuteEarth2Line className="size-3.5" />
-				{mismatch.language}
+				{label}
 			</span>
 		</Button>
 	);
