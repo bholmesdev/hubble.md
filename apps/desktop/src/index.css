@@ -73,8 +73,7 @@
 	--sidebar-foreground: var(--foreground);
 	--sidebar-primary: var(--primary);
 	--sidebar-primary-foreground: var(--primary-foreground);
-	/* gray until sidebar focused; :focus-within (theme.css) swaps to --selected */
-	--sidebar-accent: oklch(0.32 0.006 60);
+	--sidebar-accent: var(--accent);
 	--sidebar-accent-foreground: var(--foreground);
 	--sidebar-border: var(--border);
 	--sidebar-ring: var(--ring);
