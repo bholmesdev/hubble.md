@@ -2502,6 +2502,25 @@ describe("desktop pinned notes", () => {
 		vi.unstubAllGlobals();
 	});
 
+	it("loads persisted pins for the startup workspace", async () => {
+		const api = createDesktopApi();
+		api.readWorkspaceConfig.mockResolvedValue({
+			version: 1,
+			pinnedNotes: ["notes/a.md"],
+		});
+		const { workspaceStore } = await loadStoreActions(
+			api,
+			JSON.stringify({ workspace: { workspacePath: "/workspace" } }),
+		);
+
+		await vi.waitFor(() =>
+			expect(workspaceStore.get().pinnedNotes).toEqual([
+				"/workspace/notes/a.md",
+			]),
+		);
+		expect(api.readWorkspaceConfig).toHaveBeenCalledWith("/workspace");
+	});
+
 	it("loads missing workspace config as an empty pin set", async () => {
 		const api = createDesktopApi();
 		api.readWorkspaceConfig.mockResolvedValue({ version: 1, pinnedNotes: [] });
