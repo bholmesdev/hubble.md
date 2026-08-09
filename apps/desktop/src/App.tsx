@@ -662,7 +662,20 @@ function App() {
 	}, []);
 
 	return (
-		<main className="flex h-dvh flex-col bg-background text-foreground">
+		<main
+			className="flex h-dvh flex-col bg-background text-foreground"
+			onKeyDown={(event) => {
+				if (
+					!event.defaultPrevented &&
+					event.key === "Escape" &&
+					sidebarOpen &&
+					isCompactWindow()
+				) {
+					event.preventDefault();
+					setSidebarOpen(false);
+				}
+			}}
+		>
 			<Toolbar
 				scrollContainer={scrollContainerEl}
 				showSidebarBadge={
@@ -673,14 +686,13 @@ function App() {
 				}
 			/>
 			<div className="relative flex min-h-0 flex-1 overflow-hidden">
-				{/* Stays mounted while closed so the overlay slide can animate. */}
+				{/* Compact sidebar stays mounted while closed so it can slide out. */}
 				<div
 					aria-hidden={!sidebarOpen}
 					inert={!sidebarOpen}
 					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
 				>
 					<Sidebar
-						keepMounted
 						onFocusedItemChange={updateFocusedSidebarItem}
 						footer={
 							showReadyCallout ? (
