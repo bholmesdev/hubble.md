@@ -630,7 +630,7 @@ export function ReviewCommentPopover({
 					aria-label={mode === "new" ? "Add comment" : "Comment thread"}
 					data-review-comment-popover
 					className={cn(
-						"absolute z-[5] flex w-[min(21rem,calc(100vw-1rem))] flex-col rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay",
+						"absolute z-5 flex w-[min(21rem,calc(100vw-1rem))] flex-col rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay",
 						mode === "new" && "px-2 py-1.5",
 					)}
 					style={{

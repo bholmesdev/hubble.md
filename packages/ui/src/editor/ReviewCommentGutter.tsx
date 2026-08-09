@@ -165,7 +165,7 @@ export function ReviewCommentGutter({
 	const hoverTop = layout.hoverTop ?? restingTop;
 
 	return (
-		<div className="pointer-events-none absolute inset-0 z-[3]">
+		<div className="pointer-events-none absolute inset-0 z-3">
 			{layout.badges.map((badge) => (
 				<button
 					key={`${badge.comment.id}:${badge.comment.from}`}

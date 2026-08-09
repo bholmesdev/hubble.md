@@ -1309,7 +1309,7 @@ export function LinkPopover({
 		<div
 			ref={popoverRef}
 			className={cn(
-				"absolute z-[4] w-[250px]",
+				"absolute z-4 w-[250px]",
 				animatePosition &&
 					"transition-[inset-inline-start,inset-block-start] motion-reduce:transition-none duration-[var(--cursor-motion-duration)] ease-cursor-motion",
 			)}
@@ -1331,10 +1331,10 @@ export function LinkPopover({
 								setCreationHref(event.target.value);
 								setActiveSuggestionIndex(0);
 							}}
-							className="h-7 rounded-sm border-border bg-background px-2 py-[5px] text-[11px] leading-[16px]"
+							className="h-7 rounded-sm border-border bg-background px-2 py-1.25 text-[11px] leading-4"
 						/>
 					</div>
-					<div className="flex h-6 items-center px-2 text-[9px] leading-[14px] tracking-[0.12em] text-muted-foreground/85">
+					<div className="flex h-6 items-center px-2 text-[9px] leading-3.5 tracking-[0.12em] text-muted-foreground/85">
 						<span>⇥ to set title</span>
 					</div>
 				</div>
@@ -1352,7 +1352,7 @@ export function LinkPopover({
 							variant="ghost"
 							size="sm"
 							title={previewTitle}
-							className="group/preview-label relative h-full min-w-0 flex-1 justify-start rounded-none border-0 py-[5px] ps-2 pe-0 text-left text-[11px] leading-[16px] text-foreground shadow-none inset-shadow-none transition-[padding] duration-[var(--default-transition-duration)] ease-snappy hover:bg-muted group-hover/preview-label:pe-8"
+							className="group/preview-label relative h-full min-w-0 flex-1 justify-start rounded-none border-0 py-1.25 ps-2 pe-0 text-left text-[11px] leading-4 text-foreground shadow-none inset-shadow-none transition-[padding] duration-[var(--default-transition-duration)] ease-snappy hover:bg-muted group-hover/preview-label:pe-8"
 							onClick={() => dispatchMachineEvent({ type: "EXPAND_REQUESTED" })}
 						>
 							<PreviewLabel key={previewText} text={previewText} />
@@ -1423,11 +1423,11 @@ export function LinkPopover({
 								handleExistingLinkInput(event.target.value);
 								setActiveSuggestionIndex(0);
 							}}
-							className="h-7 rounded-sm border-border bg-background px-2 py-[5px] text-[11px] leading-[16px]"
+							className="h-7 rounded-sm border-border bg-background px-2 py-1.25 text-[11px] leading-4"
 						/>
 					</div>
 					<Separator className="bg-border/90" />
-					<div className="flex h-8 items-stretch text-[11px] leading-[16px]">
+					<div className="flex h-8 items-stretch text-[11px] leading-4">
 						<Button
 							type="button"
 							variant="ghost"

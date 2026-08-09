@@ -270,7 +270,7 @@ export function FormatCommandMenu({
 	return (
 		<div
 			ref={menuRef}
-			className="absolute z-[5] w-[250px] max-h-[var(--command-menu-height)] max-w-[calc(100%-1rem)] overflow-hidden rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay"
+			className="absolute z-5 w-[250px] max-h-[var(--command-menu-height)] max-w-[calc(100%-1rem)] overflow-hidden rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay"
 			style={{
 				insetInlineStart: `${position?.x ?? 0}px`,
 				insetBlockStart: `${position?.y ?? 0}px`,
@@ -290,7 +290,7 @@ export function FormatCommandMenu({
 					value={query}
 					onValueChange={setQuery}
 					placeholder="Format..."
-					className="h-8 w-full border-0 border-b border-border bg-background px-2 text-[11px] leading-[16px] text-foreground outline-hidden placeholder:text-muted-foreground"
+					className="h-8 w-full border-0 border-b border-border bg-background px-2 text-[11px] leading-4 text-foreground outline-hidden placeholder:text-muted-foreground"
 					onKeyDown={(event) => {
 						if (event.key === "Escape") {
 							event.preventDefault();
