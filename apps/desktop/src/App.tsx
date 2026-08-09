@@ -1089,7 +1089,7 @@ function MarkdownEditor({
 				createImageExtension(() => pathRef.current),
 				createEmbedExtension({
 					workspacePath: workspace.workspacePath,
-					filePath: path,
+					getFilePath: () => pathRef.current,
 				}),
 			]}
 			onPaste={(editor, event) => handleImagePaste({ editor, event })}
