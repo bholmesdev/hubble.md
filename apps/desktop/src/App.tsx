@@ -249,13 +249,8 @@ function App() {
 	);
 	const focusedCreationFolder =
 		focusedSidebarItem?.kind === "folder" ? focusedSidebarItem.path : null;
-	const closeSidebarOverlay = (target: EventTarget | null) => {
-		if (
-			sidebarOpen &&
-			isCompactWindow() &&
-			target instanceof Element &&
-			target.closest("[data-hubble-editor]")
-		) {
+	const closeSidebarOverlay = () => {
+		if (sidebarOpen && isCompactWindow()) {
 			setSidebarOpen(false);
 		}
 	};
@@ -681,6 +676,7 @@ function App() {
 				{/* Stays mounted while closed so the overlay slide can animate. */}
 				<div
 					aria-hidden={!sidebarOpen}
+					inert={!sidebarOpen}
 					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
 				>
 					<Sidebar
@@ -734,8 +730,8 @@ function App() {
 							: "flex-1 flex flex-col overflow-hidden"
 					}
 					aria-live="polite"
-					onFocusCapture={(event) => closeSidebarOverlay(event.target)}
-					onPointerDownCapture={(event) => closeSidebarOverlay(event.target)}
+					onFocusCapture={closeSidebarOverlay}
+					onPointerDownCapture={closeSidebarOverlay}
 				>
 					<div className="flex-1 min-h-0 min-w-0 relative">
 						{state.status === "loading" && <p>Loading…</p>}

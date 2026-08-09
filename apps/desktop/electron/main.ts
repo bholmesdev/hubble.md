@@ -1795,7 +1795,12 @@ function registerIpc() {
 			typeof input === "object" && input !== null && "y" in input
 				? input.y
 				: undefined;
-		if (typeof x !== "number" || typeof y !== "number") {
+		if (
+			typeof x !== "number" ||
+			!Number.isFinite(x) ||
+			typeof y !== "number" ||
+			!Number.isFinite(y)
+		) {
 			throw new Error("Invalid window position");
 		}
 		mainWindow?.setPosition(x, y);
