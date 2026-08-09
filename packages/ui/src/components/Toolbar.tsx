@@ -147,6 +147,7 @@ export function Toolbar({
 
 	function onTitlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
 		if (!onMoveWindow || event.button !== 0) return;
+		skipTitleClickRef.current = false;
 		event.currentTarget.setPointerCapture(event.pointerId);
 		titleDragRef.current = {
 			pointerX: event.screenX,
@@ -195,7 +196,12 @@ export function Toolbar({
 			flushTitleMove();
 		}
 		titleDragRef.current = null;
-		if (drag?.moved) skipTitleClickRef.current = true;
+		if (drag?.moved) {
+			skipTitleClickRef.current = true;
+			setTimeout(() => {
+				skipTitleClickRef.current = false;
+			}, 0);
+		}
 	}
 
 	function onTitleClick() {

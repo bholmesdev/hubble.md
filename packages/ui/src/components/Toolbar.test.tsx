@@ -25,6 +25,7 @@ afterEach(() => {
 	roots.length = 0;
 	document.body.replaceChildren();
 	vi.restoreAllMocks();
+	vi.useRealTimers();
 });
 
 describe("Toolbar", () => {
@@ -75,6 +76,21 @@ describe("Toolbar", () => {
 		expect(onMoveWindow).toHaveBeenCalledTimes(1);
 		expect(onMoveWindow).toHaveBeenCalledWith(114, 208);
 		expect(document.querySelector("input")).toBeNull();
+	});
+
+	it("does not suppress a later title click after a cancelled drag", () => {
+		vi.useFakeTimers();
+		renderToolbar({ onMoveWindow: vi.fn() });
+		const button = titleButton();
+		button.setPointerCapture = vi.fn();
+
+		dispatchPointer(button, "pointerdown", { screenX: 10, screenY: 20 });
+		dispatchPointer(button, "pointermove", { screenX: 20, screenY: 25 });
+		dispatchPointer(button, "pointercancel", { screenX: 20, screenY: 25 });
+		act(() => vi.runAllTimers());
+		act(() => button.click());
+
+		expect(document.querySelector("input")).toBeInstanceOf(HTMLInputElement);
 	});
 });
 
