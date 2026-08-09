@@ -127,7 +127,7 @@ export function OpenWorkspaceScreen({ url, onSelected, onDisconnect }: Props) {
 							onChange={(event) => setName(event.target.value)}
 							placeholder="Workspace name"
 							disabled={busy}
-							className="rounded-sm border border-border bg-background px-2.5 py-1.5 text-sm outline-hidden focus:border-ring"
+							className="rounded-sm border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-ring"
 						/>
 						<button
 							type="submit"

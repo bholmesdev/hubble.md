@@ -66,7 +66,7 @@ function Highlight({ text, ranges }: { text: string; ranges: MatchRange[] }) {
 		parts.push(
 			<mark
 				key={`${start}-${end}`}
-				className="rounded-xs bg-selected/30 font-semibold text-foreground"
+				className="rounded-[2px] bg-selected/30 font-semibold text-foreground"
 			>
 				{text.slice(start, end)}
 			</mark>,

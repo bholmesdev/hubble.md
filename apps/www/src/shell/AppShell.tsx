@@ -209,7 +209,7 @@ export function AppShell({
 							aria-describedby={
 								showNewNoteConflict ? "new-note-conflict" : undefined
 							}
-							className="flex-1 rounded-sm border border-border bg-background px-2 py-1 text-sm outline-hidden focus:border-ring"
+							className="flex-1 rounded-sm border border-border bg-background px-2 py-1 text-sm outline-none focus:border-ring"
 						/>
 						<button
 							type="submit"

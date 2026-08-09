@@ -136,14 +136,14 @@ function InvalidFrontMatter({
 	const [raw, setRaw] = useState(state.raw);
 	return (
 		<div className="editorPropertiesPanel border-b border-border/70">
-			<div className="flex flex-col gap-2 text-xs">
+			<div className="flex flex-col gap-2 text-[12px]">
 				<p className="m-0 text-muted-foreground">Properties unavailable</p>
 				<details className="rounded-sm border border-border bg-muted/30">
 					<summary className="cursor-pointer px-2 py-1 text-[11px] text-muted-foreground">
 						Raw front matter
 					</summary>
 					<textarea
-						className="block min-h-28 w-full resize-y border-t border-border bg-transparent p-2 font-mono text-[11px] outline-hidden"
+						className="block min-h-28 w-full resize-y border-t border-border bg-transparent p-2 font-mono text-[11px] outline-none"
 						value={raw}
 						onChange={(event) => {
 							const nextRaw = event.target.value;
@@ -266,7 +266,7 @@ function PropertyRow({
 				type="button"
 				aria-label={`Delete ${property.key || "property"}`}
 				title="Delete property"
-				className="inline-flex size-7 items-center justify-center rounded-sm bg-muted/0 text-muted-foreground/45 opacity-0 outline-hidden transition-[background-color,color,opacity] duration-150 ease-out hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground focus-visible:opacity-100 group-focus-within/property:opacity-100 group-hover/property:opacity-100"
+				className="inline-flex size-7 items-center justify-center rounded-sm bg-muted/0 text-muted-foreground/45 opacity-0 outline-none transition-[background-color,color,opacity] duration-150 ease-out hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground focus-visible:opacity-100 group-focus-within/property:opacity-100 group-hover/property:opacity-100"
 				onClick={() => onDelete()}
 			>
 				<MingcuteCloseLine className="size-3.5" />
@@ -302,7 +302,7 @@ function PropertyValue({
 	}
 	if (property.type === "checkbox") {
 		return (
-			<label className="flex h-7 items-center text-xs">
+			<label className="flex h-7 items-center text-[12px]">
 				<input
 					type="checkbox"
 					checked={property.value}
@@ -397,7 +397,7 @@ function ScalarValue({
 			ref={textareaRef}
 			value={draft}
 			placeholder="Empty"
-			className="block min-h-7 w-full resize-none overflow-hidden bg-transparent px-2 py-1 text-[11px] leading-5 outline-hidden placeholder:text-muted-foreground"
+			className="block min-h-7 w-full resize-none overflow-hidden bg-transparent px-2 py-1 text-[11px] leading-5 outline-none placeholder:text-muted-foreground"
 			rows={1}
 			onChange={(event) => {
 				setDraft(event.target.value);
@@ -503,7 +503,7 @@ function DateValue({
 	return (
 		<div
 			className={cn(
-				"flex h-7 w-fit items-center rounded-sm px-2 text-xs",
+				"flex h-7 w-fit items-center rounded-sm px-2 text-[12px]",
 				ghostBoxClass,
 			)}
 		>
@@ -547,7 +547,7 @@ function SegmentInput({
 			ref={ref}
 			value={value}
 			className={cn(
-				"w-6 bg-transparent text-center outline-hidden focus:bg-ring/30",
+				"w-6 bg-transparent text-center outline-none focus:bg-ring/30",
 				className,
 			)}
 			onFocus={(event) => event.currentTarget.select()}
@@ -600,7 +600,7 @@ function TagsValue({
 			<input
 				value={draft}
 				placeholder={values.length === 0 ? "Empty" : ""}
-				className="min-w-20 flex-1 bg-transparent text-xs outline-hidden"
+				className="min-w-20 flex-1 bg-transparent text-[12px] outline-none"
 				onChange={(event) => setDraft(event.target.value)}
 				onBlur={addDraft}
 				onKeyDown={(event) => {

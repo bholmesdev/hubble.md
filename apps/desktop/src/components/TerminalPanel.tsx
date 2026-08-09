@@ -371,7 +371,7 @@ export function TerminalPanel() {
 		>
 			<div
 				className={cn(
-					"group absolute outline-hidden z-30",
+					"group absolute outline-none z-30",
 					isRight
 						? "-left-[5px] top-0 bottom-0 w-2.5 cursor-col-resize"
 						: "-top-[5px] left-0 right-0 h-2.5 cursor-row-resize",
@@ -406,7 +406,7 @@ export function TerminalPanel() {
 									// biome-ignore lint/a11y/noAutofocus: rename input appears on explicit double click
 									autoFocus
 									aria-label="Rename terminal session"
-									className="w-40 min-w-0 bg-transparent [padding-block:0.25rem] [padding-inline:0.75rem] text-xs outline-hidden"
+									className="w-40 min-w-0 bg-transparent [padding-block:0.25rem] [padding-inline:0.75rem] text-xs outline-none"
 									value={renameDraft}
 									onFocus={(event) => event.currentTarget.select()}
 									onChange={(event) => setRenameDraft(event.target.value)}
@@ -440,7 +440,7 @@ export function TerminalPanel() {
 									type="button"
 									aria-label={`Close terminal session ${session.title}`}
 									className={cn(
-										"pointer-events-none absolute z-10 -translate-y-1/2 rounded-sm p-0.5 opacity-0 transition-opacity [inset-block-start:50%] [inset-inline-end:0.25rem] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-hidden focus:ring-1 focus:ring-ring",
+										"pointer-events-none absolute z-10 -translate-y-1/2 rounded-sm p-0.5 opacity-0 transition-opacity [inset-block-start:50%] [inset-inline-end:0.25rem] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-ring",
 										activeSessionId === session.id
 											? "bg-background"
 											: "bg-muted",
@@ -520,7 +520,7 @@ function TerminalRibbonMenu({
 				{children}
 			</ContextMenu.Trigger>
 			<ContextMenu.Portal>
-				<ContextMenu.Positioner className="isolate z-50 outline-hidden">
+				<ContextMenu.Positioner className="isolate z-50 outline-none">
 					<ContextMenu.Popup className="z-50 w-44 origin-(--transform-origin) rounded-sm border border-border bg-popover p-1 text-[11px] text-popover-foreground outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
 						<TerminalPositionItem
 							position="bottom"
