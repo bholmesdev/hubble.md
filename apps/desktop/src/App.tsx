@@ -664,6 +664,14 @@ function App() {
 	return (
 		<main
 			className="flex h-dvh flex-col bg-background text-foreground"
+			onPointerDownCapture={(event) => {
+				if (
+					event.target instanceof Element &&
+					!event.target.closest("[data-sidebar-overlay], [data-sidebar-toggle]")
+				) {
+					closeSidebarOverlay();
+				}
+			}}
 			onKeyDown={(event) => {
 				if (
 					!event.defaultPrevented &&
@@ -688,6 +696,7 @@ function App() {
 			<div className="relative flex min-h-0 flex-1 overflow-hidden">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
 				<div
+					data-sidebar-overlay
 					aria-hidden={!sidebarOpen}
 					inert={!sidebarOpen}
 					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
@@ -743,7 +752,6 @@ function App() {
 					}
 					aria-live="polite"
 					onFocusCapture={closeSidebarOverlay}
-					onPointerDownCapture={closeSidebarOverlay}
 				>
 					<div className="flex-1 min-h-0 min-w-0 relative">
 						{state.status === "loading" && <p>Loading…</p>}

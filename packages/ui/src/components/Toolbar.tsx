@@ -227,6 +227,7 @@ export function Toolbar({
 			>
 				{onToggleSidebar && (
 					<Button
+						data-sidebar-toggle
 						variant="ghost"
 						size="icon-sm"
 						className="relative"
