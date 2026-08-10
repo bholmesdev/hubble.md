@@ -56,7 +56,10 @@ import {
 } from "./FilePropertiesPanel";
 import { FindBar } from "./FindBar";
 import { FormatCommandMenu } from "./FormatCommandMenu";
-import { FormattingStatusBar } from "./FormattingStatusBar";
+import {
+	FormattingStatusBar,
+	type SpellcheckStatus,
+} from "./FormattingStatusBar";
 import { ReviewCommentPopover } from "./ReviewCommentPopover";
 import type { ReviewThread } from "./reviewComments";
 import { SelectionFormattingToolbar } from "./SelectionFormattingToolbar";
@@ -90,6 +93,8 @@ export type EditorViewProps = {
 	/** Review threads in the open document, republished on every edit, so an
 	 * app can list them in its own chrome. */
 	onReviewThreadsChange?: (threads: ReviewThread[]) => void;
+	/** Footer status for non-default spellcheck languages. Desktop-only. */
+	spellcheckStatus?: SpellcheckStatus | null;
 };
 
 export function EditorView({
@@ -112,6 +117,7 @@ export function EditorView({
 	onOpenWikiLink,
 	onMessage,
 	onReviewThreadsChange,
+	spellcheckStatus,
 }: EditorViewProps) {
 	const initialFrontMatter = parseMarkdownFrontMatter(initialMarkdown);
 	const initialFrontMatterRaw =
@@ -380,7 +386,11 @@ export function EditorView({
 				)}
 			</div>
 			<FindBar editor={editor} />
-			<FormattingStatusBar editor={editor} scrollContainer={editorViewportEl} />
+			<FormattingStatusBar
+				editor={editor}
+				scrollContainer={editorViewportEl}
+				spellcheckStatus={spellcheckStatus}
+			/>
 		</div>
 	);
 }

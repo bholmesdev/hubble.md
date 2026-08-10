@@ -271,6 +271,76 @@ function saveThemeSource(source: ThemePreference) {
 	}
 }
 
+type SpellcheckConfig = {
+	enabled: boolean;
+	languages: string[];
+};
+
+function spellcheckConfigPath(): string {
+	return path.join(app.getPath("userData"), "spellcheck.json");
+}
+
+function loadSpellcheckConfig(): SpellcheckConfig | null {
+	try {
+		const parsed = JSON.parse(
+			fsSync.readFileSync(spellcheckConfigPath(), "utf8"),
+		);
+		if (
+			typeof parsed?.enabled === "boolean" &&
+			Array.isArray(parsed?.languages)
+		) {
+			return {
+				enabled: parsed.enabled,
+				languages: parsed.languages.filter(
+					(lang: unknown) => typeof lang === "string",
+				),
+			};
+		}
+	} catch {
+		// Missing or malformed, so fall through to defaults.
+	}
+	return null;
+}
+
+function getSpellcheckConfig(): SpellcheckConfig {
+	const { defaultSession } = session;
+	return {
+		enabled: defaultSession.spellCheckerEnabled,
+		languages: defaultSession.getSpellCheckerLanguages(),
+	};
+}
+
+function saveSpellcheckConfig() {
+	try {
+		fsSync.mkdirSync(path.dirname(spellcheckConfigPath()), {
+			recursive: true,
+		});
+		fsSync.writeFileSync(
+			spellcheckConfigPath(),
+			JSON.stringify(getSpellcheckConfig(), null, 2),
+		);
+	} catch {
+		// Best-effort cache; the session keeps the live values either way.
+	}
+}
+
+function restoreSpellcheckConfig() {
+	const saved = loadSpellcheckConfig();
+	if (!saved) return;
+	session.defaultSession.spellCheckerEnabled = saved.enabled;
+	applySpellcheckLanguages(saved.languages);
+}
+
+function applySpellcheckLanguages(languages: string[]) {
+	// macOS picks languages itself and ignores setSpellCheckerLanguages.
+	if (process.platform === "darwin") return;
+	const valid = languages.filter((lang) =>
+		session.defaultSession.availableSpellCheckerLanguages.includes(lang),
+	);
+	if (valid.length === 0) return;
+	session.defaultSession.setSpellCheckerLanguages(valid);
+}
+
 function workspaceConfigPath(workspacePath: string): string {
 	const root = assertGrantedRoot(workspacePath);
 	return path.join(root, HUBBLE_DIR, workspaceConfigFile);
@@ -1840,6 +1910,37 @@ function registerIpc() {
 		},
 	);
 
+	ipcMain.handle("desktop:get-spellcheck-state", () => {
+		const { defaultSession } = session;
+		return {
+			...getSpellcheckConfig(),
+			availableLanguages: defaultSession.availableSpellCheckerLanguages,
+			systemLanguage:
+				app.getPreferredSystemLanguages()[0] ?? app.getSystemLocale(),
+		};
+	});
+
+	ipcMain.handle(
+		"desktop:set-spellcheck-enabled",
+		(_event, payload: { enabled?: unknown }) => {
+			session.defaultSession.spellCheckerEnabled = payload?.enabled === true;
+			saveSpellcheckConfig();
+		},
+	);
+
+	ipcMain.handle(
+		"desktop:set-spellcheck-languages",
+		(_event, payload: { languages?: unknown }) => {
+			const languages = Array.isArray(payload?.languages)
+				? payload.languages.filter(
+						(language): language is string => typeof language === "string",
+					)
+				: [];
+			applySpellcheckLanguages(languages);
+			saveSpellcheckConfig();
+		},
+	);
+
 	ipcMain.handle("desktop:set-menu-state", (_event, state: MenuState) => {
 		menuState = {
 			hasWorkspace: state.hasWorkspace === true,
@@ -1894,6 +1995,7 @@ if (!singleInstanceLock) {
 	app.whenReady().then(async () => {
 		await telemetry.load();
 		void telemetry.recordActivity(false);
+		restoreSpellcheckConfig();
 		await loadGrants();
 		if (launchWorkspacePath) grantRoot(launchWorkspacePath);
 		await saveGrants();

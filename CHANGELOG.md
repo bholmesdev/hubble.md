@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Add a spellcheck option to Settings. Allows for enabling / disabling, and selecting custom spellcheck dictionaries on Windows and Linux. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#234](https://github.com/bholmesdev/hubble.md/pull/234)
+
 ### Changed
 
 ### Fixed

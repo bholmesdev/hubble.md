@@ -2,6 +2,7 @@ import { getCaretFormattingState } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import { useEffect, useState } from "react";
 import MingcuteBoldLine from "~icons/mingcute/bold-line";
+import MingcuteEarth2Line from "~icons/mingcute/earth-2-line";
 import MingcuteItalicLine from "~icons/mingcute/italic-line";
 import MingcuteLinkLine from "~icons/mingcute/link-line";
 import MingcuteStrikethroughLine from "~icons/mingcute/strikethrough-line";
@@ -22,12 +23,19 @@ type PaletteState = CountState & {
 	showDashedDivider: boolean;
 };
 
+export type SpellcheckStatus = {
+	languages: string[];
+	openSettings: () => void;
+};
+
 export function FormattingStatusBar({
 	editor,
 	scrollContainer,
+	spellcheckStatus,
 }: {
 	editor: Editor | null;
 	scrollContainer: HTMLDivElement | null;
+	spellcheckStatus?: SpellcheckStatus | null;
 }) {
 	const [countMode, setCountMode] = useState<CountMode>("words");
 	const [paletteState, setPaletteState] = useState<PaletteState>({
@@ -102,17 +110,22 @@ export function FormattingStatusBar({
 		<div
 			className={`z-3 flex h-8 items-center justify-between bg-background/95 px-2 text-[12px] backdrop-blur-[2px] ${dividerClass}`}
 		>
-			<Button
-				variant="ghost"
-				size="xs"
-				className="text-muted-foreground"
-				title={
-					countMode === "words" ? "Show character count" : "Show word count"
-				}
-				onClick={() => setCountMode((m) => (m === "words" ? "chars" : "words"))}
-			>
-				{formatCountLabel(countMode, paletteState)}
-			</Button>
+			<div className="flex items-center gap-1">
+				<Button
+					variant="ghost"
+					size="xs"
+					className="text-muted-foreground"
+					title={
+						countMode === "words" ? "Show character count" : "Show word count"
+					}
+					onClick={() =>
+						setCountMode((m) => (m === "words" ? "chars" : "words"))
+					}
+				>
+					{formatCountLabel(countMode, paletteState)}
+				</Button>
+				{spellcheckStatus && <SpellcheckLabel status={spellcheckStatus} />}
+			</div>
 			<div className="flex items-center gap-2 text-muted-foreground">
 				{paletteState.canEscapeBoundary && (
 					<span className="inline-flex h-4 items-center rounded-sm border border-border bg-secondary px-1 text-[11px] leading-none text-foreground shadow-overlay">
@@ -161,4 +174,26 @@ function countWords(text: string) {
 	const trimmed = text.trim();
 	if (trimmed.length === 0) return 0;
 	return trimmed.split(/\s+/).length;
+}
+
+function SpellcheckLabel({ status }: { status: SpellcheckStatus }) {
+	const label =
+		status.languages.length > 2
+			? `${status.languages[0]} +${status.languages.length - 1}`
+			: status.languages.join(", ");
+	return (
+		<Button
+			type="button"
+			variant="ghost"
+			size="xs"
+			className="text-muted-foreground"
+			title={`Spellcheck: ${status.languages.join(", ")}. Click to change.`}
+			onClick={status.openSettings}
+		>
+			<span className="inline-flex items-center gap-1">
+				<MingcuteEarth2Line className="size-3.5" />
+				{label}
+			</span>
+		</Button>
+	);
 }

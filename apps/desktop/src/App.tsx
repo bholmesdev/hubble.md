@@ -14,6 +14,7 @@ import {
 	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
 	PlainTextEditor,
+	type SpellcheckStatus,
 	type WikiTarget,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
@@ -29,6 +30,7 @@ import { buildAppCommands } from "./commands/useAppCommands";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
+import { SpellcheckSettingsSection } from "./components/SpellcheckSection";
 import {
 	TelemetryConsentCallout,
 	TelemetrySettingsSection,
@@ -40,6 +42,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { desktopApi } from "./desktopApi";
 import type {
 	DesktopUpdateState,
+	SpellcheckState,
 	TelemetryChoice,
 	TelemetryConsent,
 } from "./desktopApi/types";
@@ -65,6 +68,7 @@ import {
 } from "./lib/filePath";
 import { isCompactWindow, useCompactWindow } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
+import { isDefaultLanguage, languageName } from "./lib/spellcheckLanguages";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
 import {
@@ -217,6 +221,7 @@ function App() {
 	);
 	const [telemetryConsent, setTelemetryConsent] =
 		useState<TelemetryConsent | null>(null);
+	const [spellcheck, setSpellcheck] = useState<SpellcheckState | null>(null);
 	const [focusedSidebarItem, setFocusedSidebarItem] =
 		useState<DesktopSidebarFocus>(null);
 	const updateFocusedSidebarItem = (next: DesktopSidebarFocus) => {
@@ -309,6 +314,38 @@ function App() {
 	useEffect(() => {
 		void desktopApi.getTelemetryConsent().then(setTelemetryConsent);
 	}, []);
+
+	useEffect(() => {
+		void desktopApi.getSpellcheckState().then(setSpellcheck);
+	}, []);
+
+	const updateSpellcheck = async (request: Promise<void>) => {
+		try {
+			await request;
+			setSpellcheck(await desktopApi.getSpellcheckState());
+		} catch {
+			toast.error("Failed to update spellcheck");
+		}
+	};
+
+	const changeSpellcheckEnabled = (enabled: boolean) => {
+		void updateSpellcheck(desktopApi.setSpellcheckEnabled(enabled));
+	};
+
+	const changeSpellcheckLanguages = (languages: string[]) => {
+		void updateSpellcheck(desktopApi.setSpellcheckLanguages(languages));
+	};
+
+	const spellcheckStatus: SpellcheckStatus | null =
+		spellcheck?.enabled &&
+		spellcheck.languages.length > 0 &&
+		desktopApi.platform !== "darwin" &&
+		!isDefaultLanguage(spellcheck.languages, spellcheck.systemLanguage)
+			? {
+					languages: spellcheck.languages.map(languageName),
+					openSettings: () => setSettingsOpen(true),
+				}
+			: null;
 
 	const chooseTelemetry = async (choice: TelemetryChoice) => {
 		setTelemetryConsent(await desktopApi.setTelemetryConsent(choice));
@@ -790,6 +827,7 @@ function App() {
 									content={state.content}
 									copyAsMarkdownRequest={copyAsMarkdownRequest}
 									viewMode={state.viewMode}
+									spellcheckStatus={spellcheckStatus}
 									onScrollContainerChange={setScrollContainerEl}
 								/>
 							</div>
@@ -809,20 +847,27 @@ function App() {
 				onRunCommand={recordRecentCommand}
 			/>
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+				{updateState ? (
+					<UpdatesSection
+						state={updateState}
+						onPrimaryAction={() => void triggerPrimaryUpdateAction()}
+						onViewChangelog={openWhatsNew}
+					/>
+				) : null}
 				<GeneralSettingsSection />
+				{spellcheck ? (
+					<SpellcheckSettingsSection
+						state={spellcheck}
+						onEnabledChange={changeSpellcheckEnabled}
+						onLanguagesChange={changeSpellcheckLanguages}
+					/>
+				) : null}
 				<CodeFilesSettingsSection />
 				<ChatAboutNoteSettingsSection />
 				{telemetryConsent ? (
 					<TelemetrySettingsSection
 						consent={telemetryConsent}
 						onChoose={(choice) => void chooseTelemetry(choice)}
-					/>
-				) : null}
-				{updateState ? (
-					<UpdatesSection
-						state={updateState}
-						onPrimaryAction={() => void triggerPrimaryUpdateAction()}
-						onViewChangelog={openWhatsNew}
 					/>
 				) : null}
 			</SettingsDialog>
@@ -911,12 +956,14 @@ function DocumentViewer({
 	content,
 	copyAsMarkdownRequest,
 	viewMode,
+	spellcheckStatus,
 	onScrollContainerChange,
 }: {
 	path: string;
 	content: string;
 	copyAsMarkdownRequest: number;
 	viewMode: ViewMode;
+	spellcheckStatus?: SpellcheckStatus | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const documentId = editorDocumentId(path);
@@ -1010,6 +1057,7 @@ function DocumentViewer({
 			documentId={documentId}
 			initialMarkdown={content}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
+			spellcheckStatus={spellcheckStatus}
 			onScrollContainerChange={onScrollContainerChange}
 		/>
 	);
@@ -1090,12 +1138,14 @@ function MarkdownEditor({
 	documentId,
 	initialMarkdown,
 	copyAsMarkdownRequest,
+	spellcheckStatus,
 	onScrollContainerChange,
 }: {
 	path: string;
 	documentId: string;
 	initialMarkdown: string;
 	copyAsMarkdownRequest: number;
+	spellcheckStatus?: SpellcheckStatus | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
@@ -1172,6 +1222,7 @@ function MarkdownEditor({
 				kind === "success" ? toast.success(message) : toast.error(message)
 			}
 			onReviewThreadsChange={setReviewThreads}
+			spellcheckStatus={spellcheckStatus}
 		/>
 	);
 }
