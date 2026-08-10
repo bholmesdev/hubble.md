@@ -33,12 +33,7 @@ export function SpellcheckSettingsSection({
 					macOS detects the language you are writing in automatically.
 				</p>
 			) : (
-				<div className="flex flex-col gap-1.5">
-					<LanguagePicker state={state} onLanguagesChange={onLanguagesChange} />
-					<p className="text-xs text-muted-foreground">
-						A word passes if any selected language knows it.
-					</p>
-				</div>
+				<LanguagePicker state={state} onLanguagesChange={onLanguagesChange} />
 			)}
 		</SettingsSection>
 	);

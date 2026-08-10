@@ -1892,7 +1892,8 @@ function registerIpc() {
 		return {
 			...getSpellcheckConfig(),
 			availableLanguages: defaultSession.availableSpellCheckerLanguages,
-			systemLanguage: app.getSystemLocale(),
+			systemLanguage:
+				app.getPreferredSystemLanguages()[0] ?? app.getSystemLocale(),
 		};
 	});
 
