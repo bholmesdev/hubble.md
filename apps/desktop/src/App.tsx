@@ -297,25 +297,30 @@ function App() {
 		void desktopApi.getSpellcheckState().then(setSpellcheck);
 	}, []);
 
+	const updateSpellcheck = async (request: Promise<void>) => {
+		try {
+			await request;
+			setSpellcheck(await desktopApi.getSpellcheckState());
+		} catch {
+			toast.error("Failed to update spellcheck");
+		}
+	};
+
 	const changeSpellcheckEnabled = (enabled: boolean) => {
-		void desktopApi.setSpellcheckEnabled(enabled);
-		setSpellcheck((prev) => (prev ? { ...prev, enabled } : prev));
+		void updateSpellcheck(desktopApi.setSpellcheckEnabled(enabled));
 	};
 
 	const changeSpellcheckLanguages = (languages: string[]) => {
-		void desktopApi.setSpellcheckLanguages(languages);
-		setSpellcheck((prev) => (prev ? { ...prev, languages } : prev));
+		void updateSpellcheck(desktopApi.setSpellcheckLanguages(languages));
 	};
 
 	const spellcheckStatus: SpellcheckStatus | null =
 		spellcheck?.enabled &&
+		spellcheck.languages.length > 0 &&
 		desktopApi.platform !== "darwin" &&
 		!isDefaultLanguage(spellcheck.languages, spellcheck.systemLanguage)
 			? {
-					languages: (spellcheck.languages.length
-						? spellcheck.languages
-						: ["en-US"]
-					).map(languageName),
+					languages: spellcheck.languages.map(languageName),
 					openSettings: () => setSettingsOpen(true),
 				}
 			: null;

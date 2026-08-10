@@ -1899,15 +1899,20 @@ function registerIpc() {
 
 	ipcMain.handle(
 		"desktop:set-spellcheck-enabled",
-		(_event, { enabled }: { enabled: boolean }) => {
-			session.defaultSession.spellCheckerEnabled = enabled;
+		(_event, payload: { enabled?: unknown }) => {
+			session.defaultSession.spellCheckerEnabled = payload?.enabled === true;
 			saveSpellcheckConfig();
 		},
 	);
 
 	ipcMain.handle(
 		"desktop:set-spellcheck-languages",
-		(_event, { languages }: { languages: string[] }) => {
+		(_event, payload: { languages?: unknown }) => {
+			const languages = Array.isArray(payload?.languages)
+				? payload.languages.filter(
+						(language): language is string => typeof language === "string",
+					)
+				: [];
 			applySpellcheckLanguages(languages);
 			saveSpellcheckConfig();
 		},
