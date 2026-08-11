@@ -1,8 +1,9 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
+import type { ResolvedTheme } from "@hubble.md/theme";
 import { Button, useResizeSeparator } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { FitAddon } from "@xterm/addon-fit";
-import { Terminal } from "@xterm/xterm";
+import { type ITheme, Terminal } from "@xterm/xterm";
 import {
 	type ReactNode,
 	useEffect,
@@ -27,7 +28,7 @@ import {
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
-import { isDarkTheme, subscribeTheme } from "../theme";
+import { themeStateStore } from "../theme";
 import "@xterm/xterm/css/xterm.css";
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
@@ -135,18 +136,6 @@ function terminalStateReducer(
 	}
 }
 
-function cssColorToRgba(color: string): string {
-	const canvas = document.createElement("canvas");
-	canvas.width = 1;
-	canvas.height = 1;
-	const ctx = canvas.getContext("2d");
-	if (!ctx) return color;
-	ctx.fillStyle = color;
-	ctx.fillRect(0, 0, 1, 1);
-	const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-	return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
-}
-
 async function startTerminalSession(
 	title: string,
 	options: StartSessionOptions,
@@ -171,48 +160,14 @@ async function startTerminalSession(
 	}
 }
 
-const LIGHT_THEME = {
-	black: "#000000",
-	red: "#cd3131",
-	green: "#00bc00",
-	yellow: "#949800",
-	blue: "#0451a5",
-	magenta: "#bc05bc",
-	cyan: "#0598bc",
-	white: "#555555",
-	brightBlack: "#666666",
-	brightRed: "#cd3131",
-	brightGreen: "#14ce14",
-	brightYellow: "#b5ba00",
-	brightBlue: "#0451a5",
-	brightMagenta: "#bc05bc",
-	brightCyan: "#0598bc",
-	brightWhite: "#a5a5a5",
-};
-
-const DARK_THEME = {
-	black: "#000000",
-	red: "#cd3131",
-	green: "#0dbc79",
-	yellow: "#e5e510",
-	blue: "#2472c8",
-	magenta: "#bc3fbc",
-	cyan: "#11a8cd",
-	white: "#e5e5e5",
-	brightBlack: "#666666",
-	brightRed: "#f14c4c",
-	brightGreen: "#23d18b",
-	brightYellow: "#f5f543",
-	brightBlue: "#3b8eea",
-	brightMagenta: "#d670d6",
-	brightCyan: "#29b8db",
-	brightWhite: "#e5e5e5",
-};
-
 export function TerminalPanel() {
 	const isOpen = useStoreValue(terminalOpenStore);
 	const workspacePath = useStoreValue(workspacePathStore);
 	const pendingTerminalCommand = useStoreValue(pendingTerminalCommandStore);
+	const terminalTheme = useStoreValue(
+		themeStateStore,
+		(state) => state.active.terminal,
+	);
 	const [{ sessions, activeSessionId }, dispatch] = useReducer(
 		terminalStateReducer,
 		EMPTY_TERMINAL_STATE,
@@ -492,6 +447,7 @@ export function TerminalPanel() {
 							onExit={handleSessionExit}
 							sessionId={session.id}
 							isActive={activeSessionId === session.id}
+							theme={terminalTheme}
 						/>
 					</div>
 				))}
@@ -575,10 +531,12 @@ function TerminalInstance({
 	onExit,
 	sessionId,
 	isActive,
+	theme,
 }: {
 	onExit: (sessionId: string) => void;
 	sessionId: string;
 	isActive: boolean;
+	theme: ResolvedTheme["terminal"];
 }) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const termRef = useRef<Terminal | null>(null);
@@ -590,48 +548,23 @@ function TerminalInstance({
 		onExitRef.current = onExit;
 	}, [onExit]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+	// A session owns its xterm instance; theme and focus changes update it in place.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: remount only for sessionId
 	useEffect(() => {
 		if (!containerRef.current) return;
 
 		const term = new Terminal({
 			fontSize: 13,
-			theme: { background: "transparent" },
+			theme: toXtermTheme(theme),
 			cursorBlink: true,
 			allowTransparency: true,
 		});
 
-		const updateTheme = () => {
-			const style = getComputedStyle(document.body);
-			const rawForeground = style.color || "#ececec";
-			const rawBackground = style.backgroundColor || "#ffffff";
-
-			const foreground = cssColorToRgba(rawForeground);
-			const background = cssColorToRgba(rawBackground);
-
-			// Tailwind 4 outputs font-mono or default-mono-font-family
-			let fontFamily = style.getPropertyValue("--font-mono").trim();
-			if (!fontFamily) {
-				fontFamily = style
-					.getPropertyValue("--default-mono-font-family")
-					.trim();
-			}
-			if (!fontFamily) fontFamily = "monospace";
-
-			const palette = isDarkTheme() ? DARK_THEME : LIGHT_THEME;
-
-			term.options.fontFamily = fontFamily;
-			term.options.theme = {
-				...palette,
-				background,
-				foreground,
-				cursor: foreground,
-			};
-		};
-
-		updateTheme();
-
-		const unsubscribeTheme = subscribeTheme(updateTheme);
+		const style = getComputedStyle(document.body);
+		term.options.fontFamily =
+			style.getPropertyValue("--font-mono").trim() ||
+			style.getPropertyValue("--default-mono-font-family").trim() ||
+			"monospace";
 
 		const fitAddon = new FitAddon();
 		term.loadAddon(fitAddon);
@@ -671,18 +604,18 @@ function TerminalInstance({
 
 		resizeObserver.observe(containerRef.current);
 
-		// Initial fit
-		// ResizeObserver will handle the initial fit
-
 		return () => {
 			clearTimeout(fitTimeout);
 			unsubscribeData();
 			unsubscribeExit();
 			resizeObserver.disconnect();
-			unsubscribeTheme();
 			term.dispose();
 		};
-	}, [sessionId]); // Important: only sessionId — anything else here remounts xterm
+	}, [sessionId]);
+
+	useEffect(() => {
+		if (termRef.current) termRef.current.options.theme = toXtermTheme(theme);
+	}, [theme]);
 
 	useEffect(() => {
 		if (
@@ -707,4 +640,31 @@ function TerminalInstance({
 	}, [isActive]);
 
 	return <div ref={containerRef} className="w-full h-full" />;
+}
+
+function toXtermTheme(theme: ResolvedTheme["terminal"]): ITheme {
+	return {
+		foreground: theme.foreground,
+		background: theme.background,
+		cursor: theme.cursor,
+		cursorAccent: theme["cursor-accent"],
+		selectionBackground: theme["selection-background"],
+		selectionForeground: theme["selection-foreground"],
+		black: theme.black,
+		red: theme.red,
+		green: theme.green,
+		yellow: theme.yellow,
+		blue: theme.blue,
+		magenta: theme.magenta,
+		cyan: theme.cyan,
+		white: theme.white,
+		brightBlack: theme["bright-black"],
+		brightRed: theme["bright-red"],
+		brightGreen: theme["bright-green"],
+		brightYellow: theme["bright-yellow"],
+		brightBlue: theme["bright-blue"],
+		brightMagenta: theme["bright-magenta"],
+		brightCyan: theme["bright-cyan"],
+		brightWhite: theme["bright-white"],
+	};
 }

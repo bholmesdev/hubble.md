@@ -18,7 +18,6 @@ type MockDesktopApi = {
 	openPathFromLink: ReturnType<typeof vi.fn>;
 	openPathInDefaultApp: ReturnType<typeof vi.fn>;
 	sidebarDeltaForPath: ReturnType<typeof vi.fn>;
-	setThemeSource: ReturnType<typeof vi.fn>;
 };
 
 function createDesktopApi(): MockDesktopApi {
@@ -40,7 +39,6 @@ function createDesktopApi(): MockDesktopApi {
 		openPathFromLink: vi.fn(async () => ({ kind: "opened" })),
 		openPathInDefaultApp: vi.fn(async () => {}),
 		sidebarDeltaForPath: vi.fn(async () => null),
-		setThemeSource: vi.fn(async () => {}),
 	};
 }
 
@@ -61,13 +59,6 @@ async function loadStoreActions(
 		desktopApi: api,
 		setTimeout,
 		clearTimeout,
-		matchMedia: () => ({
-			get matches() {
-				return systemPrefersDark;
-			},
-			addEventListener() {},
-			removeEventListener() {},
-		}),
 	});
 
 	const actions = await import("./actions");
@@ -76,34 +67,9 @@ async function loadStoreActions(
 	return { ...actions, ...history, ...state };
 }
 
-/** What the stubbed `matchMedia` reports. Under a forced `themeSource` that is the override, not the OS. */
-let systemPrefersDark = false;
-
-function stubThemeDom() {
-	const classList = { toggle: vi.fn() };
-	vi.stubGlobal("document", { documentElement: { classList } });
-	return classList;
-}
-
-/**
- * Leaves `setThemeSource` pending so a test decides when the main process drops
- * the override, the point at which the real OS appearance becomes readable.
- */
-function deferThemeSource(api: MockDesktopApi) {
-	let release: (() => void) | undefined;
-	api.setThemeSource.mockImplementationOnce(
-		() =>
-			new Promise<void>((resolve) => {
-				release = resolve;
-			}),
-	);
-	return () => release?.();
-}
-
 describe("desktop savePathContent", () => {
 	beforeEach(() => {
 		vi.unstubAllGlobals();
-		systemPrefersDark = false;
 	});
 
 	it("hydrates the default chat command and persists edits", async () => {
@@ -121,78 +87,6 @@ describe("desktop savePathContent", () => {
 			STORAGE_KEY,
 			expect.stringContaining('"chatCommand":"codex exec"'),
 		);
-	});
-
-	it("mirrors the theme preference to the native theme source", async () => {
-		const api = createDesktopApi();
-		const classList = stubThemeDom();
-		const { setThemePreference, themePreferenceStore } =
-			await loadStoreActions(api);
-		const { STORAGE_KEY } = await import("./persistence");
-
-		expect(themePreferenceStore.get()).toBe("system");
-		setThemePreference("dark");
-
-		expect(classList.toggle).toHaveBeenLastCalledWith("dark", true);
-		expect(api.setThemeSource).toHaveBeenLastCalledWith("dark");
-		expect(localStorage.setItem).toHaveBeenLastCalledWith(
-			STORAGE_KEY,
-			expect.stringContaining('"theme":"dark"'),
-		);
-	});
-
-	it("holds the current theme until the main process drops the override", async () => {
-		const api = createDesktopApi();
-		const classList = stubThemeDom();
-		const release = deferThemeSource(api);
-		const { setThemePreference } = await loadStoreActions(api);
-
-		setThemePreference("system");
-
-		expect(api.setThemeSource).toHaveBeenLastCalledWith("system");
-		expect(classList.toggle).not.toHaveBeenCalled();
-
-		release();
-		await vi.waitFor(() =>
-			expect(classList.toggle).toHaveBeenLastCalledWith("dark", false),
-		);
-	});
-
-	it("re-applies a saved system preference once the override is dropped", async () => {
-		const api = createDesktopApi();
-		const classList = stubThemeDom();
-		const release = deferThemeSource(api);
-		const { initThemePreference } = await loadStoreActions(api);
-
-		initThemePreference();
-		expect(api.setThemeSource).toHaveBeenLastCalledWith("system");
-		expect(classList.toggle).toHaveBeenLastCalledWith("dark", false);
-
-		// A stale override was forcing light. The real OS value only reads back once
-		// the main process drops it, and no media change event announces that.
-		systemPrefersDark = true;
-		release();
-		await vi.waitFor(() =>
-			expect(classList.toggle).toHaveBeenLastCalledWith("dark", true),
-		);
-	});
-
-	it("drops a pending system apply when an explicit theme is picked first", async () => {
-		const api = createDesktopApi();
-		const classList = stubThemeDom();
-		const release = deferThemeSource(api);
-		const { setThemePreference, themePreferenceStore } =
-			await loadStoreActions(api);
-
-		setThemePreference("system");
-		setThemePreference("dark");
-		expect(classList.toggle).toHaveBeenLastCalledWith("dark", true);
-
-		release();
-		await vi.waitFor(() => expect(api.setThemeSource).toHaveBeenCalledTimes(2));
-
-		expect(themePreferenceStore.get()).toBe("dark");
-		expect(classList.toggle).toHaveBeenLastCalledWith("dark", true);
 	});
 
 	it("defaults code files to Hubble and persists the external-app preference", async () => {

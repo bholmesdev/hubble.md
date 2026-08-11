@@ -1,6 +1,7 @@
 (() => {
 	const hubbleToken = window.__hubbleHtmlAppToken || window.name;
 	let nextHubbleRequestId = 0;
+	let hubbleThemeRevision = -1;
 	const pendingHubbleRequests = new Map();
 	const postHubbleRequest = (id, method, params) => {
 		parent.postMessage(
@@ -30,6 +31,33 @@
 
 	window.addEventListener("message", (event) => {
 		const data = event.data;
+		if (event.source === parent && data?.type === "hubble:theme") {
+			if (
+				!Number.isSafeInteger(data.revision) ||
+				data.revision < hubbleThemeRevision ||
+				(data.appearance !== "light" && data.appearance !== "dark")
+			)
+				return;
+			const variables = data.variables;
+			if (!variables || typeof variables !== "object") return;
+			for (const [property, value] of Object.entries(variables)) {
+				if (!/^--[a-z0-9-]+$/.test(property)) continue;
+				if (typeof value !== "string") continue;
+				if (!/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(value)) continue;
+				document.documentElement.style.setProperty(property, value);
+			}
+			hubbleThemeRevision = data.revision;
+			if (typeof data.theme === "string") {
+				document.documentElement.dataset.theme = data.theme;
+			}
+			document.documentElement.dataset.appearance = data.appearance;
+			document.documentElement.classList.toggle(
+				"dark",
+				data.appearance === "dark",
+			);
+			document.documentElement.style.colorScheme = data.appearance;
+			return;
+		}
 		if (!data || data.type !== "hubble:response") return;
 		const pending = pendingHubbleRequests.get(data.id);
 		if (!pending) return;

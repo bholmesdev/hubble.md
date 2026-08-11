@@ -17,10 +17,8 @@
 	font-display: swap;
 }
 
-/* Desktop-only shadcn token extensions; shared light tokens live in theme.css. */
+/* Desktop-only shadcn token aliases. */
 :root {
-	color-scheme: light;
-	--destructive-foreground: oklch(0.985 0 0);
 	--sidebar-primary: var(--primary);
 	--sidebar-primary-foreground: var(--primary-foreground);
 	--sidebar-ring: var(--ring);
@@ -44,39 +42,6 @@
 	--transition-property-position:
 		inset-inline-start, inset-block-start, left, top, width, height, opacity,
 		transform, box-shadow, background-color, border-color, color;
-}
-
-.dark {
-	color-scheme: dark;
-	--background: oklch(0.2 0.004 60);
-	--foreground: oklch(0.945 0.002 60);
-	--card: oklch(0.24 0.005 60);
-	--card-foreground: var(--foreground);
-	--popover: oklch(0.24 0.005 60);
-	--popover-foreground: var(--foreground);
-	--primary: oklch(0.47 0.08 159.6);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.285 0.005 60);
-	--secondary-foreground: var(--foreground);
-	--muted: oklch(0.275 0.005 60);
-	--muted-foreground: oklch(0.72 0.006 60);
-	--accent: oklch(0.32 0.04 88);
-	--accent-foreground: var(--foreground);
-	--selected: oklch(0.73 0.125 88);
-	--selected-foreground: oklch(0.24 0.03 85);
-	--destructive: oklch(0.704 0.191 22.216);
-	--destructive-foreground: oklch(0.985 0 0);
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 14%);
-	--ring: oklch(0.75 0.13 85);
-	--sidebar: var(--card);
-	--sidebar-foreground: var(--foreground);
-	--sidebar-primary: var(--primary);
-	--sidebar-primary-foreground: var(--primary-foreground);
-	--sidebar-accent: var(--accent);
-	--sidebar-accent-foreground: var(--foreground);
-	--sidebar-border: var(--border);
-	--sidebar-ring: var(--ring);
 }
 
 @layer base {

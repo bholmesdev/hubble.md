@@ -5,21 +5,6 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hubble</title>
-    <script>
-      // Apply the theme class before first paint so a cold launch doesn't flash
-      // the wrong scheme. Same persisted key as src/store/persistence.ts.
-      try {
-        const stored = localStorage.getItem("hubble-desktop-app");
-        const theme = stored ? JSON.parse(stored).settings?.theme : null;
-        if (
-          theme === "dark" ||
-          (theme !== "light" &&
-            matchMedia("(prefers-color-scheme: dark)").matches)
-        ) {
-          document.documentElement.classList.add("dark");
-        }
-      } catch {}
-    </script>
   </head>
 
   <body>

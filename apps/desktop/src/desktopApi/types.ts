@@ -1,5 +1,5 @@
+import type { ThemeSettings, ThemeState } from "@hubble.md/theme";
 import type { FileKind } from "../lib/filePath";
-import type { ThemePreference } from "../theme";
 
 export type FileEntry = {
 	path: string;
@@ -202,7 +202,10 @@ export type DesktopApi = {
 	toAssetUrl(path: string): string;
 	getLaunchFilePath(): Promise<string | null>;
 	getLaunchWorkspacePath(): Promise<string | null>;
-	setThemeSource(source: ThemePreference): Promise<void>;
+	getThemeState(): Promise<ThemeState>;
+	setThemeSettings(settings: ThemeSettings): Promise<void>;
+	openThemesFolder(): Promise<void>;
+	notifyThemeReady(): void;
 	getSpellcheckState(): Promise<SpellcheckState>;
 	setSpellcheckEnabled(enabled: boolean): Promise<void>;
 	setSpellcheckLanguages(languages: string[]): Promise<void>;
@@ -221,6 +224,7 @@ export type DesktopApi = {
 	onUpdateStateChange(
 		callback: (state: DesktopUpdateState) => void,
 	): Unsubscribe;
+	onThemeStateChange(callback: (state: ThemeState) => void): Unsubscribe;
 	onMenuCreateMarkdownFile(callback: () => void): Unsubscribe;
 	onMenuCreateHtmlFile(callback: () => void): Unsubscribe;
 	onMenuOpenFile(callback: () => void): Unsubscribe;

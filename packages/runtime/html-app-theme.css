@@ -1,51 +1,5 @@
 :root {
-	color-scheme: light dark;
-	--brand: oklch(0.426 0.08 159.6);
-	--brand-accent: oklch(0.847 0.168 84.7);
-	--brand-accent-foreground: oklch(0.327 0.051 164.9);
-	--background: oklch(0.995 0.001 95);
-	--foreground: oklch(0.27 0.008 150);
-	--card: oklch(0.998 0.001 95);
-	--card-foreground: var(--foreground);
-	--primary: var(--brand);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.968 0.003 95);
-	--secondary-foreground: var(--foreground);
-	--muted: oklch(0.96 0.003 95);
-	--muted-foreground: oklch(0.55 0.01 95);
-	--accent: oklch(0.965 0.05 90);
-	--accent-foreground: var(--foreground);
-	--selected: oklch(0.9 0.12 90);
-	--selected-foreground: var(--foreground);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.9 0.004 95);
-	--input: oklch(0.91 0.004 95);
-	--ring: var(--brand-accent);
 	--radius: 0.625rem;
-}
-
-@media (prefers-color-scheme: dark) {
-	:root {
-		--background: oklch(0.2 0.004 60);
-		--foreground: oklch(0.945 0.002 60);
-		--card: oklch(0.24 0.005 60);
-		--primary: oklch(0.47 0.08 159.6);
-		--primary-foreground: oklch(0.985 0 0);
-		--secondary: oklch(0.285 0.005 60);
-		--muted: oklch(0.275 0.005 60);
-		--muted-foreground: oklch(0.72 0.006 60);
-		--accent: oklch(0.32 0.04 88);
-		--selected: oklch(0.73 0.125 88);
-		--selected-foreground: oklch(0.24 0.03 85);
-		--destructive: oklch(0.704 0.191 22.216);
-		--border: oklch(1 0 0 / 10%);
-		--input: oklch(1 0 0 / 14%);
-		--ring: oklch(0.75 0.13 85);
-	}
-
-	::selection {
-		background: color-mix(in oklab, #8a764b 88%, transparent);
-	}
 }
 
 @theme inline {
@@ -59,6 +13,8 @@
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
 	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
 	--color-primary: var(--primary);
 	--color-primary-foreground: var(--primary-foreground);
 	--color-secondary: var(--secondary);
@@ -70,9 +26,15 @@
 	--color-selected: var(--selected);
 	--color-selected-foreground: var(--selected-foreground);
 	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
 	--radius-sm: calc(var(--radius) * 0.6);
 	--radius-md: calc(var(--radius) * 0.8);
 	--radius-lg: var(--radius);

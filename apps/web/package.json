@@ -24,6 +24,7 @@
 		"astro": "astro"
 	},
 	"dependencies": {
+		"@hubble.md/theme": "workspace:*",
 		"@iconify-json/mingcute": "^1.2.7",
 		"@plausible-analytics/tracker": "^0.4.5",
 		"astro": "^6.4.6",

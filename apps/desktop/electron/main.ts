@@ -6,6 +6,11 @@ import path from "node:path";
 import { type AppCommandId, getCommand } from "@hubble.md/editor/commands";
 import hubbleRuntime from "@hubble.md/runtime/global.js?raw";
 import htmlAppTheme from "@hubble.md/runtime/html-app-theme.css?raw";
+import {
+	type Appearance,
+	type ThemeSettings,
+	themeCss,
+} from "@hubble.md/theme";
 import tailwindRuntime from "@tailwindcss/browser?raw";
 import alpineRuntime from "alpinejs/dist/cdn.min.js?raw";
 import chokidar, { type FSWatcher } from "chokidar";
@@ -45,10 +50,10 @@ import {
 	SEARCH_MAX_RESULT_FILES,
 	SEARCH_MIN_QUERY_LENGTH,
 } from "../src/lib/searchContent";
-import type { ThemePreference } from "../src/theme";
 import { DeleteUndo } from "./deleteUndo";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
+import { ThemeService, toElectronColor } from "./theme";
 import {
 	collectWorkspaceFiles,
 	listSidebarFiles,
@@ -98,13 +103,18 @@ const updateCheckErrorMessage =
 // Check every 4 hours after the initial packaged-app update check.
 const updateCheckIntervalMs = 4 * 60 * 60 * 1000;
 // Windows/Linux draw the min/max/close buttons as a native overlay whose colors
-// are static unless we update them. Mirror the app palette so the button strip
-// follows the OS appearance instead of staying light in dark mode.
+// are static unless we update them. Mirror the active sidebar palette.
 function titleBarOverlayOptions() {
-	const colors = nativeTheme.shouldUseDarkColors
-		? { color: "#181715", symbolColor: "#a6a5a0" }
-		: { color: "#ffffff", symbolColor: "#454545" };
-	return { ...colors, height: toolbarHeight };
+	const { colors } = themeService.state.active;
+	return {
+		color: toElectronColor(colors.sidebar),
+		symbolColor: toElectronColor(colors["sidebar-foreground"]),
+		height: toolbarHeight,
+	};
+}
+
+function currentNativeAppearance(): Appearance {
+	return nativeTheme.shouldUseDarkColors ? "dark" : "light";
 }
 
 app.setName(appName);
@@ -112,10 +122,11 @@ if (devAppName) {
 	app.setPath("userData", path.join(app.getPath("appData"), devAppName));
 }
 
-// The renderer owns the preference and mirrors it to a `.dark` class, but native
-// chrome and sandboxed HTML apps read `themeSource`. Restore it before the window
-// exists so those are right on the first frame, after the userData override above.
-nativeTheme.themeSource = loadThemeSource();
+const themeService = new ThemeService(
+	app.getPath("userData"),
+	currentNativeAppearance(),
+);
+nativeTheme.themeSource = themeService.state.settings.mode;
 const telemetry = new TelemetryManager({
 	statePath: path.join(app.getPath("userData"), "telemetry.json"),
 	endpoint:
@@ -134,15 +145,33 @@ if (isDev && process.env.HUBBLE_DESKTOP_ENABLE_CDP === "1") {
 let mainWindow: BrowserWindow | null = null;
 let saveWindowStateTimer: ReturnType<typeof setTimeout> | null = null;
 
-// Repaint the native window-control overlay when the OS appearance changes so it
-// tracks the live theme switch (macOS manages its traffic lights itself).
-if (process.platform !== "darwin") {
-	nativeTheme.on("updated", () => {
-		if (mainWindow && !mainWindow.isDestroyed()) {
+themeService.subscribe((state) => {
+	if (nativeTheme.themeSource !== state.settings.mode) {
+		nativeTheme.themeSource = state.settings.mode;
+		// While a light/dark override is forced, Chromium reports the override —
+		// not the real OS appearance — through shouldUseDarkColors. Re-read it
+		// after moving themeSource; if it shifted, republish and let the nested
+		// publish notify with a consistent state instead of this stale one.
+		const appearance = currentNativeAppearance();
+		if (appearance !== state.systemAppearance) {
+			themeService.setSystemAppearance(appearance);
+			return;
+		}
+	}
+	if (mainWindow && !mainWindow.isDestroyed()) {
+		mainWindow.setBackgroundColor(
+			toElectronColor(state.active.colors.background),
+		);
+		if (process.platform !== "darwin") {
 			mainWindow.setTitleBarOverlay(titleBarOverlayOptions());
 		}
-	});
-}
+	}
+	sendToRenderer("desktop:theme-state", state);
+});
+
+nativeTheme.on("updated", () => {
+	themeService.setSystemAppearance(currentNativeAppearance());
+});
 let pendingOpenPath: string | null = firstExistingFileArg(
 	process.argv.slice(1),
 );
@@ -220,9 +249,6 @@ const openAgentClientSchema = z
 		workspacePath: z.string().trim().min(1),
 	})
 	.strict();
-const htmlAppHeadStyles = [
-	{ name: "hubble-theme", source: htmlAppTheme },
-] as const;
 const htmlAppHeadScripts = [
 	{ name: "hubble-runtime", source: hubbleRuntime },
 	{ name: "tailwind-browser", source: tailwindRuntime },
@@ -238,37 +264,6 @@ function grantsPath(): string {
 
 function windowStatePath(): string {
 	return path.join(app.getPath("userData"), "window-size.json");
-}
-
-function themeSourcePath(): string {
-	return path.join(app.getPath("userData"), "theme.json");
-}
-
-function isThemePreference(value: unknown): value is ThemePreference {
-	return value === "light" || value === "dark" || value === "system";
-}
-
-function loadThemeSource(): ThemePreference {
-	try {
-		const raw = fsSync.readFileSync(themeSourcePath(), "utf8");
-		const source = JSON.parse(raw).source;
-		if (isThemePreference(source)) return source;
-	} catch {
-		// Missing or malformed theme state just means following the OS.
-	}
-	return "system";
-}
-
-function saveThemeSource(source: ThemePreference) {
-	try {
-		fsSync.mkdirSync(path.dirname(themeSourcePath()), { recursive: true });
-		fsSync.writeFileSync(
-			themeSourcePath(),
-			JSON.stringify({ source }, null, 2),
-		);
-	} catch {
-		// Best-effort cache; the renderer resends the preference on every launch.
-	}
 }
 
 type SpellcheckConfig = {
@@ -340,7 +335,6 @@ function applySpellcheckLanguages(languages: string[]) {
 	if (valid.length === 0) return;
 	session.defaultSession.setSpellCheckerLanguages(valid);
 }
-
 function workspaceConfigPath(workspacePath: string): string {
 	const root = assertGrantedRoot(workspacePath);
 	return path.join(root, HUBBLE_DIR, workspaceConfigFile);
@@ -741,7 +735,15 @@ function insertBeforeCloseTag(html: string, tagName: string, content: string) {
 }
 
 function injectHtmlAppRuntime(html: string): string {
-	const headStyles = htmlAppHeadStyles.map(styleTag).join("\n");
+	const headStyles = [
+		{
+			name: "hubble-theme-colors",
+			source: themeCss(themeService.state.active),
+		},
+		{ name: "hubble-theme", source: htmlAppTheme },
+	]
+		.map(styleTag)
+		.join("\n");
 	const headScripts = htmlAppHeadScripts.map(scriptTag).join("\n");
 	const bodyEndScripts = htmlAppBodyEndScripts.map(scriptTag).join("\n");
 	const headInjection = `\n${headStyles}\n${headScripts}\n`;
@@ -1186,6 +1188,9 @@ async function createWindow() {
 		height: windowState.height,
 		minWidth: minWindowWidth,
 		show: false,
+		backgroundColor: toElectronColor(
+			themeService.state.active.colors.background,
+		),
 		titleBarStyle: "hidden",
 		...(process.platform !== "darwin"
 			? { titleBarOverlay: titleBarOverlayOptions() }
@@ -1200,6 +1205,16 @@ async function createWindow() {
 		},
 	});
 	mainWindow = window;
+	let resolveThemeReady: () => void;
+	const themeReady = new Promise<void>((resolve) => {
+		resolveThemeReady = resolve;
+	});
+	const onThemeReady = (event: Electron.IpcMainEvent) => {
+		if (event.sender !== window.webContents) return;
+		ipcMain.removeListener("desktop:theme-ready", onThemeReady);
+		resolveThemeReady();
+	};
+	ipcMain.on("desktop:theme-ready", onThemeReady);
 	// Viewer content must never navigate the window or open new ones; external
 	// links go through shell IPC. Unlike will-navigate, this covers subframes.
 	window.webContents.on("will-frame-navigate", (details) => {
@@ -1229,6 +1244,12 @@ async function createWindow() {
 	window.webContents.once("did-finish-load", async () => {
 		window.webContents.setZoomFactor(zoomFactor);
 		await setTrafficLightInset(window, zoomFactor);
+		// Avoid a theme flash without leaving the window hidden if renderer startup fails.
+		await Promise.race([
+			themeReady,
+			new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
+		]);
+		ipcMain.removeListener("desktop:theme-ready", onThemeReady);
 		if (window.isDestroyed()) return;
 		window.show();
 	});
@@ -1262,6 +1283,7 @@ async function createWindow() {
 		saveWindowState(window);
 	});
 	window.on("closed", () => {
+		ipcMain.removeListener("desktop:theme-ready", onThemeReady);
 		if (mainWindow === window) mainWindow = null;
 	});
 
@@ -1902,13 +1924,16 @@ function registerIpc() {
 		autoUpdater.quitAndInstall(false, true);
 	});
 
+	ipcMain.handle("desktop:get-theme-state", () => themeService.state);
 	ipcMain.handle(
-		"desktop:set-theme-source",
-		(_event, { source }: { source: ThemePreference }) => {
-			nativeTheme.themeSource = isThemePreference(source) ? source : "system";
-			saveThemeSource(nativeTheme.themeSource);
-		},
+		"desktop:set-theme-settings",
+		(_event, settings: ThemeSettings) => themeService.setSettings(settings),
 	);
+	ipcMain.handle("desktop:open-themes-folder", async () => {
+		await fs.mkdir(themeService.themesPath, { recursive: true });
+		const error = await shell.openPath(themeService.themesPath);
+		if (error) throw new Error(error);
+	});
 
 	ipcMain.handle("desktop:get-spellcheck-state", () => {
 		const { defaultSession } = session;
@@ -1995,6 +2020,7 @@ if (!singleInstanceLock) {
 	app.whenReady().then(async () => {
 		await telemetry.load();
 		void telemetry.recordActivity(false);
+		await themeService.initialize();
 		restoreSpellcheckConfig();
 		await loadGrants();
 		if (launchWorkspacePath) grantRoot(launchWorkspacePath);
@@ -2016,6 +2042,8 @@ if (!singleInstanceLock) {
 	app.on("window-all-closed", () => {
 		if (process.platform !== "darwin") app.quit();
 	});
+
+	app.on("before-quit", () => void themeService.dispose());
 
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) {
