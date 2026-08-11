@@ -16,16 +16,27 @@ const state: ThemeState = {
 	errors: [],
 };
 
+let themeListener: ((state: ThemeState) => void) | null = null;
 const desktopApi = {
 	getThemeState: vi.fn(async () => state),
 	setThemeSettings: vi.fn(async () => {}),
-	onThemeStateChange: vi.fn(() => () => {}),
+	onThemeStateChange: vi.fn((listener: (state: ThemeState) => void) => {
+		themeListener = listener;
+		return () => {
+			if (themeListener === listener) themeListener = null;
+		};
+	}),
 };
 
 vi.mock("./desktopApi", () => ({ desktopApi }));
 
 describe("theme", () => {
 	beforeEach(() => {
+		vi.resetModules();
+		vi.clearAllMocks();
+		desktopApi.getThemeState.mockResolvedValue(state);
+		desktopApi.setThemeSettings.mockResolvedValue(undefined);
+		themeListener = null;
 		document.documentElement.removeAttribute("class");
 		document.documentElement.removeAttribute("style");
 		document.documentElement.removeAttribute("data-theme");
@@ -53,5 +64,53 @@ describe("theme", () => {
 
 		expect(desktopApi.setThemeSettings).toHaveBeenCalledWith(settings);
 		expect(document.documentElement.dataset.theme).toBe("builtin:hubble-light");
+	});
+
+	it("rolls back an optimistic update when persistence fails", async () => {
+		desktopApi.setThemeSettings.mockRejectedValueOnce(
+			new Error("write failed"),
+		);
+		const { initTheme, setThemeSettings, themeStateStore } = await import(
+			"./theme"
+		);
+		await initTheme();
+
+		await expect(
+			setThemeSettings({ ...DEFAULT_THEME_SETTINGS, mode: "light" }),
+		).rejects.toThrow("write failed");
+
+		expect(themeStateStore.get().settings).toEqual(state.settings);
+		expect(document.documentElement.dataset.theme).toBe("builtin:hubble-dark");
+	});
+
+	it("ignores stale theme states from Electron", async () => {
+		const { initTheme, themeStateStore } = await import("./theme");
+		await initTheme();
+		const latest: ThemeState = {
+			...state,
+			revision: 3,
+			settings: { ...DEFAULT_THEME_SETTINGS, mode: "light" },
+			active: HUBBLE_LIGHT_THEME,
+		};
+		if (!themeListener) throw new Error("Theme listener was not registered.");
+
+		themeListener(latest);
+		themeListener({ ...state, revision: 2 });
+
+		expect(themeStateStore.get()).toEqual(latest);
+		expect(document.documentElement.dataset.theme).toBe("builtin:hubble-light");
+	});
+
+	it("restores the active theme after a preview", async () => {
+		const { initTheme, previewTheme, restoreThemePreview } = await import(
+			"./theme"
+		);
+		await initTheme();
+
+		previewTheme(HUBBLE_LIGHT_THEME);
+		expect(document.documentElement.dataset.theme).toBe("builtin:hubble-light");
+
+		restoreThemePreview();
+		expect(document.documentElement.dataset.theme).toBe("builtin:hubble-dark");
 	});
 });

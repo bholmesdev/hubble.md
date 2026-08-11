@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { DEFAULT_THEME_SETTINGS } from "@hubble.md/theme";
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	loadThemeSettings,
@@ -95,6 +96,19 @@ describe("ThemeService", () => {
 		});
 
 		expect(service.state.settings.dark).toBe("user:missing");
+		expect(service.state.active.id).toBe("builtin:hubble-dark");
+	});
+
+	it("follows system appearance only in system mode", async () => {
+		const service = await createService();
+		expect(service.state.active.id).toBe("builtin:hubble-dark");
+
+		service.setSystemAppearance("light");
+		expect(service.state.active.id).toBe("builtin:hubble-light");
+
+		await service.setSettings({ ...DEFAULT_THEME_SETTINGS, mode: "dark" });
+		service.setSystemAppearance("dark");
+		service.setSystemAppearance("light");
 		expect(service.state.active.id).toBe("builtin:hubble-dark");
 	});
 });

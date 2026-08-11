@@ -12,7 +12,26 @@ import {
 	SYNTAX_TOKENS,
 	TERMINAL_TOKENS,
 	themeCss,
+	themeVariables,
 } from "./index.js";
+
+const sharedThemeCss = readFileSync(
+	new URL("../../ui/src/theme.css", import.meta.url),
+	"utf8",
+);
+
+function cssVariables(selector: string): Record<string, string> {
+	const start = sharedThemeCss.indexOf(`${selector} {`);
+	if (start === -1) throw new Error(`Missing ${selector} theme fallback.`);
+	const end = sharedThemeCss.indexOf("}", start);
+	const block = sharedThemeCss.slice(start, end);
+	return Object.fromEntries(
+		[...block.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((match) => [
+			match[1],
+			match[2].trim(),
+		]),
+	);
+}
 
 const customTheme = {
 	name: "Rosé Pine",
@@ -80,6 +99,24 @@ describe("custom themes", () => {
 		expect(css).toContain("--background:#fefdfd");
 		expect(css).toContain("--syntax-keyword:#aa0d91");
 		expect(css).not.toContain("undefined");
+	});
+
+	it("keeps the shared CSS fallbacks aligned with the built-in themes", () => {
+		for (const [selector, theme] of [
+			[":root", HUBBLE_LIGHT_THEME],
+			[".dark", HUBBLE_DARK_THEME],
+		] as const) {
+			const variables = cssVariables(selector);
+			const expected = themeVariables(theme);
+			expect(
+				Object.fromEntries(
+					Object.keys(expected).map((property) => [
+						property,
+						variables[property],
+					]),
+				),
+			).toEqual(expected);
+		}
 	});
 
 	it("documents every token in its JSON schema", () => {
