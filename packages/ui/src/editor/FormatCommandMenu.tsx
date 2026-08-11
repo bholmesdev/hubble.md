@@ -187,10 +187,13 @@ export function FormatCommandMenu({
 	)
 		? selectedKind
 		: visibleCommands[0]?.kind;
-	const closeMenu = () => {
+	const hideMenu = () => {
 		setOpen(false);
 		setQuery("");
 		setPosition(null);
+	};
+	const closeMenu = () => {
+		hideMenu();
 		// Drop the frozen highlight and restore the real selection so a chosen
 		// command formats the range the user was looking at.
 		editor?.commands.restoreSelection({ focus: false });
@@ -214,6 +217,13 @@ export function FormatCommandMenu({
 			if (!editor) return;
 
 			const handleKeyDown = (event: KeyboardEvent) => {
+				if (open && event.key === "Escape") {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					closeMenu();
+					editor.commands.focus(undefined, { scrollIntoView: false });
+					return;
+				}
 				if (!keymatch(event, getCommand("app.format-menu").defaultBinding))
 					return;
 				if (!editor.isFocused && !open) return;
@@ -226,12 +236,24 @@ export function FormatCommandMenu({
 				}
 				openMenu();
 			};
+			const handlePointerDown = (event: PointerEvent) => {
+				if (!open) return;
+				const target = event.target;
+				if (!(target instanceof Node)) return;
+				if (menuRef.current?.contains(target)) return;
+				hideMenu();
+				editor.commands.clearFrozenSelection();
+			};
 
 			window.addEventListener("keydown", handleKeyDown, true);
-			return () => window.removeEventListener("keydown", handleKeyDown, true);
+			window.addEventListener("pointerdown", handlePointerDown, true);
+			return () => {
+				window.removeEventListener("keydown", handleKeyDown, true);
+				window.removeEventListener("pointerdown", handlePointerDown, true);
+			};
 		},
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-		[closeMenu, editor, open, openMenu],
+		[closeMenu, editor, hideMenu, open, openMenu],
 	);
 
 	useEffect(
@@ -291,13 +313,6 @@ export function FormatCommandMenu({
 					onValueChange={setQuery}
 					placeholder="Format..."
 					className="h-8 w-full border-0 border-b border-border bg-background px-2 text-[11px] leading-4 text-foreground outline-hidden placeholder:text-muted-foreground"
-					onKeyDown={(event) => {
-						if (event.key === "Escape") {
-							event.preventDefault();
-							closeMenu();
-							editor.commands.focus(undefined, { scrollIntoView: false });
-						}
-					}}
 				/>
 				<Command.List className="min-h-0 max-h-64 overflow-y-auto p-1">
 					{visibleCommands.length === 0 ? (
