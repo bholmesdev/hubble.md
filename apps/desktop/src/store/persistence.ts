@@ -1,4 +1,3 @@
-import type { ThemePreference } from "../theme";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
 import {
 	emptyDoc,
@@ -33,7 +32,6 @@ type SettingsState = {
 	chatCommand: string;
 	codeFileOpenMode: CodeFileOpenMode;
 	lastSeenVersion: string | null;
-	theme: ThemePreference;
 };
 
 export type CodeFileOpenMode = "hubble" | "default-app";
@@ -62,7 +60,6 @@ type Persisted = {
 		chatCommand?: string;
 		codeFileOpenMode?: CodeFileOpenMode;
 		lastSeenVersion?: string | null;
-		theme?: ThemePreference;
 	};
 };
 
@@ -130,10 +127,6 @@ export function getInitialState(): DesktopState {
 					: p
 						? ""
 						: null,
-			theme:
-				p?.settings?.theme === "light" || p?.settings?.theme === "dark"
-					? p.settings.theme
-					: "system",
 		},
 	};
 }
@@ -158,7 +151,6 @@ export function serialize(state: DesktopState): Persisted {
 			chatCommand: state.settings.chatCommand,
 			codeFileOpenMode: state.settings.codeFileOpenMode,
 			lastSeenVersion: state.settings.lastSeenVersion,
-			theme: state.settings.theme,
 		},
 	};
 }

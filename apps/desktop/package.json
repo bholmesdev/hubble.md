@@ -32,6 +32,7 @@
 		"@floating-ui/dom": "^1.7.5",
 		"@hubble.md/editor": "workspace:*",
 		"@hubble.md/runtime": "workspace:*",
+		"@hubble.md/theme": "workspace:*",
 		"@hubble.md/ui": "workspace:*",
 		"@simplestack/store": "^0.7.5",
 		"@tailwindcss/browser": "^4.3.1",

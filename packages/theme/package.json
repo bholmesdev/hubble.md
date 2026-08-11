@@ -1,0 +1,45 @@
+{
+	"name": "@hubble.md/theme",
+	"version": "0.0.1",
+	"description": "Theme contract and built-in themes for Hubble.md",
+	"license": "MIT",
+	"author": "Ben Holmes <hey@bholmes.dev>",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/bholmesdev/hubble.md.git",
+		"directory": "packages/theme"
+	},
+	"homepage": "https://hubble.md",
+	"bugs": "https://github.com/bholmesdev/hubble.md/issues",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./schema.json": "./theme.schema.json"
+	},
+	"files": [
+		"dist",
+		"theme.schema.json"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@types/node": "^25.5.0",
+		"typescript": "~5.8.3",
+		"vitest": "^3.2.4"
+	}
+}

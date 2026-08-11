@@ -19,7 +19,7 @@ import {
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import {
@@ -27,6 +27,7 @@ import {
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
+import { AppearanceSettingsSection } from "./components/AppearanceSettingsSection";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
@@ -95,7 +96,6 @@ import {
 	setLastSeenVersion,
 	setReviewThreads,
 	setSidebarOpen,
-	setThemePreference,
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
 	toggleTerminal,
@@ -110,14 +110,13 @@ import {
 	lastSeenVersionStore,
 	sidebarOpenStore,
 	terminalPositionStore,
-	themePreferenceStore,
 	uiStore,
 	type ViewMode,
 	viewerStore,
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
-import { isDarkTheme, subscribeTheme } from "./theme";
+import { themeStateStore } from "./theme";
 
 // Forces editor refresh when underlying TipTap extensions change
 const HMR_REV = (() => {
@@ -245,7 +244,10 @@ function App() {
 		}));
 	const lastSeenVersion = useStoreValue(lastSeenVersionStore);
 	const pinnedNotes = useStoreValue(workspaceStore).pinnedNotes;
-	const isDark = useSyncExternalStore(subscribeTheme, isDarkTheme, () => false);
+	const isDark = useStoreValue(
+		themeStateStore,
+		(theme) => theme.active.appearance === "dark",
+	);
 	const focusedSidebarPath = focusedSidebarItem
 		? focusedSidebarItem.path
 		: null;
@@ -854,7 +856,7 @@ function App() {
 						onViewChangelog={openWhatsNew}
 					/>
 				) : null}
-				<GeneralSettingsSection />
+				<AppearanceSettingsSection />
 				{spellcheck ? (
 					<SpellcheckSettingsSection
 						state={spellcheck}
@@ -872,29 +874,6 @@ function App() {
 				) : null}
 			</SettingsDialog>
 		</main>
-	);
-}
-
-function GeneralSettingsSection() {
-	const theme = useStoreValue(themePreferenceStore);
-	return (
-		<SettingsSection title="General" description="Choose the app appearance.">
-			<div className="flex items-center gap-2">
-				{(["light", "dark", "system"] as const).map((preference) => (
-					<Button
-						key={preference}
-						size="sm"
-						variant={theme === preference ? "secondary" : "outline"}
-						aria-pressed={theme === preference}
-						onClick={() => setThemePreference(preference)}
-					>
-						{preference === "system"
-							? "System default"
-							: `${preference[0].toUpperCase()}${preference.slice(1)}`}
-					</Button>
-				))}
-			</div>
-		</SettingsSection>
 	);
 }
 

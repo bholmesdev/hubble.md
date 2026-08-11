@@ -1,4 +1,6 @@
 import { hasMarkdownExtension, withMarkdownExtension } from "@hubble.md/editor";
+import { type ThemeState, themeVariables } from "@hubble.md/theme";
+import { useStoreValue } from "@simplestack/store/react";
 import type { CSSProperties } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { z } from "zod/v4";
@@ -21,6 +23,7 @@ import {
 	touchFile,
 } from "../store/actions";
 import { cleanFileState, getBaseline, viewerStore } from "../store/state";
+import { themeStateStore } from "../theme";
 import {
 	applyPatchToMarkdown,
 	type HtmlAppFilePatch,
@@ -105,6 +108,7 @@ export function IframeView({
 	const recordedUseRef = useRef(false);
 	const [token] = useState(() => crypto.randomUUID());
 	const [error, setError] = useState<string | null>(null);
+	const themeState = useStoreValue(themeStateStore);
 
 	useEffect(() => {
 		onError?.(error);
@@ -161,6 +165,10 @@ export function IframeView({
 		return () => window.removeEventListener("message", onMessage);
 	}, [htmlAppPath, workspacePath]);
 
+	useEffect(() => {
+		postTheme(iframeRef.current, themeState);
+	}, [themeState]);
+
 	if (error) return null;
 
 	return (
@@ -175,8 +183,24 @@ export function IframeView({
 			style={style}
 			width="100%"
 			onError={() => setError("Failed to load iframe.")}
-			onLoad={() => setError(null)}
+			onLoad={() => {
+				setError(null);
+				postTheme(iframeRef.current, themeState);
+			}}
 		/>
+	);
+}
+
+function postTheme(iframe: HTMLIFrameElement | null, state: ThemeState): void {
+	iframe?.contentWindow?.postMessage(
+		{
+			type: "hubble:theme",
+			revision: state.revision,
+			theme: state.active.id,
+			appearance: state.active.appearance,
+			variables: themeVariables(state.active),
+		},
+		"*",
 	);
 }
 

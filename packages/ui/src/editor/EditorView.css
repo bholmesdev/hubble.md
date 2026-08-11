@@ -290,27 +290,33 @@
 
 [data-hubble-editor] .ProseMirror [data-review-type="reviewComment"],
 [data-hubble-editor] .ProseMirror [data-review-type="reviewHighlight"] {
-	background: color-mix(in oklab, var(--brand-accent) 24%, transparent);
+	background: color-mix(in oklab, var(--review-comment) 24%, transparent);
 	box-shadow: inset 0 -2px
-		color-mix(in oklab, var(--brand-accent) 70%, transparent);
+		color-mix(in oklab, var(--review-comment) 70%, transparent);
 	border-radius: 2px;
 	color: inherit;
 }
 
 [data-hubble-editor] .ProseMirror [data-review-type="reviewInsertion"] {
-	background: color-mix(in oklab, #2f9e44 18%, transparent);
-	box-shadow: inset 0 -2px color-mix(in oklab, #2f9e44 48%, transparent);
+	background: color-mix(in oklab, var(--review-insertion) 18%, transparent);
+	box-shadow: inset 0 -2px
+		color-mix(in oklab, var(--review-insertion) 48%, transparent);
 }
 
 [data-hubble-editor] .ProseMirror [data-review-type="reviewDeletion"] {
-	background: color-mix(in oklab, #d94841 14%, transparent);
+	background: color-mix(in oklab, var(--review-deletion) 14%, transparent);
 	text-decoration: line-through;
-	text-decoration-color: color-mix(in oklab, #d94841 70%, currentColor);
+	text-decoration-color: color-mix(
+		in oklab,
+		var(--review-deletion) 70%,
+		currentColor
+	);
 }
 
 [data-hubble-editor] .ProseMirror [data-review-type="reviewReplacement"] {
-	background: color-mix(in oklab, #e67700 16%, transparent);
-	box-shadow: inset 0 -2px color-mix(in oklab, #e67700 48%, transparent);
+	background: color-mix(in oklab, var(--review-replacement) 16%, transparent);
+	box-shadow: inset 0 -2px
+		color-mix(in oklab, var(--review-replacement) 48%, transparent);
 }
 
 [data-hubble-editor]
@@ -438,17 +444,17 @@
 
 [data-hubble-editor] .ProseMirror pre code {
 	background: transparent;
-	color: #000;
+	color: var(--syntax-plain);
 	padding: 0;
 }
 
 [data-hubble-editor] .ProseMirror .xml .hljs-meta {
-	color: #c0c0c0;
+	color: var(--syntax-meta);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-comment,
 [data-hubble-editor] .ProseMirror .hljs-quote {
-	color: #007400;
+	color: var(--syntax-comment);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-tag,
@@ -457,35 +463,35 @@
 [data-hubble-editor] .ProseMirror .hljs-selector-tag,
 [data-hubble-editor] .ProseMirror .hljs-literal,
 [data-hubble-editor] .ProseMirror .hljs-name {
-	color: #aa0d91;
+	color: var(--syntax-keyword);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-variable,
 [data-hubble-editor] .ProseMirror .hljs-template-variable {
-	color: #3f6e74;
+	color: var(--syntax-variable);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-code,
 [data-hubble-editor] .ProseMirror .hljs-string,
 [data-hubble-editor] .ProseMirror .hljs-meta .hljs-string {
-	color: #c41a16;
+	color: var(--syntax-string);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-regexp,
 [data-hubble-editor] .ProseMirror .hljs-link {
-	color: #0e0eff;
+	color: var(--syntax-regexp);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-title,
 [data-hubble-editor] .ProseMirror .hljs-symbol,
 [data-hubble-editor] .ProseMirror .hljs-bullet,
 [data-hubble-editor] .ProseMirror .hljs-number {
-	color: #1c00cf;
+	color: var(--syntax-number);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-section,
 [data-hubble-editor] .ProseMirror .hljs-meta {
-	color: #643820;
+	color: var(--syntax-section);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-title.class_,
@@ -493,20 +499,20 @@
 [data-hubble-editor] .ProseMirror .hljs-type,
 [data-hubble-editor] .ProseMirror .hljs-built_in,
 [data-hubble-editor] .ProseMirror .hljs-params {
-	color: #5c2699;
+	color: var(--syntax-type);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-attr {
-	color: #836c28;
+	color: var(--syntax-attribute);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-subst {
-	color: #000;
+	color: var(--syntax-plain);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-selector-id,
 [data-hubble-editor] .ProseMirror .hljs-selector-class {
-	color: #9b703f;
+	color: var(--syntax-selector);
 }
 
 [data-hubble-editor] .ProseMirror .hljs-doctag,
@@ -516,81 +522,6 @@
 
 [data-hubble-editor] .ProseMirror .hljs-emphasis {
 	font-style: italic;
-}
-
-/*
- * Dark-mode syntax palette (Atom One Dark), paired with the Xcode-style light
- * theme above.
- */
-.dark [data-hubble-editor] .ProseMirror pre code {
-	color: #abb2bf;
-}
-
-.dark [data-hubble-editor] .ProseMirror .xml .hljs-meta {
-	color: #5c6370;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-comment,
-.dark [data-hubble-editor] .ProseMirror .hljs-quote {
-	color: #7f848e;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-tag,
-.dark [data-hubble-editor] .ProseMirror .hljs-attribute,
-.dark [data-hubble-editor] .ProseMirror .hljs-keyword,
-.dark [data-hubble-editor] .ProseMirror .hljs-selector-tag,
-.dark [data-hubble-editor] .ProseMirror .hljs-literal,
-.dark [data-hubble-editor] .ProseMirror .hljs-name {
-	color: #c678dd;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-variable,
-.dark [data-hubble-editor] .ProseMirror .hljs-template-variable {
-	color: #e06c75;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-code,
-.dark [data-hubble-editor] .ProseMirror .hljs-string,
-.dark [data-hubble-editor] .ProseMirror .hljs-meta .hljs-string {
-	color: #98c379;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-regexp,
-.dark [data-hubble-editor] .ProseMirror .hljs-link {
-	color: #56b6c2;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-title,
-.dark [data-hubble-editor] .ProseMirror .hljs-symbol,
-.dark [data-hubble-editor] .ProseMirror .hljs-bullet,
-.dark [data-hubble-editor] .ProseMirror .hljs-number {
-	color: #d19a66;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-section,
-.dark [data-hubble-editor] .ProseMirror .hljs-meta {
-	color: #61afef;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-title.class_,
-.dark [data-hubble-editor] .ProseMirror .hljs-class .hljs-title,
-.dark [data-hubble-editor] .ProseMirror .hljs-type,
-.dark [data-hubble-editor] .ProseMirror .hljs-built_in,
-.dark [data-hubble-editor] .ProseMirror .hljs-params {
-	color: #e5c07b;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-attr {
-	color: #d19a66;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-subst {
-	color: #abb2bf;
-}
-
-.dark [data-hubble-editor] .ProseMirror .hljs-selector-id,
-.dark [data-hubble-editor] .ProseMirror .hljs-selector-class {
-	color: #e06c75;
 }
 
 [data-hubble-editor] .ProseMirror span[data-link="true"] {

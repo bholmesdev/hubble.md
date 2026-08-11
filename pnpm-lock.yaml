@@ -26,6 +26,9 @@ importers:
       '@hubble.md/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@hubble.md/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
       '@hubble.md/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -162,6 +165,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@hubble.md/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
       '@iconify-json/mingcute':
         specifier: ^1.2.7
         version: 1.2.7
@@ -195,6 +201,9 @@ importers:
       '@hubble.md/sync-backend':
         specifier: workspace:*
         version: link:../../packages/sync-backend
+      '@hubble.md/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
       '@hubble.md/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -391,6 +400,22 @@ importers:
       unist-util-visit:
         specifier: ^5.1.0
         version: 5.1.0
+
+  packages/theme:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
+      typescript:
+        specifier: ~5.8.3
+        version: 5.8.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(happy-dom@20.10.3)(jiti@2.6.1)(lightningcss@1.30.2)(msw@2.12.13(@types/node@25.5.0)(typescript@5.8.3))(yaml@2.9.0)
 
   packages/ui:
     dependencies:

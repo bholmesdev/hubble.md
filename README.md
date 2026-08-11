@@ -61,6 +61,7 @@ This repo is a pnpm workspace:
     ├── editor         # Framework-agnostic Markdown editor core (Tiptap + Markdown conversion)
     ├── ui             # Shared React editor UI built on the editor core
     ├── runtime        # Runtime injected into HTML Apps and Embeds
+    ├── theme          # Theme schema, resolver, and built-in color themes
     ├── sync           # Filesystem sync engine (HEAVILY WIP)
     ├── convex-client  # Convex client used by the sync engine
     ├── sync-backend   # Convex backend powering Cloud Sync
@@ -86,6 +87,7 @@ pnpm typecheck        # typecheck all packages
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) covers the contribution flow, local setup, and pre-PR checks.
 - [`CONTEXT.md`](./CONTEXT.md) is the shared glossary for project terms (Workspace, HTML App, Embed, and more).
 - [`apps/desktop/README.md`](./apps/desktop/README.md) covers desktop build, dev, and packaging.
+- [`docs/themes.md`](./docs/themes.md) documents custom JSON themes.
 
 ## Powered by Warp
 

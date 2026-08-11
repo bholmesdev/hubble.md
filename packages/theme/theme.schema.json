@@ -1,0 +1,273 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://hubble.md/schemas/theme.json",
+	"title": "Hubble theme",
+	"description": "A light or dark color theme for Hubble.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["name", "appearance", "colors"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"name": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 80,
+			"description": "Display name shown in the theme picker."
+		},
+		"author": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 120,
+			"description": "Optional theme author metadata."
+		},
+		"appearance": {
+			"enum": ["light", "dark"],
+			"description": "Whether this theme fills the light or dark slot. Also selects the built-in palette used for omitted colors."
+		},
+		"palette": {
+			"type": "object",
+			"description": "Named colors that color values can reference as \"$name\".",
+			"propertyNames": {
+				"pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+				"maxLength": 80
+			},
+			"additionalProperties": { "$ref": "#/$defs/hexColor" }
+		},
+		"colors": {
+			"$ref": "#/$defs/colorMap",
+			"description": "Interface colors. The nine required foundation colors derive sensible defaults for every other token.",
+			"required": [
+				"background",
+				"foreground",
+				"card",
+				"primary",
+				"primary-foreground",
+				"muted",
+				"muted-foreground",
+				"border",
+				"ring"
+			]
+		},
+		"syntax": {
+			"$ref": "#/$defs/syntaxMap",
+			"description": "Code syntax-highlighting colors. Omitted tokens use the built-in palette for this appearance."
+		},
+		"terminal": {
+			"$ref": "#/$defs/terminalMap",
+			"description": "Terminal colors. Omitted tokens fall back to the interface colors and the built-in ANSI palette."
+		}
+	},
+	"$defs": {
+		"hexColor": {
+			"type": "string",
+			"pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$",
+			"description": "A #RRGGBB or #RRGGBBAA color."
+		},
+		"colorValue": {
+			"description": "A #RRGGBB or #RRGGBBAA color, or a \"$name\" reference into palette.",
+			"oneOf": [
+				{ "$ref": "#/$defs/hexColor" },
+				{
+					"type": "string",
+					"pattern": "^\\$[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+				}
+			]
+		},
+		"colorMap": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"brand": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Brand tint for links. Defaults to primary."
+				},
+				"brand-accent": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Brand highlight fill. Defaults to ring."
+				},
+				"brand-accent-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text on brand-accent. Defaults to primary-foreground."
+				},
+				"background": {
+					"$ref": "#/$defs/colorValue",
+					"description": "App and editor background."
+				},
+				"foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Default text color."
+				},
+				"card": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Raised surface background for cards and panels."
+				},
+				"card-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text on card. Defaults to foreground."
+				},
+				"popover": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Menu and dialog background. Defaults to card."
+				},
+				"popover-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text in menus and dialogs. Defaults to foreground."
+				},
+				"primary": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Primary action color for buttons and active controls."
+				},
+				"primary-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text on primary."
+				},
+				"secondary": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Secondary button fill. Defaults to muted."
+				},
+				"secondary-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text on secondary. Defaults to foreground."
+				},
+				"muted": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Subdued fill for hovers and inactive surfaces."
+				},
+				"muted-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Secondary text color."
+				},
+				"accent": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Hover highlight for menu items and rows. Defaults to muted."
+				},
+				"accent-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text on accent. Defaults to foreground."
+				},
+				"selected": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Selection highlight for active rows and text selection. Defaults to primary."
+				},
+				"selected-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text on selected. Defaults to primary-foreground."
+				},
+				"destructive": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Errors and destructive actions."
+				},
+				"destructive-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text on destructive."
+				},
+				"border": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Default border color."
+				},
+				"input": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Form control border. Defaults to border."
+				},
+				"ring": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Focus ring around the active control."
+				},
+				"sidebar": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Sidebar background. Defaults to card."
+				},
+				"sidebar-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Sidebar text. Defaults to foreground."
+				},
+				"sidebar-accent": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Hover and inactive-selection fill for sidebar rows. Defaults to muted."
+				},
+				"sidebar-accent-foreground": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text on sidebar-accent. Defaults to foreground."
+				},
+				"sidebar-border": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Border between the sidebar and the editor. Defaults to border."
+				},
+				"review-comment": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Review comment and highlight marks in the editor."
+				},
+				"review-insertion": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Review insertion marks in the editor."
+				},
+				"review-deletion": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Review deletion marks in the editor."
+				},
+				"review-replacement": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Review replacement marks in the editor."
+				}
+			}
+		},
+		"syntaxMap": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"plain": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Default code text."
+				},
+				"meta": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Metadata and processing directives."
+				},
+				"comment": { "$ref": "#/$defs/colorValue" },
+				"keyword": { "$ref": "#/$defs/colorValue" },
+				"variable": { "$ref": "#/$defs/colorValue" },
+				"string": { "$ref": "#/$defs/colorValue" },
+				"regexp": { "$ref": "#/$defs/colorValue" },
+				"number": { "$ref": "#/$defs/colorValue" },
+				"section": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Headings and section markers."
+				},
+				"type": { "$ref": "#/$defs/colorValue" },
+				"attribute": { "$ref": "#/$defs/colorValue" },
+				"selector": { "$ref": "#/$defs/colorValue" }
+			}
+		},
+		"terminalMap": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"foreground": { "$ref": "#/$defs/colorValue" },
+				"background": { "$ref": "#/$defs/colorValue" },
+				"cursor": { "$ref": "#/$defs/colorValue" },
+				"cursor-accent": {
+					"$ref": "#/$defs/colorValue",
+					"description": "Text inside the block cursor."
+				},
+				"selection-background": { "$ref": "#/$defs/colorValue" },
+				"selection-foreground": { "$ref": "#/$defs/colorValue" },
+				"black": { "$ref": "#/$defs/colorValue" },
+				"red": { "$ref": "#/$defs/colorValue" },
+				"green": { "$ref": "#/$defs/colorValue" },
+				"yellow": { "$ref": "#/$defs/colorValue" },
+				"blue": { "$ref": "#/$defs/colorValue" },
+				"magenta": { "$ref": "#/$defs/colorValue" },
+				"cyan": { "$ref": "#/$defs/colorValue" },
+				"white": { "$ref": "#/$defs/colorValue" },
+				"bright-black": { "$ref": "#/$defs/colorValue" },
+				"bright-red": { "$ref": "#/$defs/colorValue" },
+				"bright-green": { "$ref": "#/$defs/colorValue" },
+				"bright-yellow": { "$ref": "#/$defs/colorValue" },
+				"bright-blue": { "$ref": "#/$defs/colorValue" },
+				"bright-magenta": { "$ref": "#/$defs/colorValue" },
+				"bright-cyan": { "$ref": "#/$defs/colorValue" },
+				"bright-white": { "$ref": "#/$defs/colorValue" }
+			}
+		}
+	}
+}

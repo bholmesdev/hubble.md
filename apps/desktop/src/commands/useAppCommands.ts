@@ -29,7 +29,6 @@ import {
 	openWorkspaceWithSidebar,
 	requestChatAboutNote,
 	setSidebarOpen,
-	setThemePreference,
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
 	togglePinnedNote,
@@ -37,6 +36,7 @@ import {
 	toggleTerminal,
 } from "../store/actions";
 import { canGoBack, canGoForward } from "../store/history";
+import { setThemeSettings, themeStateStore } from "../theme";
 
 const CONTRIBUTING_URL =
 	"https://github.com/bholmesdev/hubble.md/blob/main/CONTRIBUTING.md";
@@ -292,7 +292,13 @@ function defineCommands(
 			group: "View",
 			keywords: ["dark mode", "light mode", "appearance", "color"],
 			isEnabled: () => true,
-			run: () => setThemePreference(context.isDark ? "light" : "dark"),
+			run: () => {
+				const { settings } = themeStateStore.get();
+				return setThemeSettings({
+					...settings,
+					mode: context.isDark ? "light" : "dark",
+				});
+			},
 		}),
 		// Zoom bindings differ by platform, so they stay outside the registry.
 		paletteOnly({

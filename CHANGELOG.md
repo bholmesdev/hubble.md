@@ -10,6 +10,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Added
 
 - Add a spellcheck option to Settings. Allows for enabling / disabling, and selecting custom spellcheck dictionaries on Windows and Linux. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#234](https://github.com/bholmesdev/hubble.md/pull/234)
+- Install custom color themes by dropping JSON files into the themes folder from Settings → Appearance, then pick separate light and dark themes with live previews. Themes restyle the whole app, including the terminal and HTML apps; see [docs/themes.md](https://github.com/bholmesdev/hubble.md/blob/main/docs/themes.md) for the format. Thanks [@n00ki](https://github.com/n00ki)!
 
 ### Changed
 

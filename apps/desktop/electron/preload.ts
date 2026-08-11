@@ -107,8 +107,11 @@ const desktopApi = {
 	getLaunchFilePath: () => ipcRenderer.invoke("desktop:get-launch-file-path"),
 	getLaunchWorkspacePath: () =>
 		ipcRenderer.invoke("desktop:get-launch-workspace-path"),
-	setThemeSource: (source) =>
-		ipcRenderer.invoke("desktop:set-theme-source", { source }),
+	getThemeState: () => ipcRenderer.invoke("desktop:get-theme-state"),
+	setThemeSettings: (settings) =>
+		ipcRenderer.invoke("desktop:set-theme-settings", settings),
+	openThemesFolder: () => ipcRenderer.invoke("desktop:open-themes-folder"),
+	notifyThemeReady: () => ipcRenderer.send("desktop:theme-ready"),
 	getSpellcheckState: () => ipcRenderer.invoke("desktop:get-spellcheck-state"),
 	setSpellcheckEnabled: (enabled) =>
 		ipcRenderer.invoke("desktop:set-spellcheck-enabled", { enabled }),
@@ -132,6 +135,7 @@ const desktopApi = {
 		subscribe("desktop:open-file", (path: string) => callback(path)),
 	onUpdateStateChange: (callback) =>
 		subscribe("desktop:update-state", callback),
+	onThemeStateChange: (callback) => subscribe("desktop:theme-state", callback),
 	onMenuCreateMarkdownFile: (callback) =>
 		subscribe("desktop:menu-create-markdown-file", callback),
 	onMenuCreateHtmlFile: (callback) =>
