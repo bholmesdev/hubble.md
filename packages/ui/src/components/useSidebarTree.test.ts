@@ -10,6 +10,7 @@ import {
 	flattenRows,
 	type SidebarFile,
 	type SidebarRow,
+	type SidebarSortMode,
 	useSidebarTree,
 } from "./useSidebarTree";
 
@@ -43,10 +44,8 @@ function folderNames(node: ReturnType<typeof buildFileTree>) {
 
 describe("buildFileTree", () => {
 	it("includes empty folders from directory entries", () => {
-		const tree = buildFileTree(
-			[],
-			[{ path: "/workspace/empty", modifiedAt: 3 }],
-			(path) => path.replace("/workspace/", ""),
+		const tree = buildFileTree([], [{ path: "/workspace/empty" }], (path) =>
+			path.replace("/workspace/", ""),
 		);
 
 		expect(folderNames(tree)).toEqual(["empty"]);
@@ -56,10 +55,7 @@ describe("buildFileTree", () => {
 	it("includes folder-only nested hierarchies from directory entries", () => {
 		const tree = buildFileTree(
 			[],
-			[
-				{ path: "/workspace/parent", modifiedAt: 1 },
-				{ path: "/workspace/parent/child", modifiedAt: 2 },
-			],
+			[{ path: "/workspace/parent" }, { path: "/workspace/parent/child" }],
 			(path) => path.replace("/workspace/", ""),
 		);
 
@@ -83,10 +79,7 @@ describe("flattenRows", () => {
 		const getDisplayPath = (path: string) => path.replace("/workspace/", "");
 		const tree = buildFileTree(
 			[],
-			[
-				{ path: "/workspace/empty", modifiedAt: 1 },
-				{ path: "/workspace/empty/new-folder", modifiedAt: 2 },
-			],
+			[{ path: "/workspace/empty" }, { path: "/workspace/empty/new-folder" }],
 			getDisplayPath,
 		);
 
@@ -106,10 +99,7 @@ describe("flattenRows", () => {
 		const getDisplayPath = (path: string) => path.replace("/workspace/", "");
 		const tree = buildFileTree(
 			[],
-			[
-				{ path: "/workspace/empty", modifiedAt: 1 },
-				{ path: "/workspace/empty/new-folder", modifiedAt: 2 },
-			],
+			[{ path: "/workspace/empty" }, { path: "/workspace/empty/new-folder" }],
 			getDisplayPath,
 		);
 
@@ -122,6 +112,101 @@ describe("flattenRows", () => {
 		});
 
 		expect(rows.map((row) => row.label)).toEqual(["empty/new-folder"]);
+	});
+
+	it.each([
+		["recent", ["alpha.md", "charlie.md", "bravo.md"]],
+		["alpha", ["alpha.md", "bravo.md", "charlie.md"]],
+	] satisfies [
+		SidebarSortMode,
+		string[],
+	][])("sorts files by %s", (sortMode, expected) => {
+		const files = [
+			{ path: "/workspace/alpha.md", modifiedAt: 30 },
+			{ path: "/workspace/bravo.md", modifiedAt: 10 },
+			{ path: "/workspace/charlie.md", modifiedAt: 20 },
+		];
+		const tree = buildFileTree(files, [], getDisplayPath);
+
+		const rows = flattenRows({
+			files,
+			getDisplayPath,
+			tree,
+			sortMode,
+			expandedFolders: new Set(),
+		});
+
+		expect(fileLabels(rows)).toEqual(expected);
+	});
+
+	it.each([
+		"recent",
+		"alpha",
+	] satisfies SidebarSortMode[])("keeps folders alphabetical at every depth with %s file order", (sortMode) => {
+		const files = [
+			{ path: "/workspace/02 Stuff/new.md", modifiedAt: 30 },
+			{ path: "/workspace/00 Index/old.md", modifiedAt: 10 },
+		];
+		const folders = [
+			{ path: "/workspace/Parent/02 Stuff" },
+			{ path: "/workspace/Parent/00 Index" },
+			{ path: "/workspace/02 Stuff" },
+			{ path: "/workspace/00 Index" },
+			{ path: "/workspace/Parent" },
+		];
+		const tree = buildFileTree(files, folders, getDisplayPath);
+
+		const rows = flattenRows({
+			files,
+			getDisplayPath,
+			tree,
+			sortMode,
+			expandedFolders: new Set(["Parent/"]),
+		});
+
+		expect(folderLabels(rows, 0)).toEqual(["00 Index", "02 Stuff", "Parent"]);
+		expect(folderLabels(rows, 1)).toEqual(["00 Index", "02 Stuff"]);
+	});
+
+	it("sorts numeric names naturally", () => {
+		const files = [
+			{ path: "/workspace/10 Notes.md" },
+			{ path: "/workspace/2 Notes.md" },
+		];
+		const tree = buildFileTree(
+			files,
+			[{ path: "/workspace/10 Archive" }, { path: "/workspace/2 Archive" }],
+			getDisplayPath,
+		);
+
+		const rows = flattenRows({
+			files,
+			getDisplayPath,
+			tree,
+			sortMode: "alpha",
+			expandedFolders: new Set(),
+		});
+
+		expect(folderLabels(rows, 0)).toEqual(["2 Archive", "10 Archive"]);
+		expect(fileLabels(rows)).toEqual(["2 Notes.md", "10 Notes.md"]);
+	});
+
+	it("uses the selected file order for pinned files", () => {
+		const files = [
+			{ path: "/workspace/alpha.md", modifiedAt: 10, pinned: true },
+			{ path: "/workspace/bravo.md", modifiedAt: 30, pinned: true },
+		];
+		const tree = buildFileTree(files, [], getDisplayPath);
+
+		const rows = flattenRows({
+			files,
+			getDisplayPath,
+			tree,
+			sortMode: "recent",
+			expandedFolders: new Set(),
+		});
+
+		expect(fileLabels(rows)).toEqual(["bravo.md", "alpha.md"]);
 	});
 });
 
@@ -209,6 +294,16 @@ function renderTree(overrides: Partial<TreeProps>) {
 
 function filePaths(rows: SidebarRow[]) {
 	return rows.flatMap((row) => (row.kind === "file" ? [row.file.path] : []));
+}
+
+function fileLabels(rows: SidebarRow[]) {
+	return rows.flatMap((row) => (row.kind === "file" ? [row.label] : []));
+}
+
+function folderLabels(rows: SidebarRow[], depth: number) {
+	return rows.flatMap((row) =>
+		row.kind === "folder" && row.depth === depth ? [row.label] : [],
+	);
 }
 
 function folderRow(rows: SidebarRow[], id: string) {
