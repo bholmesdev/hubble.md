@@ -31,6 +31,14 @@ export const FakeSelectionExtension = Extension.create({
 					editor.view.dispatch(editor.state.tr);
 					return true;
 				},
+			clearFrozenSelection:
+				() =>
+				({ editor }) => {
+					const storage = this.storage as { frozen: FrozenSelection };
+					storage.frozen = null;
+					editor.view.dispatch(editor.state.tr);
+					return true;
+				},
 			restoreSelection:
 				({ focus }) =>
 				({ editor, chain }) => {
@@ -84,6 +92,8 @@ declare module "@tiptap/core" {
 		fakeSelection: {
 			/** Snapshot the current editor selection to display while blurred */
 			freezeSelection: () => ReturnType;
+			/** Clear the frozen selection without changing the editor selection */
+			clearFrozenSelection: () => ReturnType;
 			/** Restore the frozen selection into the native DOM selection and focus the editor */
 			restoreSelection: ({ focus }: { focus: boolean }) => ReturnType;
 		};
