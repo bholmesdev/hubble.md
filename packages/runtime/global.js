@@ -59,6 +59,10 @@
 			remove: (path) => requestHubble("files.remove", { path }),
 			safeRemove: (path) => safeRequestHubble("files.remove", { path }),
 		},
+		links: {
+			open: (url) => requestHubble("links.open", { url }),
+			safeOpen: (url) => safeRequestHubble("links.open", { url }),
+		},
 	};
 
 	const send = () => {
