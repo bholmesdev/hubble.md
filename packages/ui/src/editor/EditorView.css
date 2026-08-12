@@ -330,6 +330,11 @@
 	overflow-x: auto;
 }
 
+[data-hubble-editor]:not([data-hubble-source-editor]) .ProseMirror pre {
+	white-space: pre;
+	overflow-wrap: normal;
+}
+
 [data-hubble-editor] .pm-code-block {
 	position: relative;
 }
