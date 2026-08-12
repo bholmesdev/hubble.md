@@ -72,6 +72,12 @@ const createInputSchema = z
 		open: z.boolean().optional(),
 	})
 	.strict();
+const externalUrlSchema = z
+	.string()
+	.refine(
+		(url) => /^https?:\/\//i.test(url),
+		"Only http(s) external URLs are allowed",
+	);
 const filePatchSchema = z
 	.object({
 		body: z.string().optional(),
@@ -195,19 +201,27 @@ export function toAssetUrl(path: string): string {
 	return `hubble-asset://local/${pathWithEncodedRoot}`;
 }
 
-async function handleHtmlAppRequest(
+export async function handleHtmlAppRequest(
 	request: HtmlAppRequest,
 	workspacePath: string | null,
 	htmlAppPath: string,
 ) {
 	try {
-		if (!workspacePath) {
-			throw new Error("Open a workspace to query files.");
-		}
 		const params =
 			request.params && typeof request.params === "object"
 				? (request.params as Record<string, unknown>)
 				: {};
+		if (request.method === "links.open") {
+			const url = parseInput(externalUrlSchema, params.url);
+			await desktopApi.openExternalUrl(url);
+			return {
+				ok: true,
+				value: { url },
+			};
+		}
+		if (!workspacePath) {
+			throw new Error("Open a workspace to query files.");
+		}
 		const resolveFilePath = (path: string, mustExist: boolean) => {
 			const basePath = isDotRelative(path)
 				? dirname(htmlAppPath)
