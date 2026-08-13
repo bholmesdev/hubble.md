@@ -10,7 +10,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Added
 
 - Add a spellcheck option to Settings. Allows for enabling / disabling, and selecting custom spellcheck dictionaries on Windows and Linux. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#234](https://github.com/bholmesdev/hubble.md/pull/234)
-- macOS users can now install Hubble via Homebrew with `brew tap PARAM-ship/hubble && brew install --cask hubble-md`. Thanks [@PARAM-ship](https://github.com/PARAM-ship)! [#174](https://github.com/bholmesdev/hubble.md/issues/174)
+- macOS users can now install Hubble via Homebrew with `brew tap PARAM-ship/hubble && brew install --cask hubble-md`. Thanks [@paramcodes](https://github.com/paramcodes)! [#264](https://github.com/bholmesdev/hubble.md/pull/264)
 
 ### Changed
 
