@@ -162,6 +162,8 @@ let menuState: MenuState = {
 	isSourceMode: false,
 	canGoBack: false,
 	canGoForward: false,
+	hasTabs: false,
+	hasMultipleTabs: false,
 };
 let updateState: DesktopUpdateState = {
 	isSupported: supportsAutoUpdates,
@@ -922,7 +924,22 @@ function buildMenu() {
 					click: () => sendToRenderer("desktop:menu-sync-workspace"),
 				},
 				{ type: "separator" },
-				{ role: "close" },
+				// `CmdOrCtrl+W` has to keep closing the window once the last Tab is
+				// gone, so this item stays enabled and decides at click time.
+				{
+					id: "app.close-tab",
+					label: menuState.hasTabs
+						? getCommand("app.close-tab").label
+						: "Close",
+					accelerator: getCommand("app.close-tab").defaultBinding,
+					click: () => {
+						if (menuState.hasTabs) {
+							sendToRenderer("desktop:menu-close-tab");
+							return;
+						}
+						mainWindow?.close();
+					},
+				},
 			],
 		},
 		{
@@ -954,6 +971,13 @@ function buildMenu() {
 				),
 				commandMenuItem("app.go-forward", () =>
 					sendToRenderer("desktop:menu-go-forward"),
+				),
+				{ type: "separator" },
+				commandMenuItem("app.previous-tab", () =>
+					sendToRenderer("desktop:menu-previous-tab"),
+				),
+				commandMenuItem("app.next-tab", () =>
+					sendToRenderer("desktop:menu-next-tab"),
 				),
 				{ type: "separator" },
 				{
@@ -1952,6 +1976,8 @@ function registerIpc() {
 			isSourceMode: state.isSourceMode === true,
 			canGoBack: state.canGoBack === true,
 			canGoForward: state.canGoForward === true,
+			hasTabs: state.hasTabs === true,
+			hasMultipleTabs: state.hasMultipleTabs === true,
 		};
 		buildMenu();
 	});

@@ -101,6 +101,8 @@ export type MenuState = {
 	isSourceMode: boolean;
 	canGoBack: boolean;
 	canGoForward: boolean;
+	hasTabs: boolean;
+	hasMultipleTabs: boolean;
 };
 
 export type DesktopUpdateStatus =
@@ -239,6 +241,9 @@ export type DesktopApi = {
 	onMenuToggleTerminal(callback: () => void): Unsubscribe;
 	onMenuGoBack(callback: () => void): Unsubscribe;
 	onMenuGoForward(callback: () => void): Unsubscribe;
+	onMenuCloseTab(callback: () => void): Unsubscribe;
+	onMenuNextTab(callback: () => void): Unsubscribe;
+	onMenuPreviousTab(callback: () => void): Unsubscribe;
 	onMenuToggleSourceMode(callback: () => void): Unsubscribe;
 	onUndoDelete(callback: () => void): Unsubscribe;
 	onWindowFocus(callback: () => void): Unsubscribe;
