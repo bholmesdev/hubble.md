@@ -27,6 +27,7 @@ import {
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
+import { DocumentTabs } from "./components/DocumentTabs";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
@@ -69,9 +70,12 @@ import {
 import { isCompactWindow, useCompactWindow } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { isDefaultLanguage, languageName } from "./lib/spellcheckLanguages";
+import { useScrollMemory } from "./lib/useScrollMemory";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
 import {
+	activateAdjacentTab,
+	closeActiveTab,
 	createWorkspaceWithSidebar,
 	editorDocumentId,
 	forceKeepLocalEdits,
@@ -81,6 +85,7 @@ import {
 	handleExternalFileChange,
 	loadPath,
 	openChangelog,
+	openTabForPath,
 	openWorkspace,
 	openWorkspaceWithSidebar,
 	reconcileWorkspacePath,
@@ -109,6 +114,7 @@ import {
 	codeFileOpenModeStore,
 	lastSeenVersionStore,
 	sidebarOpenStore,
+	tabsStore,
 	terminalPositionStore,
 	themePreferenceStore,
 	uiStore,
@@ -209,11 +215,13 @@ function App() {
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
+	const tabs = useStoreValue(tabsStore);
 	const hasWorkspace = workspacePath !== null;
 	const { canGoBack: menuCanGoBack, canGoForward: menuCanGoForward } =
 		useHistoryNav();
 	const [scrollContainerEl, setScrollContainerEl] =
 		useState<HTMLDivElement | null>(null);
+	useScrollMemory(state.currentPath, scrollContainerEl);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [copyAsMarkdownRequest, setCopyAsMarkdownRequest] = useState(0);
 	const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(
@@ -447,6 +455,8 @@ function App() {
 			isSourceMode: state.viewMode === "source",
 			canGoBack: menuCanGoBack,
 			canGoForward: menuCanGoForward,
+			hasTabs: tabs.order.length > 0,
+			hasMultipleTabs: tabs.order.length > 1,
 		});
 	}, [
 		hasWorkspace,
@@ -454,6 +464,7 @@ function App() {
 		menuCanGoForward,
 		state.currentPath,
 		state.viewMode,
+		tabs.order.length,
 	]);
 
 	useEffect(() => {
@@ -579,6 +590,9 @@ function App() {
 			desktopApi.onMenuToggleTerminal(() => toggleTerminal()),
 			desktopApi.onMenuGoBack(() => void goBack()),
 			desktopApi.onMenuGoForward(() => void goForward()),
+			desktopApi.onMenuCloseTab(() => void closeActiveTab()),
+			desktopApi.onMenuNextTab(() => void activateAdjacentTab(1)),
+			desktopApi.onMenuPreviousTab(() => void activateAdjacentTab(-1)),
 			desktopApi.onMenuToggleSourceMode(() => {
 				const current = viewerStore.get();
 				if (
@@ -793,45 +807,48 @@ function App() {
 					aria-live="polite"
 					onFocusCapture={closeSidebarOverlay}
 				>
-					<div className="flex-1 min-h-0 min-w-0 relative">
-						{state.status === "loading" && <p>Loading…</p>}
-						{state.status === "error" && (
-							<p>{state.error ?? "Failed to open file."}</p>
-						)}
-						{state.status !== "loading" &&
-							state.status !== "error" &&
-							!state.currentPath && (
-								<div className="flex h-full items-center justify-center p-6">
-									{hasWorkspace ? (
-										<Button onClick={() => void openFilePicker()}>
-											Open file
-										</Button>
-									) : (
-										<WelcomeScreen
-											onCreateFolder={() => void createWorkspaceWithSidebar()}
-											onOpenFolder={() => void openWorkspaceWithSidebar()}
+					<div className="flex-1 min-h-0 min-w-0 flex flex-col">
+						<DocumentTabs />
+						<div className="flex-1 min-h-0 min-w-0 relative">
+							{state.status === "loading" && <p>Loading…</p>}
+							{state.status === "error" && (
+								<p>{state.error ?? "Failed to open file."}</p>
+							)}
+							{state.status !== "loading" &&
+								state.status !== "error" &&
+								!state.currentPath && (
+									<div className="flex h-full items-center justify-center p-6">
+										{hasWorkspace ? (
+											<Button onClick={() => void openFilePicker()}>
+												Open file
+											</Button>
+										) : (
+											<WelcomeScreen
+												onCreateFolder={() => void createWorkspaceWithSidebar()}
+												onOpenFolder={() => void openWorkspaceWithSidebar()}
+											/>
+										)}
+									</div>
+								)}
+							{state.status === "ready" && state.currentPath && (
+								<div className="flex h-full min-h-0 flex-col">
+									{state.externalChange.kind === "conflict" && (
+										<ExternalChangeBanner
+											onKeepMyEdits={() => void forceKeepLocalEdits()}
+											onReloadFromDisk={reloadFromDiskConflict}
 										/>
 									)}
+									<DocumentViewer
+										path={state.currentPath}
+										content={state.content}
+										copyAsMarkdownRequest={copyAsMarkdownRequest}
+										viewMode={state.viewMode}
+										spellcheckStatus={spellcheckStatus}
+										onScrollContainerChange={setScrollContainerEl}
+									/>
 								</div>
 							)}
-						{state.status === "ready" && state.currentPath && (
-							<div className="flex h-full min-h-0 flex-col">
-								{state.externalChange.kind === "conflict" && (
-									<ExternalChangeBanner
-										onKeepMyEdits={() => void forceKeepLocalEdits()}
-										onReloadFromDisk={reloadFromDiskConflict}
-									/>
-								)}
-								<DocumentViewer
-									path={state.currentPath}
-									content={state.content}
-									copyAsMarkdownRequest={copyAsMarkdownRequest}
-									viewMode={state.viewMode}
-									spellcheckStatus={spellcheckStatus}
-									onScrollContainerChange={setScrollContainerEl}
-								/>
-							</div>
-						)}
+						</div>
 					</div>
 					<TerminalPanel />
 				</section>
@@ -840,7 +857,7 @@ function App() {
 				open={searchOpen}
 				onOpenChange={changeSearchOpen}
 				files={paletteFiles}
-				onSelectFile={(path) => void loadPath(path)}
+				onSelectFile={(path) => void openTabForPath(path)}
 				searchContents={searchFileContents}
 				commands={paletteCommands}
 				recentCommandIds={recentCommandIds}

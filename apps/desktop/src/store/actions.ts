@@ -36,6 +36,11 @@ import {
 	rewriteMovedLinks,
 } from "../lib/markdownLinkRewrite";
 import {
+	captureScroll,
+	forgetScrollPositions,
+	rewriteScrollMemory,
+} from "../lib/scrollMemory";
+import {
 	setThemePreference as applyThemePreference,
 	initTheme,
 	type ThemePreference,
@@ -45,8 +50,10 @@ import {
 	activeHistory,
 	canGoBack,
 	canGoForward,
+	dropHistory,
 	normalizeStack,
 	pushHistory,
+	resetHistory,
 	rewriteHistory,
 	setHistory,
 } from "./history";
@@ -72,6 +79,7 @@ import {
 	type SortMode,
 	sidebarOpenStore,
 	switcherOpenStore,
+	tabsStore,
 	themePreferenceStore,
 	uiStore,
 	type ViewMode,
@@ -79,6 +87,15 @@ import {
 	withOpenedDoc,
 	workspaceStore,
 } from "./state";
+import {
+	emptyTabs,
+	findTabByPath,
+	nextActiveTabId,
+	type TabId,
+	type TabTarget,
+	withClosedTab,
+	withRewrittenTabPaths,
+} from "./tabs";
 import { createTitleManager } from "./titleManagement";
 import { applyWorkspaceDelta } from "./workspaceDelta";
 
@@ -498,6 +515,8 @@ type LoadPathOptions = {
 	missing?: "toast" | "silent";
 	/** `false` keeps code files in Hubble regardless of the default-app preference. */
 	launchExternal?: boolean;
+	/** Defaults to the Active Tab, so callers that predate tabs are unchanged. */
+	tab?: TabTarget;
 };
 
 export function getPendingRenameTarget(path: string) {
@@ -611,7 +630,13 @@ export function clearPendingTerminalCommand() {
 export function clearViewer() {
 	const path = viewerStore.get().currentPath;
 	if (path) titleManager.stop(path);
-	viewerStore.set((state) => emptyDoc(state.lastOpenedPath));
+	// Every Tab goes, so every trail goes with it.
+	resetHistory();
+	appStore.set((state) => ({
+		...state,
+		tabs: emptyTabs(),
+		document: emptyDoc(state.document.lastOpenedPath),
+	}));
 }
 
 /** Opens a workspace and reveals the sidebar. */
@@ -662,16 +687,26 @@ export async function openWorkspace(path?: string) {
 		await expireDeleteUndo();
 	}
 
-	workspaceStore.set((state) => {
-		const filtered = state.recentWorkspaces.filter((p) => p !== nextPath);
+	// Tabs belong to the open folder: their notes live in it, and their trails
+	// record paths inside it. Opening another folder starts a fresh set.
+	appStore.set((state) => {
+		const filtered = state.workspace.recentWorkspaces.filter(
+			(p) => p !== nextPath,
+		);
 		return {
 			...state,
-			workspacePath: nextPath,
-			recentWorkspaces: [nextPath, ...filtered].slice(0, MAX_RECENT),
-			files: [],
-			pinnedNotes: [],
+			tabs: emptyTabs(),
+			workspace: {
+				...state.workspace,
+				workspacePath: nextPath,
+				recentWorkspaces: [nextPath, ...filtered].slice(0, MAX_RECENT),
+				files: [],
+				pinnedNotes: [],
+			},
 		};
 	});
+	resetHistory();
+	forgetScrollPositions();
 	switcherOpenStore.set(false);
 	await Promise.all([refreshFileList(nextPath), loadPinnedNotes(nextPath)]);
 
@@ -822,6 +857,41 @@ export function savePathContent(
 	);
 }
 
+/**
+ * Steps off the open document: records where the user was, writes their edits,
+ * and reports whether leaving is allowed. Every route out of a note goes
+ * through here, so opening a note, closing its Tab, and moving through history
+ * all leave it the same way.
+ *
+ * Saving here rather than letting the editor's unmount flush do it is what
+ * makes leaving reliable. That flush runs after the store has already moved to
+ * the next path, so `savePathContentNow` sees a path that is no longer current
+ * and drops the write.
+ *
+ * Returns false when the note is in conflict, since the banner asking whether
+ * the disk copy or the open copy wins cannot be answered from another note.
+ */
+async function leaveCurrentDocument(nextPath?: string): Promise<boolean> {
+	const { currentPath, content } = viewerStore.get();
+	if (!currentPath) return true;
+	// Reopening the same path is not leaving it, and skipping that case
+	// matters: the active-file watcher reloads the current path when a read
+	// fails, and saving first would write a file that just disappeared back
+	// to disk.
+	if (nextPath && pathEquals(currentPath, nextPath)) return true;
+	// The editor's scroll container is shared between notes and resets as soon
+	// as the next one renders, so where the user was has to be read now.
+	captureScroll(currentPath);
+	await savePathContent(currentPath, content);
+	if (viewerStore.get().externalChange.kind !== "conflict") return true;
+	// Refusing without saying so reads as a dead click, and the banner offering
+	// the choice can be off screen behind the sidebar.
+	toast.error("This note changed on disk", {
+		description: "Choose which version to keep before leaving it.",
+	});
+	return false;
+}
+
 const deletionActions = createDeleteActions({
 	saveBeforeDelete: (path, content) =>
 		saves.run(path, () =>
@@ -882,6 +952,9 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 		if (movedAssetFolder) movedFiles.push(movedAssetFolder);
 		await updateMovedLinks(movedFiles, filesBeforeRename);
 		rewriteHistory(path, nextPath);
+		rewriteScrollMemory((scrolled) =>
+			scrolled === path ? nextPath : scrolled,
+		);
 		appStore.set((state) => ({
 			...state,
 			workspace: {
@@ -901,6 +974,9 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 					),
 				),
 			},
+			tabs: withRewrittenTabPaths(state.tabs, (tabPath) =>
+				tabPath === path ? nextPath : tabPath,
+			),
 			document: {
 				...state.document,
 				currentPath:
@@ -1011,6 +1087,9 @@ export async function renameFolder(
 		await desktopApi.renameFile(path, nextPath);
 		await deleteEmptySourceAncestors(path, nextPath, workspacePath);
 		rewriteHistory(path, nextPath, true);
+		rewriteScrollMemory((scrolled) =>
+			replacePathPrefix(scrolled, path, nextPath),
+		);
 		appStore.set((state) => ({
 			...state,
 			workspace: {
@@ -1035,6 +1114,9 @@ export async function renameFolder(
 					),
 				),
 			},
+			tabs: withRewrittenTabPaths(state.tabs, (tabPath) =>
+				replacePathPrefix(tabPath, path, nextPath),
+			),
 			document: {
 				...state.document,
 				currentPath: state.document.currentPath
@@ -1122,6 +1204,9 @@ export async function moveSidebarItem(
 				? await moveAssociatedAssetFolder(sourcePath, nextPath)
 				: null;
 		rewriteHistory(sourcePath, nextPath, isFolder);
+		rewriteScrollMemory((scrolled) =>
+			replacePathPrefix(scrolled, sourcePath, nextPath),
+		);
 		appStore.set((state) => ({
 			...state,
 			workspace: {
@@ -1142,6 +1227,9 @@ export async function moveSidebarItem(
 					),
 				),
 			},
+			tabs: withRewrittenTabPaths(state.tabs, (tabPath) =>
+				replacePathPrefix(tabPath, sourcePath, nextPath),
+			),
 			document: {
 				...state.document,
 				currentPath: state.document.currentPath
@@ -1275,6 +1363,8 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 		const historyMode = options?.history ?? "push";
 		const missingMode = options?.missing ?? "toast";
 		const fileKind = fileKindForPath(path);
+		if (!(await leaveCurrentDocument(path))) return;
+		if (isStale()) return;
 		const timer = window.setTimeout(() => {
 			if (isStale()) return;
 			viewerStore.set((state) => ({
@@ -1296,7 +1386,9 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 			if (currentPath && !pathEquals(currentPath, path)) {
 				titleManager.stop(currentPath);
 			}
-			appStore.set((state) => withOpenedDoc(state, path, content));
+			appStore.set((state) =>
+				withOpenedDoc(state, path, content, options?.tab),
+			);
 			if (historyMode === "push") pushHistory(path);
 		} catch (err) {
 			if (isStale()) return;
@@ -1311,6 +1403,10 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 						: state,
 				);
 			} else {
+				// The file is gone rather than unreadable, so only the Tab holding
+				// it closes. Other Tabs point at files that are still there.
+				const gone = findTabByPath(tabsStore.get(), path);
+				if (gone) dropHistory(gone);
 				appStore.set((state) => ({
 					...state,
 					workspace: {
@@ -1321,12 +1417,24 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 							),
 						),
 					},
+					tabs: gone ? withClosedTab(state.tabs, gone) : state.tabs,
 					document: emptyDoc(
 						state.document.lastOpenedPath === path
 							? null
 							: state.document.lastOpenedPath,
 					),
 				}));
+				// Falling back to a neighbouring Tab has to wait for this run to
+				// finish, or `takeLatest` cancels the load it starts.
+				const fallback = tabsStore.get().activeTabId;
+				const next = fallback ? tabsStore.get().byId[fallback]?.path : null;
+				if (next) {
+					void loadPath(next, {
+						history: "none",
+						launchExternal: false,
+						tab: fallback ?? undefined,
+					});
+				}
 			}
 		} finally {
 			window.clearTimeout(timer);
@@ -1357,6 +1465,112 @@ export async function loadPath(path: string, options?: LoadPathOptions) {
 }
 
 /**
+ * Opens `path` in its own Tab, focusing the Tab already showing it rather than
+ * opening a second one. Two Tabs on one note would give it two autosave timers
+ * writing the same file.
+ */
+export async function openTabForPath(path: string) {
+	const open = findTabByPath(tabsStore.get(), path);
+	if (open) {
+		await activateTab(open);
+		return;
+	}
+	await loadPath(path, { tab: "new" });
+}
+
+/**
+ * Shows the note a Tab is holding. Activation re-reads from disk the way a
+ * sidebar click does, so it neither pushes onto that Tab's trail nor launches
+ * an external app for a code file — `navigateHistory` takes the same care.
+ */
+export async function activateTab(id: TabId) {
+	const tabs = tabsStore.get();
+	const tab = tabs.byId[id];
+	if (!tab) return;
+	// Clicking the Tab already in front would re-read from disk and throw away
+	// undo for nothing. Switching notes costs undo; clicking where you already
+	// are should not.
+	//
+	// The check looks at the note on screen, not just the Active Tab, because
+	// the changelog covers the editor without a Tab of its own: its Tab stays
+	// active while its note is hidden, and activating it has to reload.
+	const showing = viewerStore.get().currentPath;
+	if (tabs.activeTabId === id && pathEquals(showing ?? "", tab.path)) return;
+	await loadPath(tab.path, {
+		history: "none",
+		launchExternal: false,
+		tab: id,
+	});
+}
+
+/**
+ * Closes a Tab and its back/forward trail, moving to the neighbour it leaves
+ * behind. Closing the last Tab empties the editor rather than picking a note.
+ */
+export async function closeTab(id: TabId) {
+	const tabs = tabsStore.get();
+	if (!tabs.byId[id]) return;
+	const wasActive = tabs.activeTabId === id;
+	const next = wasActive ? nextActiveTabId(tabs, id) : null;
+
+	if (wasActive && !(await leaveCurrentDocument())) return;
+	dropHistory(id);
+	appStore.set((state) => ({ ...state, tabs: withClosedTab(state.tabs, id) }));
+
+	if (!wasActive) return;
+	const nextPath = next ? tabsStore.get().byId[next]?.path : null;
+	if (nextPath && next) {
+		await loadPath(nextPath, {
+			history: "none",
+			launchExternal: false,
+			tab: next,
+		});
+		return;
+	}
+	appStore.set((state) => ({
+		...state,
+		document: emptyDoc(state.document.lastOpenedPath),
+	}));
+}
+
+/**
+ * Closes every Tab but the one in front. Opening a note from the sidebar gives
+ * it a Tab, so browsing leaves a row of them behind; this is the way back to
+ * one note without clicking every cross.
+ */
+export async function closeOtherTabs() {
+	const { order, activeTabId } = tabsStore.get();
+	if (!activeTabId) return;
+	for (const id of order) {
+		if (id !== activeTabId) await closeTab(id);
+	}
+}
+
+/** Closes every Tab, emptying the editor. */
+export async function closeAllTabs() {
+	// Background Tabs go first, or closing the front one would load a
+	// neighbour that is about to close anyway.
+	await closeOtherTabs();
+	await closeActiveTab();
+}
+
+/** Closes whichever Tab is in front. No-op when none is. */
+export async function closeActiveTab() {
+	const active = tabsStore.get().activeTabId;
+	if (active) await closeTab(active);
+}
+
+/** Steps to the Tab `delta` places away, wrapping at either end. */
+export async function activateAdjacentTab(delta: number) {
+	const { order, activeTabId } = tabsStore.get();
+	if (order.length < 2 || !activeTabId) return;
+	const at = order.indexOf(activeTabId);
+	if (at < 0) return;
+	const next = order[(at + delta + order.length) % order.length];
+	await activateTab(next);
+}
+
+/**
  * Opens the app changelog as an ephemeral note. It never touches disk or
  * history: `lastOpenedPath` and the workspace's `lastOpenedPaths` keep the
  * real note so relaunch restores it, and the stack index stays put so back
@@ -1365,10 +1579,7 @@ export async function loadPath(path: string, options?: LoadPathOptions) {
 export async function openChangelog(): Promise<boolean> {
 	const current = viewerStore.get();
 	if (isChangelogPath(current.currentPath)) return true;
-	if (current.currentPath) {
-		await savePathContent(current.currentPath, current.content);
-		if (viewerStore.get().externalChange.kind === "conflict") return false;
-	}
+	if (!(await leaveCurrentDocument())) return false;
 	// An in-flight loadPath must not resolve over the changelog.
 	invalidateLoadPath();
 	viewerStore.set((state) => ({
@@ -1396,10 +1607,7 @@ async function navigateHistory(delta: -1 | 1) {
 	// Block concurrent history ops for the whole leave (save + load).
 	historyStore.set((state) => ({ ...state, isNavigating: true }));
 	try {
-		if (current.currentPath) {
-			await savePathContent(current.currentPath, current.content);
-			if (viewerStore.get().externalChange.kind === "conflict") return;
-		}
+		if (!(await leaveCurrentDocument())) return;
 
 		let working = activeHistory();
 		let nextIndex = working.index + (fromChangelog ? 0 : delta);
