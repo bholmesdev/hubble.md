@@ -1576,12 +1576,19 @@ export async function activateTab(id: TabId) {
  * behind. Closing the last Tab empties the editor rather than picking a note.
  */
 export async function closeTab(id: TabId) {
+	if (!tabsStore.get().byId[id]) return;
+	if (tabsStore.get().activeTabId === id && !(await leaveCurrentDocument()))
+		return;
+
+	// Read the Tabs after leaving, not before: saving the outgoing note is a
+	// round trip to disk, and a delete landing while it is in flight closes
+	// Tabs underneath us. Deciding on the stale snapshot would then load a
+	// neighbour that is itself gone.
 	const tabs = tabsStore.get();
 	if (!tabs.byId[id]) return;
 	const wasActive = tabs.activeTabId === id;
 	const next = wasActive ? nextActiveTabId(tabs, id) : null;
 
-	if (wasActive && !(await leaveCurrentDocument())) return;
 	dropHistory(id);
 	appStore.set((state) => ({ ...state, tabs: withClosedTab(state.tabs, id) }));
 
