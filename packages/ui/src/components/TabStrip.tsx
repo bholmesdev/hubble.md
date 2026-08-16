@@ -20,6 +20,9 @@ export type TabStripProps = {
 	onClose: (id: string) => void;
 };
 
+const tabAt = (strip: HTMLElement | null, index: number) =>
+	strip?.querySelectorAll<HTMLElement>('[role="tab"]')[index];
+
 /**
  * The row of open notes above the editor. It shows from the first note
  * onwards: arriving only at the second would shove the editor down mid-click,
@@ -49,16 +52,14 @@ export function TabStrip({
 	// Behavior 18: a note activated off-screen has to be brought into view,
 	// which horizontal overflow alone does not do.
 	useEffect(() => {
-		const selected = stripRef.current?.querySelector<HTMLElement>(
-			'[aria-selected="true"]',
-		);
-		selected?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-	}, [activeTabId]);
+		tabAt(stripRef.current, anchor)?.scrollIntoView?.({
+			block: "nearest",
+			inline: "nearest",
+		});
+	}, [anchor]);
 
 	const focusTabAt = (index: number) => {
-		const buttons =
-			stripRef.current?.querySelectorAll<HTMLElement>('[role="tab"]');
-		buttons?.[index]?.focus();
+		tabAt(stripRef.current, index)?.focus();
 	};
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
