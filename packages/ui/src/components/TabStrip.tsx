@@ -1,4 +1,8 @@
-import { type KeyboardEvent as ReactKeyboardEvent, useRef } from "react";
+import {
+	type KeyboardEvent as ReactKeyboardEvent,
+	useEffect,
+	useRef,
+} from "react";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import { cn } from "../lib/utils";
 
@@ -33,6 +37,24 @@ export function TabStrip({
 }: TabStripProps) {
 	const stripRef = useRef<HTMLDivElement | null>(null);
 
+	// Where focus lands when the strip is reached by Tab, and where the arrow
+	// keys count from. It falls back to the first note so that the strip is
+	// still reachable while the changelog covers the editor, which is the one
+	// time no note is selected and the one time the user most needs a way back.
+	const anchor = Math.max(
+		0,
+		tabs.findIndex((tab) => tab.id === activeTabId),
+	);
+
+	// Behavior 18: a note activated off-screen has to be brought into view,
+	// which horizontal overflow alone does not do.
+	useEffect(() => {
+		const selected = stripRef.current?.querySelector<HTMLElement>(
+			'[aria-selected="true"]',
+		);
+		selected?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+	}, [activeTabId]);
+
 	const focusTabAt = (index: number) => {
 		const buttons =
 			stripRef.current?.querySelectorAll<HTMLElement>('[role="tab"]');
@@ -40,13 +62,11 @@ export function TabStrip({
 	};
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-		const at = tabs.findIndex((tab) => tab.id === activeTabId);
-		if (at < 0) return;
 		const target =
 			event.key === "ArrowLeft"
-				? (at - 1 + tabs.length) % tabs.length
+				? (anchor - 1 + tabs.length) % tabs.length
 				: event.key === "ArrowRight"
-					? (at + 1) % tabs.length
+					? (anchor + 1) % tabs.length
 					: event.key === "Home"
 						? 0
 						: event.key === "End"
@@ -62,7 +82,7 @@ export function TabStrip({
 		// deliberately outside the tab order.
 		if (event.key === "Delete" || event.key === "Backspace") {
 			event.preventDefault();
-			onClose(tabs[at].id);
+			onClose(tabs[anchor].id);
 		}
 	};
 
@@ -75,7 +95,7 @@ export function TabStrip({
 			onKeyDown={onKeyDown}
 			className="flex shrink-0 items-stretch gap-px overflow-x-auto border-border border-b bg-background"
 		>
-			{tabs.map((tab) => {
+			{tabs.map((tab, index) => {
 				const active = tab.id === activeTabId;
 				return (
 					<div
@@ -89,9 +109,9 @@ export function TabStrip({
 							type="button"
 							role="tab"
 							aria-selected={active}
-							// Roving focus: only the open note is a tab stop, so the strip
-							// costs one Tab press rather than one per note.
-							tabIndex={active ? 0 : -1}
+							// Roving focus: one note is the tab stop, so the strip costs
+							// one Tab press rather than one per note.
+							tabIndex={index === anchor ? 0 : -1}
 							title={tab.title}
 							onClick={() => onActivate(tab.id)}
 							// Middle-click closes, matching every other tabbed editor.

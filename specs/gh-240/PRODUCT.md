@@ -2,7 +2,7 @@
 
 ## Summary
 
-Desktop users can keep several Markdown Files open at once as a row of tabs above the editor, and switch between them with a click, `CmdOrCtrl+1`–`9`, or `CmdOrCtrl+Alt+[` / `]`. One tab is visible at a time; there is no split view. Each tab keeps its own back/forward trail. Tabs are a working set for the current session, not a saved layout.
+Desktop users can keep several Markdown Files open at once as a row of tabs above the editor, and switch between them with a click, the arrow keys, or `CmdOrCtrl+Alt+[` / `]`. One tab is visible at a time; there is no split view. Each tab keeps its own back/forward trail. Tabs are a working set for the current session, not a saved layout.
 
 ## Problem
 
@@ -17,7 +17,7 @@ Running two copies of the app over one folder is not a workaround: two instances
 1. Keep several Markdown Files open and switch between them in one click, without re-finding them in the sidebar.
 2. Give each tab its own back/forward trail, so following a link in one tab does not disturb another.
 3. Make the open set visible at a glance, so the user can tell which notes are in play.
-4. Leave single-note use unchanged. A user who never opens a second tab should not notice this feature exists.
+4. Cost a user who never opens a second note nothing but one row: no change to how notes load, save, or navigate, and no extra step to reach the editor by keyboard.
 
 ## Non-goals
 
@@ -28,6 +28,7 @@ Running two copies of the app over one folder is not a workaround: two instances
 5. **No preserved undo history across a tab switch.** Undo lives in the editor instance, not in app state, so it resets exactly as it does when navigating today. Scroll position *is* preserved — see Design Context.
 6. **No two tabs on the same Markdown File.** Opening a file that is already open focuses its tab.
 7. No drag-to-reorder, no pinned tabs, no preview tabs, no tab groups.
+8. **No opening a tab in the background, and no select-by-position shortcut.** `CmdOrCtrl+T`, `CmdOrCtrl`-click, and `CmdOrCtrl+1`–`9` are all worth having and none of them is load-bearing: opening a note already gives it a tab, and stepping with `CmdOrCtrl+Alt+[` / `]` reaches every tab. They are left out to keep the first version to one row and three commands.
 
 ## Design Context
 
@@ -47,22 +48,22 @@ Running two copies of the app over one folder is not a workaround: two instances
 
 ### Opening
 
-1. With a Workspace Folder or Plain Folder open, the tab strip appears above the editor whenever more than one Markdown File is open.
-2. Opening a file — sidebar, wiki link, relative link, `CmdOrCtrl+P`, file picker, or creating a new file — replaces the Active Tab, exactly as today.
-3. `CmdOrCtrl+T` opens the current file in a new tab. `CmdOrCtrl`-click or middle-click on a sidebar row or a link opens that target in a new tab without activating it.
+1. With a Workspace Folder or Plain Folder open, the tab strip appears above the editor as soon as one Markdown File is open, and stays for every note after it.
+2. Choosing a file deliberately gives it a tab: the sidebar, `CmdOrCtrl+P`, the file picker, and creating a new file. The tab becomes active.
+3. Following a wiki link or a relative link stays in the Active Tab and extends that tab's trail. Reading through linked notes is one train of thought, not a pile of tabs; Back is the way out of it.
 4. Opening a Markdown File that is already open in another tab activates that tab instead of opening a second one.
-5. A new tab is inserted after the Active Tab and becomes active, unless it was opened in the background.
+5. A new tab is inserted after the Active Tab.
 
 ### Switching
 
-6. Clicking a tab activates it. `CmdOrCtrl+1`–`8` select by position; `CmdOrCtrl+9` selects the last tab regardless of count. `CmdOrCtrl+Alt+[` / `]` step to the previous and next tab, wrapping at each end.
+6. Clicking a tab activates it. `CmdOrCtrl+Alt+[` / `]` step to the previous and next tab, wrapping at each end. The strip is one stop in the page's tab order rather than one per note; from there the arrow keys move along it, and `Home` and `End` reach its ends.
 7. Activating a tab saves the outgoing Markdown File first. If that file has an unresolved disk conflict the switch does not run and the conflict banner stays, matching how back/forward already behaves.
 8. Each tab has its own back/forward trail. Back and Forward act on the Active Tab only, and their enablement reflects that tab.
 9. Switching tabs re-reads the file from disk. Scroll position is restored to where the user left that file. Undo history and the rich/source toggle reset, exactly as they do when navigating today.
 
 ### Closing
 
-10. `CmdOrCtrl+W` closes the Active Tab; middle-click or the close control closes a specific tab. Closing discards that tab's back/forward trail.
+10. `CmdOrCtrl+W` closes the Active Tab; middle-click, the close control, or `Delete` from the keyboard closes a specific tab. Closing discards that tab's back/forward trail.
 11. Closing the Active Tab activates its right-hand neighbour, or its left-hand neighbour if it was last.
 12. Closing the final tab leaves the empty state shown when no file is open. `CmdOrCtrl+W` with no tabs open closes the window, as today.
 
@@ -77,12 +78,12 @@ Running two copies of the app over one folder is not a workaround: two instances
 
 17. A tab shows the file name without its extension. When two open tabs would show the same name, both also show enough of the parent folder to tell them apart.
 18. When tabs exceed the available width the strip scrolls horizontally, and the Active Tab is always scrolled into view.
-19. The tab strip is hidden entirely when only one Markdown File is open, so single-note use is visually unchanged.
+19. The strip is hidden only when no Markdown File is open. It does not appear on the second note: arriving then would shove the editor down under the pointer mid-click, which reads as a glitch rather than as a note opening.
 
 ## UX Validation
 
-1. Open a folder with several Markdown Files. Confirm no tab strip is visible with one file open.
-2. `CmdOrCtrl`-click a second file in the sidebar. Confirm a strip appears with two tabs and the first stays active. Open a third, then switch between all three by clicking and with `CmdOrCtrl+1`–`3`.
+1. Open a folder with several Markdown Files. Confirm the strip appears with the first file and shows one tab.
+2. Click a second file in the sidebar. Confirm a second tab appears after the first and is active. Open a third, then switch between all three by clicking and with `CmdOrCtrl+Alt+[` / `]`. Confirm one `Tab` press from the editor reaches the strip, and that the arrow keys move along it from there.
 3. Type into tab 2 continuously and immediately click tab 1. Switch back and confirm every character survived.
 4. Scroll halfway down a long note in tab 1, switch to tab 2, and switch back. Confirm the scroll position is where it was left.
 5. In tab 1 follow a wiki link, then switch to tab 2 and follow a different link. Confirm Back in each tab returns along that tab's own trail, and that Back enablement changes as tabs change.

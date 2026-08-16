@@ -2382,8 +2382,8 @@ describe("desktop loadPath", () => {
 		const firstTabId = appStore.get().tabs.activeTabId;
 		expect(canGoBack()).toBe(true);
 
-		// Stand in for the second tab that step 4's actions will create: the
-		// trail follows the Active Tab, so a fresh tab starts with no history.
+		// The trail follows the Active Tab, so a fresh Tab starts with no
+		// history.
 		appStore.set((current) => ({
 			...current,
 			tabs: {

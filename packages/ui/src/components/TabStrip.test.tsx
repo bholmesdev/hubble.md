@@ -93,6 +93,22 @@ describe("TabStrip", () => {
 		).toEqual([-1, -1]);
 	});
 
+	it("stays reachable while the changelog covers the editor", () => {
+		// Nothing is selected then, and a strip with no tab stop would be the
+		// one place the keyboard cannot get back to a note.
+		const { onActivate } = renderStrip({ activeTabId: null });
+
+		expect(tabs().map((tab) => tab.tabIndex)).toEqual([0, -1]);
+
+		act(() => {
+			tabs()[0].dispatchEvent(
+				new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+			);
+		});
+
+		expect(onActivate).toHaveBeenCalledWith("b");
+	});
+
 	it("moves between notes with the arrow keys and wraps", () => {
 		const { onActivate } = renderStrip();
 
