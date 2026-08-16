@@ -636,6 +636,7 @@ export function Sidebar({
 		onCollapse: collapseRow,
 		navRef,
 		activeIndex,
+		getItemKey: sidebarRowKey,
 		// Arrow keys leave multi-select mode.
 		onNavigate: replaceSelection,
 	});
