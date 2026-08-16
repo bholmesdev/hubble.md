@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Sidebar folders stay alphabetized while files are sorted by Recent or Name. Thanks [@n00ki](https://github.com/n00ki)! [#258](https://github.com/bholmesdev/hubble.md/pull/258)
+
 ### Fixed
 
 - Clicking elsewhere in a note now closes the formatting menu and clears its old text highlight. [#256](https://github.com/bholmesdev/hubble.md/pull/256)
