@@ -638,6 +638,7 @@ export function Sidebar({
 		activeIndex,
 		// Arrow keys leave multi-select mode.
 		onNavigate: replaceSelection,
+		getItemKey: sidebarRowKey,
 	});
 	const creationFolderId = sidebarCreationFolderId({
 		rows,

@@ -48,6 +48,7 @@ describe("useSidebarKeyboardNav", () => {
 				onSelect: vi.fn(),
 				onNavigate,
 				navRef,
+				getItemKey: (item) => item,
 			}).onKeyDown;
 			return createElement("div", { ref: navRef });
 		}
@@ -62,6 +63,36 @@ describe("useSidebarKeyboardNav", () => {
 		});
 
 		expect(onNavigate.mock.calls).toEqual([["a"], ["b"]]);
+	});
+
+	it("keeps focus on the same item after rows reorder", () => {
+		const onSelect = vi.fn();
+		let items = ["a", "b", "c"];
+		let nav: ReturnType<typeof useSidebarKeyboardNav<string>> | undefined;
+		const root = createRoot(
+			document.body.appendChild(document.createElement("div")),
+		);
+		roots.push(root);
+
+		function Harness() {
+			const navRef = useRef<HTMLDivElement>(null);
+			nav = useSidebarKeyboardNav({
+				items,
+				onSelect,
+				navRef,
+				getItemKey: (item) => item,
+			});
+			return createElement("div", { ref: navRef });
+		}
+
+		act(() => root.render(createElement(Harness)));
+		act(() => nav?.setFocusedIndex(1));
+		items = ["b", "a", "c"];
+		act(() => root.render(createElement(Harness)));
+		act(() => nav?.onKeyDown(keyEvent("Enter")));
+
+		expect(nav?.focusedIndex).toBe(0);
+		expect(onSelect).toHaveBeenCalledWith("b");
 	});
 });
 
