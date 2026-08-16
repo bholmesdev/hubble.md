@@ -15,6 +15,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Sidebar keyboard focus stays on the same item when recent files reorder. [#268](https://github.com/bholmesdev/hubble.md/pull/268)
 - Clicking elsewhere in a note now closes the formatting menu and clears its old text highlight. [#256](https://github.com/bholmesdev/hubble.md/pull/256)
 - Pinned notes remain visible after restarting or updating the desktop app. [#254](https://github.com/bholmesdev/hubble.md/pull/254)
 - Pressing Enter in a list item containing an image now creates a new list item instead of dropping out of the list. Thanks [@MonisMS](https://github.com/MonisMS)! [#241](https://github.com/bholmesdev/hubble.md/pull/241)
