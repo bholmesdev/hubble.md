@@ -49,7 +49,7 @@ Running two copies of the app over one folder is not a workaround: two instances
 ### Opening
 
 1. With a Workspace Folder or Plain Folder open, the tab strip appears above the editor as soon as one Markdown File is open, and stays for every note after it.
-2. Choosing a file deliberately gives it a tab: the sidebar, `CmdOrCtrl+P`, the file picker, and creating a new file. The tab becomes active.
+2. Choosing a file deliberately gives it a tab: the sidebar and `CmdOrCtrl+P`. The tab becomes active. The file picker and creating a new file stay on the Active Tab for now, so they replace it as they do today.
 3. Following a wiki link or a relative link stays in the Active Tab and extends that tab's trail. Reading through linked notes is one train of thought, not a pile of tabs; Back is the way out of it.
 4. Opening a Markdown File that is already open in another tab activates that tab instead of opening a second one.
 5. A new tab is inserted after the Active Tab.
@@ -70,7 +70,7 @@ Running two copies of the app over one folder is not a workaround: two instances
 ### Files changing underneath
 
 13. Renaming or moving a Markdown File open in any tab updates that tab in place; the tab's back/forward trail is rewritten as it already is today.
-14. Deleting a Markdown File closes every tab showing it. Undoing that delete reopens it as a single tab.
+14. Deleting a Markdown File closes every tab showing it. Undoing that delete puts the strip back as it was, each reopened tab at the position it held, provided no tab has opened or closed since; otherwise the file reopens as one tab beside whatever is now open.
 15. Opening a different folder closes all tabs and opens that folder's last-opened Markdown File, as today.
 16. The changelog note ("What's new") is not a file on disk and does not get a tab. It takes over the editor with the tab strip unchanged, and activating any tab leaves it — matching how it already replaces the open note today.
 

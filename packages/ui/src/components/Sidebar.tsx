@@ -624,11 +624,12 @@ export function Sidebar({
 	const activeIndex = rows.findIndex(
 		(row) => row.kind === "file" && row.file.path === highlightPath,
 	);
-	const activeIndexRef = useRef(activeIndex);
+	const activeItem = activeIndex >= 0 ? rows[activeIndex] : null;
+	const activeItemRef = useRef(activeItem);
 	useLayoutEffect(() => {
-		activeIndexRef.current = activeIndex;
-	}, [activeIndex]);
-	const { focusedIndex, setFocusedIndex, onKeyDown } = useSidebarKeyboardNav({
+		activeItemRef.current = activeItem;
+	}, [activeItem]);
+	const { focusedIndex, focusItem, onKeyDown } = useSidebarKeyboardNav({
 		items: rows,
 		onSelect: activateRow,
 		onEnter: enterRowEdit,
@@ -636,6 +637,7 @@ export function Sidebar({
 		onCollapse: collapseRow,
 		navRef,
 		activeIndex,
+		getItemKey: sidebarRowKey,
 		// Arrow keys leave multi-select mode.
 		onNavigate: replaceSelection,
 	});
@@ -714,9 +716,9 @@ export function Sidebar({
 					pendingFocusDisplayPath,
 		);
 		if (index < 0) return;
-		setFocusedIndex(index);
+		focusItem(rows[index]);
 		setPendingFocusDisplayPath(null);
-	}, [getDisplayPath, pendingFocusDisplayPath, rows, setFocusedIndex]);
+	}, [focusItem, getDisplayPath, pendingFocusDisplayPath, rows]);
 
 	useEffect(() => {
 		setSelection((current) => pruneSidebarSelection(current, rows));
@@ -724,10 +726,7 @@ export function Sidebar({
 
 	useEffect(() => {
 		const selectOpenFile = () => {
-			const index = activeIndexRef.current;
-			setFocusedIndex(
-				selectionCountRef.current > 1 ? null : index >= 0 ? index : null,
-			);
+			focusItem(selectionCountRef.current > 1 ? null : activeItemRef.current);
 			setSelection((current) => snapSidebarSelection(current, highlightPath));
 		};
 		const isEditorTarget = (target: EventTarget | null) =>
@@ -738,7 +737,7 @@ export function Sidebar({
 		if (isEditorTarget(document.activeElement)) selectOpenFile();
 		document.addEventListener("focusin", onFocusIn);
 		return () => document.removeEventListener("focusin", onFocusIn);
-	}, [highlightPath, setFocusedIndex]);
+	}, [focusItem, highlightPath]);
 
 	const handleDragStart = (event: DragStartEvent) => {
 		const data = event.active.data.current as DragItemData | undefined;
@@ -912,7 +911,7 @@ export function Sidebar({
 				enabled={Boolean(onMoveItem)}
 				onBlur={(event) => {
 					if (!event.currentTarget.contains(event.relatedTarget)) {
-						setFocusedIndex(null);
+						focusItem(null);
 					}
 				}}
 				onKeyDown={handleTreeKeyDown}
@@ -1059,7 +1058,7 @@ export function Sidebar({
 										)
 											return;
 										event.preventDefault();
-										setFocusedIndex(index);
+										focusItem(row);
 										if (!isSelected) replaceSelection(row);
 										setOpenActionsPath(
 											row.kind === "file" ? row.file.path : row.id,
@@ -1112,7 +1111,7 @@ export function Sidebar({
 											)}
 											style={rowStyle}
 											onClick={(event) => {
-												setFocusedIndex(index);
+												focusItem(row);
 												handleRowClick(row, event);
 											}}
 											onDoubleClick={(event) => {
@@ -1271,6 +1270,7 @@ export function Sidebar({
 			</DragOverlay>
 		</DndContext>
 	);
+	const sortLabel = sortMode === "recent" ? "Recent" : "Name";
 
 	return (
 		<SidebarFrame onCollapse={onCollapse} storageScope={storageScope}>
@@ -1313,8 +1313,8 @@ export function Sidebar({
 								<Button
 									variant="ghost"
 									size="icon-xs"
-									aria-label="Sort by..."
-									title="Sort by..."
+									aria-label={`Sort files: ${sortLabel}`}
+									title={`Sort files: ${sortLabel}`}
 								/>
 							}
 						>
@@ -1332,9 +1332,6 @@ export function Sidebar({
 								className="isolate z-50"
 							>
 								<Select.Popup className="z-50 w-36 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-									<p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
-										Sort by
-									</p>
 									<SortOption value="recent" label="Recent" />
 									<SortOption value="alpha" label="Name" />
 								</Select.Popup>
@@ -2441,7 +2438,13 @@ function stripMatchingExtension(name: string, extension: string) {
 		: name;
 }
 
-function SortOption({ value, label }: { value: string; label: string }) {
+function SortOption({
+	value,
+	label,
+}: {
+	value: SidebarSortMode;
+	label: string;
+}) {
 	return (
 		<Select.Item
 			value={value}

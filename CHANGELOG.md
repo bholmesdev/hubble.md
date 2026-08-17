@@ -9,14 +9,28 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Open several notes at once as tabs. Each tab keeps its own back and forward history and its own scroll position, and `Cmd/Ctrl+W` closes a tab before closing the window.
-- Add a spellcheck option to Settings. Allows for enabling / disabling, and selecting custom spellcheck dictionaries on Windows and Linux. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#234](https://github.com/bholmesdev/hubble.md/pull/234)
+- Open several notes at once as tabs. Each tab keeps its own back and forward history and its own scroll position, and `Cmd/Ctrl+W` closes a tab before closing the window. [#265](https://github.com/bholmesdev/hubble.md/pull/265)
 
 ### Changed
 
 ### Fixed
 
-- Typing and immediately opening another note no longer loses the last few characters. The open note is now saved before navigating rather than as the editor closes.
+- Typing and immediately opening another note no longer loses the last few characters. The open note is now saved before navigating rather than as the editor closes. [#265](https://github.com/bholmesdev/hubble.md/pull/265)
+
+## [0.1.27] - 2026-08-16
+
+### Added
+
+- Add a spellcheck option to Settings. Allows for enabling / disabling, and selecting custom spellcheck dictionaries on Windows and Linux. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#234](https://github.com/bholmesdev/hubble.md/pull/234)
+
+### Changed
+
+- Sidebar folders stay alphabetized while files are sorted by Recent or Name. Thanks [@n00ki](https://github.com/n00ki)! [#258](https://github.com/bholmesdev/hubble.md/pull/258)
+
+### Fixed
+
+- Sidebar keyboard focus stays on the same file or folder when sorting changes. [#267](https://github.com/bholmesdev/hubble.md/pull/267)
+- Code blocks scroll horizontally instead of wrapping long lines. Thanks [@ggbao666](https://github.com/ggbao666) for the suggestion! [#260](https://github.com/bholmesdev/hubble.md/pull/260)
 - Clicking elsewhere in a note now closes the formatting menu and clears its old text highlight. [#256](https://github.com/bholmesdev/hubble.md/pull/256)
 - Pinned notes remain visible after restarting or updating the desktop app. [#254](https://github.com/bholmesdev/hubble.md/pull/254)
 - Pressing Enter in a list item containing an image now creates a new list item instead of dropping out of the list. Thanks [@MonisMS](https://github.com/MonisMS)! [#241](https://github.com/bholmesdev/hubble.md/pull/241)
