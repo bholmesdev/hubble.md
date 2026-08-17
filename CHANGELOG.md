@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Expand or collapse all sidebar folders at once. Thanks [@n00ki](https://github.com/n00ki)! [#271](https://github.com/bholmesdev/hubble.md/pull/271)
+
 ### Changed
 
 ### Fixed
