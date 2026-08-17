@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
 	combineMarkdownFrontMatter,
 	detectFilePropertyType,
+	mergeTemplateFrontMatter,
 	parseDateInput,
 	parseMarkdownFrontMatter,
+	readDefaultTemplateDirective,
+	removeDefaultTemplateProperty,
 	serializeFrontMatter,
 } from "./frontMatter.js";
 
@@ -137,5 +140,95 @@ title: Test
 		expect(parseDateInput("04/06/2025")).toBe("2025-04-06");
 		expect(parseDateInput("04-06-2025")).toBe("2025-04-06");
 		expect(parseDateInput("13/40/2025")).toBeNull();
+	});
+
+	it("reads only boolean default-template directives", () => {
+		expect(
+			readDefaultTemplateDirective(
+				parseMarkdownFrontMatter(`---
+default-template: true
+---
+Body`),
+			),
+		).toBe(true);
+		expect(
+			readDefaultTemplateDirective(
+				parseMarkdownFrontMatter(`---
+default-template: false
+---
+Body`),
+			),
+		).toBe(false);
+		expect(
+			readDefaultTemplateDirective(
+				parseMarkdownFrontMatter(`---
+default-template: "true"
+---
+Body`),
+			),
+		).toBeNull();
+	});
+
+	it("removes default-template before applying template properties", () => {
+		const parsed = parseMarkdownFrontMatter(`---
+title: Template
+default-template: true
+---
+Body`);
+		expect(parsed.type).toBe("valid");
+		if (parsed.type !== "valid") return;
+
+		expect(removeDefaultTemplateProperty(parsed.properties)).toEqual([
+			{ key: "title", type: "text", value: "Template" },
+		]);
+	});
+
+	it("merges template properties target-first and case-sensitively", () => {
+		const result = mergeTemplateFrontMatter(
+			`---
+title: Template
+Title: Kept separately
+tags:
+  - template
+nested:
+  child: value
+default-template: true
+---
+Template body`,
+			`---
+title: Target
+tags:
+  - target
+---
+Target body`,
+		);
+
+		expect(result.type).toBe("valid");
+		if (result.type !== "valid") return;
+		expect(result.properties).toEqual([
+			{ key: "title", type: "text", value: "Target" },
+			{ key: "tags", type: "tags", value: ["target"] },
+			{ key: "Title", type: "text", value: "Kept separately" },
+			{
+				key: "nested",
+				type: "unsupported",
+				raw: "nested:\n  child: value",
+			},
+		]);
+		expect(result.frontMatter).toBe(`title: "Target"
+tags:
+  - target
+Title: "Kept separately"
+nested:
+  child: value`);
+	});
+
+	it("reports invalid template or target front matter without merging", () => {
+		expect(
+			mergeTemplateFrontMatter("---\nbroken: [one\n---\nBody", "Target"),
+		).toMatchObject({ type: "invalid-template" });
+		expect(
+			mergeTemplateFrontMatter("Template", "---\nbroken: [one\n---\nBody"),
+		).toMatchObject({ type: "invalid-target" });
 	});
 });

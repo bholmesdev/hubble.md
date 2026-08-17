@@ -194,6 +194,81 @@ describe("editor path attribution", () => {
 
 		expect(editor.can().undo()).toBe(true);
 	});
+
+	it("applies a prepared template through the rich editor host contract", async () => {
+		const onLocalChange = vi.fn();
+		const onSave = vi.fn();
+		const prepareTemplateApplication = vi.fn().mockResolvedValue({
+			body: "## Template\n\nBody",
+			frontMatter: `title: "Target"
+tags:
+  - work`,
+			cleanupToken: "assets-1",
+		});
+		const cleanupTemplateApplication = vi.fn();
+		const root = createTestRoot();
+		const getEditor = captureEditorCreation();
+
+		await act(async () => {
+			root.render(
+				<EditorView
+					path="/note.md"
+					initialMarkdown={`---
+title: Target
+---
+/template`}
+					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
+					onLocalChange={onLocalChange}
+					onSave={onSave}
+					onOpenExternalLink={() => {}}
+					onOpenWikiLink={() => {}}
+					templateChoices={[{ id: "daily", title: "Daily" }]}
+					prepareTemplateApplication={prepareTemplateApplication}
+					cleanupTemplateApplication={cleanupTemplateApplication}
+				/>,
+			);
+		});
+		const editor = getEditor();
+
+		await act(async () => {
+			editor.commands.focus("end");
+		});
+		await act(async () => {
+			editor.view.dom.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "Enter",
+					bubbles: true,
+					cancelable: true,
+				}),
+			);
+		});
+		const templateItem = document.querySelector(
+			'[cmdk-item][data-value="daily"]',
+		);
+		expect(templateItem).toBeInstanceOf(HTMLElement);
+		await act(async () => {
+			(templateItem as HTMLElement).click();
+		});
+
+		expect(prepareTemplateApplication).toHaveBeenCalledWith(
+			{ id: "daily", title: "Daily" },
+			{
+				targetPath: "/note.md",
+				targetMarkdown: `---
+title: Target
+---
+/template`,
+			},
+		);
+		expect(cleanupTemplateApplication).not.toHaveBeenCalled();
+		expect(onLocalChange).toHaveBeenCalled();
+		const markdown = onLocalChange.mock.lastCall?.[1] as string;
+		expect(markdown).toContain('title: "Target"');
+		expect(markdown).toContain("tags:\n  - work");
+		expect(markdown).toContain("## Template");
+		expect(markdown).toContain("Body");
+		expect(markdown).not.toContain("/template");
+	});
 });
 
 function createTestRoot() {

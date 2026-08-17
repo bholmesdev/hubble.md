@@ -6,6 +6,7 @@ import {
 import {
 	Button,
 	classifyHref,
+	type EditorTemplateChoice,
 	EditorView,
 	GlobalSearchPalette,
 	getActiveEditor,
@@ -65,6 +66,7 @@ import {
 } from "./lib/filePath";
 import { isCompactWindow, useCompactWindow } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
+import { isTemplatePath } from "./lib/templates";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
 import {
@@ -113,6 +115,12 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
+import {
+	prepareTemplateApplication,
+	rollbackTemplateMaterialization,
+	templateChoiceStubsForPath,
+	templateChoicesForPath,
+} from "./store/templateActions";
 import { isDarkTheme, subscribeTheme } from "./theme";
 
 // Forces editor refresh when underlying TipTap extensions change
@@ -231,12 +239,16 @@ function App() {
 	);
 	const recentCommandIds = useStoreValue(recentCommandIdsStore);
 	const workspaceFiles = useStoreValue(workspaceStore).files;
+	const templateChoices = state.currentPath
+		? templateChoiceStubsForPath(state.currentPath)
+		: [];
 	const paletteFiles: PaletteFile[] = workspaceFiles
 		.filter((file) => (file.kind ?? fileKindForPath(file.path)) === "document")
 		.map((file) => ({
 			path: file.path,
 			relativePath: relativeWorkspacePath(file.path, workspacePath ?? null),
 			modifiedAt: file.modified_at,
+			isTemplate: isTemplatePath(file.path),
 		}));
 	const lastSeenVersion = useStoreValue(lastSeenVersionStore);
 	const pinnedNotes = useStoreValue(workspaceStore).pinnedNotes;
@@ -789,6 +801,7 @@ function App() {
 									path={state.currentPath}
 									content={state.content}
 									copyAsMarkdownRequest={copyAsMarkdownRequest}
+									templateChoices={templateChoices}
 									viewMode={state.viewMode}
 									onScrollContainerChange={setScrollContainerEl}
 								/>
@@ -910,12 +923,14 @@ function DocumentViewer({
 	path,
 	content,
 	copyAsMarkdownRequest,
+	templateChoices,
 	viewMode,
 	onScrollContainerChange,
 }: {
 	path: string;
 	content: string;
 	copyAsMarkdownRequest: number;
+	templateChoices: EditorTemplateChoice[];
 	viewMode: ViewMode;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
@@ -1010,6 +1025,7 @@ function DocumentViewer({
 			documentId={documentId}
 			initialMarkdown={content}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
+			templateChoices={templateChoices}
 			onScrollContainerChange={onScrollContainerChange}
 		/>
 	);
@@ -1090,12 +1106,14 @@ function MarkdownEditor({
 	documentId,
 	initialMarkdown,
 	copyAsMarkdownRequest,
+	templateChoices,
 	onScrollContainerChange,
 }: {
 	path: string;
 	documentId: string;
 	initialMarkdown: string;
 	copyAsMarkdownRequest: number;
+	templateChoices: EditorTemplateChoice[];
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const workspace = useStoreValue(workspaceStore);
@@ -1158,6 +1176,14 @@ function MarkdownEditor({
 			onSave={savePathContent}
 			onScrollContainerChange={onScrollContainerChange}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
+			templateChoices={templateChoices}
+			loadTemplateChoices={() => templateChoicesForPath(path)}
+			prepareTemplateApplication={(choice, context) =>
+				prepareTemplateApplication(choice, context, {
+					openTemplate: (templatePath) => loadPath(templatePath),
+				})
+			}
+			cleanupTemplateApplication={rollbackTemplateMaterialization}
 			onOpenExternalLink={openExternalLink}
 			onOpenWikiLink={(target) =>
 				void loadPath(

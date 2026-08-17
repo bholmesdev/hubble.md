@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -47,6 +47,10 @@ import {
 } from "../src/lib/searchContent";
 import type { ThemePreference } from "../src/theme";
 import { DeleteUndo } from "./deleteUndo";
+import {
+	materializeTemplateBundle,
+	rollbackMaterializedAssets,
+} from "./materializeTemplate";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
 import {
@@ -125,6 +129,8 @@ const telemetry = new TelemetryManager({
 	version: app.getVersion(),
 	userAgent: () => session.defaultSession.getUserAgent(),
 });
+
+const materializedTemplateAssets = new Map<string, string[]>();
 
 if (isDev && process.env.HUBBLE_DESKTOP_ENABLE_CDP === "1") {
 	app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
@@ -1419,6 +1425,51 @@ function registerIpc() {
 			// accidentally shorten UTF-8 content while crossing string encoders.
 			// See https://github.com/bholmesdev/hubble.md/issues/126 for the repro.
 			await fs.writeFile(resolved, Uint8Array.from(bytes));
+		},
+	);
+
+	ipcMain.handle("desktop:materialize-template", async (_event, input) => {
+		if (
+			!input ||
+			typeof input.sourcePath !== "string" ||
+			typeof input.targetPath !== "string" ||
+			typeof input.content !== "string" ||
+			(input.mode !== "create" && input.mode !== "existing")
+		) {
+			throw new Error("Invalid template materialization request");
+		}
+		const sourcePath = assertGranted(input.sourcePath);
+		const targetPath = resolvePath(input.targetPath);
+		assertGranted(path.dirname(targetPath));
+		if (input.mode === "existing") assertGranted(targetPath);
+		const result = await materializeTemplateBundle({
+			...input,
+			sourcePath,
+			targetPath,
+		});
+		for (const createdPath of result.createdPaths) grantFile(createdPath);
+		if (input.mode === "create") {
+			grantFile(targetPath);
+			return { content: result.content };
+		}
+		if (result.createdPaths.length === 0) return { content: result.content };
+		const cleanupToken = randomUUID();
+		materializedTemplateAssets.set(cleanupToken, result.createdPaths);
+		setTimeout(
+			() => materializedTemplateAssets.delete(cleanupToken),
+			5 * 60 * 1000,
+		);
+		return { content: result.content, cleanupToken };
+	});
+
+	ipcMain.handle(
+		"desktop:rollback-template-materialization",
+		async (_event, { cleanupToken }) => {
+			if (typeof cleanupToken !== "string") return;
+			const createdPaths = materializedTemplateAssets.get(cleanupToken);
+			if (!createdPaths) return;
+			materializedTemplateAssets.delete(cleanupToken);
+			await rollbackMaterializedAssets(createdPaths);
 		},
 	);
 

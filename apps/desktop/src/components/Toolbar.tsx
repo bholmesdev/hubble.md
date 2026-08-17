@@ -18,6 +18,7 @@ import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
+import MingcuteSave2Line from "~icons/mingcute/save-2-line";
 import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { desktopApi } from "../desktopApi";
 import type { AgentClient } from "../desktopApi/types";
@@ -34,12 +35,14 @@ import {
 } from "../lib/filePath";
 import { useCompactWindow } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
+import { isTemplatePath } from "../lib/templates";
 import {
 	goBack,
 	goForward,
 	openPathInDefaultApp,
 	renameCurrentMarkdownFile,
 	requestChatAboutNote,
+	saveCurrentAsTemplate,
 	setViewerMode,
 	toggleSidebar,
 	toggleTerminal,
@@ -200,6 +203,8 @@ function ActionsMenu({
 }) {
 	const { viewMode } = useStoreValue(viewerStore);
 	const isSourceMode = viewMode === "source";
+	const canSaveAsTemplate =
+		!!path && hasMarkdownExtension(path) && !isTemplatePath(path);
 	const sourceModeLabel = path
 		? isSourceMode
 			? hasHtmlExtension(path)
@@ -311,6 +316,15 @@ function ActionsMenu({
 								<MingcuteCodeLine className="size-3 shrink-0" />
 								<span className="min-w-0 flex-1">{sourceModeLabel}</span>
 								<ShortcutHint commandId="app.toggle-source-mode" />
+							</Menu.Item>
+						)}
+						{canSaveAsTemplate && (
+							<Menu.Item
+								className="flex w-full cursor-pointer items-center gap-2 rounded-sm [padding-block:0.375rem] [padding-inline:0.5rem] text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+								onClick={() => void saveCurrentAsTemplate()}
+							>
+								<MingcuteSave2Line className="size-3 shrink-0" />
+								<span className="min-w-0 flex-1">Save as template</span>
 							</Menu.Item>
 						)}
 						{path && (

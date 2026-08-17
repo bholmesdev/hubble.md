@@ -19,6 +19,11 @@ type MarkdownFile = {
 
 export type MovedFileIndex = Map<string, MovedFile>;
 
+export type CopiedAsset = {
+	fromPath: string;
+	toPath: string;
+};
+
 /** Splits a link destination into its filesystem path and query/hash suffix. */
 function splitLinkDestination(destination: string): {
 	path: string;
@@ -273,4 +278,41 @@ export function rewriteMovedLinks({
 		);
 	}
 	return rewriteWikiLinks(nextContent, workspacePath, movedByOldPath);
+}
+
+/**
+ * Re-bases relative links when Markdown is copied to a different folder.
+ *
+ * Uncopied targets keep pointing to their original absolute location. Asset
+ * targets supplied by the bundle copier point at their copied destination.
+ * Workspace-relative wikilinks need no rewrite because copying their source
+ * does not change their meaning.
+ */
+export function rebaseCopiedMarkdown({
+	content,
+	fromPath,
+	toPath,
+	copiedAssets = [],
+}: {
+	content: string;
+	fromPath: string;
+	toPath: string;
+	copiedAssets?: CopiedAsset[];
+}) {
+	const targetDir = dirname(toPath);
+	if (!targetDir) return content;
+	const copiedBySource = new Map(
+		copiedAssets.map((asset) => [
+			normalizePath(asset.fromPath).toLocaleLowerCase(),
+			normalizePath(asset.toPath),
+		]),
+	);
+	return rewriteLinkDestinations(content, (destination) => {
+		if (!isLocalRelativeDestination(destination)) return destination;
+		const { path, suffix } = splitLinkDestination(destination);
+		const originalTarget = absoluteLinkPath(fromPath, path);
+		const copiedTarget =
+			copiedBySource.get(originalTarget.toLocaleLowerCase()) ?? originalTarget;
+		return `${relativeLinkPath(targetDir, copiedTarget)}${suffix}`;
+	});
 }

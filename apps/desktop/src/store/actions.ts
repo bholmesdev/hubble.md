@@ -35,6 +35,7 @@ import {
 	pathAfterMove,
 	rewriteMovedLinks,
 } from "../lib/markdownLinkRewrite";
+import { isTemplatePath } from "../lib/templates";
 import {
 	setThemePreference as applyThemePreference,
 	initTheme,
@@ -79,6 +80,12 @@ import {
 	withOpenedDoc,
 	workspaceStore,
 } from "./state";
+import {
+	contentWithDefaultTemplateFalse,
+	materializeNewMarkdownFile,
+	normalizeDefaultTemplateSiblings,
+	templateFileStem,
+} from "./templateActions";
 import { createTitleManager } from "./titleManagement";
 import { applyWorkspaceDelta } from "./workspaceDelta";
 
@@ -686,6 +693,7 @@ export function updateEditorContent(path: string, content: string) {
 	if (current.currentPath !== currentPath || current.content === content)
 		return;
 	void expireDeleteUndo();
+	void normalizeDefaultTemplateSiblings(currentPath, current.content, content);
 
 	viewerStore.set((state) => {
 		if (state.currentPath !== currentPath) return state;
@@ -1202,12 +1210,98 @@ async function createEmptyFileInFolder(
 	}
 }
 
-export function createMarkdownFileInFolder(parentPath: string) {
-	return createEmptyFileInFolder(parentPath, "new-file", ".md");
+export async function createMarkdownFileInFolder(parentPath: string) {
+	const path = uniqueFilePath(parentPath, templateFileStem(parentPath), ".md");
+	try {
+		const { startsBlankTitleSession } = await materializeNewMarkdownFile(
+			parentPath,
+			path,
+		);
+		if (startsBlankTitleSession) {
+			titleManager.start(path);
+		}
+		const modified_at = Math.floor(Date.now() / 1000);
+		workspaceStore.set((state) => ({
+			...state,
+			files: [
+				...state.files,
+				{ path, modified_at, kind: fileKindForPath(path) },
+			],
+		}));
+		await loadPath(path);
+		await refreshFileList();
+		return path;
+	} catch (err) {
+		titleManager.stop(path);
+		const message = handleFileError(err);
+		toast.error("Failed to create file", { description: message });
+		return null;
+	}
 }
 
 export function createHtmlFileInFolder(parentPath: string) {
 	return createEmptyFileInFolder(parentPath, "new-app", ".html");
+}
+
+export async function saveCurrentAsTemplate() {
+	const current = viewerStore.get();
+	const sourcePath = current.currentPath;
+	if (
+		!sourcePath ||
+		!hasMarkdownExtension(sourcePath) ||
+		isTemplatePath(sourcePath)
+	) {
+		return null;
+	}
+	const parentPath = dirname(sourcePath);
+	if (!parentPath) return null;
+	const templatesPath = joinPath(parentPath, "templates");
+	const targetPath = uniqueFilePath(
+		templatesPath,
+		fileStem(sourcePath),
+		extname(sourcePath) || ".md",
+	);
+	let content: string;
+	try {
+		content = contentWithDefaultTemplateFalse(current.content);
+	} catch (err) {
+		toast.error("Invalid note front matter", {
+			description: errorMessage(err),
+		});
+		return null;
+	}
+
+	try {
+		const materialized = await desktopApi.materializeTemplate({
+			sourcePath,
+			targetPath,
+			content,
+			mode: "create",
+		});
+		const nextContent = materialized.content;
+		const modified_at = Math.floor(Date.now() / 1000);
+		workspaceStore.set((state) => ({
+			...state,
+			files: [
+				...state.files,
+				{ path: targetPath, modified_at, kind: fileKindForPath(targetPath) },
+			],
+			folders: state.folders.some((folder) =>
+				pathEquals(folder.path, templatesPath),
+			)
+				? state.folders
+				: [...state.folders, { path: templatesPath, modified_at }],
+		}));
+		appStore.set((state) => withOpenedDoc(state, targetPath, nextContent));
+		pushHistory(targetPath);
+		await refreshFileList();
+		toast.success("Saved as template");
+		return targetPath;
+	} catch (err) {
+		const message = handleFileError(err);
+		toast.error("Failed to save template", { description: message });
+		return null;
+	}
 }
 
 export async function createFolderInFolder(parentPath: string) {

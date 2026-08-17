@@ -74,6 +74,18 @@ export type PersistPastedImageOutput = {
 	deduped: boolean;
 };
 
+export type MaterializeTemplateInput = {
+	sourcePath: string;
+	targetPath: string;
+	content: string;
+	mode: "create" | "existing";
+};
+
+export type MaterializeTemplateOutput = {
+	content: string;
+	cleanupToken?: string;
+};
+
 export type OpenPathFromLinkResult =
 	| { kind: "file"; path: string }
 	| { kind: "opened" };
@@ -160,6 +172,10 @@ export type DesktopApi = {
 	persistPastedImage(
 		input: PersistPastedImageInput,
 	): Promise<PersistPastedImageOutput>;
+	materializeTemplate(
+		input: MaterializeTemplateInput,
+	): Promise<MaterializeTemplateOutput>;
+	rollbackTemplateMaterialization(token: string): Promise<void>;
 	deleteFile(path: string, options?: { recursive?: boolean }): Promise<void>;
 	stageDelete(workspacePath: string, paths: string[]): Promise<string>;
 	undoText(): Promise<void>;

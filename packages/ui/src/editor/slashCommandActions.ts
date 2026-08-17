@@ -1,6 +1,7 @@
+import { markdownToTiptapDoc } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import { Fragment, type Node as PMNode } from "@tiptap/pm/model";
-import { TextSelection } from "@tiptap/pm/state";
+import { Selection, TextSelection } from "@tiptap/pm/state";
 
 export type SlashCommandKind =
 	| "paragraph"
@@ -128,6 +129,72 @@ export function applySlashCommand(
 	);
 	view.dispatch(tr.scrollIntoView());
 	view.focus();
+}
+
+export function applyTemplateSlashCommand(
+	editor: Editor,
+	token: SlashToken,
+	templateBody: string,
+): boolean {
+	const { state, view } = editor;
+	const { schema } = state;
+	const $from = state.doc.resolve(token.from);
+	if ($from.depth === 0) return false;
+	const topLevelDepth = Math.min(1, $from.depth);
+	const blockStart = $from.before(topLevelDepth);
+	const blockEnd = $from.after(topLevelDepth);
+	const block = state.doc.nodeAt(blockStart);
+	const nodes =
+		templateBody.trim().length === 0
+			? []
+			: trimTrailingEmptyParagraphs(
+					(markdownToTiptapDoc(templateBody).content ?? []).map((node) =>
+						schema.nodeFromJSON(node),
+					),
+				);
+	const content =
+		nodes.length > 0
+			? Fragment.fromArray(nodes)
+			: Fragment.from(schema.nodes.paragraph.create());
+	const canReplaceParagraph =
+		block?.type.name === "paragraph" &&
+		block.content.size === token.to - token.from;
+	const tr = state.tr.delete(token.from, token.to);
+
+	if (canReplaceParagraph) {
+		const mappedBlockStart = tr.mapping.map(blockStart);
+		const mappedBlockEnd = tr.mapping.map(blockEnd);
+		tr.replaceWith(mappedBlockStart, mappedBlockEnd, content);
+		tr.setSelection(Selection.near(tr.doc.resolve(mappedBlockStart), 1));
+		view.dispatch(tr.scrollIntoView());
+		view.focus();
+		return true;
+	}
+
+	if (nodes.length === 0) {
+		view.dispatch(tr.scrollIntoView());
+		view.focus();
+		return true;
+	}
+
+	const insertAt = tr.mapping.map(blockEnd);
+	tr.insert(insertAt, content);
+	tr.setSelection(Selection.near(tr.doc.resolve(insertAt + content.size), -1));
+	view.dispatch(tr.scrollIntoView());
+	view.focus();
+	return true;
+}
+
+function trimTrailingEmptyParagraphs(nodes: PMNode[]) {
+	const trimmed = [...nodes];
+	while (isEmptyParagraph(trimmed[trimmed.length - 1])) {
+		trimmed.pop();
+	}
+	return trimmed;
+}
+
+function isEmptyParagraph(node: PMNode | undefined) {
+	return node?.type.name === "paragraph" && node.childCount === 0;
 }
 
 function createInsertedBlock(

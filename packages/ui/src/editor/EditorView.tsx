@@ -37,8 +37,12 @@ import {
 	type PendingSave,
 	schedulePendingSave,
 } from "./pendingSave";
-import { SlashCommandMenu } from "./SlashCommandMenu";
+import { SlashCommandMenu, type SlashTemplateChoice } from "./SlashCommandMenu";
 import { SmartLinkExtension } from "./SmartLinkExtension";
+import {
+	applyTemplateSlashCommand,
+	type SlashToken,
+} from "./slashCommandActions";
 import { TableCellSelectionExtension } from "./TableCellSelectionExtension";
 import {
 	MarkdownTableCell,
@@ -65,6 +69,18 @@ import type { VirtualCursorMode } from "./virtualCursorMode";
 const DEFAULT_SAVE_DEBOUNCE_MS = 120;
 
 export type { WikiTarget };
+export type EditorTemplateChoice = SlashTemplateChoice;
+
+export type PrepareTemplateApplicationContext = {
+	targetPath: string;
+	targetMarkdown: string;
+};
+
+export type PreparedTemplateApplication = {
+	body: string;
+	frontMatter: string;
+	cleanupToken?: string;
+};
 
 export type EditorViewProps = {
 	path: string;
@@ -87,6 +103,13 @@ export type EditorViewProps = {
 	onOpenExternalLink: (href: string) => void | Promise<void>;
 	onOpenWikiLink: (target: string) => void | Promise<void>;
 	onMessage?: (message: string, type: "success" | "error") => void;
+	templateChoices?: EditorTemplateChoice[];
+	loadTemplateChoices?: () => Promise<EditorTemplateChoice[]>;
+	prepareTemplateApplication?: (
+		choice: EditorTemplateChoice,
+		context: PrepareTemplateApplicationContext,
+	) => Promise<PreparedTemplateApplication>;
+	cleanupTemplateApplication?: (cleanupToken: string) => void | Promise<void>;
 	/** Review threads in the open document, republished on every edit, so an
 	 * app can list them in its own chrome. */
 	onReviewThreadsChange?: (threads: ReviewThread[]) => void;
@@ -111,6 +134,10 @@ export function EditorView({
 	onOpenExternalLink,
 	onOpenWikiLink,
 	onMessage,
+	templateChoices = [],
+	loadTemplateChoices,
+	prepareTemplateApplication,
+	cleanupTemplateApplication,
 	onReviewThreadsChange,
 }: EditorViewProps) {
 	const initialFrontMatter = parseMarkdownFrontMatter(initialMarkdown);
@@ -358,7 +385,30 @@ export function EditorView({
 							onMessage={onMessage}
 							onCursorModeChange={setCursorModeOverride}
 						/>
-						<SlashCommandMenu editor={editor} viewportRef={editorViewportRef} />
+						<SlashCommandMenu
+							editor={editor}
+							viewportRef={editorViewportRef}
+							templateChoices={templateChoices}
+							loadTemplateChoices={loadTemplateChoices}
+							onSelectTemplate={
+								prepareTemplateApplication
+									? (choice, token) => {
+											void applyPreparedTemplate({
+												choice,
+												cleanupTemplateApplication,
+												editorRef,
+												latestMarkdownRef,
+												onMessage,
+												partsRef,
+												pathRef,
+												prepareTemplateApplication,
+												setFrontMatterState,
+												token,
+											});
+										}
+									: undefined
+							}
+						/>
 						<SelectionFormattingToolbar
 							editor={editor}
 							viewport={editorViewportEl}
@@ -383,6 +433,107 @@ export function EditorView({
 			<FormattingStatusBar editor={editor} scrollContainer={editorViewportEl} />
 		</div>
 	);
+}
+
+type EditorParts = {
+	body: string;
+	frontMatter: string;
+};
+
+type ApplyPreparedTemplateOptions = {
+	choice: EditorTemplateChoice;
+	cleanupTemplateApplication: EditorViewProps["cleanupTemplateApplication"];
+	editorRef: { current: Editor | null };
+	latestMarkdownRef: { current: string };
+	onMessage: EditorViewProps["onMessage"];
+	partsRef: { current: EditorParts };
+	pathRef: { current: string };
+	prepareTemplateApplication: NonNullable<
+		EditorViewProps["prepareTemplateApplication"]
+	>;
+	setFrontMatterState: (
+		state: ReturnType<typeof frontMatterStateFromMarkdown>,
+	) => void;
+	token: SlashToken;
+};
+
+async function applyPreparedTemplate({
+	choice,
+	cleanupTemplateApplication,
+	editorRef,
+	latestMarkdownRef,
+	onMessage,
+	partsRef,
+	pathRef,
+	prepareTemplateApplication,
+	setFrontMatterState,
+	token,
+}: ApplyPreparedTemplateOptions) {
+	if (!editorRef.current) return;
+	const targetPath = pathRef.current;
+	const targetMarkdown = latestMarkdownRef.current;
+	try {
+		const preparedTemplate = await prepareTemplateApplication(choice, {
+			targetPath,
+			targetMarkdown,
+		});
+		const cleanupPreparedTemplate = async () => {
+			if (!preparedTemplate.cleanupToken || !cleanupTemplateApplication) return;
+			await cleanupTemplateApplication(preparedTemplate.cleanupToken);
+		};
+		const currentEditor = editorRef.current;
+		if (
+			!currentEditor ||
+			pathRef.current !== targetPath ||
+			latestMarkdownRef.current !== targetMarkdown
+		) {
+			await cleanupPreparedTemplate();
+			return;
+		}
+		const previousParts = partsRef.current;
+		const currentBody = previousParts.body;
+		const restoreParts = () => {
+			partsRef.current = previousParts;
+			setFrontMatterState(
+				frontMatterStateFromMarkdown(latestMarkdownRef.current),
+			);
+		};
+		try {
+			partsRef.current = {
+				body: currentBody,
+				frontMatter: preparedTemplate.frontMatter,
+			};
+			setFrontMatterState(
+				frontMatterStateFromMarkdown(
+					combineMarkdownFrontMatter(preparedTemplate.frontMatter, currentBody),
+				),
+			);
+			const applied = applyTemplateSlashCommand(
+				currentEditor,
+				token,
+				preparedTemplate.body,
+			);
+			if (applied) return;
+			restoreParts();
+			await cleanupPreparedTemplate();
+		} catch (error) {
+			restoreParts();
+			await cleanupPreparedTemplate();
+			throw error;
+		}
+	} catch (error) {
+		if (
+			error &&
+			typeof error === "object" &&
+			"reported" in error &&
+			error.reported === true
+		)
+			return;
+		onMessage?.(
+			error instanceof Error ? error.message : "Template unavailable",
+			"error",
+		);
+	}
 }
 
 function hasUploadImage(node: JSONContent): boolean {

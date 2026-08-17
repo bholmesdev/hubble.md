@@ -4,7 +4,9 @@ import { Command } from "cmdk";
 import {
 	type ComponentType,
 	type RefObject,
+	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -29,8 +31,20 @@ import {
 	type SlashToken,
 } from "./slashCommandActions";
 
+export type SlashTemplateChoice = {
+	id: string;
+	title: string;
+	description?: string;
+	library?: string;
+	path?: string;
+	isDefault?: boolean;
+	keywords?: string[];
+};
+
+type SlashMenuKind = SlashCommandKind | "template";
+
 type SlashCommand = {
-	kind: SlashCommandKind;
+	kind: SlashMenuKind;
 	title: string;
 	description: string;
 	aliases: string[];
@@ -128,28 +142,68 @@ const SLASH_COMMANDS: SlashCommand[] = [
 	},
 ];
 
+const TEMPLATE_COMMAND: SlashCommand = {
+	kind: "template",
+	title: "Template",
+	description: "Insert a Markdown template",
+	aliases: ["template", "templates"],
+	icon: MingcuteTextLine,
+};
+
 // Table cells only hold inline content, so block commands are hidden there.
 const INLINE_COMMANDS = new Set<SlashCommandKind>(["strike"]);
 
 export function SlashCommandMenu({
 	editor,
 	viewportRef,
+	templateChoices = [],
+	loadTemplateChoices,
+	onSelectTemplate,
 }: {
 	editor: Editor | null;
 	viewportRef: RefObject<HTMLDivElement | null>;
+	templateChoices?: SlashTemplateChoice[];
+	loadTemplateChoices?: () => Promise<SlashTemplateChoice[]>;
+	onSelectTemplate?: (choice: SlashTemplateChoice, token: SlashToken) => void;
 }) {
 	const [token, setToken] = useState<SlashToken | null>(null);
 	const [position, setPosition] = useState<MenuPosition | null>(null);
-	const [selectedKind, setSelectedKind] =
-		useState<SlashCommandKind>("paragraph");
+	const [selectedKind, setSelectedKind] = useState<SlashMenuKind>("paragraph");
+	const [mode, setMode] = useState<"commands" | "templates">("commands");
+	const [templateSearch, setTemplateSearch] = useState("");
+	const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+	const [loadedTemplateChoices, setLoadedTemplateChoices] = useState<
+		SlashTemplateChoice[] | null
+	>(null);
 	const suppressedFromRef = useRef<number | null>(null);
 	const positionedFromRef = useRef<number | null>(null);
 	const menuRef = useRef<HTMLDivElement | null>(null);
+	const templateInputRef = useRef<HTMLInputElement | null>(null);
 	const insideTable = editor?.isActive("table") ?? false;
-	const visibleCommands = SLASH_COMMANDS.filter(
-		(command) =>
-			matchesCommand(command, token?.query ?? "") &&
-			(!insideTable || INLINE_COMMANDS.has(command.kind)),
+	const templatesEnabled = templateChoices.length > 0 && !!onSelectTemplate;
+	const commands = useMemo(
+		() =>
+			templatesEnabled ? [...SLASH_COMMANDS, TEMPLATE_COMMAND] : SLASH_COMMANDS,
+		[templatesEnabled],
+	);
+	const visibleCommands = useMemo(
+		() =>
+			commands.filter(
+				(command) =>
+					matchesCommand(command, token?.query ?? "") &&
+					(!insideTable ||
+						command.kind === "template" ||
+						isInlineCommand(command)),
+			),
+		[commands, insideTable, token?.query],
+	);
+	const availableTemplateChoices = loadedTemplateChoices ?? templateChoices;
+	const visibleTemplates = useMemo(
+		() =>
+			availableTemplateChoices.filter(
+				(choice) => templateChoiceScore(choice, templateSearch) > 0,
+			),
+		[availableTemplateChoices, templateSearch],
 	);
 	// Keep selection visible even when the current query filters out the
 	// previously selected command.
@@ -158,6 +212,59 @@ export function SlashCommandMenu({
 	)
 		? selectedKind
 		: visibleCommands[0]?.kind;
+	const activeTemplateId = visibleTemplates.some(
+		(choice) => choice.id === selectedTemplateId,
+	)
+		? selectedTemplateId
+		: visibleTemplates[0]?.id;
+
+	const closeMenu = useCallback(() => {
+		setMode("commands");
+		setTemplateSearch("");
+		setSelectedTemplateId("");
+		setLoadedTemplateChoices(null);
+		setToken(null);
+		setPosition(null);
+	}, []);
+
+	const openTemplatePicker = useCallback(async () => {
+		setMode("templates");
+		setTemplateSearch("");
+		setSelectedTemplateId(templateChoices[0]?.id ?? "");
+		queueMicrotask(() => templateInputRef.current?.focus());
+		if (!loadTemplateChoices) return;
+		await loadTemplateChoices().then(
+			(choices) => {
+				setLoadedTemplateChoices(choices);
+				setSelectedTemplateId(choices[0]?.id ?? "");
+			},
+			() => undefined,
+		);
+	}, [loadTemplateChoices, templateChoices]);
+
+	const selectCommand = useCallback(
+		(command: SlashCommand) => {
+			if (!editor || !token) return;
+			if (command.kind === "template") {
+				void openTemplatePicker();
+				return;
+			}
+			applySlashCommand(editor, token, command.kind);
+			suppressedFromRef.current = null;
+			closeMenu();
+		},
+		[closeMenu, editor, openTemplatePicker, token],
+	);
+
+	const selectTemplate = useCallback(
+		(choice: SlashTemplateChoice) => {
+			if (!onSelectTemplate || !token) return;
+			onSelectTemplate(choice, token);
+			suppressedFromRef.current = null;
+			closeMenu();
+		},
+		[closeMenu, onSelectTemplate, token],
+	);
 
 	useEffect(() => {
 		if (!editor) return;
@@ -166,18 +273,17 @@ export function SlashCommandMenu({
 		// The query lives in ProseMirror text, not in the cmdk input. Recompute
 		// the token and anchor whenever the editor may have moved.
 		const update = () => {
+			if (mode === "templates") return;
 			const nextToken = findSlashToken(editor);
 			if (!nextToken) {
 				suppressedFromRef.current = null;
 				positionedFromRef.current = null;
-				setToken(null);
-				setPosition(null);
+				closeMenu();
 				return;
 			}
 			if (suppressedFromRef.current === nextToken.from) {
 				positionedFromRef.current = null;
-				setToken(null);
-				setPosition(null);
+				closeMenu();
 				return;
 			}
 			if (positionedFromRef.current !== nextToken.from) {
@@ -203,7 +309,7 @@ export function SlashCommandMenu({
 			viewport?.removeEventListener("scroll", update);
 			window.removeEventListener("resize", update);
 		};
-	}, [editor, viewportRef]);
+	}, [closeMenu, editor, mode, viewportRef]);
 
 	useCommandMenuPosition({
 		editor,
@@ -220,17 +326,22 @@ export function SlashCommandMenu({
 	}, [activeKind]);
 
 	useEffect(() => {
+		menuRef.current
+			?.querySelector(`[cmdk-item][data-value="${activeTemplateId}"]`)
+			?.scrollIntoView({ block: "nearest" });
+	}, [activeTemplateId]);
+
+	useEffect(() => {
 		if (!editor) return;
 
 		// Keep focus in the editor so typing continues to update the document;
 		// the menu only handles navigation and command selection keys.
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (!token) return;
+			if (!token || mode === "templates") return;
 			if (event.key === "Escape") {
 				event.preventDefault();
 				suppressedFromRef.current = token.from;
-				setToken(null);
-				setPosition(null);
+				closeMenu();
 				return;
 			}
 			if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -252,19 +363,29 @@ export function SlashCommandMenu({
 				);
 				if (!selectedCommand) return;
 				event.preventDefault();
-				applySlashCommand(editor, token, selectedCommand.kind);
-				suppressedFromRef.current = null;
-				setToken(null);
-				setPosition(null);
+				selectCommand(selectedCommand);
 			}
 		};
 
 		editor.view.dom.addEventListener("keydown", handleKeyDown, true);
 		return () =>
 			editor.view.dom.removeEventListener("keydown", handleKeyDown, true);
-	}, [activeKind, editor, token, visibleCommands]);
+	}, [
+		activeKind,
+		closeMenu,
+		editor,
+		mode,
+		selectCommand,
+		token,
+		visibleCommands,
+	]);
 
-	if (!editor || !token || visibleCommands.length === 0) {
+	if (
+		!editor ||
+		!token ||
+		(mode === "commands" && visibleCommands.length === 0) ||
+		(mode === "templates" && availableTemplateChoices.length === 0)
+	) {
 		return null;
 	}
 
@@ -278,64 +399,138 @@ export function SlashCommandMenu({
 				visibility: position ? "visible" : "hidden",
 			}}
 		>
-			<Command
-				className="flex max-h-[var(--command-menu-height)] flex-col"
-				label="Slash commands"
-				value={activeKind}
-				onValueChange={(value) => setSelectedKind(value as SlashCommandKind)}
-				shouldFilter={false}
-				loop
-				onMouseDown={(event) => event.preventDefault()}
-			>
-				<Command.Input
-					value={token.query}
-					readOnly
-					className="sr-only"
-					aria-hidden="true"
-					tabIndex={-1}
-				/>
-				<Command.List className="min-h-0 max-h-64 overflow-y-auto p-1">
-					{visibleCommands.map((command) => {
-						const Icon = command.icon;
-						return (
+			{mode === "commands" ? (
+				<Command
+					className="flex max-h-[var(--command-menu-height)] flex-col"
+					label="Slash commands"
+					value={activeKind}
+					onValueChange={(value) => setSelectedKind(value as SlashMenuKind)}
+					shouldFilter={false}
+					loop
+					onMouseDown={(event) => event.preventDefault()}
+				>
+					<Command.Input
+						value={token.query}
+						readOnly
+						className="sr-only"
+						aria-hidden="true"
+						tabIndex={-1}
+					/>
+					<Command.List className="min-h-0 max-h-64 overflow-y-auto p-1">
+						{visibleCommands.map((command) => {
+							const Icon = command.icon;
+							return (
+								<Command.Item
+									key={command.kind}
+									value={command.kind}
+									keywords={[
+										command.title,
+										command.description,
+										...command.aliases,
+									]}
+									onSelect={() => selectCommand(command)}
+									className={cn(
+										"flex min-w-0 cursor-default items-center gap-2 rounded-[var(--radius-inner)] px-2 py-1.5 text-start text-[11px] leading-[15px] outline-hidden",
+										"data-[selected=true]:bg-accent data-[selected=true]:text-foreground",
+									)}
+								>
+									<span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
+										<Icon className="size-3.5" />
+									</span>
+									<span className="block min-w-0 flex-1 truncate text-foreground">
+										{command.title}
+									</span>
+									{command.shortcut && (
+										<span
+											className="shrink-0 text-[10px] leading-none text-muted-foreground/60"
+											aria-hidden="true"
+										>
+											{formatCommandShortcut(command.shortcut)}
+										</span>
+									)}
+								</Command.Item>
+							);
+						})}
+					</Command.List>
+				</Command>
+			) : (
+				<Command
+					className="flex max-h-[var(--command-menu-height)] flex-col"
+					label="Templates"
+					value={activeTemplateId}
+					onValueChange={setSelectedTemplateId}
+					shouldFilter={false}
+					loop
+					onKeyDown={(event) => {
+						if (event.key === "Escape") {
+							event.preventDefault();
+							setMode("commands");
+							queueMicrotask(() => editor.view.focus());
+						}
+					}}
+				>
+					<Command.Input
+						ref={templateInputRef}
+						value={templateSearch}
+						onValueChange={setTemplateSearch}
+						placeholder="Search templates..."
+						className="h-8 border-border border-b bg-transparent px-2 text-[12px] outline-none placeholder:text-muted-foreground"
+					/>
+					<Command.List className="min-h-0 max-h-64 overflow-y-auto p-1">
+						{visibleTemplates.map((choice) => (
 							<Command.Item
-								key={command.kind}
-								value={command.kind}
+								key={choice.id}
+								value={choice.id}
 								keywords={[
-									command.title,
-									command.description,
-									...command.aliases,
+									choice.title,
+									choice.description ?? "",
+									choice.library ?? "",
+									choice.path ?? "",
+									...(choice.keywords ?? []),
 								]}
-								onSelect={() => {
-									applySlashCommand(editor, token, command.kind);
-									setToken(null);
-									setPosition(null);
-								}}
+								onSelect={() => selectTemplate(choice)}
 								className={cn(
 									"flex min-w-0 cursor-default items-center gap-2 rounded-[var(--radius-inner)] px-2 py-1.5 text-start text-[11px] leading-[15px] outline-hidden",
 									"data-[selected=true]:bg-accent data-[selected=true]:text-foreground",
 								)}
 							>
-								<span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-									<Icon className="size-3.5" />
-								</span>
-								<span className="block min-w-0 flex-1 truncate text-foreground">
-									{command.title}
-								</span>
-								{command.shortcut && (
-									<span
-										className="shrink-0 text-[10px] leading-none text-muted-foreground/60"
-										aria-hidden="true"
-									>
-										{formatCommandShortcut(command.shortcut)}
+								<span className="block min-w-0 flex-1">
+									<span className="flex min-w-0 items-center gap-1.5">
+										<span className="truncate text-foreground">
+											{choice.title}
+										</span>
+										{choice.isDefault && (
+											<span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] uppercase leading-none text-muted-foreground">
+												Default
+											</span>
+										)}
 									</span>
-								)}
+									{(choice.description || choice.library) && (
+										<span className="block truncate text-muted-foreground">
+											{[choice.description, choice.library]
+												.filter(Boolean)
+												.join(" · ")}
+										</span>
+									)}
+								</span>
 							</Command.Item>
-						);
-					})}
-				</Command.List>
-			</Command>
+						))}
+						{visibleTemplates.length === 0 && (
+							<Command.Empty className="px-2 py-3 text-[11px] text-muted-foreground">
+								No templates found
+							</Command.Empty>
+						)}
+					</Command.List>
+				</Command>
+			)}
 		</div>
+	);
+}
+
+function isInlineCommand(command: SlashCommand) {
+	return (
+		command.kind !== "template" &&
+		INLINE_COMMANDS.has(command.kind as SlashCommandKind)
 	);
 }
 
@@ -364,6 +559,16 @@ function commandScore(value: string, search: string, keywords: string[]) {
 		}
 	}
 	return best;
+}
+
+function templateChoiceScore(choice: SlashTemplateChoice, search: string) {
+	return commandScore(choice.id, search, [
+		choice.title,
+		choice.description ?? "",
+		choice.library ?? "",
+		choice.path ?? "",
+		...(choice.keywords ?? []),
+	]);
 }
 
 function normalize(value: string) {

@@ -17,14 +17,19 @@ export {
 } from "./FindExtension.js";
 export {
 	combineMarkdownFrontMatter,
+	DEFAULT_TEMPLATE_PROPERTY_KEY,
 	detectFilePropertyType,
 	type FileProperty,
 	type FilePropertyType,
 	isDateString,
 	isSimplePropertyKey,
+	type MergeTemplateFrontMatterResult,
+	mergeTemplateFrontMatter,
 	type ParsedFrontMatter,
 	parseDateInput,
 	parseMarkdownFrontMatter,
+	readDefaultTemplateDirective,
+	removeDefaultTemplateProperty,
 	serializeFrontMatter,
 	setMarkdownFrontMatter,
 } from "./frontMatter.js";

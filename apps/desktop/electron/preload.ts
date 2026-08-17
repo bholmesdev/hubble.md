@@ -43,6 +43,12 @@ const desktopApi = {
 			bytes,
 		});
 	},
+	materializeTemplate: (input) =>
+		ipcRenderer.invoke("desktop:materialize-template", input),
+	rollbackTemplateMaterialization: (cleanupToken) =>
+		ipcRenderer.invoke("desktop:rollback-template-materialization", {
+			cleanupToken,
+		}),
 	createFolder: (path) => ipcRenderer.invoke("desktop:create-folder", { path }),
 	renameFile: (fromPath, toPath) =>
 		ipcRenderer.invoke("desktop:rename-file", { fromPath, toPath }),

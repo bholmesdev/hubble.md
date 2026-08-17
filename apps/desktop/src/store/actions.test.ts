@@ -15,6 +15,8 @@ type MockDesktopApi = {
 	setDeleteUndoAvailable: ReturnType<typeof vi.fn>;
 	undoText: ReturnType<typeof vi.fn>;
 	pathExists: ReturnType<typeof vi.fn>;
+	materializeTemplate: ReturnType<typeof vi.fn>;
+	rollbackTemplateMaterialization: ReturnType<typeof vi.fn>;
 	openPathFromLink: ReturnType<typeof vi.fn>;
 	openPathInDefaultApp: ReturnType<typeof vi.fn>;
 	sidebarDeltaForPath: ReturnType<typeof vi.fn>;
@@ -37,6 +39,8 @@ function createDesktopApi(): MockDesktopApi {
 		setDeleteUndoAvailable: vi.fn(async () => {}),
 		undoText: vi.fn(async () => {}),
 		pathExists: vi.fn(async () => false),
+		materializeTemplate: vi.fn(async (_input) => ({ content: "" })),
+		rollbackTemplateMaterialization: vi.fn(async () => {}),
 		openPathFromLink: vi.fn(async () => ({ kind: "opened" })),
 		openPathInDefaultApp: vi.fn(async () => {}),
 		sidebarDeltaForPath: vi.fn(async () => null),
@@ -1402,6 +1406,137 @@ describe("desktop title generation", () => {
 		await vi.advanceTimersByTimeAsync(500);
 
 		expect(api.renameFile).not.toHaveBeenCalled();
+	});
+});
+
+describe("desktop template actions", () => {
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("creates blank templates inside template libraries without title generation", async () => {
+		const api = createDesktopApi();
+		const { appStore, createMarkdownFileInFolder, updateEditorContent } =
+			await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+		}));
+
+		const path = await createMarkdownFileInFolder("/workspace/Templates");
+		updateEditorContent(
+			"/workspace/Templates/new-template.md",
+			"Template title",
+		);
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(path).toBe("/workspace/Templates/new-template.md");
+		expect(api.writeFileText).toHaveBeenCalledWith(
+			"/workspace/Templates/new-template.md",
+			"---\ndefault-template: false\n---\n",
+		);
+		expect(api.renameFile).not.toHaveBeenCalled();
+	});
+
+	it("materializes the effective default for new Markdown notes", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockImplementation(async (path: string) =>
+			path === "/workspace/templates/daily.md"
+				? "---\ndefault-template: true\n---\n# Daily"
+				: path === "/workspace/notes/new-file.md"
+					? "# Daily"
+					: "",
+		);
+		api.materializeTemplate.mockResolvedValue({ content: "# Daily" });
+		const {
+			appStore,
+			createMarkdownFileInFolder,
+			updateEditorContent,
+			viewerStore,
+		} = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: {
+				...state.workspace,
+				workspacePath: "/workspace",
+				files: [{ path: "/workspace/templates/daily.md", modified_at: 1 }],
+			},
+		}));
+
+		const path = await createMarkdownFileInFolder("/workspace/notes");
+		expect(viewerStore.get().content).toBe("# Daily");
+		updateEditorContent(path as string, "# Edited title");
+		await vi.advanceTimersByTimeAsync(500);
+
+		expect(path).toBe("/workspace/notes/new-file.md");
+		expect(api.materializeTemplate).toHaveBeenCalledWith({
+			sourcePath: "/workspace/templates/daily.md",
+			targetPath: "/workspace/notes/new-file.md",
+			content: "# Daily",
+			mode: "create",
+		});
+		expect(api.renameFile).not.toHaveBeenCalled();
+	});
+
+	it("unchecks sibling defaults when a template becomes the default", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockImplementation(async (path: string) =>
+			path === "/workspace/templates/b.md"
+				? "---\ndefault-template: true\n---\nB"
+				: "A",
+		);
+		const { appStore, updateEditorContent } = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: {
+				...state.workspace,
+				workspacePath: "/workspace",
+				files: [
+					{ path: "/workspace/templates/a.md", modified_at: 1 },
+					{ path: "/workspace/templates/b.md", modified_at: 1 },
+				],
+			},
+			document: {
+				...state.document,
+				currentPath: "/workspace/templates/a.md",
+				content: "---\ndefault-template: false\n---\nA",
+				diskContent: "---\ndefault-template: false\n---\nA",
+			},
+		}));
+
+		updateEditorContent(
+			"/workspace/templates/a.md",
+			"---\ndefault-template: true\n---\nA",
+		);
+		await vi.waitFor(() =>
+			expect(api.writeFileText).toHaveBeenCalledWith(
+				"/workspace/templates/b.md",
+				"---\ndefault-template: false\n---\nB",
+			),
+		);
+	});
+
+	it("does not save invalid front matter as a template", async () => {
+		const api = createDesktopApi();
+		const { appStore, saveCurrentAsTemplate } = await loadStoreActions(api);
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/workspace" },
+			document: {
+				...state.document,
+				currentPath: "/workspace/note.md",
+				content: "---\nbroken: [one\n---\nBody",
+				diskContent: "---\nbroken: [one\n---\nBody",
+			},
+		}));
+
+		expect(await saveCurrentAsTemplate()).toBeNull();
+		expect(api.materializeTemplate).not.toHaveBeenCalled();
 	});
 });
 

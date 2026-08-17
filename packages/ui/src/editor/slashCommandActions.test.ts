@@ -7,6 +7,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	applySlashCommand,
+	applyTemplateSlashCommand,
 	findSlashToken,
 	type SlashToken,
 } from "./slashCommandActions";
@@ -138,6 +139,78 @@ describe("slash command document actions", () => {
 						},
 					],
 				},
+			],
+		});
+	});
+
+	it("replaces a slash-only paragraph with multiple template blocks", () => {
+		const editor = createEditor(docWithParagraph("/template"));
+		const token = expectSlashToken(editor);
+
+		applyTemplateSlashCommand(editor, token, "# Agenda\n\n- one\n- two");
+
+		expect(editor.getJSON()).toMatchObject({
+			type: "doc",
+			content: [
+				{
+					type: "heading",
+					attrs: { level: 1 },
+					content: [{ type: "text", text: "Agenda" }],
+				},
+				{
+					type: "bulletList",
+					content: [
+						{
+							attrs: { checked: null },
+							type: "listItem",
+							content: [
+								{ type: "paragraph", content: [{ type: "text", text: "one" }] },
+							],
+						},
+						{
+							attrs: { checked: null },
+							type: "listItem",
+							content: [
+								{ type: "paragraph", content: [{ type: "text", text: "two" }] },
+							],
+						},
+					],
+				},
+				{ type: "paragraph" },
+			],
+		});
+	});
+
+	it("inserts template blocks after a non-empty slash paragraph", () => {
+		const editor = createEditor(docWithParagraph("Intro /template"));
+		const token = expectSlashToken(editor);
+
+		applyTemplateSlashCommand(editor, token, "## Details\n\nBody");
+
+		expect(editor.getJSON()).toMatchObject({
+			type: "doc",
+			content: [
+				{ type: "paragraph", content: [{ type: "text", text: "Intro " }] },
+				{
+					type: "heading",
+					attrs: { level: 2 },
+					content: [{ type: "text", text: "Details" }],
+				},
+				{ type: "paragraph", content: [{ type: "text", text: "Body" }] },
+			],
+		});
+	});
+
+	it("removes the slash token for property-only templates", () => {
+		const editor = createEditor(docWithParagraph("Intro /template"));
+		const token = expectSlashToken(editor);
+
+		applyTemplateSlashCommand(editor, token, "");
+
+		expect(editor.getJSON()).toMatchObject({
+			type: "doc",
+			content: [
+				{ type: "paragraph", content: [{ type: "text", text: "Intro " }] },
 			],
 		});
 	});

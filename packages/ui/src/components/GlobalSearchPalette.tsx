@@ -27,6 +27,7 @@ export type PaletteFile = {
 	path: string;
 	relativePath: string;
 	modifiedAt: number;
+	isTemplate?: boolean;
 };
 
 export type PaletteContentMatch = {
@@ -87,18 +88,37 @@ function folderPath(relativePath: string) {
 	return slash === -1 ? "" : relativePath.slice(0, slash);
 }
 
-function getNameResults(files: PaletteFile[], query: string) {
+function comparePaletteFiles(a: PaletteFile, b: PaletteFile) {
+	const byTemplate =
+		Number(a.isTemplate ?? false) - Number(b.isTemplate ?? false);
+	return byTemplate || b.modifiedAt - a.modifiedAt;
+}
+
+export function getNameResults(files: PaletteFile[], query: string) {
 	if (query.trim() === "") {
-		return [...files]
-			.sort((a, b) => b.modifiedAt - a.modifiedAt)
-			.slice(0, MAX_RECENT_FILES);
+		return [...files].sort(comparePaletteFiles).slice(0, MAX_RECENT_FILES);
 	}
 	return files
 		.map((file) => ({ file, score: scorePath(query, file.relativePath) }))
 		.filter((entry) => entry.score > 0)
-		.sort((a, b) => b.score - a.score || b.file.modifiedAt - a.file.modifiedAt)
+		.sort((a, b) => b.score - a.score || comparePaletteFiles(a.file, b.file))
 		.slice(0, MAX_NAME_RESULTS)
 		.map((entry) => entry.file);
+}
+
+export function rankContentResults(
+	results: PaletteFileMatches[],
+	files: PaletteFile[],
+) {
+	const fileByPath = new Map(files.map((file) => [file.path, file]));
+	return [...results].sort((a, b) => {
+		const fileA = fileByPath.get(a.path);
+		const fileB = fileByPath.get(b.path);
+		if (!fileA && !fileB) return 0;
+		if (!fileA) return 1;
+		if (!fileB) return -1;
+		return comparePaletteFiles(fileA, fileB);
+	});
 }
 
 /**
@@ -241,9 +261,10 @@ function GlobalSearchPalette({
 	);
 	const namePaths = new Set(nameResults.map((file) => file.path));
 	// A file that already matched by name appears once, in the name group.
-	const contentResults = (result?.results ?? []).filter(
-		(entry) => !namePaths.has(entry.path),
-	);
+	const contentResults = rankContentResults(
+		result?.results ?? [],
+		files,
+	).filter((entry) => !namePaths.has(entry.path));
 
 	const select = (path: string) => {
 		onOpenChange(false);

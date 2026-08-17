@@ -37,6 +37,8 @@ export type ParsedFrontMatter =
 	| { type: "invalid"; raw: string; body: string; error: string }
 	| { type: "valid"; raw: string; body: string; properties: FileProperty[] };
 
+export const DEFAULT_TEMPLATE_PROPERTY_KEY = "default-template";
+
 export function parseMarkdownFrontMatter(markdown: string): ParsedFrontMatter {
 	const split = splitFrontMatter(markdown);
 	if (!split) return { type: "none", body: markdown };
@@ -67,6 +69,61 @@ export function parseMarkdownFrontMatter(markdown: string): ParsedFrontMatter {
 		raw: split.raw,
 		body: split.body,
 		properties: mapToProperties(doc.contents),
+	};
+}
+
+export function readDefaultTemplateDirective(
+	frontMatter: ParsedFrontMatter,
+): boolean | null {
+	if (frontMatter.type !== "valid") return null;
+	const property = frontMatter.properties.find(
+		(candidate) => candidate.key === DEFAULT_TEMPLATE_PROPERTY_KEY,
+	);
+	if (!property || property.type !== "checkbox") return null;
+	return property.value;
+}
+
+export function removeDefaultTemplateProperty(
+	properties: FileProperty[],
+): FileProperty[] {
+	return properties.filter(
+		(property) => property.key !== DEFAULT_TEMPLATE_PROPERTY_KEY,
+	);
+}
+
+export type MergeTemplateFrontMatterResult =
+	| { type: "valid"; frontMatter: string; properties: FileProperty[] }
+	| { type: "invalid-template"; error: string }
+	| { type: "invalid-target"; error: string };
+
+export function mergeTemplateFrontMatter(
+	templateMarkdown: string,
+	targetMarkdown: string,
+): MergeTemplateFrontMatterResult {
+	const template = parseMarkdownFrontMatter(templateMarkdown);
+	if (template.type === "invalid") {
+		return { type: "invalid-template", error: template.error };
+	}
+	const target = parseMarkdownFrontMatter(targetMarkdown);
+	if (target.type === "invalid") {
+		return { type: "invalid-target", error: target.error };
+	}
+	const targetProperties = target.type === "valid" ? target.properties : [];
+	const templateProperties =
+		template.type === "valid"
+			? removeDefaultTemplateProperty(template.properties)
+			: [];
+	const existingKeys = new Set(
+		targetProperties.map((property) => property.key),
+	);
+	const missingTemplateProperties = templateProperties.filter(
+		(property) => !existingKeys.has(property.key),
+	);
+	const properties = [...targetProperties, ...missingTemplateProperties];
+	return {
+		type: "valid",
+		frontMatter: serializeFrontMatter(properties),
+		properties,
 	};
 }
 

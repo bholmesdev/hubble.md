@@ -29,8 +29,11 @@ export {
 	setActiveEditor,
 } from "./editor/activeEditor";
 export {
+	type EditorTemplateChoice,
 	EditorView,
 	type EditorViewProps,
+	type PreparedTemplateApplication,
+	type PrepareTemplateApplicationContext,
 	type WikiTarget,
 } from "./editor/EditorView";
 export { FormattingStatusBar } from "./editor/FormattingStatusBar";
