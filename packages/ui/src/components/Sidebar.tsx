@@ -1270,6 +1270,7 @@ export function Sidebar({
 			</DragOverlay>
 		</DndContext>
 	);
+	const sortLabel = sortMode === "recent" ? "Recent" : "Name";
 
 	return (
 		<SidebarFrame onCollapse={onCollapse} storageScope={storageScope}>
@@ -1312,8 +1313,8 @@ export function Sidebar({
 								<Button
 									variant="ghost"
 									size="icon-xs"
-									aria-label="Sort by..."
-									title="Sort by..."
+									aria-label={`Sort files: ${sortLabel}`}
+									title={`Sort files: ${sortLabel}`}
 								/>
 							}
 						>
@@ -1331,9 +1332,6 @@ export function Sidebar({
 								className="isolate z-50"
 							>
 								<Select.Popup className="z-50 w-36 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-									<p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
-										Sort by
-									</p>
 									<SortOption value="recent" label="Recent" />
 									<SortOption value="alpha" label="Name" />
 								</Select.Popup>
@@ -2440,7 +2438,13 @@ function stripMatchingExtension(name: string, extension: string) {
 		: name;
 }
 
-function SortOption({ value, label }: { value: string; label: string }) {
+function SortOption({
+	value,
+	label,
+}: {
+	value: SidebarSortMode;
+	label: string;
+}) {
 	return (
 		<Select.Item
 			value={value}

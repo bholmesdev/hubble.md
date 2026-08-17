@@ -139,7 +139,7 @@ function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
 								size="xs"
 								aria-label="Code block language"
 								title="Code block language"
-								className="pm-code-block-language"
+								className="pm-code-block-language h-4"
 							/>
 						}
 					>
@@ -177,6 +177,7 @@ function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
 					size="icon-xs"
 					aria-label="Copy code"
 					title="Copy code"
+					className="size-4"
 					onClick={() => {
 						void copyCodeBlock(node.textContent);
 					}}
@@ -188,6 +189,7 @@ function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
 				<NodeViewContent<"code">
 					as="code"
 					className={language ? `language-${language}` : undefined}
+					style={{ whiteSpace: "inherit" }}
 				/>
 			</pre>
 		</NodeViewWrapper>

@@ -13,9 +13,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Sidebar folders stay alphabetized while files are sorted by Recent or Name. Thanks [@n00ki](https://github.com/n00ki)! [#258](https://github.com/bholmesdev/hubble.md/pull/258)
+
 ### Fixed
 
 - Sidebar keyboard focus stays on the same file or folder when sorting changes. [#267](https://github.com/bholmesdev/hubble.md/pull/267)
+- Code blocks scroll horizontally instead of wrapping long lines. Thanks [@ggbao666](https://github.com/ggbao666) for the suggestion! [#260](https://github.com/bholmesdev/hubble.md/pull/260)
 - Clicking elsewhere in a note now closes the formatting menu and clears its old text highlight. [#256](https://github.com/bholmesdev/hubble.md/pull/256)
 - Pinned notes remain visible after restarting or updating the desktop app. [#254](https://github.com/bholmesdev/hubble.md/pull/254)
 - Pressing Enter in a list item containing an image now creates a new list item instead of dropping out of the list. Thanks [@MonisMS](https://github.com/MonisMS)! [#241](https://github.com/bholmesdev/hubble.md/pull/241)

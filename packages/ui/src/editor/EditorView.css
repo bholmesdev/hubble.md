@@ -330,6 +330,11 @@
 	overflow-x: auto;
 }
 
+[data-hubble-editor]:not([data-hubble-source-editor]) .ProseMirror pre {
+	white-space: pre;
+	overflow-wrap: normal;
+}
+
 [data-hubble-editor] .pm-code-block {
 	position: relative;
 }
@@ -428,7 +433,7 @@
 [data-hubble-editor] .pm-code-block-language {
 	max-inline-size: 9rem;
 	border: 0;
-	padding-inline: 0.5rem;
+	padding-inline: 0.25rem;
 }
 
 [data-hubble-editor] .pm-code-block-language [data-slot="value"] {
@@ -440,6 +445,10 @@
 	background: transparent;
 	color: #000;
 	padding: 0;
+}
+
+[data-hubble-editor]:not([data-hubble-source-editor]) .ProseMirror pre code {
+	display: inline-block;
 }
 
 [data-hubble-editor] .ProseMirror .xml .hljs-meta {

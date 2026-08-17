@@ -11,13 +11,11 @@ export type SidebarFile = {
 
 export type SidebarFolder = {
 	path: string;
-	modifiedAt?: number;
 };
 
 type FolderNode = {
 	id: string;
 	name: string;
-	modifiedAt: number;
 	folders: Map<string, FolderNode>;
 	files: SidebarFile[];
 };
@@ -157,7 +155,6 @@ function makeFolder(id: string, name: string): FolderNode {
 	return {
 		id,
 		name,
-		modifiedAt: 0,
 		folders: new Map(),
 		files: [],
 	};
@@ -175,10 +172,8 @@ export function buildFileTree(
 		if (!displayPath) continue;
 		const segments = displayPath.split("/").filter(Boolean);
 		let parent = root;
-		const modifiedAt = folderEntry.modifiedAt ?? 0;
 		for (const segment of segments) {
 			const folder = ensureFolder(parent, segment);
-			folder.modifiedAt = Math.max(folder.modifiedAt, modifiedAt);
 			parent = folder;
 		}
 	}
@@ -194,7 +189,6 @@ export function buildFileTree(
 		const modifiedAt = file.modifiedAt ?? 0;
 		for (const segment of segments) {
 			const folder = ensureFolder(parent, segment);
-			folder.modifiedAt = Math.max(folder.modifiedAt, modifiedAt);
 			parent = folder;
 		}
 
@@ -203,7 +197,6 @@ export function buildFileTree(
 			path: file.path,
 			modifiedAt,
 		});
-		parent.modifiedAt = Math.max(parent.modifiedAt, modifiedAt);
 	}
 
 	return root;
@@ -268,9 +261,7 @@ function appendFolderChildren(
 	rows: SidebarRow[],
 	uncompactFolderId: string | null,
 ) {
-	const folders = [...folder.folders.values()].sort((a, b) =>
-		compareNodes(a, b, sortMode),
-	);
+	const folders = [...folder.folders.values()].sort(compareFolders);
 	const files = [...folder.files].sort((a, b) => compareFiles(a, b, sortMode));
 
 	for (const child of folders) {
@@ -333,16 +324,8 @@ function compactFolder(
 	return { folder: cursor, label: names.join("/"), segments };
 }
 
-function compareNodes(
-	a: Pick<FolderNode, "name" | "modifiedAt">,
-	b: Pick<FolderNode, "name" | "modifiedAt">,
-	sortMode: SidebarSortMode,
-) {
-	if (sortMode === "recent") {
-		const byModified = b.modifiedAt - a.modifiedAt;
-		if (byModified !== 0) return byModified;
-	}
-	return a.name.localeCompare(b.name);
+function compareFolders(a: FolderNode, b: FolderNode) {
+	return compareNames(a.name, b.name);
 }
 
 function compareFiles(
@@ -350,11 +333,23 @@ function compareFiles(
 	b: SidebarFile,
 	sortMode: SidebarSortMode,
 ) {
+	const byName = compareNames(
+		fileNameFromPath(a.path),
+		fileNameFromPath(b.path),
+	);
 	if (sortMode === "recent") {
-		const byModified = (b.modifiedAt ?? 0) - (a.modifiedAt ?? 0);
-		if (byModified !== 0) return byModified;
+		return (b.modifiedAt ?? 0) - (a.modifiedAt ?? 0) || byName;
 	}
-	return fileNameFromPath(a.path).localeCompare(fileNameFromPath(b.path));
+	return byName;
+}
+
+const nameCollator = new Intl.Collator(undefined, {
+	numeric: true,
+	sensitivity: "base",
+});
+
+function compareNames(a: string, b: string) {
+	return nameCollator.compare(a, b) || a.localeCompare(b);
 }
 
 function getFolderAncestorIds(displayPath: string): Set<string> {
