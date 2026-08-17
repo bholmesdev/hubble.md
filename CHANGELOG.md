@@ -17,6 +17,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Sidebar keyboard focus stays on the same file or folder when sorting changes. [#267](https://github.com/bholmesdev/hubble.md/pull/267)
 - Code blocks scroll horizontally instead of wrapping long lines. Thanks [@ggbao666](https://github.com/ggbao666) for the suggestion! [#260](https://github.com/bholmesdev/hubble.md/pull/260)
 - Clicking elsewhere in a note now closes the formatting menu and clears its old text highlight. [#256](https://github.com/bholmesdev/hubble.md/pull/256)
 - Pinned notes remain visible after restarting or updating the desktop app. [#254](https://github.com/bholmesdev/hubble.md/pull/254)
