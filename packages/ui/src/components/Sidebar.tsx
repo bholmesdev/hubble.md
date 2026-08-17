@@ -34,6 +34,7 @@ import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDeleteLine from "~icons/mingcute/delete-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
+import MingcuteFolderLine from "~icons/mingcute/folder-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteNewFolderLine from "~icons/mingcute/new-folder-line";
@@ -476,7 +477,16 @@ export function Sidebar({
 	const highlightPath = pendingPath ?? currentPath;
 	const uncompactFolderId =
 		deleteOnCancel?.kind === "folder" ? deleteOnCancel.path : null;
-	const { collapseFolder, expandFolder, rows, toggleFolder } = useSidebarTree({
+	const {
+		collapseAllFolders,
+		collapseFolder,
+		expandAllFolders,
+		expandFolder,
+		hasExpandedFolders,
+		hasFolders,
+		rows,
+		toggleFolder,
+	} = useSidebarTree({
 		files,
 		folders,
 		getDisplayPath,
@@ -1271,6 +1281,9 @@ export function Sidebar({
 		</DndContext>
 	);
 	const sortLabel = sortMode === "recent" ? "Recent" : "Name";
+	const folderActionLabel = hasExpandedFolders
+		? "Collapse all folders"
+		: "Expand all folders";
 
 	return (
 		<SidebarFrame onCollapse={onCollapse} storageScope={storageScope}>
@@ -1300,6 +1313,23 @@ export function Sidebar({
 							onClick={() => void createFolder(null)}
 						>
 							<MingcuteNewFolderLine className="size-3.5" />
+						</Button>
+					)}
+					{hasFolders && (
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							aria-label={folderActionLabel}
+							title={folderActionLabel}
+							onClick={
+								hasExpandedFolders ? collapseAllFolders : expandAllFolders
+							}
+						>
+							{hasExpandedFolders ? (
+								<MingcuteFolderLine className="size-3.5" />
+							) : (
+								<MingcuteFolderOpenLine className="size-3.5" />
+							)}
 						</Button>
 					)}
 					<Select.Root
