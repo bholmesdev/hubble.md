@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Reuse folder-aware Markdown templates from the `/template` menu, set defaults for new notes, and save existing notes as templates with their images and links intact. [#269](https://github.com/bholmesdev/hubble.md/pull/269)
+
 ### Changed
 
 ### Fixed
