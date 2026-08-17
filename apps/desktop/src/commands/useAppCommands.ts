@@ -21,6 +21,10 @@ import {
 	supportsSourceToggle,
 } from "../lib/filePath";
 import {
+	activateAdjacentTab,
+	closeActiveTab,
+	closeAllTabs,
+	closeOtherTabs,
 	createFolderInFolder,
 	deleteMarkdownFile,
 	goBack,
@@ -37,6 +41,7 @@ import {
 	toggleTerminal,
 } from "../store/actions";
 import { canGoBack, canGoForward } from "../store/history";
+import { tabsStore } from "../store/state";
 
 const CONTRIBUTING_URL =
 	"https://github.com/bholmesdev/hubble.md/blob/main/CONTRIBUTING.md";
@@ -69,6 +74,8 @@ function toRegistryContext(context: AppCommandContext): RegistryContext {
 		isSourceMode: context.isSourceMode,
 		canGoBack: canGoBack(),
 		canGoForward: canGoForward(),
+		hasTabs: tabsStore.get().order.length > 0,
+		hasMultipleTabs: tabsStore.get().order.length > 1,
 	};
 }
 
@@ -204,6 +211,37 @@ function defineCommands(
 		),
 
 		// Navigate
+		fromRegistry(
+			"app.close-tab",
+			"Navigate",
+			["tab", "close"],
+			closeActiveTab,
+			// The window-close role owns this accelerator; the native menu decides
+			// between closing a tab and closing the window.
+			{ globalShortcut: false },
+		),
+		paletteOnly({
+			id: "app.close-other-tabs",
+			label: "Close Other Tabs",
+			group: "Navigate",
+			keywords: ["tab", "close", "clean"],
+			isEnabled: () => tabsStore.get().order.length > 1,
+			run: closeOtherTabs,
+		}),
+		paletteOnly({
+			id: "app.close-all-tabs",
+			label: "Close All Tabs",
+			group: "Navigate",
+			keywords: ["tab", "close", "clean"],
+			isEnabled: () => tabsStore.get().order.length > 0,
+			run: closeAllTabs,
+		}),
+		fromRegistry("app.next-tab", "Navigate", ["tab", "switch"], () =>
+			activateAdjacentTab(1),
+		),
+		fromRegistry("app.previous-tab", "Navigate", ["tab", "switch"], () =>
+			activateAdjacentTab(-1),
+		),
 		fromRegistry("app.go-back", "Navigate", ["history", "previous"], goBack),
 		fromRegistry("app.go-forward", "Navigate", ["history", "next"], goForward),
 		fromRegistry(

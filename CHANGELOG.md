@@ -9,9 +9,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Open several notes at once as tabs. Each tab keeps its own back and forward history and its own scroll position, and `Cmd/Ctrl+W` closes a tab before closing the window. [#265](https://github.com/bholmesdev/hubble.md/pull/265)
+
 ### Changed
 
 ### Fixed
+
+- Typing and immediately opening another note no longer loses the last few characters. The open note is now saved before navigating rather than as the editor closes. [#265](https://github.com/bholmesdev/hubble.md/pull/265)
 
 ## [0.1.27] - 2026-08-16
 

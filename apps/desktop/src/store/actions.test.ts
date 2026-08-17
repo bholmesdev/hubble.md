@@ -2314,13 +2314,14 @@ describe("desktop loadPath", () => {
 		expect(canGoForward()).toBe(false);
 	});
 
-	it("keeps navigation history separate per workspace", async () => {
+	it("forgets navigation history when another workspace is opened", async () => {
 		const api = createDesktopApi();
 		api.pathExists.mockResolvedValue(true);
 		api.readFileText.mockImplementation(
 			async (path: string) => `content:${path}`,
 		);
-		const { appStore, canGoBack, loadPath } = await loadStoreActions(api);
+		const { appStore, canGoBack, loadPath, openWorkspace } =
+			await loadStoreActions(api);
 
 		appStore.set((current) => ({
 			...current,
@@ -2330,12 +2331,112 @@ describe("desktop loadPath", () => {
 		await loadPath("/workspace-a/b.md");
 		expect(canGoBack()).toBe(true);
 
-		appStore.set((current) => ({
-			...current,
-			workspace: { ...current.workspace, workspacePath: "/workspace-b" },
-		}));
+		await openWorkspace("/workspace-b");
 
 		expect(canGoBack()).toBe(false);
+	});
+
+	it("forgets the trails of tabs that are no longer open", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { appStore, closeTab, historyStore, loadPath, openTabForPath } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const first = appStore.get().tabs.activeTabId;
+		await openTabForPath("/workspace/b.md");
+		const second = appStore.get().tabs.activeTabId;
+		if (!first || !second) throw new Error("expected two tabs");
+		expect(Object.keys(historyStore.get().byTab).sort()).toEqual(
+			[first, second].sort(),
+		);
+
+		// A stack orphaned by any route out is unreachable, so the next
+		// navigation reconciles it away rather than each route remembering.
+		historyStore.set((state) => ({
+			...state,
+			byTab: {
+				...state.byTab,
+				"tab-orphaned": { entries: ["/gone.md"], index: 0 },
+			},
+		}));
+		await closeTab(second);
+		await loadPath("/workspace/c.md");
+
+		expect(Object.keys(historyStore.get().byTab)).toEqual([first]);
+	});
+
+	it("keeps navigation history separate per tab", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { appStore, canGoBack, loadPath } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		await loadPath("/workspace/b.md");
+		const firstTabId = appStore.get().tabs.activeTabId;
+		expect(canGoBack()).toBe(true);
+
+		// The trail follows the Active Tab, so a fresh Tab starts with no
+		// history.
+		appStore.set((current) => ({
+			...current,
+			tabs: {
+				order: [...current.tabs.order, "tab-second"],
+				activeTabId: "tab-second",
+				byId: {
+					...current.tabs.byId,
+					"tab-second": { path: "/workspace/c.md" },
+				},
+			},
+		}));
+		expect(canGoBack()).toBe(false);
+
+		appStore.set((current) => ({
+			...current,
+			tabs: { ...current.tabs, activeTabId: firstTabId },
+		}));
+		expect(canGoBack()).toBe(true);
+	});
+
+	it("saves dirty content before opening another file", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { loadPath, updateEditorContent } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		updateEditorContent("/workspace/a.md", "dirty");
+		// The editor's own debounced flush runs after the store has moved on, so
+		// the save has to happen here or the edit is dropped.
+		await loadPath("/workspace/b.md");
+
+		expect(api.writeFileText).toHaveBeenCalledWith("/workspace/a.md", "dirty");
+	});
+
+	it("does not write the current file back when reopening the same path", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { loadPath, updateEditorContent } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		updateEditorContent("/workspace/a.md", "dirty");
+		api.writeFileText.mockClear();
+		// The active-file watcher reloads the open path when a read fails. Saving
+		// first would restore a file that just disappeared.
+		await loadPath("/workspace/a.md");
+
+		expect(api.writeFileText).not.toHaveBeenCalled();
 	});
 
 	it("saves dirty content before navigating history", async () => {
@@ -2377,6 +2478,58 @@ describe("desktop loadPath", () => {
 
 		await goBack();
 
+		expect(viewerStore.get().currentPath).toBe("/workspace/b.md");
+	});
+
+	it("blocks opening another note while the current one has a disk conflict", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { appStore, loadPath, viewerStore } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		appStore.set((current) => ({
+			...current,
+			document: {
+				...current.document,
+				externalChange: { kind: "conflict", diskContent: "disk" },
+			},
+		}));
+
+		// The banner asking which copy wins cannot be answered from another
+		// note, so a sidebar click has to refuse the same way Back does.
+		await loadPath("/workspace/b.md");
+
+		expect(viewerStore.get().currentPath).toBe("/workspace/a.md");
+		expect(viewerStore.get().externalChange.kind).toBe("conflict");
+	});
+
+	it("blocks closing a tab while its note has a disk conflict", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { appStore, closeTab, loadPath, openTabForPath, viewerStore } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		await openTabForPath("/workspace/b.md");
+		const conflicted = appStore.get().tabs.activeTabId;
+		if (!conflicted) throw new Error("expected a tab");
+		appStore.set((current) => ({
+			...current,
+			document: {
+				...current.document,
+				externalChange: { kind: "conflict", diskContent: "disk" },
+			},
+		}));
+
+		await closeTab(conflicted);
+
+		expect(appStore.get().tabs.order).toContain(conflicted);
 		expect(viewerStore.get().currentPath).toBe("/workspace/b.md");
 	});
 
@@ -2572,5 +2725,384 @@ describe("desktop pinned notes", () => {
 			version: 1,
 			pinnedNotes: [],
 		});
+	});
+});
+
+describe("desktop tabs", () => {
+	it("opens a tab for the loaded file", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockResolvedValue("content");
+		const { appStore, loadPath } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+
+		const { order, activeTabId, byId } = appStore.get().tabs;
+		expect(order).toHaveLength(1);
+		expect(activeTabId).toBe(order[0]);
+		expect(byId[order[0]].path).toBe("/workspace/a.md");
+	});
+
+	it("reuses the active tab when opening another file", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockResolvedValue("content");
+		const { appStore, loadPath } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const firstId = appStore.get().tabs.activeTabId;
+		await loadPath("/workspace/b.md");
+
+		const { order, activeTabId, byId } = appStore.get().tabs;
+		expect(order).toEqual([firstId]);
+		expect(activeTabId).toBe(firstId);
+		expect(byId[order[0]].path).toBe("/workspace/b.md");
+	});
+
+	it("keeps the tab pointing at the open document when a load fails", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(async (path: string) => {
+			if (path === "/workspace/missing.md") throw new Error("ENOENT");
+			return "content";
+		});
+		const { appStore, loadPath, viewerStore } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		await loadPath("/workspace/missing.md");
+
+		const { order, byId } = appStore.get().tabs;
+		expect(order).toHaveLength(1);
+		expect(byId[order[0]].path).toBe("/workspace/a.md");
+		expect(viewerStore.get().currentPath).toBe("/workspace/a.md");
+	});
+
+	it("closes tabs when the viewer is cleared", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockResolvedValue("content");
+		const { appStore, clearViewer, loadPath } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		clearViewer();
+
+		expect(appStore.get().tabs.order).toEqual([]);
+		expect(appStore.get().tabs.activeTabId).toBeNull();
+	});
+
+	it("does not persist tabs across a relaunch", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockResolvedValue("content");
+		const { STORAGE_KEY } = await import("./persistence");
+		const { appStore, loadPath } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		expect(appStore.get().tabs.order).toHaveLength(1);
+
+		const [, written] = vi.mocked(localStorage.setItem).mock.lastCall ?? [];
+		expect(vi.mocked(localStorage.setItem).mock.lastCall?.[0]).toBe(
+			STORAGE_KEY,
+		);
+		expect(JSON.parse(written ?? "{}")).not.toHaveProperty("tabs");
+
+		const relaunched = await loadStoreActions(createDesktopApi(), written);
+
+		expect(relaunched.appStore.get().tabs.order).toEqual([]);
+	});
+
+	it("opens a second tab beside the active one", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockResolvedValue("content");
+		const { appStore, loadPath, openTabForPath, viewerStore } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const first = appStore.get().tabs.activeTabId;
+		await openTabForPath("/workspace/b.md");
+
+		const { order, activeTabId, byId } = appStore.get().tabs;
+		expect(order).toHaveLength(2);
+		expect(order[0]).toBe(first);
+		expect(activeTabId).toBe(order[1]);
+		expect(byId[order[0]].path).toBe("/workspace/a.md");
+		expect(byId[order[1]].path).toBe("/workspace/b.md");
+		expect(viewerStore.get().currentPath).toBe("/workspace/b.md");
+	});
+
+	it("focuses the open tab instead of opening the same note twice", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockResolvedValue("content");
+		const { appStore, loadPath, openTabForPath } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const first = appStore.get().tabs.activeTabId;
+		await openTabForPath("/workspace/b.md");
+		// Two tabs on one note would give it two autosave timers.
+		await openTabForPath("/workspace/a.md");
+
+		expect(appStore.get().tabs.order).toHaveLength(2);
+		expect(appStore.get().tabs.activeTabId).toBe(first);
+	});
+
+	it("activating a tab reloads its note without extending the trail", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { activateTab, appStore, canGoBack, loadPath, openTabForPath } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const first = appStore.get().tabs.activeTabId;
+		if (!first) throw new Error("expected a tab");
+		await openTabForPath("/workspace/b.md");
+		expect(canGoBack()).toBe(false);
+
+		await activateTab(first);
+
+		expect(appStore.get().document.currentPath).toBe("/workspace/a.md");
+		// The first tab only ever visited one note, so its trail stays flat.
+		expect(canGoBack()).toBe(false);
+	});
+
+	it("closing the active tab moves to the next one and opens it", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { appStore, closeTab, loadPath, openTabForPath, viewerStore } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const first = appStore.get().tabs.activeTabId;
+		await openTabForPath("/workspace/b.md");
+		const second = appStore.get().tabs.activeTabId;
+		if (!first || !second) throw new Error("expected two tabs");
+
+		await closeTab(second);
+
+		expect(appStore.get().tabs.order).toEqual([first]);
+		expect(appStore.get().tabs.activeTabId).toBe(first);
+		expect(viewerStore.get().currentPath).toBe("/workspace/a.md");
+	});
+
+	it("closing the last tab empties the editor", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockResolvedValue("content");
+		const { appStore, closeTab, loadPath, viewerStore } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const only = appStore.get().tabs.activeTabId;
+		if (!only) throw new Error("expected a tab");
+
+		await closeTab(only);
+
+		expect(appStore.get().tabs.order).toEqual([]);
+		expect(appStore.get().tabs.activeTabId).toBeNull();
+		expect(viewerStore.get().currentPath).toBeNull();
+	});
+
+	it("rewrites a background tab when its file is renamed", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		api.listDirectory.mockResolvedValue({ files: [], folders: [] });
+		const { appStore, loadPath, openTabForPath, renameMarkdownFile } =
+			await loadStoreActions(api);
+
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace" },
+		}));
+		await loadPath("/workspace/a.md");
+		const background = appStore.get().tabs.activeTabId;
+		await openTabForPath("/workspace/b.md");
+
+		// Renaming a note nobody is looking at still has to move its tab.
+		await renameMarkdownFile("/workspace/a.md", "renamed");
+
+		if (!background) throw new Error("expected a tab");
+		expect(appStore.get().tabs.byId[background].path).toBe(
+			"/workspace/renamed.md",
+		);
+	});
+
+	it("closes a background tab when its file is deleted, and reopens it on undo", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		api.listDirectory.mockResolvedValue({ files: [], folders: [] });
+		const toast = Object.assign(
+			vi.fn(() => "delete-undo"),
+			{
+				dismiss: vi.fn(),
+				success: vi.fn(),
+				error: vi.fn(),
+			},
+		);
+		vi.doMock("sonner", () => ({ toast }));
+		const {
+			appStore,
+			deleteSidebarItems,
+			loadPath,
+			openTabForPath,
+			undoDelete,
+		} = await loadStoreActions(api);
+
+		appStore.set((current) => ({
+			...current,
+			workspace: { ...current.workspace, workspacePath: "/workspace" },
+		}));
+		await loadPath("/workspace/a.md");
+		const background = appStore.get().tabs.activeTabId;
+		await openTabForPath("/workspace/b.md");
+		const visible = appStore.get().tabs.activeTabId;
+
+		await deleteSidebarItems([{ kind: "file", path: "/workspace/a.md" }]);
+
+		expect(appStore.get().tabs.order).toEqual([visible]);
+
+		await undoDelete();
+
+		// Undo puts the closed tab back where it was, ahead of the visible one.
+		expect(appStore.get().tabs.order).toEqual([background, visible]);
+		vi.doUnmock("sonner");
+	});
+
+	it("leaves no document behind when tabs are closed back to back", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { appStore, closeTab, loadPath, openTabForPath, viewerStore } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		await openTabForPath("/workspace/b.md");
+		await openTabForPath("/workspace/c.md");
+		const open = [...appStore.get().tabs.order];
+		expect(open).toHaveLength(3);
+
+		// Closing without awaiting each one is what a user does with a fast
+		// double click. Every close must see the strip the one before it left.
+		await Promise.all(open.map((id) => closeTab(id)));
+
+		expect(appStore.get().tabs.order).toEqual([]);
+		expect(appStore.get().tabs.activeTabId).toBeNull();
+		// The editor must not still be holding a note that has no tab.
+		expect(viewerStore.get().currentPath).toBeNull();
+	});
+
+	it("does not reload the note already in front", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { activateTab, appStore, loadPath } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const only = appStore.get().tabs.activeTabId;
+		if (!only) throw new Error("expected a tab");
+		api.readFileText.mockClear();
+
+		await activateTab(only);
+
+		// Re-reading would reset undo and view mode for a click that changed
+		// nothing.
+		expect(api.readFileText).not.toHaveBeenCalled();
+	});
+
+	it("reloads the active tab when the changelog is covering it", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { activateTab, appStore, loadPath, openChangelog, viewerStore } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const only = appStore.get().tabs.activeTabId;
+		if (!only) throw new Error("expected a tab");
+		expect(await openChangelog()).toBe(true);
+		expect(viewerStore.get().currentPath).not.toBe("/workspace/a.md");
+
+		// The changelog has no tab of its own, so its tab stayed active while
+		// its note was off screen. Activating it must bring the note back.
+		await activateTab(only);
+
+		expect(viewerStore.get().currentPath).toBe("/workspace/a.md");
+	});
+
+	it("closes the other tabs without disturbing the one in front", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { appStore, closeOtherTabs, loadPath, openTabForPath, viewerStore } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		await openTabForPath("/workspace/b.md");
+		await openTabForPath("/workspace/c.md");
+		const kept = appStore.get().tabs.activeTabId;
+
+		await closeOtherTabs();
+
+		expect(appStore.get().tabs.order).toEqual([kept]);
+		expect(viewerStore.get().currentPath).toBe("/workspace/c.md");
+	});
+
+	it("closes every tab and empties the editor", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { appStore, closeAllTabs, loadPath, openTabForPath, viewerStore } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		await openTabForPath("/workspace/b.md");
+
+		await closeAllTabs();
+
+		expect(appStore.get().tabs.order).toEqual([]);
+		expect(viewerStore.get().currentPath).toBeNull();
+	});
+
+	it("steps between tabs and wraps at either end", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { activateAdjacentTab, appStore, loadPath, openTabForPath } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const first = appStore.get().tabs.activeTabId;
+		await openTabForPath("/workspace/b.md");
+		const second = appStore.get().tabs.activeTabId;
+
+		// Forward from the last tab comes back round to the first.
+		await activateAdjacentTab(1);
+		expect(appStore.get().tabs.activeTabId).toBe(first);
+		await activateAdjacentTab(-1);
+		expect(appStore.get().tabs.activeTabId).toBe(second);
 	});
 });
