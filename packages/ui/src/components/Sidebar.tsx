@@ -34,6 +34,7 @@ import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDeleteLine from "~icons/mingcute/delete-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
+import MingcuteFoldVerticalLine from "~icons/mingcute/fold-vertical-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteNewFolderLine from "~icons/mingcute/new-folder-line";
@@ -41,6 +42,7 @@ import MingcutePinFill from "~icons/mingcute/pin-fill";
 import MingcutePinLine from "~icons/mingcute/pin-line";
 import MingcuteRightLine from "~icons/mingcute/right-line";
 import MingcuteSortDescendingLine from "~icons/mingcute/sort-descending-line";
+import MingcuteUnfoldVerticalLine from "~icons/mingcute/unfold-vertical-line";
 import { useResizeSeparator } from "../hooks/useResizeSeparator";
 import { isEditableEventTarget } from "../lib/dom";
 import {
@@ -476,7 +478,16 @@ export function Sidebar({
 	const highlightPath = pendingPath ?? currentPath;
 	const uncompactFolderId =
 		deleteOnCancel?.kind === "folder" ? deleteOnCancel.path : null;
-	const { collapseFolder, expandFolder, rows, toggleFolder } = useSidebarTree({
+	const {
+		collapseAllFolders,
+		collapseFolder,
+		expandAllFolders,
+		expandFolder,
+		hasExpandedFolders,
+		hasFolders,
+		rows,
+		toggleFolder,
+	} = useSidebarTree({
 		files,
 		folders,
 		getDisplayPath,
@@ -485,6 +496,9 @@ export function Sidebar({
 		storageScope,
 		uncompactFolderId,
 	});
+	const allFoldersActionLabel = hasExpandedFolders
+		? "Collapse all folders"
+		: "Expand all folders";
 	const [selection, setSelection] = useState<SidebarSelectionState>({
 		selectedKeys: new Set(),
 		anchorKey: null,
@@ -1338,6 +1352,23 @@ export function Sidebar({
 							</Select.Positioner>
 						</Select.Portal>
 					</Select.Root>
+					{hasFolders ? (
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							aria-label={allFoldersActionLabel}
+							title={allFoldersActionLabel}
+							onClick={
+								hasExpandedFolders ? collapseAllFolders : expandAllFolders
+							}
+						>
+							{hasExpandedFolders ? (
+								<MingcuteFoldVerticalLine className="size-3.5" />
+							) : (
+								<MingcuteUnfoldVerticalLine className="size-3.5" />
+							)}
+						</Button>
+					) : null}
 				</div>
 			</div>
 			{tree}

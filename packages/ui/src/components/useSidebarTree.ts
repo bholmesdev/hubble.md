@@ -106,6 +106,10 @@ export function useSidebarTree({
 		expandedFolders,
 		uncompactFolderId,
 	});
+	const folderRowIds = getFolderRowIds(tree, uncompactFolderId);
+	const hasExpandedFolders = rows.some(
+		(row) => row.kind === "folder" && row.expanded,
+	);
 
 	useEffect(() => {
 		if (!highlightPath || revealedPathRef.current === highlightPath) return;
@@ -147,8 +151,23 @@ export function useSidebarTree({
 	const collapseFolder = (id: string) => setExpanded(id, false);
 	const toggleFolder = (id: string) =>
 		setExpanded(id, !expandedFolders.has(id));
+	const expandAllFolders = () => {
+		setExpandedState({ key: storageKey, folders: new Set(folderRowIds) });
+	};
+	const collapseAllFolders = () => {
+		setExpandedState({ key: storageKey, folders: new Set() });
+	};
 
-	return { collapseFolder, expandFolder, rows, toggleFolder };
+	return {
+		collapseAllFolders,
+		collapseFolder,
+		expandAllFolders,
+		expandFolder,
+		hasExpandedFolders,
+		hasFolders: folderRowIds.length > 0,
+		rows,
+		toggleFolder,
+	};
 }
 
 function makeFolder(id: string, name: string): FolderNode {
@@ -210,6 +229,24 @@ function ensureFolder(parent: FolderNode, name: string): FolderNode {
 		parent.folders.set(name, folder);
 	}
 	return folder;
+}
+
+function getFolderRowIds(tree: FolderNode, uncompactFolderId: string | null) {
+	const ids: string[] = [];
+	appendFolderRowIds(tree, uncompactFolderId, ids);
+	return ids;
+}
+
+function appendFolderRowIds(
+	folder: FolderNode,
+	uncompactFolderId: string | null,
+	ids: string[],
+) {
+	for (const child of folder.folders.values()) {
+		const compacted = compactFolder(child, uncompactFolderId);
+		ids.push(compacted.folder.id);
+		appendFolderRowIds(compacted.folder, uncompactFolderId, ids);
+	}
 }
 
 export function flattenRows({
