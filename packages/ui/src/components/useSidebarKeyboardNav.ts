@@ -43,8 +43,10 @@ export function useSidebarKeyboardNav<T>({
 	useEffect(() => {
 		if (focusedIndex === -1) setFocusedKey(null);
 	}, [focusedIndex]);
-	const setFocusedIndex = (index: number | null) => {
-		setFocusedKey(index === null ? null : (getItemKey(items[index]) ?? null));
+	const focusItem = (item: T | null) => {
+		const key = item === null ? null : getItemKey(item);
+		focusedKeyRef.current = key;
+		setFocusedKey(key);
 	};
 	const getFocusedIndex = () => {
 		const key = focusedKeyRef.current;
@@ -131,5 +133,5 @@ export function useSidebarKeyboardNav<T>({
 		}
 	};
 
-	return { focusedIndex: currentIndex, setFocusedIndex, onKeyDown };
+	return { focusedIndex: currentIndex, focusItem, onKeyDown };
 }

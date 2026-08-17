@@ -92,6 +92,33 @@ describe("useSidebarKeyboardNav", () => {
 
 		expect(onSelect).toHaveBeenCalledWith("b");
 	});
+
+	it("skips rows without item keys", () => {
+		const onNavigate = vi.fn();
+		let onKeyDown: ((event: ReactKeyboardEvent) => void) | undefined;
+		const root = createRoot(
+			document.body.appendChild(document.createElement("div")),
+		);
+		roots.push(root);
+
+		function Harness() {
+			const navRef = useRef<HTMLDivElement>(null);
+			onKeyDown = useSidebarKeyboardNav({
+				items: ["a", "section", "b"],
+				onSelect: vi.fn(),
+				onNavigate,
+				navRef,
+				getItemKey: (item) => (item === "section" ? null : item),
+			}).onKeyDown;
+			return createElement("div", { ref: navRef });
+		}
+
+		act(() => root.render(createElement(Harness)));
+		act(() => onKeyDown?.(keyEvent("ArrowDown")));
+		act(() => onKeyDown?.(keyEvent("ArrowDown")));
+
+		expect(onNavigate.mock.calls).toEqual([["a"], ["b"]]);
+	});
 });
 
 function keyEvent(key: string) {
