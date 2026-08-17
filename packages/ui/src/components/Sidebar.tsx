@@ -479,13 +479,12 @@ export function Sidebar({
 	const uncompactFolderId =
 		deleteOnCancel?.kind === "folder" ? deleteOnCancel.path : null;
 	const {
-		collapseAllFolders,
 		collapseFolder,
-		expandAllFolders,
 		expandFolder,
 		hasExpandedFolders,
 		hasFolders,
 		rows,
+		toggleAllFolders,
 		toggleFolder,
 	} = useSidebarTree({
 		files,
@@ -1294,7 +1293,7 @@ export function Sidebar({
 						Files
 					</span>
 				)}
-				<div className="flex items-center gap-1">
+				<div className="flex shrink-0 items-center gap-1">
 					{onCreateFile && (
 						<NewFileMenu
 							onCreateFile={() => void createFile(creationFolderId)}
@@ -1358,9 +1357,7 @@ export function Sidebar({
 							size="icon-xs"
 							aria-label={allFoldersActionLabel}
 							title={allFoldersActionLabel}
-							onClick={
-								hasExpandedFolders ? collapseAllFolders : expandAllFolders
-							}
+							onClick={toggleAllFolders}
 						>
 							{hasExpandedFolders ? (
 								<MingcuteFoldVerticalLine className="size-3.5" />

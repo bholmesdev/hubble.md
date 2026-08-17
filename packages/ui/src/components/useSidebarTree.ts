@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { z } from "zod/v4";
 import { fileNameFromPath, normalizeDisplayPath } from "../lib/filePath";
 
@@ -106,7 +106,7 @@ export function useSidebarTree({
 		expandedFolders,
 		uncompactFolderId,
 	});
-	const folderRowIds = getFolderRowIds(tree, uncompactFolderId);
+	const folderIds = getFolderIds(tree, uncompactFolderId);
 	const hasExpandedFolders = rows.some(
 		(row) => row.kind === "folder" && row.expanded,
 	);
@@ -151,21 +151,22 @@ export function useSidebarTree({
 	const collapseFolder = (id: string) => setExpanded(id, false);
 	const toggleFolder = (id: string) =>
 		setExpanded(id, !expandedFolders.has(id));
-	const expandAllFolders = () => {
-		setExpandedState({ key: storageKey, folders: new Set(folderRowIds) });
-	};
-	const collapseAllFolders = () => {
-		setExpandedState({ key: storageKey, folders: new Set() });
+	const toggleAllFolders = () => {
+		startTransition(() => {
+			setExpandedState({
+				key: storageKey,
+				folders: hasExpandedFolders ? new Set() : new Set(folderIds),
+			});
+		});
 	};
 
 	return {
-		collapseAllFolders,
 		collapseFolder,
-		expandAllFolders,
 		expandFolder,
 		hasExpandedFolders,
-		hasFolders: folderRowIds.length > 0,
+		hasFolders: folderIds.length > 0,
 		rows,
+		toggleAllFolders,
 		toggleFolder,
 	};
 }
@@ -231,22 +232,17 @@ function ensureFolder(parent: FolderNode, name: string): FolderNode {
 	return folder;
 }
 
-function getFolderRowIds(tree: FolderNode, uncompactFolderId: string | null) {
+function getFolderIds(tree: FolderNode, uncompactFolderId: string | null) {
 	const ids: string[] = [];
-	appendFolderRowIds(tree, uncompactFolderId, ids);
+	const walk = (folder: FolderNode) => {
+		for (const child of folder.folders.values()) {
+			const compacted = compactFolder(child, uncompactFolderId);
+			for (const segment of compacted.segments) ids.push(segment.id);
+			walk(compacted.folder);
+		}
+	};
+	walk(tree);
 	return ids;
-}
-
-function appendFolderRowIds(
-	folder: FolderNode,
-	uncompactFolderId: string | null,
-	ids: string[],
-) {
-	for (const child of folder.folders.values()) {
-		const compacted = compactFolder(child, uncompactFolderId);
-		ids.push(compacted.folder.id);
-		appendFolderRowIds(compacted.folder, uncompactFolderId, ids);
-	}
 }
 
 export function flattenRows({

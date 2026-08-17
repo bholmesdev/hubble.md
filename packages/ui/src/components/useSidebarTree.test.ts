@@ -224,7 +224,7 @@ describe("useSidebarTree", () => {
 		expect(harness.current.hasExpandedFolders).toBe(false);
 		expect(filePaths(harness.current.rows)).toEqual([]);
 
-		act(() => harness.current.expandAllFolders());
+		act(() => harness.current.toggleAllFolders());
 
 		expect(harness.current.hasExpandedFolders).toBe(true);
 		expect(filePaths(harness.current.rows)).toEqual([
@@ -233,7 +233,7 @@ describe("useSidebarTree", () => {
 			"/workspace/gamma/delta/two.md",
 		]);
 
-		act(() => harness.current.collapseAllFolders());
+		act(() => harness.current.toggleAllFolders());
 
 		expect(harness.current.hasExpandedFolders).toBe(false);
 		expect(filePaths(harness.current.rows)).toEqual([]);
@@ -246,6 +246,26 @@ describe("useSidebarTree", () => {
 
 		expect(harness.current.hasFolders).toBe(false);
 		expect(harness.current.hasExpandedFolders).toBe(false);
+	});
+
+	it("keeps a compacted folder chain expanded when its shape changes", () => {
+		const nestedFile = {
+			path: "/workspace/alpha/beta/one.md",
+			modifiedAt: 1,
+		};
+		const harness = renderTree({ files: [nestedFile] });
+
+		act(() => harness.current.toggleAllFolders());
+		harness.rerender({
+			files: [nestedFile, { path: "/workspace/alpha/root.md", modifiedAt: 2 }],
+		});
+
+		expect(folderRow(harness.current.rows, "alpha/").expanded).toBe(true);
+		expect(folderRow(harness.current.rows, "alpha/beta/").expanded).toBe(true);
+		expect(filePaths(harness.current.rows)).toEqual([
+			"/workspace/alpha/beta/one.md",
+			"/workspace/alpha/root.md",
+		]);
 	});
 
 	it("keeps selected-file ancestors collapsed across unrelated rerenders", () => {
