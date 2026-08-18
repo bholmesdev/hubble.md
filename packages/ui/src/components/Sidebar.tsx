@@ -601,10 +601,7 @@ export function Sidebar({
 			event.preventDefault();
 			return;
 		}
-		// Ignore the second click of a double-click.
 		if (event.detail > 1) return;
-		// Selecting a folder targets actions such as New File, so a row click
-		// should not also collapse it. Use the chevron or click the row again.
 		const wouldCollapseFolder = row.kind === "folder" && row.expanded;
 		if (!wouldCollapseFolder || clickedFolderToggle || wasOnlySelectedRow) {
 			activateRow(row);
@@ -1018,8 +1015,7 @@ export function Sidebar({
 									data-selected={isSelected ? "true" : undefined}
 									className={cn(
 										"group/sidebar-row relative flex w-full items-center text-sidebar-foreground",
-										// Do not transition background-color: expansion reorders rows,
-										// leaving the old selection accented for one paint after it moves.
+										// Background transitions leave a ghost highlight when expansion reorders rows.
 										"transition-[opacity,filter] duration-150 ease-out motion-reduce:transition-none",
 										isSelected &&
 											"bg-sidebar-accent text-sidebar-accent-foreground",
