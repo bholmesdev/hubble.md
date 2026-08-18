@@ -602,6 +602,7 @@ export function Sidebar({
 			return;
 		}
 		if (event.detail > 1) return;
+		// Expanded folders select first; the chevron toggles immediately.
 		const wouldCollapseFolder = row.kind === "folder" && row.expanded;
 		if (!wouldCollapseFolder || clickedFolderToggle || wasOnlySelectedRow) {
 			activateRow(row);
