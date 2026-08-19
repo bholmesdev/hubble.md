@@ -585,6 +585,12 @@ export function Sidebar({
 		row: SidebarSelectableRow,
 		event: React.MouseEvent<HTMLButtonElement>,
 	) => {
+		const rowKey = sidebarRowKey(row);
+		const wasOnlySelectedRow =
+			rowKey !== null && selectedKeys.size === 1 && selectedKeys.has(rowKey);
+		const clickedFolderToggle =
+			event.target instanceof Element &&
+			event.target.closest("[data-sidebar-folder-toggle]") !== null;
 		const mode: SidebarSelectionMode = event.shiftKey
 			? "range"
 			: event.metaKey || event.ctrlKey
@@ -595,8 +601,12 @@ export function Sidebar({
 			event.preventDefault();
 			return;
 		}
-		if (row.kind === "file" && event.detail > 1) return;
-		activateRow(row);
+		if (event.detail > 1) return;
+		// Expanded folders select first; the chevron toggles immediately.
+		const wouldCollapseFolder = row.kind === "folder" && row.expanded;
+		if (!wouldCollapseFolder || clickedFolderToggle || wasOnlySelectedRow) {
+			activateRow(row);
+		}
 		requestAnimationFrame(() => navRef.current?.focus());
 	};
 	const enterRowEdit = (row: SidebarRow) => {
@@ -959,7 +969,12 @@ export function Sidebar({
 						paddingInlineStart: `${0.5 + row.depth * 0.75}rem`,
 					} as React.CSSProperties;
 					const chevron = (
-						<span className="inline-flex size-3 shrink-0 items-center justify-center text-muted-foreground">
+						<span
+							className="-m-1 inline-flex size-5 shrink-0 items-center justify-center text-muted-foreground"
+							data-sidebar-folder-toggle={
+								row.kind === "folder" ? "" : undefined
+							}
+						>
 							{row.kind === "folder" && (
 								<MingcuteRightLine
 									className={cn(
@@ -1003,7 +1018,8 @@ export function Sidebar({
 									data-selected={isSelected ? "true" : undefined}
 									className={cn(
 										"group/sidebar-row relative flex w-full items-center text-sidebar-foreground",
-										"transition-[background-color,opacity,filter] duration-150 ease-out motion-reduce:transition-none",
+										// Background transitions leave a ghost highlight when expansion reorders rows.
+										"transition-[opacity,filter] duration-150 ease-out motion-reduce:transition-none",
 										isSelected &&
 											"bg-sidebar-accent text-sidebar-accent-foreground",
 										isOpen && "font-medium",
