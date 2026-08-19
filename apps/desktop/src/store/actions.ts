@@ -1,8 +1,14 @@
+import {
+	type CommandBindings,
+	type CommandId,
+	isDefaultCommandBinding,
+	setCommandBindings,
+} from "@hubble.md/editor";
 import type { ReviewThread } from "@hubble.md/ui";
 import { toast } from "sonner";
 import changelogRaw from "../../../../CHANGELOG.md?raw";
 import { desktopApi } from "../desktopApi";
-import type { WorkspaceDelta } from "../desktopApi/types";
+import type { TelemetryChoice, WorkspaceDelta } from "../desktopApi/types";
 import { classifyFileChange } from "../externalFileChange";
 import {
 	CHANGELOG_PATH,
@@ -17,6 +23,7 @@ import {
 	extname,
 	fileKindForPath,
 	fileStem,
+	hasHtmlExtension,
 	hasMarkdownExtension,
 	isCodeFile,
 	isEditableFile,
@@ -70,8 +77,11 @@ import {
 	pendingTerminalCommandStore,
 	reviewThreadsStore,
 	type SortMode,
+	shortcutBindingsStore,
 	sidebarOpenStore,
+	spellcheckStore,
 	switcherOpenStore,
+	telemetryConsentStore,
 	themePreferenceStore,
 	uiStore,
 	type ViewMode,
@@ -560,6 +570,64 @@ export async function openPathInDefaultApp(path: string) {
 
 export function setLastSeenVersion(version: string) {
 	lastSeenVersionStore.set(version);
+}
+
+export function loadSettingsState() {
+	void desktopApi
+		.getTelemetryConsent()
+		.then((consent) => telemetryConsentStore.set(consent));
+	void desktopApi
+		.getSpellcheckState()
+		.then((spellcheck) => spellcheckStore.set(spellcheck));
+}
+
+export async function setSpellcheckEnabled(enabled: boolean) {
+	await updateSpellcheck(desktopApi.setSpellcheckEnabled(enabled));
+}
+
+export async function setSpellcheckLanguages(languages: string[]) {
+	await updateSpellcheck(desktopApi.setSpellcheckLanguages(languages));
+}
+
+async function updateSpellcheck(request: Promise<void>) {
+	try {
+		await request;
+		spellcheckStore.set(await desktopApi.getSpellcheckState());
+	} catch {
+		toast.error("Failed to update spellcheck");
+	}
+}
+
+export async function setTelemetryConsent(choice: TelemetryChoice) {
+	telemetryConsentStore.set(await desktopApi.setTelemetryConsent(choice));
+	if (choice !== "enabled") return;
+
+	const viewer = viewerStore.get();
+	void desktopApi.recordTelemetryActivity({
+		usedHtmlApp:
+			viewer.status === "ready" &&
+			!!viewer.currentPath &&
+			hasHtmlExtension(viewer.currentPath),
+	});
+}
+
+export function setShortcutBinding(id: CommandId, binding: string | null) {
+	const next = { ...shortcutBindingsStore.get() };
+	if (isDefaultCommandBinding(id, binding)) {
+		delete next[id];
+	} else {
+		next[id] = binding;
+	}
+	saveShortcutBindings(next);
+}
+
+export function resetShortcutBindings() {
+	saveShortcutBindings({});
+}
+
+function saveShortcutBindings(bindings: CommandBindings) {
+	setCommandBindings(bindings);
+	shortcutBindingsStore.set(bindings);
 }
 
 export function initThemePreference() {

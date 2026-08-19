@@ -19,7 +19,7 @@ import MingcuteQuoteLeftLine from "~icons/mingcute/quote-left-line";
 import MingcuteStrikethroughLine from "~icons/mingcute/strikethrough-line";
 import MingcuteTable2Line from "~icons/mingcute/table-2-line";
 import MingcuteTextLine from "~icons/mingcute/text-line";
-import { formatCommandShortcut } from "../lib/shortcut";
+import { formatCommandShortcut, useCommandBindings } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { useCommandMenuPosition } from "./commandMenuPosition";
 import {
@@ -138,6 +138,7 @@ export function SlashCommandMenu({
 	editor: Editor | null;
 	viewportRef: RefObject<HTMLDivElement | null>;
 }) {
+	const commandBindings = useCommandBindings();
 	const [token, setToken] = useState<SlashToken | null>(null);
 	const [position, setPosition] = useState<MenuPosition | null>(null);
 	const [selectedKind, setSelectedKind] =
@@ -297,6 +298,9 @@ export function SlashCommandMenu({
 				<Command.List className="min-h-0 max-h-64 overflow-y-auto p-1">
 					{visibleCommands.map((command) => {
 						const Icon = command.icon;
+						const shortcut = command.shortcut
+							? formatCommandShortcut(command.shortcut, commandBindings)
+							: null;
 						return (
 							<Command.Item
 								key={command.kind}
@@ -322,14 +326,14 @@ export function SlashCommandMenu({
 								<span className="block min-w-0 flex-1 truncate text-foreground">
 									{command.title}
 								</span>
-								{command.shortcut && (
+								{shortcut ? (
 									<span
 										className="shrink-0 text-[10px] leading-none text-muted-foreground/60"
 										aria-hidden="true"
 									>
-										{formatCommandShortcut(command.shortcut)}
+										{shortcut}
 									</span>
-								)}
+								) : null}
 							</Command.Item>
 						);
 					})}

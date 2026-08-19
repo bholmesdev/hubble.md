@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { setCommandBindings } from "@hubble.md/editor";
 import { act, type ReactNode } from "react";
 // @ts-expect-error This package does not ship @types/react-dom; the test only
 // needs createRoot's render/unmount surface.
@@ -23,6 +24,7 @@ afterEach(() => {
 		for (const root of roots) root.unmount();
 	});
 	roots.length = 0;
+	setCommandBindings({});
 	document.body.replaceChildren();
 	vi.restoreAllMocks();
 	vi.useRealTimers();
@@ -92,12 +94,29 @@ describe("Toolbar", () => {
 
 		expect(document.querySelector("input")).toBeInstanceOf(HTMLInputElement);
 	});
+
+	it("updates shortcut hints when bindings change", () => {
+		renderToolbar({ onToggleSidebar: () => {} });
+		const toggle = document.querySelector('[aria-label="Toggle sidebar"]');
+		const defaultTitle = toggle?.getAttribute("title");
+
+		act(() => {
+			setCommandBindings({
+				"app.toggle-sidebar": "CmdOrCtrl+Alt+E",
+			});
+		});
+
+		expect(toggle?.getAttribute("title")).toMatch(/Alt|⌥/);
+		expect(toggle?.getAttribute("title")).not.toBe(defaultTitle);
+	});
 });
 
 function renderToolbar({
 	onMoveWindow,
+	onToggleSidebar,
 }: {
 	onMoveWindow?: (x: number, y: number) => void;
+	onToggleSidebar?: () => void;
 } = {}) {
 	const container = document.createElement("div");
 	document.body.append(container);
@@ -108,6 +127,7 @@ function renderToolbar({
 			<Toolbar
 				currentPath="/workspace/note.md"
 				sidebarOpen={false}
+				onToggleSidebar={onToggleSidebar}
 				onRenameCurrentPath={() => {}}
 				onMoveWindow={onMoveWindow}
 			/>,

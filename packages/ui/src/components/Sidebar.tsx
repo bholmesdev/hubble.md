@@ -15,7 +15,7 @@ import {
 	useSensor,
 	useSensors,
 } from "@dnd-kit/core";
-import { getCommand } from "@hubble.md/editor";
+import { getCommandBinding } from "@hubble.md/editor";
 import { keymatch } from "keymatch";
 import {
 	type CSSProperties,
@@ -50,7 +50,7 @@ import {
 	splitFileName,
 } from "../lib/filePath";
 import { shouldShowFooterDivider } from "../lib/scrollOverflow";
-import { formatCommandShortcut } from "../lib/shortcut";
+import { useCommandShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 import {
@@ -677,9 +677,11 @@ export function Sidebar({
 		for (const folderId of actionable.folders) onDeleteFolder?.(folderId);
 	};
 	const handleTreeKeyDown = (event: React.KeyboardEvent) => {
+		const deleteBinding = getCommandBinding("app.delete");
 		if (
 			!isEditableEventTarget(event.target) &&
-			keymatch(event.nativeEvent, getCommand("app.delete").defaultBinding)
+			deleteBinding &&
+			keymatch(event.nativeEvent, deleteBinding)
 		) {
 			const focusedRow = focusedIndex === null ? null : rows[focusedIndex];
 			const focusedKey = focusedRow ? sidebarRowKey(focusedRow) : null;
@@ -1862,6 +1864,7 @@ function NewFileMenu({
 	onCreateFile: () => void;
 	onCreateHtmlFile?: () => void;
 }) {
+	const newFileShortcut = useCommandShortcut("app.new-file");
 	const [open, setOpen] = useState(false);
 	return (
 		<Menu.Root open={open} onOpenChange={setOpen}>
@@ -1889,7 +1892,7 @@ function NewFileMenu({
 						<ActionItem
 							icon={<MingcuteEditLine />}
 							onClick={onCreateFile}
-							shortcut={formatCommandShortcut("app.new-file")}
+							shortcut={newFileShortcut ?? undefined}
 						>
 							New Note
 						</ActionItem>
@@ -1943,6 +1946,9 @@ function FolderActionsMenu({
 	onTogglePinnedFile?: (path: string) => void;
 	getDisplayPath: (path: string) => string;
 }) {
+	const revealShortcut = useCommandShortcut("app.reveal");
+	const newFileShortcut = useCommandShortcut("app.new-file");
+	const deleteShortcut = useCommandShortcut("app.delete");
 	if (selection.count > 1) {
 		return (
 			<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
@@ -1966,7 +1972,7 @@ function FolderActionsMenu({
 				<ActionItem
 					icon={<MingcuteFolderOpenLine />}
 					onClick={() => onRevealFolder(id)}
-					shortcut={formatCommandShortcut("app.reveal")}
+					shortcut={revealShortcut ?? undefined}
 				>
 					{revealLabel ?? "Reveal in File Manager"}
 				</ActionItem>
@@ -1975,7 +1981,7 @@ function FolderActionsMenu({
 				<ActionItem
 					icon={<MingcuteEditLine />}
 					onClick={() => onCreateFile(id)}
-					shortcut={formatCommandShortcut("app.new-file")}
+					shortcut={newFileShortcut ?? undefined}
 				>
 					New file
 				</ActionItem>
@@ -2008,7 +2014,7 @@ function FolderActionsMenu({
 				<ActionItem
 					destructive
 					icon={<MingcuteDeleteLine />}
-					shortcut={formatCommandShortcut("app.delete")}
+					shortcut={deleteShortcut ?? undefined}
 					onClick={() =>
 						onDeleteSelection
 							? onDeleteSelection({ files: [], folders: [id], count: 1 })
@@ -2056,6 +2062,9 @@ function FileActionsMenu({
 	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	getDisplayPath: (path: string) => string;
 }) {
+	const revealShortcut = useCommandShortcut("app.reveal");
+	const copyPathShortcut = useCommandShortcut("app.copy-path");
+	const deleteShortcut = useCommandShortcut("app.delete");
 	if (selection.count > 1) {
 		return (
 			<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
@@ -2087,7 +2096,7 @@ function FileActionsMenu({
 				<ActionItem
 					icon={<MingcuteFolderOpenLine />}
 					onClick={() => onRevealFile(file.path)}
-					shortcut={formatCommandShortcut("app.reveal")}
+					shortcut={revealShortcut ?? undefined}
 				>
 					{revealLabel ?? "Reveal in File Manager"}
 				</ActionItem>
@@ -2096,7 +2105,7 @@ function FileActionsMenu({
 				<ActionItem
 					icon={<MingcuteCopy2Line />}
 					onClick={() => onCopyFilePath(file.path)}
-					shortcut={formatCommandShortcut("app.copy-path")}
+					shortcut={copyPathShortcut ?? undefined}
 				>
 					Copy file path
 				</ActionItem>
@@ -2121,7 +2130,7 @@ function FileActionsMenu({
 				<ActionItem
 					destructive
 					icon={<MingcuteDeleteLine />}
-					shortcut={formatCommandShortcut("app.delete")}
+					shortcut={deleteShortcut ?? undefined}
 					onClick={() =>
 						onDeleteSelection
 							? onDeleteSelection({ files: [file], folders: [], count: 1 })
@@ -2173,6 +2182,7 @@ function BulkDeleteAction({
 	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	getDisplayPath: (path: string) => string;
 }) {
+	const deleteShortcut = useCommandShortcut("app.delete");
 	const actionable = sidebarDeleteSelection(
 		selection,
 		getDisplayPath,
@@ -2184,7 +2194,7 @@ function BulkDeleteAction({
 		<ActionItem
 			destructive
 			icon={<MingcuteDeleteLine />}
-			shortcut={formatCommandShortcut("app.delete")}
+			shortcut={deleteShortcut ?? undefined}
 			onClick={() => {
 				if (onDeleteSelection) {
 					onDeleteSelection(actionable);
