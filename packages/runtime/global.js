@@ -59,7 +59,20 @@
 			remove: (path) => requestHubble("files.remove", { path }),
 			safeRemove: (path) => safeRequestHubble("files.remove", { path }),
 		},
+		links: {
+			open: (url) => requestHubble("links.open", { url }),
+			safeOpen: (url) => safeRequestHubble("links.open", { url }),
+		},
 	};
+
+	document.addEventListener("click", (event) => {
+		if (event.defaultPrevented) return;
+		const anchor =
+			event.target instanceof Element ? event.target.closest("a[href]") : null;
+		if (!anchor || !/^https?:\/\//i.test(anchor.href)) return;
+		event.preventDefault();
+		safeRequestHubble("links.open", { url: anchor.href });
+	});
 
 	const send = () => {
 		const body = document.body;

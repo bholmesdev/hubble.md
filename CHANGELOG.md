@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- HTML Apps can open external links in the system browser, from plain `<a>` links or the new `hubble.links.open(url)` API. [#262](https://github.com/bholmesdev/hubble.md/issues/262)
+
 ### Changed
 
 ### Fixed
