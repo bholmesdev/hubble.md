@@ -1,6 +1,7 @@
 import {
 	type AppCommandId,
 	getCommand,
+	getCommandBinding,
 	wikiDisplayNameForTarget,
 } from "@hubble.md/editor";
 import {
@@ -9,7 +10,6 @@ import {
 	EditorView,
 	GlobalSearchPalette,
 	getActiveEditor,
-	Input,
 	MarkdownSourceEditor,
 	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
@@ -21,32 +21,21 @@ import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import {
 	recentCommandIdsStore,
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
-import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
-import { ShortcutsSettingsPrototype } from "./components/ShortcutsSettingsPrototype";
+import { Settings } from "./components/Settings";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
-import { SpellcheckSettingsSection } from "./components/SpellcheckSection";
-import {
-	TelemetryConsentCallout,
-	TelemetrySettingsSection,
-} from "./components/TelemetrySection";
+import { TelemetryConsentCallout } from "./components/TelemetrySection";
 import { TerminalPanel } from "./components/TerminalPanel";
 import { Toolbar } from "./components/Toolbar";
-import { SidebarCallout, UpdatesSection } from "./components/UpdatesSection";
+import { SidebarCallout } from "./components/UpdatesSection";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { desktopApi } from "./desktopApi";
-import type {
-	DesktopUpdateState,
-	SpellcheckState,
-	TelemetryChoice,
-	TelemetryConsent,
-} from "./desktopApi/types";
+import type { DesktopUpdateState } from "./desktopApi/types";
 import { createEmbedExtension } from "./editor/EmbedExtension";
 import { handleImageDrop, handleImagePaste } from "./editor/handleImagePaste";
 import { IframeView, toAssetUrl } from "./editor/IframeView";
@@ -81,6 +70,7 @@ import {
 	goForward,
 	handleExternalFileChange,
 	loadPath,
+	loadSettingsState,
 	openChangelog,
 	openWorkspace,
 	openWorkspaceWithSidebar,
@@ -91,12 +81,10 @@ import {
 	reloadFromDiskConflict,
 	requestChatAboutNote,
 	savePathContent,
-	setChatCommand,
-	setCodeFileOpenMode,
 	setLastSeenVersion,
 	setReviewThreads,
 	setSidebarOpen,
-	setThemePreference,
+	setTelemetryConsent,
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
 	toggleTerminal,
@@ -106,12 +94,12 @@ import {
 import { canGoBack, canGoForward } from "./store/history";
 import { useHistoryNav } from "./store/hooks";
 import {
-	chatCommandStore,
-	codeFileOpenModeStore,
 	lastSeenVersionStore,
+	shortcutBindingsStore,
 	sidebarOpenStore,
+	spellcheckStore,
+	telemetryConsentStore,
 	terminalPositionStore,
-	themePreferenceStore,
 	uiStore,
 	type ViewMode,
 	viewerStore,
@@ -204,31 +192,25 @@ async function searchFileContents(query: string) {
 	return { results, truncated };
 }
 
-function hasShortcutsPrototypeQuery() {
-	if (!import.meta.env.DEV) return false;
-	const variant = new URLSearchParams(window.location.search).get("variant");
-	return variant === "sidebar" || variant === "tabs" || variant === "table";
-}
-
 function App() {
 	const state = useStoreValue(viewerStore);
 	const compact = useCompactWindow();
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
+	const shortcutBindings = useStoreValue(shortcutBindingsStore);
 	const hasWorkspace = workspacePath !== null;
 	const { canGoBack: menuCanGoBack, canGoForward: menuCanGoForward } =
 		useHistoryNav();
 	const [scrollContainerEl, setScrollContainerEl] =
 		useState<HTMLDivElement | null>(null);
-	const [settingsOpen, setSettingsOpen] = useState(hasShortcutsPrototypeQuery);
+	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [copyAsMarkdownRequest, setCopyAsMarkdownRequest] = useState(0);
 	const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(
 		null,
 	);
-	const [telemetryConsent, setTelemetryConsent] =
-		useState<TelemetryConsent | null>(null);
-	const [spellcheck, setSpellcheck] = useState<SpellcheckState | null>(null);
+	const telemetryConsent = useStoreValue(telemetryConsentStore);
+	const spellcheck = useStoreValue(spellcheckStore);
 	const [focusedSidebarItem, setFocusedSidebarItem] =
 		useState<DesktopSidebarFocus>(null);
 	const updateFocusedSidebarItem = (next: DesktopSidebarFocus) => {
@@ -318,30 +300,7 @@ function App() {
 		if (currentVersion) setLastSeenVersion(currentVersion);
 	};
 
-	useEffect(() => {
-		void desktopApi.getTelemetryConsent().then(setTelemetryConsent);
-	}, []);
-
-	useEffect(() => {
-		void desktopApi.getSpellcheckState().then(setSpellcheck);
-	}, []);
-
-	const updateSpellcheck = async (request: Promise<void>) => {
-		try {
-			await request;
-			setSpellcheck(await desktopApi.getSpellcheckState());
-		} catch {
-			toast.error("Failed to update spellcheck");
-		}
-	};
-
-	const changeSpellcheckEnabled = (enabled: boolean) => {
-		void updateSpellcheck(desktopApi.setSpellcheckEnabled(enabled));
-	};
-
-	const changeSpellcheckLanguages = (languages: string[]) => {
-		void updateSpellcheck(desktopApi.setSpellcheckLanguages(languages));
-	};
+	useEffect(loadSettingsState, []);
 
 	const spellcheckStatus: SpellcheckStatus | null =
 		spellcheck?.enabled &&
@@ -353,20 +312,6 @@ function App() {
 					openSettings: () => setSettingsOpen(true),
 				}
 			: null;
-
-	const chooseTelemetry = async (choice: TelemetryChoice) => {
-		setTelemetryConsent(await desktopApi.setTelemetryConsent(choice));
-		if (choice !== "enabled") return;
-		// Declining wiped today's record, so re-enabling must record the current
-		// session again; an open HTML file counts as HTML App use.
-		const viewer = viewerStore.get();
-		void desktopApi.recordTelemetryActivity({
-			usedHtmlApp:
-				viewer.status === "ready" &&
-				!!viewer.currentPath &&
-				hasHtmlExtension(viewer.currentPath),
-		});
-	};
 
 	useEffect(() => {
 		// First install has no update to announce; just record the version.
@@ -464,13 +409,18 @@ function App() {
 	]);
 
 	useEffect(() => {
+		void desktopApi.setShortcutBindings(shortcutBindings);
+	}, [shortcutBindings]);
+
+	useEffect(() => {
 		if (!sidebarOpen) setFocusedSidebarItem(null);
 	}, [sidebarOpen]);
 
 	useEffect(() => {
 		const onKeyDown = async (event: KeyboardEvent) => {
 			if (event.defaultPrevented) return;
-			if (keymatch(event, getCommand("app.format-menu").defaultBinding)) {
+			const formatBinding = getCommandBinding("app.format-menu");
+			if (formatBinding && keymatch(event, formatBinding)) {
 				const editor = getActiveEditor();
 				if (editor?.isFocused && !editor.state.selection.empty) return;
 				event.preventDefault();
@@ -517,10 +467,8 @@ function App() {
 				() => void | Promise<void>,
 			][]) {
 				const command = getCommand(id);
-				if (
-					keymatch(event, command.defaultBinding) &&
-					command.isEnabled(context)
-				) {
+				const binding = getCommandBinding(id);
+				if (binding && keymatch(event, binding) && command.isEnabled(context)) {
 					event.preventDefault();
 					await handler();
 					return;
@@ -706,34 +654,6 @@ function App() {
 		};
 	}, []);
 
-	const settingsSections = (
-		<>
-			{updateState ? (
-				<UpdatesSection
-					state={updateState}
-					onPrimaryAction={() => void triggerPrimaryUpdateAction()}
-					onViewChangelog={openWhatsNew}
-				/>
-			) : null}
-			<GeneralSettingsSection />
-			{spellcheck ? (
-				<SpellcheckSettingsSection
-					state={spellcheck}
-					onEnabledChange={changeSpellcheckEnabled}
-					onLanguagesChange={changeSpellcheckLanguages}
-				/>
-			) : null}
-			<CodeFilesSettingsSection />
-			<ChatAboutNoteSettingsSection />
-			{telemetryConsent ? (
-				<TelemetrySettingsSection
-					consent={telemetryConsent}
-					onChoose={(choice) => void chooseTelemetry(choice)}
-				/>
-			) : null}
-		</>
-	);
-
 	return (
 		<main
 			className="flex h-dvh flex-col bg-background text-foreground"
@@ -813,7 +733,7 @@ function App() {
 								/>
 							) : telemetryConsent === "unset" ? (
 								<TelemetryConsentCallout
-									onChoose={(choice) => void chooseTelemetry(choice)}
+									onChoose={(choice) => void setTelemetryConsent(choice)}
 								/>
 							) : undefined
 						}
@@ -881,94 +801,14 @@ function App() {
 				recentCommandIds={recentCommandIds}
 				onRunCommand={recordRecentCommand}
 			/>
-			<SettingsDialog
+			<Settings
 				open={settingsOpen}
 				onOpenChange={setSettingsOpen}
-				className={import.meta.env.DEV ? "max-w-4xl" : undefined}
-			>
-				{import.meta.env.DEV ? (
-					<ShortcutsSettingsPrototype general={settingsSections} />
-				) : (
-					settingsSections
-				)}
-			</SettingsDialog>
+				updateState={updateState}
+				onUpdateAction={() => void triggerPrimaryUpdateAction()}
+				onViewChangelog={openWhatsNew}
+			/>
 		</main>
-	);
-}
-
-function GeneralSettingsSection() {
-	const theme = useStoreValue(themePreferenceStore);
-	return (
-		<SettingsSection title="General" description="Choose the app appearance.">
-			<div className="flex items-center gap-2">
-				{(["light", "dark", "system"] as const).map((preference) => (
-					<Button
-						key={preference}
-						size="sm"
-						variant={theme === preference ? "secondary" : "outline"}
-						aria-pressed={theme === preference}
-						onClick={() => setThemePreference(preference)}
-					>
-						{preference === "system"
-							? "System default"
-							: `${preference[0].toUpperCase()}${preference.slice(1)}`}
-					</Button>
-				))}
-			</div>
-		</SettingsSection>
-	);
-}
-
-function CodeFilesSettingsSection() {
-	const mode = useStoreValue(codeFileOpenModeStore);
-	return (
-		<SettingsSection
-			title="Code files"
-			description="Choose where code files (JavaScript, Python, etc) are opened."
-		>
-			<div className="flex items-center gap-2">
-				<Button
-					size="sm"
-					variant={mode === "hubble" ? "secondary" : "outline"}
-					aria-pressed={mode === "hubble"}
-					onClick={() => setCodeFileOpenMode("hubble")}
-				>
-					Hubble
-				</Button>
-				<Button
-					size="sm"
-					variant={mode === "default-app" ? "secondary" : "outline"}
-					aria-pressed={mode === "default-app"}
-					onClick={() => setCodeFileOpenMode("default-app")}
-				>
-					Default app
-				</Button>
-			</div>
-		</SettingsSection>
-	);
-}
-
-function ChatAboutNoteSettingsSection() {
-	const [draft, setDraft] = useState(() => chatCommandStore.get());
-
-	return (
-		<SettingsSection
-			title="Chat about this note"
-			description={`This command runs in a new terminal when you pick "Chat about this note" from a note's ⋯ menu. The shell replaces $HUBBLE_NOTE_PATH with the current note's file path.`}
-		>
-			<div className="relative">
-				<Input
-					className="font-mono pe-8"
-					spellCheck={false}
-					value={draft}
-					onChange={(event) => {
-						setDraft(event.currentTarget.value);
-						setChatCommand(event.currentTarget.value);
-					}}
-				/>
-				<MingcutePencilLine className="pointer-events-none absolute end-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/60" />
-			</div>
-		</SettingsSection>
 	);
 }
 
