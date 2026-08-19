@@ -68,7 +68,7 @@ describe("HTML app external links", () => {
 		desktopApi.openExternalUrl.mockResolvedValue(undefined);
 	});
 
-	const openLink = (url: unknown) =>
+	const openLink = (url: string | number) =>
 		handleHtmlAppRequest(
 			{ type: "hubble:request", id: 1, method: "links.open", params: { url } },
 			workspacePath,
@@ -102,7 +102,7 @@ describe("HTML app external links", () => {
 		expect(desktopApi.openExternalUrl).not.toHaveBeenCalled();
 	});
 
-	it("keeps rejecting unknown methods", async () => {
+	it("rejects unknown methods", async () => {
 		const response = await handleHtmlAppRequest(
 			{ type: "hubble:request", id: 1, method: "links.close", params: {} },
 			workspacePath,
