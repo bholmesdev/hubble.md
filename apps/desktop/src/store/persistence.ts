@@ -1,3 +1,4 @@
+import { type CommandBindings, cleanCommandBindings } from "@hubble.md/editor";
 import type { ThemePreference } from "../theme";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
 import {
@@ -33,6 +34,7 @@ type SettingsState = {
 	chatCommand: string;
 	codeFileOpenMode: CodeFileOpenMode;
 	lastSeenVersion: string | null;
+	shortcutBindings: CommandBindings;
 	theme: ThemePreference;
 };
 
@@ -62,6 +64,7 @@ type Persisted = {
 		chatCommand?: string;
 		codeFileOpenMode?: CodeFileOpenMode;
 		lastSeenVersion?: string | null;
+		shortcutBindings?: unknown;
 		theme?: ThemePreference;
 	};
 };
@@ -130,6 +133,7 @@ export function getInitialState(): DesktopState {
 					: p
 						? ""
 						: null,
+			shortcutBindings: cleanCommandBindings(p?.settings?.shortcutBindings),
 			theme:
 				p?.settings?.theme === "light" || p?.settings?.theme === "dark"
 					? p.settings.theme
@@ -158,6 +162,7 @@ export function serialize(state: DesktopState): Persisted {
 			chatCommand: state.settings.chatCommand,
 			codeFileOpenMode: state.settings.codeFileOpenMode,
 			lastSeenVersion: state.settings.lastSeenVersion,
+			shortcutBindings: state.settings.shortcutBindings,
 			theme: state.settings.theme,
 		},
 	};

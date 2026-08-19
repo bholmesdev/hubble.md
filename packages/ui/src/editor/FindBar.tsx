@@ -1,6 +1,6 @@
 import {
 	type FindState,
-	getCommand,
+	getCommandBinding,
 	getFindState,
 	selectFindMatch,
 } from "@hubble.md/editor";
@@ -108,7 +108,8 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 					}
 					return;
 				}
-				if (!keymatch(event, getCommand("app.find").defaultBinding)) return;
+				const binding = getCommandBinding("app.find");
+				if (!binding || !keymatch(event, binding)) return;
 				if (!editor?.isFocused && !open) return;
 				event.preventDefault();
 				openFind();

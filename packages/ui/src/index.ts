@@ -73,7 +73,13 @@ export {
 	scoreCommand,
 	stripCommandPrefix,
 } from "./lib/paletteCommand";
-export { formatCommandShortcut, formatShortcut } from "./lib/shortcut";
+export {
+	formatCommandShortcut,
+	formatShortcut,
+	useCommandBindings,
+	useCommandShortcut,
+	useCommandShortcutLabel,
+} from "./lib/shortcut";
 export { Button, buttonVariants } from "./primitives/button";
 export { Input } from "./primitives/input";
 export { Modal } from "./primitives/modal";

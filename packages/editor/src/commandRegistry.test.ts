@@ -1,9 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	cleanCommandBindings,
 	commandRegistry,
+	findCommandBindingConflicts,
 	getCommand,
+	getCommandBinding,
+	getCommandBindings,
+	resolveCommandBinding,
+	setCommandBindings,
+	subscribeCommandBindings,
 	tiptapBinding,
 } from "./commandRegistry.js";
+
+afterEach(() => setCommandBindings({}));
 
 describe("commandRegistry", () => {
 	it("owns unique bindings for every command", () => {
@@ -35,5 +44,56 @@ describe("commandRegistry", () => {
 	it("converts shared bindings to TipTap syntax", () => {
 		expect(tiptapBinding("editor.heading-1")).toBe("Mod-Alt-1");
 		expect(tiptapBinding("editor.strike")).toBe("Mod-Shift-x");
+	});
+
+	it("resolves custom and disabled bindings", () => {
+		setCommandBindings({
+			"app.new-file": "CmdOrCtrl+Alt+N",
+			"editor.bold": null,
+		});
+
+		expect(getCommandBinding("app.new-file")).toBe("CmdOrCtrl+Alt+N");
+		expect(getCommandBinding("editor.bold")).toBeNull();
+		expect(getCommandBinding("app.settings")).toBe("CmdOrCtrl+,");
+		expect(tiptapBinding("editor.bold")).toBeNull();
+	});
+
+	it("keeps conflicting bindings but activates the first command", () => {
+		setCommandBindings({ "app.settings": "CmdOrCtrl+N" });
+
+		expect(resolveCommandBinding("app.settings", getCommandBindings())).toBe(
+			"CmdOrCtrl+N",
+		);
+		expect(
+			findCommandBindingConflicts("app.settings", getCommandBindings()),
+		).toEqual(["app.new-file"]);
+		expect(getCommandBinding("app.new-file")).toBe("CmdOrCtrl+N");
+		expect(getCommandBinding("app.settings")).toBeNull();
+	});
+
+	it("drops unknown, invalid, and default persisted values", () => {
+		expect(
+			cleanCommandBindings({
+				"app.new-file": "CmdOrCtrl+N",
+				"app.settings": null,
+				"editor.bold": 42,
+				"missing.command": "CmdOrCtrl+M",
+			}),
+		).toEqual({ "app.settings": null });
+		expect(
+			resolveCommandBinding("app.settings", { "app.settings": null }),
+		).toBeNull();
+	});
+
+	it("notifies binding subscribers", () => {
+		const listener = vi.fn();
+		const unsubscribe = subscribeCommandBindings(listener);
+
+		setCommandBindings({ "app.settings": null });
+		expect(listener).toHaveBeenCalledOnce();
+
+		unsubscribe();
+		setCommandBindings({});
+		expect(listener).toHaveBeenCalledOnce();
 	});
 });

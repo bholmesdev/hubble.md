@@ -1,4 +1,8 @@
-import { formatCommandShortcut, WorkspaceSwitcherMenu } from "@hubble.md/ui";
+import {
+	useCommandShortcut,
+	useCommandShortcutLabel,
+	WorkspaceSwitcherMenu,
+} from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
@@ -19,6 +23,10 @@ export function WorkspaceSwitcher() {
 	const workspacePath = useStoreValue(workspacePathStore);
 	const recentWorkspaces = useStoreValue(recentWorkspacesStore);
 	const open = useStoreValue(switcherOpenStore);
+	const title = useCommandShortcutLabel(
+		workspacePath ? tildePath(workspacePath) : "",
+		"app.open-recent",
+	);
 	if (!workspacePath) return null;
 	const workspaceName = basename(workspacePath);
 	const others = recentWorkspaces.filter((p) => p !== workspacePath);
@@ -27,7 +35,7 @@ export function WorkspaceSwitcher() {
 	return (
 		<WorkspaceSwitcherMenu
 			label={workspaceName}
-			title={`${tildePath(workspacePath)} (${formatCommandShortcut("app.open-recent")})`}
+			title={title}
 			open={open}
 			onOpenChange={setWorkspaceSwitcherOpen}
 		>
@@ -98,13 +106,20 @@ export function WorkspaceSwitcher() {
 				onClick={() => void openWorkspace()}
 			>
 				<span className="flex-1">Add folder...</span>
-				<span
-					className="ms-auto shrink-0 text-[11px] leading-none text-muted-foreground/60"
-					aria-hidden="true"
-				>
-					{formatCommandShortcut("app.open-folder")}
-				</span>
+				<ShortcutHint id="app.open-folder" />
 			</WorkspaceSwitcherMenu.Item>
 		</WorkspaceSwitcherMenu>
 	);
+}
+
+function ShortcutHint({ id }: { id: "app.open-folder" }) {
+	const shortcut = useCommandShortcut(id);
+	return shortcut ? (
+		<span
+			className="ms-auto shrink-0 text-[11px] leading-none text-muted-foreground/60"
+			aria-hidden="true"
+		>
+			{shortcut}
+		</span>
+	) : null;
 }

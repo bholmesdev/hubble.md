@@ -19,6 +19,12 @@ type MockDesktopApi = {
 	openPathInDefaultApp: ReturnType<typeof vi.fn>;
 	sidebarDeltaForPath: ReturnType<typeof vi.fn>;
 	setThemeSource: ReturnType<typeof vi.fn>;
+	getTelemetryConsent: ReturnType<typeof vi.fn>;
+	setTelemetryConsent: ReturnType<typeof vi.fn>;
+	recordTelemetryActivity: ReturnType<typeof vi.fn>;
+	getSpellcheckState: ReturnType<typeof vi.fn>;
+	setSpellcheckEnabled: ReturnType<typeof vi.fn>;
+	setSpellcheckLanguages: ReturnType<typeof vi.fn>;
 };
 
 function createDesktopApi(): MockDesktopApi {
@@ -41,6 +47,17 @@ function createDesktopApi(): MockDesktopApi {
 		openPathInDefaultApp: vi.fn(async () => {}),
 		sidebarDeltaForPath: vi.fn(async () => null),
 		setThemeSource: vi.fn(async () => {}),
+		getTelemetryConsent: vi.fn(async () => "unset"),
+		setTelemetryConsent: vi.fn(async (choice) => choice),
+		recordTelemetryActivity: vi.fn(async () => {}),
+		getSpellcheckState: vi.fn(async () => ({
+			enabled: true,
+			languages: ["en-US"],
+			availableLanguages: ["en-US", "fr"],
+			systemLanguage: "en-US",
+		})),
+		setSpellcheckEnabled: vi.fn(async () => {}),
+		setSpellcheckLanguages: vi.fn(async () => {}),
 	};
 }
 
@@ -121,6 +138,64 @@ describe("desktop savePathContent", () => {
 			STORAGE_KEY,
 			expect.stringContaining('"chatCommand":"codex exec"'),
 		);
+	});
+
+	it("hydrates and persists shortcut bindings", async () => {
+		const api = createDesktopApi();
+		const persisted = JSON.stringify({
+			settings: {
+				shortcutBindings: {
+					"app.new-file": "CmdOrCtrl+Alt+N",
+					"missing.command": "CmdOrCtrl+M",
+				},
+			},
+		});
+		const { resetShortcutBindings, setShortcutBinding, shortcutBindingsStore } =
+			await loadStoreActions(api, persisted);
+		const { getCommandBinding } = await import("@hubble.md/editor");
+		const { STORAGE_KEY } = await import("./persistence");
+
+		expect(shortcutBindingsStore.get()).toEqual({
+			"app.new-file": "CmdOrCtrl+Alt+N",
+		});
+		expect(getCommandBinding("app.new-file")).toBe("CmdOrCtrl+Alt+N");
+
+		setShortcutBinding("app.settings", null);
+		expect(getCommandBinding("app.settings")).toBeNull();
+		expect(localStorage.setItem).toHaveBeenLastCalledWith(
+			STORAGE_KEY,
+			expect.stringContaining('"app.settings":null'),
+		);
+
+		resetShortcutBindings();
+		expect(shortcutBindingsStore.get()).toEqual({});
+		expect(getCommandBinding("app.new-file")).toBe("CmdOrCtrl+N");
+	});
+
+	it("shares desktop settings state across consumers", async () => {
+		const api = createDesktopApi();
+		const {
+			loadSettingsState,
+			setSpellcheckEnabled,
+			setSpellcheckLanguages,
+			setTelemetryConsent,
+			spellcheckStore,
+			telemetryConsentStore,
+		} = await loadStoreActions(api);
+
+		loadSettingsState();
+		await vi.waitFor(() => {
+			expect(telemetryConsentStore.get()).toBe("unset");
+			expect(spellcheckStore.get()?.languages).toEqual(["en-US"]);
+		});
+
+		await setSpellcheckEnabled(false);
+		await setSpellcheckLanguages(["fr"]);
+		await setTelemetryConsent("declined");
+
+		expect(api.setSpellcheckEnabled).toHaveBeenCalledWith(false);
+		expect(api.setSpellcheckLanguages).toHaveBeenCalledWith(["fr"]);
+		expect(telemetryConsentStore.get()).toBe("declined");
 	});
 
 	it("mirrors the theme preference to the native theme source", async () => {

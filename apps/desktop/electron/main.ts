@@ -3,7 +3,13 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { type AppCommandId, getCommand } from "@hubble.md/editor/commands";
+import {
+	type AppCommandId,
+	type CommandBindings,
+	getCommand,
+	getCommandBinding,
+	setCommandBindings,
+} from "@hubble.md/editor/commands";
 import hubbleRuntime from "@hubble.md/runtime/global.js?raw";
 import htmlAppTheme from "@hubble.md/runtime/html-app-theme.css?raw";
 import tailwindRuntime from "@tailwindcss/browser?raw";
@@ -785,7 +791,6 @@ type TextContextMenuItem =
 	| {
 			id: "copy-as-markdown";
 			label: string;
-			accelerator?: string;
 			flag: keyof Electron.EditFlags;
 			click: (webContents: Electron.WebContents) => void;
 	  };
@@ -796,7 +801,6 @@ const textContextMenuItems: TextContextMenuItem[] = [
 	{
 		id: "copy-as-markdown",
 		label: getCommand("app.copy-as-markdown").label,
-		accelerator: getCommand("app.copy-as-markdown").defaultBinding,
 		flag: "canCopy",
 		click: (webContents) => {
 			webContents.send("desktop:menu-copy-as-markdown");
@@ -849,7 +853,7 @@ function buildTextContextMenu(
 				: {
 						id: item.id,
 						label: item.label,
-						accelerator: item.accelerator,
+						accelerator: getCommandBinding("app.copy-as-markdown") ?? undefined,
 						enabled: params.editFlags[item.flag],
 						click: () => item.click(webContents),
 					},
@@ -877,7 +881,7 @@ function commandMenuItem(
 	return {
 		id,
 		label: command.label,
-		accelerator: command.defaultBinding,
+		accelerator: getCommandBinding(id) ?? undefined,
 		enabled: command.isEnabled(menuState),
 		click,
 	};
@@ -1951,6 +1955,14 @@ function registerIpc() {
 		};
 		buildMenu();
 	});
+
+	ipcMain.handle(
+		"desktop:set-shortcut-bindings",
+		(_event, bindings: CommandBindings) => {
+			setCommandBindings(bindings);
+			buildMenu();
+		},
+	);
 }
 
 protocol.registerSchemesAsPrivileged([

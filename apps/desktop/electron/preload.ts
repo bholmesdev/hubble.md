@@ -115,6 +115,8 @@ const desktopApi = {
 	setSpellcheckLanguages: (languages) =>
 		ipcRenderer.invoke("desktop:set-spellcheck-languages", { languages }),
 	setMenuState: (state) => ipcRenderer.invoke("desktop:set-menu-state", state),
+	setShortcutBindings: (bindings) =>
+		ipcRenderer.invoke("desktop:set-shortcut-bindings", bindings),
 	getUpdateState: () => ipcRenderer.invoke("desktop:get-update-state"),
 	getTelemetryConsent: () =>
 		ipcRenderer.invoke("desktop:get-telemetry-consent"),

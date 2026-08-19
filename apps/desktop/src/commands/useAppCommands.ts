@@ -1,6 +1,7 @@
 import {
 	type CommandId,
 	getCommand,
+	getCommandBinding,
 	type CommandContext as RegistryContext,
 } from "@hubble.md/editor";
 import {
@@ -111,7 +112,7 @@ function defineCommands(
 			label: options?.label ?? command.label,
 			group,
 			keywords,
-			binding: command.defaultBinding,
+			binding: getCommandBinding(id) ?? undefined,
 			globalShortcut: options?.globalShortcut ?? true,
 			isEnabled: options?.isEnabled ?? (() => command.isEnabled(registry)),
 			run,

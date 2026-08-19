@@ -198,14 +198,103 @@ export const commandRegistry = {
 export type CommandId = keyof typeof commandRegistry;
 export type AppCommandId = Extract<CommandId, `app.${string}`>;
 export type EditorCommandId = Extract<CommandId, `editor.${string}`>;
+export type CommandBindings = Partial<Record<CommandId, string | null>>;
+
+let commandBindings: CommandBindings = {};
+const bindingListeners = new Set<() => void>();
+const commandIds = Object.keys(commandRegistry) as CommandId[];
+const bindingPartOrder = ["CmdOrCtrl", "Ctrl", "Alt", "Shift", "Super"];
+const bindingParts = new Set(bindingPartOrder);
 
 export function getCommand<Id extends CommandId>(id: Id) {
 	return commandRegistry[id];
 }
 
+export function getCommandBinding(id: CommandId) {
+	const binding = resolveCommandBinding(id, commandBindings);
+	if (!binding) return binding;
+	const bindingKey = sortCommandBinding(binding);
+	for (const commandId of commandIds) {
+		if (commandId === id) return binding;
+		const otherBinding = resolveCommandBinding(commandId, commandBindings);
+		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
+			return null;
+		}
+	}
+	return binding;
+}
+
+export function resolveCommandBinding(
+	id: CommandId,
+	bindings: CommandBindings,
+) {
+	return bindings[id] === undefined
+		? getCommand(id).defaultBinding
+		: bindings[id];
+}
+
+export function findCommandBindingConflicts(
+	id: CommandId,
+	bindings: CommandBindings,
+) {
+	const binding = resolveCommandBinding(id, bindings);
+	if (!binding) return [];
+	const bindingKey = sortCommandBinding(binding);
+	return commandIds.filter((commandId) => {
+		if (commandId === id) return false;
+		const otherBinding = resolveCommandBinding(commandId, bindings);
+		return (
+			otherBinding !== null && sortCommandBinding(otherBinding) === bindingKey
+		);
+	});
+}
+
+export function sortCommandBinding(binding: string) {
+	const parts = binding.split("+");
+	const modifiers = bindingPartOrder.filter((part) => parts.includes(part));
+	const keys = parts.filter((part) => !bindingParts.has(part));
+	return [...modifiers, ...keys].join("+");
+}
+
+export function setCommandBindings(bindings: CommandBindings) {
+	commandBindings = cleanCommandBindings(bindings);
+	for (const listener of bindingListeners) listener();
+}
+
+export function getCommandBindings() {
+	return commandBindings;
+}
+
+export function subscribeCommandBindings(listener: () => void) {
+	bindingListeners.add(listener);
+	return () => {
+		bindingListeners.delete(listener);
+	};
+}
+
+export function cleanCommandBindings(value: unknown): CommandBindings {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+	const bindings: CommandBindings = {};
+	for (const [id, binding] of Object.entries(value)) {
+		if (!(id in commandRegistry)) continue;
+		if (binding !== null && (typeof binding !== "string" || !binding)) continue;
+		const commandId = id as CommandId;
+		if (binding !== getCommand(commandId).defaultBinding) {
+			bindings[commandId] = binding;
+		}
+	}
+	return bindings;
+}
+
 export function tiptapBinding(id: EditorCommandId) {
-	return getCommand(id)
-		.defaultBinding.replace("CmdOrCtrl", "Mod")
+	const binding = getCommandBinding(id);
+	return binding ? toTiptapBinding(binding) : null;
+}
+
+export function toTiptapBinding(binding: string) {
+	return binding
+		.replace("CmdOrCtrl", "Mod")
 		.split("+")
 		.map((part) => (/^[A-Z]$/.test(part) ? part.toLowerCase() : part))
 		.join("-");
