@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { formatShortcut } from "@hubble.md/ui";
 import { describe, expect, it } from "vitest";
 
 Object.defineProperty(window, "desktopApi", { value: {} });
@@ -19,9 +20,29 @@ describe("filterShortcutGroups", () => {
 		expect(filterShortcutGroups("no such shortcut")).toEqual([]);
 	});
 
+	it("matches current bindings in raw and display form", () => {
+		const bindings = { "app.new-file": "CmdOrCtrl+Alt+N" } as const;
+
+		expect(
+			filterShortcutGroups("CmdOrCtrl+Alt+N", bindings)[0]?.commands[0]?.id,
+		).toBe("app.new-file");
+		expect(
+			filterShortcutGroups(formatShortcut("CmdOrCtrl+Alt+N"), bindings)[0]
+				?.commands[0]?.id,
+		).toBe("app.new-file");
+	});
+
 	it("does not mark reordered registry modifiers as custom", () => {
-		expect(isShortcutCustomized("app.toggle-source-mode", {})).toBe(false);
-		expect(isShortcutCustomized("app.copy-as-markdown", {})).toBe(false);
+		expect(
+			isShortcutCustomized("app.toggle-source-mode", {
+				"app.toggle-source-mode": "CmdOrCtrl+Alt+U",
+			}),
+		).toBe(false);
+		expect(
+			isShortcutCustomized("app.toggle-source-mode", {
+				"app.toggle-source-mode": null,
+			}),
+		).toBe(true);
 	});
 });
 

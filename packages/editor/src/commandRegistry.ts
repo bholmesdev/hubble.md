@@ -256,6 +256,14 @@ export function sortCommandBinding(binding: string) {
 	return [...modifiers, ...keys].join("+");
 }
 
+export function isDefaultCommandBinding(id: CommandId, binding: string | null) {
+	return (
+		binding !== null &&
+		sortCommandBinding(binding) ===
+			sortCommandBinding(getCommand(id).defaultBinding)
+	);
+}
+
 export function setCommandBindings(bindings: CommandBindings) {
 	commandBindings = cleanCommandBindings(bindings);
 	for (const listener of bindingListeners) listener();
@@ -280,7 +288,7 @@ export function cleanCommandBindings(value: unknown): CommandBindings {
 		if (!(id in commandRegistry)) continue;
 		if (binding !== null && (typeof binding !== "string" || !binding)) continue;
 		const commandId = id as CommandId;
-		if (binding !== getCommand(commandId).defaultBinding) {
+		if (!isDefaultCommandBinding(commandId, binding)) {
 			bindings[commandId] = binding;
 		}
 	}

@@ -14,7 +14,8 @@ export function SettingsDialog({
 	className?: string;
 	children: ReactNode;
 }) {
-	const [scrolled, setScrolled] = useState(false);
+	const [scrollState, setScrollState] = useState({ title, scrolled: false });
+	const scrolled = scrollState.title === title && scrollState.scrolled;
 
 	return (
 		<Modal
@@ -37,7 +38,10 @@ export function SettingsDialog({
 			<div
 				className="contents"
 				onScrollCapture={(event) =>
-					setScrolled((event.target as HTMLElement).scrollTop > 0)
+					setScrollState({
+						title,
+						scrolled: (event.target as HTMLElement).scrollTop > 0,
+					})
 				}
 			>
 				{children}

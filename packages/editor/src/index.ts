@@ -11,6 +11,7 @@ export {
 	getCommand,
 	getCommandBinding,
 	getCommandBindings,
+	isDefaultCommandBinding,
 	resolveCommandBinding,
 	setCommandBindings,
 	sortCommandBinding,

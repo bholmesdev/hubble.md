@@ -249,7 +249,7 @@ function ChatSettings() {
 
 function ShortcutSettings() {
 	const state = useShortcutState();
-	const groups = filterShortcutGroups(state.query);
+	const groups = filterShortcutGroups(state.query, state.bindings);
 
 	return (
 		<div className="p-4">

@@ -170,6 +170,9 @@ describe("desktop savePathContent", () => {
 		resetShortcutBindings();
 		expect(shortcutBindingsStore.get()).toEqual({});
 		expect(getCommandBinding("app.new-file")).toBe("CmdOrCtrl+N");
+
+		setShortcutBinding("app.toggle-source-mode", "CmdOrCtrl+Alt+U");
+		expect(shortcutBindingsStore.get()).toEqual({});
 	});
 
 	it("shares desktop settings state across consumers", async () => {

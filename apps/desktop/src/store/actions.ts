@@ -1,7 +1,7 @@
 import {
 	type CommandBindings,
 	type CommandId,
-	getCommand,
+	isDefaultCommandBinding,
 	setCommandBindings,
 } from "@hubble.md/editor";
 import type { ReviewThread } from "@hubble.md/ui";
@@ -613,7 +613,7 @@ export async function setTelemetryConsent(choice: TelemetryChoice) {
 
 export function setShortcutBinding(id: CommandId, binding: string | null) {
 	const next = { ...shortcutBindingsStore.get() };
-	if (binding === getCommand(id).defaultBinding) {
+	if (isDefaultCommandBinding(id, binding)) {
 		delete next[id];
 	} else {
 		next[id] = binding;

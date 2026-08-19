@@ -6,6 +6,7 @@ import {
 	getCommand,
 	getCommandBinding,
 	getCommandBindings,
+	isDefaultCommandBinding,
 	resolveCommandBinding,
 	setCommandBindings,
 	subscribeCommandBindings,
@@ -75,11 +76,15 @@ describe("commandRegistry", () => {
 		expect(
 			cleanCommandBindings({
 				"app.new-file": "CmdOrCtrl+N",
+				"app.toggle-source-mode": "CmdOrCtrl+Alt+U",
 				"app.settings": null,
 				"editor.bold": 42,
 				"missing.command": "CmdOrCtrl+M",
 			}),
 		).toEqual({ "app.settings": null });
+		expect(
+			isDefaultCommandBinding("app.toggle-source-mode", "CmdOrCtrl+Alt+U"),
+		).toBe(true);
 		expect(
 			resolveCommandBinding("app.settings", { "app.settings": null }),
 		).toBeNull();

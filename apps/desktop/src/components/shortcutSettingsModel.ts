@@ -3,6 +3,7 @@ import {
 	type CommandId,
 	commandRegistry,
 	getCommand,
+	isDefaultCommandBinding,
 	resolveCommandBinding,
 	sortCommandBinding,
 } from "@hubble.md/editor";
@@ -64,14 +65,18 @@ export const shortcutCommands = (
 	};
 });
 
-export function filterShortcutGroups(query: string) {
+export function filterShortcutGroups(
+	query: string,
+	bindings: CommandBindings = {},
+) {
 	const needle = query.trim().toLocaleLowerCase();
 	const filtered = needle
-		? shortcutCommands.filter((command) =>
-				`${command.label} ${command.description} ${command.id} ${command.area}`
+		? shortcutCommands.filter((command) => {
+				const binding = resolveCommandBinding(command.id, bindings);
+				return `${command.label} ${command.description} ${command.id} ${command.area} ${binding ?? ""} ${binding ? formatShortcut(binding) : ""}`
 					.toLocaleLowerCase()
-					.includes(needle),
-			)
+					.includes(needle);
+			})
 		: shortcutCommands;
 
 	return (["App", "Editor"] as const).flatMap((area) => {
@@ -81,7 +86,7 @@ export function filterShortcutGroups(query: string) {
 }
 
 export function isShortcutCustomized(id: CommandId, bindings: CommandBindings) {
-	return resolveCommandBinding(id, bindings) !== getCommand(id).defaultBinding;
+	return !isDefaultCommandBinding(id, resolveCommandBinding(id, bindings));
 }
 
 const commonFixedBindings = bindingSet([
