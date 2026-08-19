@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Customize keyboard shortcuts from Settings. Thanks [@Mamdouh66](https://github.com/Mamdouh66)! [#204](https://github.com/bholmesdev/hubble.md/pull/204)
+
 ### Changed
 
 ### Fixed
