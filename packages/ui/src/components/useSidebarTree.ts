@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { z } from "zod/v4";
 import { fileNameFromPath, normalizeDisplayPath } from "../lib/filePath";
 
@@ -106,6 +106,10 @@ export function useSidebarTree({
 		expandedFolders,
 		uncompactFolderId,
 	});
+	const folderIds = getFolderIds(tree, uncompactFolderId);
+	const hasExpandedFolders = rows.some(
+		(row) => row.kind === "folder" && row.expanded,
+	);
 
 	useEffect(() => {
 		if (!highlightPath || revealedPathRef.current === highlightPath) return;
@@ -147,8 +151,24 @@ export function useSidebarTree({
 	const collapseFolder = (id: string) => setExpanded(id, false);
 	const toggleFolder = (id: string) =>
 		setExpanded(id, !expandedFolders.has(id));
+	const toggleAllFolders = () => {
+		startTransition(() => {
+			setExpandedState({
+				key: storageKey,
+				folders: hasExpandedFolders ? new Set() : new Set(folderIds),
+			});
+		});
+	};
 
-	return { collapseFolder, expandFolder, rows, toggleFolder };
+	return {
+		collapseFolder,
+		expandFolder,
+		hasExpandedFolders,
+		hasFolders: folderIds.length > 0,
+		rows,
+		toggleAllFolders,
+		toggleFolder,
+	};
 }
 
 function makeFolder(id: string, name: string): FolderNode {
@@ -210,6 +230,19 @@ function ensureFolder(parent: FolderNode, name: string): FolderNode {
 		parent.folders.set(name, folder);
 	}
 	return folder;
+}
+
+function getFolderIds(tree: FolderNode, uncompactFolderId: string | null) {
+	const ids: string[] = [];
+	const walk = (folder: FolderNode) => {
+		for (const child of folder.folders.values()) {
+			const compacted = compactFolder(child, uncompactFolderId);
+			for (const segment of compacted.segments) ids.push(segment.id);
+			walk(compacted.folder);
+		}
+	};
+	walk(tree);
+	return ids;
 }
 
 export function flattenRows({
