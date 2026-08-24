@@ -33,6 +33,8 @@ lowlight.registerAlias({
 	xml: ["html"],
 	bash: ["sh", "shell"],
 	markdown: ["md"],
+	sql: ["sql"],
+	mk: ["mk"],
 });
 
 export const HubbleCodeBlock = CodeBlockLowlight.extend({
@@ -238,4 +240,6 @@ const codeBlockLanguages = [
 	{ value: "python", label: "Python" },
 	{ value: "rust", label: "Rust" },
 	{ value: "go", label: "Go" },
+	{ value: "sql", label: "SQL" },
+	{ value: "mk", label: "Makefile" },
 ] as const;
