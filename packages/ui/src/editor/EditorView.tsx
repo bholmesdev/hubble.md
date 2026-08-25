@@ -170,6 +170,7 @@ export function EditorView({
 
 	const editor = useEditor({
 		editable,
+		textDirection: "auto",
 		extensions: [
 			...starterKitWithRegistryShortcuts({
 				code: false,
