@@ -742,8 +742,9 @@ describe("desktop renameMarkdownFile", () => {
 			},
 		}));
 
-		await renameMarkdownFile(path, "renamed");
+		const renamedPath = await renameMarkdownFile(path, "renamed");
 
+		expect(renamedPath).toBe("/workspace/renamed.md");
 		expect(api.renameFile).toHaveBeenCalledWith(path, "/workspace/renamed.md");
 		expect(api.readFileText).toHaveBeenLastCalledWith("/workspace/renamed.md");
 		expect(viewerStore.get().currentPath).toBe("/workspace/renamed.md");

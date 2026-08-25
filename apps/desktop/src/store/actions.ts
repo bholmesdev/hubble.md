@@ -926,18 +926,19 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 	const { files: filesBeforeRename, workspacePath } = workspaceStore.get();
 
 	const trimmedName = nextName.trim();
-	if (trimmedName.length === 0) return;
+	if (trimmedName.length === 0) return null;
 
 	const parent = dirname(path);
-	if (!parent) return;
+	if (!parent) return null;
 
 	const proposedStem = renameStem(trimmedName, currentExt);
 	const nextNameWithExt = `${proposedStem}${currentExt}`;
 	// Slash paths are relative to the current file's folder, matching sidebar
 	// rename behavior for nested notes.
 	const nextPath = normalizePath(joinPath(parent, nextNameWithExt));
-	if (!isSafeRelativeRenamePath(trimmedName, nextPath, workspacePath)) return;
-	if (nextPath === path) return;
+	if (!isSafeRelativeRenamePath(trimmedName, nextPath, workspacePath))
+		return null;
+	if (nextPath === path) return path;
 
 	try {
 		if (isCurrentFile && isEditableFile(path)) {
@@ -987,10 +988,12 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 			// Path rewrite already updated history; reload content without a new visit.
 			await loadPath(nextPath, { history: "none", launchExternal: false });
 		}
+		return nextPath;
 	} catch (err) {
 		pendingRenames.delete(path);
 		const message = handleFileError(err);
 		toast.error("Failed to rename file", { description: message });
+		return null;
 	} finally {
 		window.setTimeout(() => pendingRenames.delete(path), 1000);
 	}
