@@ -2,6 +2,7 @@ import type { Editor } from "@tiptap/core";
 import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useLayoutEffect, useRef } from "react";
+import { EmptyBlockDirectionExtension } from "./EmptyBlockDirectionExtension";
 import {
 	flushPendingSave,
 	type PendingSave,
@@ -76,6 +77,7 @@ export function PlainTextEditor({
 				trailingNode: false,
 				underline: false,
 			}),
+			EmptyBlockDirectionExtension,
 		],
 		content: plainTextDocFromText(initialText),
 		onUpdate: ({ editor: current }) => {

@@ -29,6 +29,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { clearActiveEditor, setActiveEditor } from "./activeEditor";
 import { CODE_BLOCK_COPY_EVENT, HubbleCodeBlock } from "./CodeBlockExtension";
 import { copySelectionAsMarkdown } from "./copyAsMarkdown";
+import { EmptyBlockDirectionExtension } from "./EmptyBlockDirectionExtension";
 import { LinkClickExtension } from "./LinkClickExtension";
 import { LinkCreationGhostExtension } from "./LinkCreationGhostExtension";
 import { LinkPopover, type WikiTarget } from "./LinkPopover";
@@ -189,6 +190,7 @@ export function EditorView({
 			}),
 			LinkCreationGhostExtension,
 			ContextMenuSpellcheckExtension,
+			EmptyBlockDirectionExtension,
 			FakeSelectionExtension,
 			FindExtension,
 			HeadingExtension,
