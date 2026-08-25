@@ -107,6 +107,68 @@
 	margin-inline-start: 1.3rem;
 }
 
+/* dir=auto resolves each text block. Match its structural parent so markers,
+ * checkboxes, and quote borders use the same side. */
+[data-hubble-editor]
+	.ProseMirror
+	:is(
+		blockquote:has(> :first-child:dir(ltr)),
+		li:has(> div > :first-child:dir(ltr))
+	) {
+	direction: ltr;
+}
+
+[data-hubble-editor]
+	.ProseMirror
+	:is(
+		blockquote:has(> :first-child:dir(rtl)),
+		li:has(> div > :first-child:dir(rtl))
+	) {
+	direction: rtl;
+}
+
+/* Keep an empty new block on the previous block's side until its first strong
+ * character lets dir=auto resolve its own direction. */
+[data-hubble-editor]
+	.ProseMirror
+	:is(
+		:dir(ltr) + p:has(> br.ProseMirror-trailingBreak:only-child),
+		:is(
+				blockquote:has(> :last-child:dir(ltr)),
+				:is(ul, ol):has(> li:last-child > div > :first-child:dir(ltr))
+			)
+			+ p:has(> br.ProseMirror-trailingBreak:only-child),
+		li:has(> div > :first-child:dir(ltr))
+			+ li:has(> div > p > br.ProseMirror-trailingBreak:only-child)
+	) {
+	direction: ltr;
+}
+
+[data-hubble-editor]
+	.ProseMirror
+	:is(
+		:dir(rtl) + p:has(> br.ProseMirror-trailingBreak:only-child),
+		:is(
+				blockquote:has(> :last-child:dir(rtl)),
+				:is(ul, ol):has(> li:last-child > div > :first-child:dir(rtl))
+			)
+			+ p:has(> br.ProseMirror-trailingBreak:only-child),
+		li:has(> div > :first-child:dir(rtl))
+			+ li:has(> div > p > br.ProseMirror-trailingBreak:only-child)
+	) {
+	direction: rtl;
+}
+
+/* Empty dir=auto paragraphs do not use their list item's CSS direction, so
+ * inherit the temporary direction set above. */
+[data-hubble-editor]
+	.ProseMirror
+	li:has(> div > p > br.ProseMirror-trailingBreak:only-child)
+	> div
+	> p:has(> br.ProseMirror-trailingBreak:only-child) {
+	direction: inherit;
+}
+
 [data-hubble-editor] .ProseMirror :is(ul, ol) li::marker {
 	color: var(--muted-foreground);
 }

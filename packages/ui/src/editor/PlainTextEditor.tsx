@@ -54,6 +54,7 @@ export function PlainTextEditor({
 	};
 
 	const editor = useEditor({
+		textDirection: "auto",
 		extensions: [
 			StarterKit.configure({
 				blockquote: false,
