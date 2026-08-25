@@ -25,6 +25,7 @@ afterEach(() => {
 	});
 	roots.length = 0;
 	document.body.replaceChildren();
+	vi.restoreAllMocks();
 });
 
 describe("Sidebar", () => {
@@ -39,11 +40,20 @@ describe("Sidebar", () => {
 		});
 
 		const input = renameInput("new-file");
+		const focusTree = vi.spyOn(sidebarTree(), "focus");
+		const frames: FrameRequestCallback[] = [];
+		vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+			frames.push(callback);
+			return frames.length;
+		});
 		act(() => {
 			setInputValue(input, "daily-notes");
 			input.dispatchEvent(
 				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
 			);
+		});
+		act(() => {
+			for (const frame of frames) frame(0);
 		});
 
 		expect(onRenameFile).toHaveBeenCalledWith(
@@ -51,6 +61,7 @@ describe("Sidebar", () => {
 			"daily-notes",
 			{ origin: "new-note", commit: "enter" },
 		);
+		expect(focusTree).not.toHaveBeenCalled();
 	});
 
 	it("returns to the sidebar after an existing note is renamed", () => {
@@ -184,6 +195,12 @@ function existingNoteButton() {
 	).find((element) => element.textContent?.trim() === "existing.md");
 	if (!button) throw new Error("Missing existing note button");
 	return button;
+}
+
+function sidebarTree() {
+	const tree = document.querySelector<HTMLElement>('[role="tree"]');
+	if (!tree) throw new Error("Missing sidebar tree");
+	return tree;
 }
 
 function renameInput(value: string) {
