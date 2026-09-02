@@ -64,9 +64,9 @@ import { type WatchHandle, watchWorkspace } from "./workspaceWatcher";
 import {
 	loadZoomFactor,
 	resetWindowZoom,
-	setTrafficLightInset,
 	stepWindowZoom,
 	toolbarHeight,
+	trafficLightInsetForZoom,
 	trafficLightPositionForZoom,
 	zoomStep,
 } from "./zoom";
@@ -111,6 +111,14 @@ function titleBarOverlayOptions() {
 		? { color: "#181715", symbolColor: "#a6a5a0" }
 		: { color: "#ffffff", symbolColor: "#454545" };
 	return { ...colors, height: toolbarHeight };
+}
+
+// What the native window paints until the renderer's first frame. Mirrors
+// `--background` (light in theme.css, dark in index.css), which index.html falls
+// back to in turn while its CSS bundle is still loading, so the launch frame,
+// the boot canvas and the mounted app are all the same color.
+function windowBackgroundColor() {
+	return nativeTheme.shouldUseDarkColors ? "#171614" : "#fefdfd";
 }
 
 app.setName(appName);
@@ -1189,7 +1197,10 @@ async function createWindow() {
 		width: windowState.width,
 		height: windowState.height,
 		minWidth: minWindowWidth,
+		// Hidden only long enough to restore full-screen/maximized state below, so
+		// that restore isn't animated.
 		show: false,
+		backgroundColor: windowBackgroundColor(),
 		titleBarStyle: "hidden",
 		...(process.platform !== "darwin"
 			? { titleBarOverlay: titleBarOverlayOptions() }
@@ -1201,6 +1212,14 @@ async function createWindow() {
 			plugins: true,
 			preload: path.join(__dirname, "../preload/preload.mjs"),
 			sandbox: false,
+			// Both reach the renderer before its first paint: Chromium applies the
+			// zoom itself, and preload reads the inset off this argument. Setting
+			// either one from main after load would need a round-trip the window
+			// then has to wait on.
+			zoomFactor,
+			additionalArguments: [
+				`--hubble-traffic-light-inset=${trafficLightInsetForZoom(zoomFactor)}`,
+			],
 		},
 	});
 	mainWindow = window;
@@ -1229,13 +1248,14 @@ async function createWindow() {
 	} else if (windowState.isMaximized) {
 		window.maximize();
 	}
-	// Apply persisted zoom while hidden so the first visible paint is already scaled.
-	window.webContents.once("did-finish-load", async () => {
-		window.webContents.setZoomFactor(zoomFactor);
-		await setTrafficLightInset(window, zoomFactor);
-		if (window.isDestroyed()) return;
-		window.show();
-	});
+	// Show before the page loads. Zoom, the traffic-light inset and the theme are
+	// all settled above, so the window opens as a correctly themed, correctly
+	// scaled frame that content then fills in.
+	//
+	// `ready-to-show` is not the better hook it looks like: with a body of just
+	// `<div id="root">` there is nothing to paint until React mounts, so it fires
+	// with the load event and buys back almost nothing.
+	window.show();
 
 	window.on("focus", () => sendToRenderer("desktop:window-focus"));
 
