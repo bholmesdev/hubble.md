@@ -15,6 +15,8 @@ export default defineConfig({
 			}),
 		],
 		build: {
+			// electron-vite defaults every target to `minify: false`.
+			minify: "esbuild",
 			lib: {
 				entry: "electron/main.ts",
 			},
@@ -23,6 +25,7 @@ export default defineConfig({
 	preload: {
 		plugins: [externalizeDepsPlugin()],
 		build: {
+			minify: "esbuild",
 			lib: {
 				entry: "electron/preload.ts",
 			},
@@ -52,6 +55,7 @@ export default defineConfig({
 			strictPort: false,
 		},
 		build: {
+			minify: "esbuild",
 			rollupOptions: {
 				input: "index.html",
 			},

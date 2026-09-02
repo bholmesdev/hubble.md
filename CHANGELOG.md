@@ -11,6 +11,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- The app window now appears about 200ms sooner on launch, already in the right theme, instead of staying hidden behind a bouncing dock icon until the whole app had loaded. [#279](https://github.com/bholmesdev/hubble.md/issues/279)
+- The desktop download is smaller: the app bundle dropped from 131 MB to 56 MB and the app code itself is half the size, so updates download faster. [#279](https://github.com/bholmesdev/hubble.md/issues/279)
+
 ### Fixed
 
 ## [0.1.28] - 2026-08-19

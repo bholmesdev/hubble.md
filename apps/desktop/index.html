@@ -5,6 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hubble</title>
+    <style>
+      /* The window is shown as soon as it exists, before this page has loaded,
+         so the canvas has to be themed without waiting for the CSS bundle. The
+         literals mirror `--background` (theme.css light, index.css `.dark`) and
+         the main process paints the same pair behind the window; once the bundle
+         defines the real token the var takes over. */
+      :root {
+        color-scheme: light;
+        background-color: var(--background, #fefdfd);
+      }
+      :root.dark {
+        color-scheme: dark;
+        background-color: var(--background, #171614);
+      }
+    </style>
     <script>
       // Apply the theme class before first paint so a cold launch doesn't flash
       // the wrong scheme. Same persisted key as src/store/persistence.ts.
