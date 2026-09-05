@@ -73,6 +73,24 @@ export function withOpenedTab(
 }
 
 /**
+ * Opens `path` in a new Tab immediately right of the Active one, without
+ * focusing it. A Tab already showing `path` is left alone rather than
+ * duplicated.
+ */
+export function withBackgroundTab(tabs: TabsState, path: string): TabsState {
+	if (findTabByPath(tabs, path)) return tabs;
+	const id = mintTabId();
+	const activeAt = tabs.activeTabId ? tabs.order.indexOf(tabs.activeTabId) : -1;
+	const order = [...tabs.order];
+	order.splice(activeAt < 0 ? order.length : activeAt + 1, 0, id);
+	return {
+		order,
+		activeTabId: tabs.activeTabId,
+		byId: { ...tabs.byId, [id]: { path } },
+	};
+}
+
+/**
  * The Tab to focus once `id` closes: its right neighbour, falling back to its
  * left. Null when `id` was the only Tab open.
  */

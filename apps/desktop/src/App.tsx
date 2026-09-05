@@ -26,7 +26,6 @@ import {
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
-import { DocumentTabs } from "./components/DocumentTabs";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { Settings } from "./components/Settings";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
@@ -228,6 +227,7 @@ function App() {
 	};
 	const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
+	const [searchOpensInNewTab, setSearchOpensInNewTab] = useState(false);
 	const [searchFolderParent, setSearchFolderParent] = useState<string | null>(
 		null,
 	);
@@ -263,7 +263,12 @@ function App() {
 	}, [compact]);
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
+		else setSearchOpensInNewTab(false);
 		setSearchOpen(open);
+	};
+	const openSearch = (mode: "current" | "new-tab") => {
+		setSearchOpensInNewTab(mode === "new-tab");
+		changeSearchOpen(true);
 	};
 	const paletteCommands = buildAppCommands(
 		{
@@ -271,6 +276,7 @@ function App() {
 			requestCopyAsMarkdown: () =>
 				setCopyAsMarkdownRequest((request) => request + 1),
 			focusSidebar: focusSidebarNav,
+			openNewTab: () => openSearch("new-tab"),
 		},
 		{
 			currentPath: state.currentPath ?? null,
@@ -461,7 +467,8 @@ function App() {
 				"app.settings": () => setSettingsOpen(true),
 				"app.open-recent": () => setWorkspaceSwitcherOpen(true),
 				// The File menu accelerator fires too, but opening is idempotent.
-				"app.go-to-file": () => changeSearchOpen(true),
+				"app.go-to-file": () => openSearch("current"),
+				"app.new-tab": () => openSearch("new-tab"),
 				"app.open-folder": openWorkspaceWithSidebar,
 				"app.open-file": openFilePicker,
 				"app.copy-path": () => copyFilePath(currentPath),
@@ -489,7 +496,7 @@ function App() {
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen, focusedCreationFolder, focusedSidebarPath]);
+	}, [openSearch, focusedCreationFolder, focusedSidebarPath]);
 
 	useEffect(() => {
 		let active = true;
@@ -540,7 +547,8 @@ function App() {
 			desktopApi.onMenuShowWorkspaceSwitcher(() =>
 				setWorkspaceSwitcherOpen(true),
 			),
-			desktopApi.onMenuGoToFile(() => changeSearchOpen(true)),
+			desktopApi.onMenuGoToFile(() => openSearch("current")),
+			desktopApi.onMenuNewTab(() => openSearch("new-tab")),
 			desktopApi.onMenuSyncWorkspace(() => void refreshFiles()),
 			desktopApi.onMenuToggleTerminal(() => toggleTerminal()),
 			desktopApi.onMenuGoBack(() => void goBack()),
@@ -563,7 +571,7 @@ function App() {
 			for (const dispose of disposers) dispose();
 		};
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen, focusedCreationFolder]);
+	}, [openSearch, focusedCreationFolder]);
 
 	useEffect(() => {
 		// Window focus can fire in bursts when switching apps, so debounce the
@@ -701,6 +709,7 @@ function App() {
 						whatsNewVersion !== null ||
 						telemetryConsent === "unset")
 				}
+				onNewTab={hasWorkspace ? () => openSearch("new-tab") : undefined}
 			/>
 			<div className="relative flex min-h-0 flex-1 overflow-hidden">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
@@ -763,7 +772,6 @@ function App() {
 					onFocusCapture={closeSidebarOverlay}
 				>
 					<div className="flex-1 min-h-0 min-w-0 flex flex-col">
-						<DocumentTabs />
 						<div className="flex-1 min-h-0 min-w-0 relative">
 							{state.status === "loading" && <p>Loading…</p>}
 							{state.status === "error" && (
@@ -812,7 +820,9 @@ function App() {
 				open={searchOpen}
 				onOpenChange={changeSearchOpen}
 				files={paletteFiles}
-				onSelectFile={(path) => void openTabForPath(path)}
+				onSelectFile={(path) =>
+					void (searchOpensInNewTab ? openTabForPath(path) : loadPath(path))
+				}
 				searchContents={searchFileContents}
 				commands={paletteCommands}
 				recentCommandIds={recentCommandIds}

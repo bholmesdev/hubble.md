@@ -2909,6 +2909,26 @@ describe("desktop tabs", () => {
 		expect(viewerStore.get().currentPath).toBe("/workspace/b.md");
 	});
 
+	it("opens a background tab to the right without switching notes", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockResolvedValue("content");
+		const { appStore, loadPath, openBackgroundTab, viewerStore } =
+			await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		const first = appStore.get().tabs.activeTabId;
+		await openBackgroundTab("/workspace/b.md");
+		await openBackgroundTab("/workspace/b.md");
+
+		const { order, activeTabId, byId } = appStore.get().tabs;
+		expect(order).toHaveLength(2);
+		expect(activeTabId).toBe(first);
+		expect(order[1] && byId[order[1]]?.path).toBe("/workspace/b.md");
+		expect(viewerStore.get().currentPath).toBe("/workspace/a.md");
+		expect(api.readFileText).toHaveBeenCalledTimes(1);
+	});
+
 	it("focuses the open tab instead of opening the same note twice", async () => {
 		const api = createDesktopApi();
 		api.pathExists.mockResolvedValue(true);

@@ -916,6 +916,9 @@ function buildMenu() {
 				commandMenuItem("app.go-to-file", () =>
 					sendToRenderer("desktop:menu-go-to-file"),
 				),
+				commandMenuItem("app.new-tab", () =>
+					sendToRenderer("desktop:menu-new-tab"),
+				),
 				{ type: "separator" },
 				{
 					id: "sync-workspace",

@@ -4,6 +4,7 @@ import {
 	nextActiveTabId,
 	type TabsState,
 	tabLabels,
+	withBackgroundTab,
 	withClosedTab,
 	withOpenedTab,
 	withoutTabsMatching,
@@ -39,6 +40,25 @@ describe("opening tabs", () => {
 		expect(after.order).toHaveLength(3);
 		expect(after.order[1]).toBe(after.activeTabId);
 		expect(after.order[2]).toBe("b");
+	});
+
+	it("opens a background tab to the right without focusing it", () => {
+		const before = strip({ a: "/w/one.md", b: "/w/two.md" }, "a");
+
+		const after = withBackgroundTab(before, "/w/three.md");
+
+		expect(after.activeTabId).toBe("a");
+		expect(after.order).toHaveLength(3);
+		expect(after.order[1]).not.toBe("a");
+		expect(after.order[1]).not.toBe("b");
+		expect(after.byId[after.order[1] ?? ""]?.path).toBe("/w/three.md");
+		expect(after.order[2]).toBe("b");
+	});
+
+	it("does not duplicate a path already open as a background tab", () => {
+		const before = strip({ a: "/w/one.md", b: "/w/two.md" }, "a");
+
+		expect(withBackgroundTab(before, "/w/two.md")).toBe(before);
 	});
 
 	it("mints a tab when the strip is empty or the target has closed", () => {

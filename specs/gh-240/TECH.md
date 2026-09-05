@@ -78,7 +78,9 @@ Scroll is kept in a small module-level cache keyed by path — written when leav
 
 Pure tab logic — the state shape and the functions over it — lives in `apps/desktop/src/store/tabs.ts`, which `state.ts` imports rather than the reverse. Keeping it out of `state.ts` is what lets it be tested without standing up the store.
 
-The tab strip is a prop-driven component in `packages/ui`, keeping that package free of store coupling, with a thin container in `apps/desktop` supplying order, labels, and the active id. It mounts above the editor inside the document column rather than in `Toolbar`, which is a fixed-height three-cluster row carrying a window drag region. Label disambiguation and next-active-tab-on-close are pure functions, unit-tested directly.
+The tab strip is a prop-driven component in `packages/ui`, keeping that package free of store coupling, with a thin container in `apps/desktop` supplying order, labels, and the active id. It mounts in `Toolbar` as `centerSlot`, replacing the file-name control; click-to-rename lives on the Active Tab. Interactive tab chrome is `no-drag`; unused top-bar space stays a window drag region, including the macOS traffic-light inset. Label disambiguation and next-active-tab-on-close are pure functions, unit-tested directly.
+
+Sidebar plain clicks call `loadPath` (Active Tab). `CmdOrCtrl`-click calls `openBackgroundTab`, which mints a path-only tab to the right without loading it. `+` and `CmdOrCtrl+T` open the existing file palette with a new-tab flag; choosing a file then calls `openTabForPath`. Plain `CmdOrCtrl+P` still calls `loadPath`. `CmdOrCtrl`-click is removed from sidebar multi-select; `Shift`-click range select stays.
 
 Commands go in `packages/editor/src/commandRegistry.ts`, with palette entries in `useAppCommands.ts` and native menu items in `apps/desktop/electron/main.ts`. `CmdOrCtrl+W` currently maps to the window `close` role in the File menu and needs to close a tab first, falling back to closing the window when none are open. `MenuState` gains tab enablement. No manual memos — CI runs `pnpm check:react-compiler`.
 

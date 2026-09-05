@@ -62,6 +62,7 @@ export type AppCommandActions = {
 	openSettings: () => void;
 	requestCopyAsMarkdown: () => void;
 	focusSidebar: () => void;
+	openNewTab: () => void;
 };
 
 function toRegistryContext(context: AppCommandContext): RegistryContext {
@@ -212,6 +213,12 @@ function defineCommands(
 		),
 
 		// Navigate
+		fromRegistry(
+			"app.new-tab",
+			"Navigate",
+			["tab", "open", "palette"],
+			actions.openNewTab,
+		),
 		fromRegistry(
 			"app.close-tab",
 			"Navigate",

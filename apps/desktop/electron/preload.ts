@@ -150,6 +150,7 @@ const desktopApi = {
 	onMenuShowWorkspaceSwitcher: (callback) =>
 		subscribe("desktop:menu-show-workspace-switcher", callback),
 	onMenuGoToFile: (callback) => subscribe("desktop:menu-go-to-file", callback),
+	onMenuNewTab: (callback) => subscribe("desktop:menu-new-tab", callback),
 	onMenuSyncWorkspace: (callback) =>
 		subscribe("desktop:menu-sync-workspace", callback),
 	onWorkspaceChanged: (callback) =>

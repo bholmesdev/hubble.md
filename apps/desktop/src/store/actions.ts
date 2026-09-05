@@ -103,6 +103,7 @@ import {
 	nextActiveTabId,
 	type TabId,
 	type TabTarget,
+	withBackgroundTab,
 	withClosedTab,
 	withRewrittenTabPaths,
 } from "./tabs";
@@ -1547,6 +1548,24 @@ export async function openTabForPath(path: string) {
 }
 
 /**
+ * Opens `path` as a Tab to the right of the Active one without switching to
+ * it. An already-open path is left as-is. With no Active Tab there is nothing
+ * to stay on, so the file opens normally.
+ */
+export async function openBackgroundTab(path: string) {
+	const tabs = tabsStore.get();
+	if (findTabByPath(tabs, path)) return;
+	if (!tabs.activeTabId) {
+		await openTabForPath(path);
+		return;
+	}
+	appStore.set((state) => ({
+		...state,
+		tabs: withBackgroundTab(state.tabs, path),
+	}));
+}
+
+/**
  * Shows the note a Tab is holding. Activation re-reads from disk the way a
  * sidebar click does, so it neither pushes onto that Tab's trail nor launches
  * an external app for a code file — `navigateHistory` takes the same care.
@@ -1609,9 +1628,9 @@ export async function closeTab(id: TabId) {
 }
 
 /**
- * Closes every Tab but the one in front. Opening a note from the sidebar gives
- * it a Tab, so browsing leaves a row of them behind; this is the way back to
- * one note without clicking every cross.
+ * Closes every Tab but the one in front. Cmd-clicking notes in the sidebar
+ * accumulates background Tabs; this is the way back to one note without
+ * clicking every cross.
  */
 export async function closeOtherTabs() {
 	const { order, activeTabId } = tabsStore.get();

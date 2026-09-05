@@ -76,6 +76,7 @@ export function Toolbar({
 	scrollContainer,
 	platformInset = true,
 	leftSlot,
+	centerSlot,
 	rightSlot,
 	onToggleSidebar,
 	onRenameCurrentPath,
@@ -89,6 +90,7 @@ export function Toolbar({
 	scrollContainer?: HTMLDivElement | null;
 	platformInset?: boolean;
 	leftSlot?: React.ReactNode;
+	centerSlot?: React.ReactNode;
 	rightSlot?: React.ReactNode;
 	onToggleSidebar?: () => void;
 	onRenameCurrentPath?: (nextName: string) => void | Promise<void>;
@@ -264,7 +266,9 @@ export function Toolbar({
 				) : null}
 			</ToolbarCluster>
 			<div className="flex min-w-0 justify-center" style={{ flex: "1 1 auto" }}>
-				{editingTitle ? (
+				{centerSlot ? (
+					centerSlot
+				) : editingTitle ? (
 					<input
 						ref={titleInputRef}
 						className="h-6 min-w-0 max-w-full select-text rounded-sm bg-transparent px-1 text-center text-xs text-foreground outline-none focus-visible:outline-none focus-visible:ring-0"

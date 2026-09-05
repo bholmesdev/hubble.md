@@ -159,4 +159,46 @@ describe("TabStrip", () => {
 		// Middle-clicking closes without also switching to the tab.
 		expect(onActivate).not.toHaveBeenCalled();
 	});
+
+	it("offers a new-tab control even when no note is open", () => {
+		const onNewTab = vi.fn();
+		renderStrip({ tabs: [], activeTabId: null, onNewTab });
+
+		expect(document.querySelector("[role=tablist]")).toBeNull();
+		const add = document.querySelector<HTMLElement>("[aria-label='New tab']");
+		act(() => add?.click());
+		expect(onNewTab).toHaveBeenCalledTimes(1);
+	});
+
+	it("renames from a click on the active tab", () => {
+		const onRename = vi.fn();
+		const onActivate = vi.fn();
+		renderStrip({ onRename, onActivate });
+
+		act(() => tabs()[0].click());
+		expect(onActivate).not.toHaveBeenCalled();
+
+		const input = document.querySelector("input");
+		expect(input).toBeInstanceOf(HTMLInputElement);
+		act(() => {
+			if (!(input instanceof HTMLInputElement)) return;
+			Object.getOwnPropertyDescriptor(
+				HTMLInputElement.prototype,
+				"value",
+			)?.set?.call(input, "renamed");
+			input.dispatchEvent(new Event("input", { bubbles: true }));
+			input.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+		});
+		expect(onRename).toHaveBeenCalledWith("a", "renamed");
+	});
+
+	it("activates an inactive tab instead of renaming it", () => {
+		const onRename = vi.fn();
+		const { onActivate } = renderStrip({ onRename });
+
+		act(() => tabs()[1].click());
+		expect(onActivate).toHaveBeenCalledWith("b");
+		expect(document.querySelector("input")).toBeNull();
+		expect(onRename).not.toHaveBeenCalled();
+	});
 });

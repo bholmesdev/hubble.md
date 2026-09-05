@@ -234,6 +234,7 @@ export type DesktopApi = {
 	onMenuCopyAsMarkdown(callback: () => void): Unsubscribe;
 	onMenuShowWorkspaceSwitcher(callback: () => void): Unsubscribe;
 	onMenuGoToFile(callback: () => void): Unsubscribe;
+	onMenuNewTab(callback: () => void): Unsubscribe;
 	onMenuSyncWorkspace(callback: () => void): Unsubscribe;
 	onWorkspaceChanged(
 		callback: (event: WorkspaceWatchEvent) => void,

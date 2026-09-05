@@ -17,9 +17,10 @@ import {
 	deleteFolder,
 	deleteMarkdownFile,
 	deleteSidebarItems,
+	loadPath,
 	moveSidebarItems,
+	openBackgroundTab,
 	openPathInDefaultApp,
-	openTabForPath,
 	openWorkspace,
 	renameFolder,
 	renameMarkdownFile,
@@ -112,11 +113,10 @@ export function Sidebar({
 			onCollapse={collapseSidebar}
 			onSortModeChange={setSortMode}
 			onSelectFile={(path) => {
-				// Picking a note from the sidebar is an explicit open, so it gets its
-				// own Tab. Following a link inside a note stays in the current one.
-				void openTabForPath(path);
+				void loadPath(path);
 				if (compact) collapseSidebar();
 			}}
+			onOpenFileInNewTab={(path) => void openBackgroundTab(path)}
 			onOpenFileInDefaultApp={(path) => void openPathInDefaultApp(path)}
 			onRevealFile={(path) => void desktopApi.revealFile(path)}
 			onCopyFilePath={(path) => void copyFilePath(path)}

@@ -62,7 +62,7 @@ A Markdown File opened directly from the filesystem, not through a Workspace Fol
 
 ### Tab
 
-A note the user has open in the desktop editor, shown as one entry in the tab strip above the document.
+A note the user has open in the desktop editor, shown as one entry in the tab strip in the top bar.
 
 A Tab records **where** a note is, not what it holds: its path and its own back/forward trail. The open document itself stays singular — one [[Markdown File]] is loaded at a time, in one editor, with one file watcher. Activating a Tab saves the current note and loads the Tab's note from disk, the same thing clicking a sidebar row already does. Background Tabs therefore hold no unsaved text, no dirty state, and no conflict state; there is nothing in a Tab to go stale.
 
