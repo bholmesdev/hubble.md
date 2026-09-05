@@ -145,11 +145,12 @@ export function TabStrip({
 						return (
 							<div
 								key={tab.id}
+								data-selected={active ? "true" : undefined}
 								className={cn(
 									"group flex h-7 min-w-0 items-center gap-0.5 rounded-sm pr-0.5 pl-2",
 									active
-										? "bg-accent/50 text-foreground"
-										: "text-muted-foreground hover:bg-accent/20",
+										? "bg-muted text-foreground"
+										: "text-muted-foreground hover:bg-muted/60",
 								)}
 								style={NO_DRAG_STYLE}
 							>
@@ -179,12 +180,9 @@ export function TabStrip({
 										aria-selected={active}
 										tabIndex={index === anchor ? 0 : -1}
 										title={tab.title}
-										onClick={() => {
-											if (active && onRename) {
-												beginRename(tab);
-												return;
-											}
-											onActivate(tab.id);
+										onClick={() => onActivate(tab.id)}
+										onDoubleClick={() => {
+											if (active) beginRename(tab);
 										}}
 										onAuxClick={(event) => {
 											if (event.button !== 1) return;
@@ -202,7 +200,7 @@ export function TabStrip({
 									aria-label={`Close ${tab.label}`}
 									onClick={() => onClose(tab.id)}
 									className={cn(
-										"rounded p-0.5 text-muted-foreground opacity-0 hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
+										"rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
 										active && "opacity-100",
 									)}
 								>

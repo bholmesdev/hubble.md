@@ -55,7 +55,7 @@ Running two copies of the app over one folder is not a workaround: two instances
 
 ### Switching
 
-6. Clicking an inactive tab activates it. Clicking the Active Tab's label starts an inline rename, the same role the file name in the top bar used to have. `CmdOrCtrl+Alt+[` / `]` step to the previous and next tab, wrapping at each end. The strip is one stop in the page's tab order rather than one per note; from there the arrow keys move along it, and `Home` and `End` reach its ends.
+6. Clicking an inactive tab activates it. Double-clicking the Active Tab's label starts an inline rename, the same role the file name in the top bar used to have. A single click on the Active Tab only keeps it selected. `CmdOrCtrl+Alt+[` / `]` step to the previous and next tab, wrapping at each end. The strip is one stop in the page's tab order rather than one per note; from there the arrow keys move along it, and `Home` and `End` reach its ends.
 7. Activating a tab saves the outgoing Markdown File first. If that file has an unresolved disk conflict the switch does not run and the conflict banner stays, matching how back/forward already behaves.
 8. Each tab has its own back/forward trail. Back and Forward act on the Active Tab only, and their enablement reflects that tab.
 9. Switching tabs re-reads the file from disk. Scroll position is restored to where the user left that file. Undo history and the rich/source toggle reset, exactly as they do when navigating today.
@@ -87,7 +87,7 @@ Running two copies of the app over one folder is not a workaround: two instances
 4. Type into tab 2 continuously and immediately click tab 1. Switch back and confirm every character survived.
 5. Scroll halfway down a long note in tab 1, switch to tab 2, and switch back. Confirm the scroll position is where it was left.
 6. In tab 1 follow a wiki link, then switch to tab 2 and follow a different link. Confirm Back in each tab returns along that tab's own trail, and that Back enablement changes as tabs change.
-7. Click the Active Tab's label. Confirm it becomes an inline rename field. Confirm dragging the unused part of the top bar still moves the window.
+7. Double-click the Active Tab's label. Confirm it becomes an inline rename field. A single click must not start a rename. Confirm dragging the unused part of the top bar still moves the window.
 8. `Shift`-click a range of sidebar rows. Confirm they stay selected. `CmdOrCtrl`-click a file. Confirm it opens a background tab and does not toggle the multi-selection.
 9. Edit a note in tab 2, change the same file outside Hubble, return to tab 2, and confirm the conflict banner appears and switching away is refused until it is resolved.
 10. Rename a file open in a background tab from the sidebar. Confirm that tab's label updates and activating it opens the renamed file.

@@ -170,13 +170,25 @@ describe("TabStrip", () => {
 		expect(onNewTab).toHaveBeenCalledTimes(1);
 	});
 
-	it("renames from a click on the active tab", () => {
+	it("does not rename from a single click on the active tab", () => {
+		const onRename = vi.fn();
+		const { onActivate } = renderStrip({ onRename });
+
+		act(() => tabs()[0].click());
+
+		expect(onActivate).toHaveBeenCalledWith("a");
+		expect(document.querySelector("input")).toBeNull();
+		expect(onRename).not.toHaveBeenCalled();
+	});
+
+	it("renames from a double click on the active tab", () => {
 		const onRename = vi.fn();
 		const onActivate = vi.fn();
 		renderStrip({ onRename, onActivate });
 
-		act(() => tabs()[0].click());
-		expect(onActivate).not.toHaveBeenCalled();
+		act(() => {
+			tabs()[0].dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+		});
 
 		const input = document.querySelector("input");
 		if (!(input instanceof HTMLInputElement)) {
@@ -214,7 +226,9 @@ describe("TabStrip", () => {
 			],
 		});
 
-		act(() => tabs()[0].click());
+		act(() => {
+			tabs()[0].dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+		});
 		const input = document.querySelector("input");
 		if (!(input instanceof HTMLInputElement)) {
 			throw new Error("Missing rename field");
@@ -234,6 +248,18 @@ describe("TabStrip", () => {
 
 		act(() => tabs()[1].click());
 		expect(onActivate).toHaveBeenCalledWith("b");
+		expect(document.querySelector("input")).toBeNull();
+		expect(onRename).not.toHaveBeenCalled();
+	});
+
+	it("does not rename from a double click on an inactive tab", () => {
+		const onRename = vi.fn();
+		renderStrip({ onRename });
+
+		act(() => {
+			tabs()[1].dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+		});
+
 		expect(document.querySelector("input")).toBeNull();
 		expect(onRename).not.toHaveBeenCalled();
 	});
