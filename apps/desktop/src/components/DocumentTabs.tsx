@@ -1,6 +1,7 @@
 import { TabStrip, type TabStripItem } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { isChangelogPath } from "../lib/changelogNote";
+import { fileStem } from "../lib/filePath";
 import {
 	activateTab,
 	closeTab,
@@ -30,6 +31,7 @@ export function DocumentTabs({
 		id,
 		label: labels[id] ?? "",
 		title: tabs.byId[id]?.path ?? "",
+		name: fileStem(tabs.byId[id]?.path ?? ""),
 	}));
 
 	return (

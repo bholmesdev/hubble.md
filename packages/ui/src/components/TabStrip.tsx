@@ -19,6 +19,8 @@ export type TabStripItem = {
 	label: string;
 	/** Shown on hover, where the full path disambiguates two similar labels. */
 	title: string;
+	/** File name without a folder prefix. Used when renaming. */
+	name?: string;
 };
 
 export type TabStripProps = {
@@ -79,7 +81,7 @@ export function TabStrip({
 
 	const beginRename = (tab: TabStripItem) => {
 		if (!onRename) return;
-		setDraft(tab.label);
+		setDraft(tab.name ?? tab.label);
 		setEditingId(tab.id);
 	};
 
@@ -92,8 +94,8 @@ export function TabStrip({
 		const nextName = draft.trim();
 		const current = tabs.find((tab) => tab.id === id);
 		cancelRename();
-		if (!nextName || !current || nextName === current.label || !onRename)
-			return;
+		const original = current?.name ?? current?.label;
+		if (!nextName || !current || nextName === original || !onRename) return;
 		onRename(id, nextName);
 	};
 

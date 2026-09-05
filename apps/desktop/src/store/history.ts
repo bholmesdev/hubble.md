@@ -68,6 +68,23 @@ export function setHistory(stack: HistoryStack) {
 	}));
 }
 
+/**
+ * Gives a new Tab a one-entry trail so the first navigation from it can
+ * come back. No-op when that Tab already has a stack.
+ */
+export function seedHistory(tabId: TabId, path: string) {
+	historyStore.set((state) => {
+		if (state.byTab[tabId]?.entries.length) return state;
+		return {
+			...state,
+			byTab: {
+				...state.byTab,
+				[tabId]: { entries: [path], index: 0 },
+			},
+		};
+	});
+}
+
 /** Forgets a closed tab's stack. */
 export function dropHistory(tabId: TabId) {
 	historyStore.set((state) => {

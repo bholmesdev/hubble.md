@@ -200,6 +200,34 @@ describe("TabStrip", () => {
 		expect(onRename).toHaveBeenCalledWith("a", "renamed");
 	});
 
+	it("renames from the file name, not a folder-qualified label", () => {
+		const onRename = vi.fn();
+		renderStrip({
+			onRename,
+			tabs: [
+				{
+					id: "a",
+					label: "notes/index",
+					title: "/w/notes/index.md",
+					name: "index",
+				},
+			],
+		});
+
+		act(() => tabs()[0].click());
+		const input = document.querySelector("input");
+		if (!(input instanceof HTMLInputElement)) {
+			throw new Error("Missing rename field");
+		}
+		expect(input.value).toBe("index");
+		act(() => {
+			input.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
+		});
+		expect(onRename).not.toHaveBeenCalled();
+	});
+
 	it("activates an inactive tab instead of renaming it", () => {
 		const onRename = vi.fn();
 		const { onActivate } = renderStrip({ onRename });

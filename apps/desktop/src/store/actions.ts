@@ -62,6 +62,7 @@ import {
 	pushHistory,
 	resetHistory,
 	rewriteHistory,
+	seedHistory,
 	setHistory,
 } from "./history";
 import type { CodeFileOpenMode, TerminalPosition } from "./persistence";
@@ -1559,10 +1560,13 @@ export async function openBackgroundTab(path: string) {
 		await openTabForPath(path);
 		return;
 	}
+	const next = withBackgroundTab(tabs, path);
+	const mintedId = next.order.find((id) => !tabs.byId[id]);
 	appStore.set((state) => ({
 		...state,
-		tabs: withBackgroundTab(state.tabs, path),
+		tabs: next,
 	}));
+	if (mintedId) seedHistory(mintedId, path);
 }
 
 /**
