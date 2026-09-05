@@ -179,15 +179,23 @@ describe("TabStrip", () => {
 		expect(onActivate).not.toHaveBeenCalled();
 
 		const input = document.querySelector("input");
-		expect(input).toBeInstanceOf(HTMLInputElement);
+		if (!(input instanceof HTMLInputElement)) {
+			throw new Error("Missing rename field");
+		}
+		expect(input.value).toBe("plan");
 		act(() => {
-			if (!(input instanceof HTMLInputElement)) return;
+			input.focus();
 			Object.getOwnPropertyDescriptor(
 				HTMLInputElement.prototype,
 				"value",
 			)?.set?.call(input, "renamed");
 			input.dispatchEvent(new Event("input", { bubbles: true }));
-			input.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+			input.dispatchEvent(new Event("change", { bubbles: true }));
+		});
+		act(() => {
+			input.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
 		});
 		expect(onRename).toHaveBeenCalledWith("a", "renamed");
 	});
