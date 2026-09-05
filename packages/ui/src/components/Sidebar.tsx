@@ -107,7 +107,7 @@ export type SidebarSelectionState = {
 export type SidebarSelectionMode =
 	// plain click: select only this row
 	| "replace"
-	// programmatic add/remove; Cmd/Ctrl-click opens a tab instead
+	// add or remove one row without a click gesture
 	| "toggle"
 	// shift click: select every row between the anchor and this row
 	| "range";

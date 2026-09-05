@@ -32,6 +32,19 @@ describe("opening tabs", () => {
 		expect(after.byId.a.path).toBe("/w/two.md");
 	});
 
+	it("focuses the tab already showing a path instead of duplicating it", () => {
+		const before = strip({ a: "/w/one.md", b: "/w/two.md" }, "a");
+
+		expect(withOpenedTab(before, "/w/two.md")).toEqual({
+			...before,
+			activeTabId: "b",
+		});
+		expect(withOpenedTab(before, "/w/two.md", "new")).toEqual({
+			...before,
+			activeTabId: "b",
+		});
+	});
+
 	it("opens a new tab directly right of the active one", () => {
 		const before = strip({ a: "/w/one.md", b: "/w/two.md" }, "a");
 

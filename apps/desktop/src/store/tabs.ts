@@ -55,6 +55,10 @@ export function withOpenedTab(
 	path: string,
 	target?: TabTarget,
 ): TabsState {
+	const existing = findTabByPath(tabs, path);
+	if (existing) {
+		return { ...tabs, activeTabId: existing };
+	}
 	if (target !== "new") {
 		const id = target && tabs.byId[target] ? target : tabs.activeTabId;
 		if (id && tabs.byId[id]) {

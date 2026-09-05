@@ -2943,6 +2943,11 @@ describe("desktop tabs", () => {
 
 		expect(appStore.get().tabs.order).toHaveLength(2);
 		expect(appStore.get().tabs.activeTabId).toBe(first);
+
+		await loadPath("/workspace/b.md");
+		expect(appStore.get().tabs.order).toHaveLength(2);
+		expect(appStore.get().tabs.activeTabId).not.toBe(first);
+		expect(appStore.get().tabs.activeTabId).toBe(appStore.get().tabs.order[1]);
 	});
 
 	it("activating a tab reloads its note without extending the trail", async () => {

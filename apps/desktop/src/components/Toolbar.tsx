@@ -29,7 +29,6 @@ import {
 	hasMarkdownExtension,
 	hasTextExtension,
 	isEditableFile,
-	pathEquals,
 	relativeWorkspacePath,
 	supportsSourceToggle,
 } from "../lib/filePath";
@@ -58,18 +57,6 @@ import { DocumentTabs } from "./DocumentTabs";
 const dragRegionStyle = {
 	WebkitAppRegion: "drag",
 } as CSSProperties;
-
-type TitlePreview = { path: string; previewPath: string } | null;
-
-export function toolbarPathForTitlePreview(
-	currentPath: string | null | undefined,
-	titlePreview: TitlePreview,
-) {
-	if (!currentPath || titlePreview?.path !== currentPath) return currentPath;
-	return pathEquals(currentPath, titlePreview.previewPath)
-		? currentPath
-		: titlePreview.previewPath;
-}
 
 // Traffic lights are hidden in fullscreen, so drop their reserved inset.
 function useIsFullScreen() {
