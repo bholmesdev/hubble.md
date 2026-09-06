@@ -5,7 +5,12 @@ import { act, type ReactNode } from "react";
 // needs createRoot's render/unmount surface.
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TabStrip, type TabStripProps } from "./TabStrip";
+import {
+	TAB_MAX_WIDTH_CLASS,
+	TAB_MIN_WIDTH_CLASS,
+	TabStrip,
+	type TabStripProps,
+} from "./TabStrip";
 
 type Root = {
 	render(children: ReactNode): void;
@@ -158,6 +163,29 @@ describe("TabStrip", () => {
 		expect(onClose).toHaveBeenLastCalledWith("a");
 		// Middle-clicking closes without also switching to the tab.
 		expect(onActivate).not.toHaveBeenCalled();
+	});
+
+	it("gives each tab a comfortable max and a readable min", () => {
+		renderStrip();
+
+		const chrome = [...document.querySelectorAll("[data-selected], .group")];
+		const tabChrome = chrome.filter((el) => el.querySelector("[role=tab]"));
+		expect(tabChrome.length).toBe(2);
+		for (const el of tabChrome) {
+			expect(el.className).toContain(TAB_MIN_WIDTH_CLASS);
+			expect(el.className).toContain(TAB_MAX_WIDTH_CLASS);
+			expect(el.className).toContain("flex-1");
+		}
+	});
+
+	it("keeps the new-tab control outside the scrolling strip", () => {
+		const onNewTab = vi.fn();
+		renderStrip({ onNewTab });
+
+		const strip = document.querySelector("[role=tablist]");
+		const add = document.querySelector("[aria-label='New tab']");
+		expect(strip?.contains(add)).toBe(false);
+		expect(add?.parentElement).toBe(strip?.parentElement?.parentElement);
 	});
 
 	it("offers a new-tab control even when no note is open", () => {

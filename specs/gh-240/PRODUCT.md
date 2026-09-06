@@ -76,7 +76,7 @@ Running two copies of the app over one folder is not a workaround: two instances
 ### Presentation
 
 17. A tab shows the file name without its extension. When two open tabs would show the same name, both also show enough of the parent folder to tell them apart.
-18. When tabs exceed the available width the strip scrolls horizontally, and the Active Tab is always scrolled into view.
+18. Tabs start at a comfortable width and shrink together as more open. When they reach a readable minimum the strip scrolls horizontally; dashed edges mark leftover tabs the same way the editor marks vertical overflow. The Active Tab stays scrolled into view. The `+` control stays outside the scrolling strip.
 19. Right-side toolbar controls stay on the right. The window remains draggable from the unused part of the top bar, including the macOS traffic-light inset.
 
 ## UX Validation
@@ -93,6 +93,6 @@ Running two copies of the app over one folder is not a workaround: two instances
 10. Rename a file open in a background tab from the sidebar. Confirm that tab's label updates and activating it opens the renamed file.
 11. Delete a file open in a background tab. Confirm the tab closes, then undo the delete and confirm it reopens.
 12. Open two files with the same name from different folders. Confirm both tabs show enough path to distinguish them.
-13. Open enough tabs to overflow the strip. Confirm it scrolls and the Active Tab stays visible.
+13. Open enough tabs to overflow the strip. Confirm they shrink first, then scroll, dashed edges appear at the overflow, the Active Tab stays visible, and `+` stays reachable.
 14. Close tabs with `CmdOrCtrl+W` until none remain. Confirm the empty state, then that a further `CmdOrCtrl+W` closes the window.
 15. Switch to a different folder with several tabs open, then switch back. Confirm tabs reset to that folder's last-opened file.

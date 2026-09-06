@@ -7,8 +7,14 @@ import {
 } from "react";
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
+import { horizontalOverflowEdges } from "../lib/scrollOverflow";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
+
+/** Comfortable width for a single title; tabs grow to this when space allows. */
+export const TAB_MAX_WIDTH_CLASS = "max-w-48";
+/** Stop shrinking here so the stem stays readable, then scroll. */
+export const TAB_MIN_WIDTH_CLASS = "min-w-24";
 
 const NO_DRAG_STYLE = {
 	WebkitAppRegion: "no-drag",
@@ -53,6 +59,7 @@ export function TabStrip({
 	const renameInputRef = useRef<HTMLInputElement | null>(null);
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [draft, setDraft] = useState("");
+	const [overflow, setOverflow] = useState({ start: false, end: false });
 
 	const anchor = Math.max(
 		0,
@@ -65,6 +72,26 @@ export function TabStrip({
 			inline: "nearest",
 		});
 	}, [anchor]);
+
+	useEffect(() => {
+		if (tabs.length === 0) {
+			setOverflow({ start: false, end: false });
+			return;
+		}
+		const el = stripRef.current;
+		if (!el) return;
+		const update = () => setOverflow(horizontalOverflowEdges(el));
+		update();
+		el.addEventListener("scroll", update, { passive: true });
+		window.addEventListener("resize", update);
+		const resize = new ResizeObserver(update);
+		resize.observe(el);
+		return () => {
+			el.removeEventListener("scroll", update);
+			window.removeEventListener("resize", update);
+			resize.disconnect();
+		};
+	}, [tabs.length]);
 
 	useEffect(() => {
 		if (!editingId) return;
@@ -133,82 +160,92 @@ export function TabStrip({
 		<div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
 			{tabs.length > 0 ? (
 				<div
-					ref={stripRef}
-					role="tablist"
-					aria-label="Open notes"
-					onKeyDown={onKeyDown}
-					className="flex min-w-0 items-stretch gap-px overflow-x-auto"
+					className={cn(
+						"min-w-0 flex-1",
+						overflow.start && "[border-inline-start:1px_dashed_var(--border)]",
+						overflow.end && "[border-inline-end:1px_dashed_var(--border)]",
+					)}
 				>
-					{tabs.map((tab, index) => {
-						const active = tab.id === activeTabId;
-						const editing = editingId === tab.id;
-						return (
-							<div
-								key={tab.id}
-								data-selected={active ? "true" : undefined}
-								className={cn(
-									"group flex h-7 min-w-0 items-center gap-0.5 rounded-sm pr-0.5 pl-2",
-									active
-										? "bg-muted text-foreground"
-										: "text-muted-foreground hover:bg-muted/60",
-								)}
-								style={NO_DRAG_STYLE}
-							>
-								{editing ? (
-									<input
-										ref={renameInputRef}
-										className="h-5 w-28 min-w-0 select-text rounded-sm bg-transparent px-0.5 text-xs text-foreground outline-none"
-										value={draft}
-										aria-label={`Rename ${tab.label}`}
-										onBlur={() => commitRename(tab.id)}
-										onChange={(event) => setDraft(event.target.value)}
-										onKeyDown={(event) => {
-											event.stopPropagation();
-											if (event.key === "Enter") {
+					<div
+						ref={stripRef}
+						role="tablist"
+						aria-label="Open notes"
+						onKeyDown={onKeyDown}
+						className="flex min-w-0 items-stretch gap-px overflow-x-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+					>
+						{tabs.map((tab, index) => {
+							const active = tab.id === activeTabId;
+							const editing = editingId === tab.id;
+							return (
+								<div
+									key={tab.id}
+									data-selected={active ? "true" : undefined}
+									className={cn(
+										"group flex h-7 min-w-0 flex-1 items-center gap-0.5 rounded-sm pr-0.5 pl-2",
+										TAB_MIN_WIDTH_CLASS,
+										TAB_MAX_WIDTH_CLASS,
+										active
+											? "bg-muted text-foreground"
+											: "text-muted-foreground hover:bg-muted/60",
+									)}
+									style={NO_DRAG_STYLE}
+								>
+									{editing ? (
+										<input
+											ref={renameInputRef}
+											className="h-5 w-28 min-w-0 select-text rounded-sm bg-transparent px-0.5 text-xs text-foreground outline-none"
+											value={draft}
+											aria-label={`Rename ${tab.label}`}
+											onBlur={() => commitRename(tab.id)}
+											onChange={(event) => setDraft(event.target.value)}
+											onKeyDown={(event) => {
+												event.stopPropagation();
+												if (event.key === "Enter") {
+													event.preventDefault();
+													commitRename(tab.id);
+												} else if (event.key === "Escape") {
+													event.preventDefault();
+													cancelRename();
+												}
+											}}
+										/>
+									) : (
+										<button
+											type="button"
+											role="tab"
+											aria-selected={active}
+											tabIndex={index === anchor ? 0 : -1}
+											title={tab.title}
+											onClick={() => onActivate(tab.id)}
+											onDoubleClick={() => {
+												if (active) beginRename(tab);
+											}}
+											onAuxClick={(event) => {
+												if (event.button !== 1) return;
 												event.preventDefault();
-												commitRename(tab.id);
-											} else if (event.key === "Escape") {
-												event.preventDefault();
-												cancelRename();
-											}
-										}}
-									/>
-								) : (
+												onClose(tab.id);
+											}}
+											className="min-w-0 flex-1 truncate py-0.5 text-start text-xs"
+										>
+											{tab.label}
+										</button>
+									)}
 									<button
 										type="button"
-										role="tab"
-										aria-selected={active}
-										tabIndex={index === anchor ? 0 : -1}
-										title={tab.title}
-										onClick={() => onActivate(tab.id)}
-										onDoubleClick={() => {
-											if (active) beginRename(tab);
-										}}
-										onAuxClick={(event) => {
-											if (event.button !== 1) return;
-											event.preventDefault();
-											onClose(tab.id);
-										}}
-										className="max-w-36 truncate py-0.5 text-xs"
+										tabIndex={-1}
+										aria-label={`Close ${tab.label}`}
+										onClick={() => onClose(tab.id)}
+										className={cn(
+											"shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
+											active && "opacity-100",
+										)}
 									>
-										{tab.label}
+										<MingcuteCloseLine className="size-3" />
 									</button>
-								)}
-								<button
-									type="button"
-									tabIndex={-1}
-									aria-label={`Close ${tab.label}`}
-									onClick={() => onClose(tab.id)}
-									className={cn(
-										"rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
-										active && "opacity-100",
-									)}
-								>
-									<MingcuteCloseLine className="size-3" />
-								</button>
-							</div>
-						);
-					})}
+								</div>
+							);
+						})}
+					</div>
 				</div>
 			) : null}
 			{onNewTab ? (
