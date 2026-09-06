@@ -107,10 +107,22 @@ export type SidebarSelectionState = {
 export type SidebarSelectionMode =
 	// plain click: select only this row
 	| "replace"
-	// cmd/ctrl click: add or remove this row from the selection
+	// add or remove one row without a click gesture
 	| "toggle"
 	// shift click: select every row between the anchor and this row
 	| "range";
+
+export type SidebarRowClickMode = "range" | "new-tab" | "replace";
+
+/** Shift range-selects. Cmd/Ctrl-click opens a file in a new tab. */
+export function sidebarRowClickMode(
+	event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean },
+	kind: "file" | "folder",
+): SidebarRowClickMode {
+	if (event.shiftKey) return "range";
+	if ((event.metaKey || event.ctrlKey) && kind === "file") return "new-tab";
+	return "replace";
+}
 
 export type SidebarMoveCandidate =
 	| {
@@ -403,6 +415,7 @@ export function Sidebar({
 	onCollapse,
 	onSortModeChange,
 	onSelectFile,
+	onOpenFileInNewTab,
 	onOpenFileInDefaultApp,
 	onRevealFile,
 	onCopyFilePath,
@@ -434,6 +447,7 @@ export function Sidebar({
 	onCollapse?: () => void;
 	onSortModeChange: (mode: SidebarSortMode) => void;
 	onSelectFile: (path: string) => void;
+	onOpenFileInNewTab?: (path: string) => void;
 	onOpenFileInDefaultApp?: (path: string) => void;
 	onRevealFile?: (path: string) => void;
 	onCopyFilePath?: (path: string) => void;
@@ -585,16 +599,18 @@ export function Sidebar({
 		row: SidebarSelectableRow,
 		event: React.MouseEvent<HTMLButtonElement>,
 	) => {
-		const mode: SidebarSelectionMode = event.shiftKey
-			? "range"
-			: event.metaKey || event.ctrlKey
-				? "toggle"
-				: "replace";
-		updateSelection(row, mode);
-		if (mode !== "replace") {
+		const clickMode = sidebarRowClickMode(event, row.kind);
+		if (clickMode === "range") {
+			updateSelection(row, "range");
 			event.preventDefault();
 			return;
 		}
+		if (clickMode === "new-tab" && onOpenFileInNewTab && row.kind === "file") {
+			event.preventDefault();
+			onOpenFileInNewTab(row.file.path);
+			return;
+		}
+		updateSelection(row, "replace");
 		if (row.kind === "file" && event.detail > 1) return;
 		activateRow(row);
 		requestAnimationFrame(() => navRef.current?.focus());

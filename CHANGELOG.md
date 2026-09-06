@@ -9,9 +9,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Open several notes at once as tabs in the top bar. A sidebar click reuses the current tab; `Cmd/Ctrl`-click opens a new tab in the background; `+` and `Cmd/Ctrl+T` open the file palette in a new tab. Crowded tabs shrink like Chrome, then the strip scrolls with dashed overflow edges. Each tab keeps its own back and forward history and its own scroll position, and `Cmd/Ctrl+W` closes a tab before closing the window. Thanks [@MonisMS](https://github.com/MonisMS)! [#282](https://github.com/bholmesdev/hubble.md/pull/282)
+
 ### Changed
 
 ### Fixed
+
+- Typing and immediately opening another note no longer loses the last few characters. The open note is now saved before navigating rather than as the editor closes.
 
 ## [0.1.28] - 2026-08-19
 

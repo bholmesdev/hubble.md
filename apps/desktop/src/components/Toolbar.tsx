@@ -29,7 +29,6 @@ import {
 	hasMarkdownExtension,
 	hasTextExtension,
 	isEditableFile,
-	pathEquals,
 	relativeWorkspacePath,
 	supportsSourceToggle,
 } from "../lib/filePath";
@@ -39,7 +38,6 @@ import {
 	goBack,
 	goForward,
 	openPathInDefaultApp,
-	renameCurrentMarkdownFile,
 	requestChatAboutNote,
 	setViewerMode,
 	toggleSidebar,
@@ -50,27 +48,15 @@ import {
 	currentPathStore,
 	reviewThreadsStore,
 	sidebarOpenStore,
-	titleGenerationPreviewStore,
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
 import { ClaudeLogo, CodexLogo } from "./AgentLogos";
+import { DocumentTabs } from "./DocumentTabs";
 
 const dragRegionStyle = {
 	WebkitAppRegion: "drag",
 } as CSSProperties;
-
-type TitlePreview = { path: string; previewPath: string } | null;
-
-export function toolbarPathForTitlePreview(
-	currentPath: string | null | undefined,
-	titlePreview: TitlePreview,
-) {
-	if (!currentPath || titlePreview?.path !== currentPath) return currentPath;
-	return pathEquals(currentPath, titlePreview.previewPath)
-		? currentPath
-		: titlePreview.previewPath;
-}
 
 // Traffic lights are hidden in fullscreen, so drop their reserved inset.
 function useIsFullScreen() {
@@ -85,21 +71,21 @@ function useIsFullScreen() {
 export function Toolbar({
 	scrollContainer,
 	showSidebarBadge = false,
+	onNewTab,
 }: {
 	scrollContainer: HTMLDivElement | null;
 	showSidebarBadge?: boolean;
+	onNewTab?: () => void;
 }) {
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
-	const titlePreview = useStoreValue(titleGenerationPreviewStore);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const isFullScreen = useIsFullScreen();
 	const compact = useCompactWindow();
 	// The changelog note is virtual: show a friendly title and disable the
 	// file actions (rename, reveal, copy path) that assume a file on disk.
 	const isChangelog = isChangelogPath(currentPath);
-	const toolbarPath = toolbarPathForTitlePreview(currentPath, titlePreview);
 	const actionPath = currentPath && !isChangelog ? currentPath : null;
 	const comments: ReviewCommentSummaryProps | null =
 		currentPath && hasMarkdownExtension(currentPath)
@@ -111,10 +97,11 @@ export function Toolbar({
 						kind === "success" ? toast.success(message) : toast.error(message),
 				}
 			: null;
+	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
 
 	return (
 		<SharedToolbar
-			currentPath={isChangelog ? "What's new" : (toolbarPath ?? null)}
+			currentPath={isChangelog ? "What's new" : (currentPath ?? null)}
 			sidebarOpen={sidebarOpen}
 			sidebarOverlays={compact}
 			sidebarBadge={showSidebarBadge}
@@ -123,12 +110,10 @@ export function Toolbar({
 			rootProps={{ style: dragRegionStyle }}
 			onToggleSidebar={toggleSidebar}
 			leftSlot={compact ? null : <NavigationControls />}
-			onMoveWindow={(x, y) => void desktopApi.moveWindow(x, y)}
-			onRenameCurrentPath={
-				isChangelog
-					? undefined
-					: (nextName) => void renameCurrentMarkdownFile(nextName)
+			centerSlot={
+				<DocumentTabs onNewTab={onNewTab} newTabTitle={newTabTitle} />
 			}
+			onMoveWindow={(x, y) => void desktopApi.moveWindow(x, y)}
 			rightSlot={
 				<div className="flex items-center gap-1">
 					{!compact && (

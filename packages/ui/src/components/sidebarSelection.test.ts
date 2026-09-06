@@ -7,6 +7,7 @@ import {
 	sidebarFocusTarget,
 	sidebarMoveCandidateFromRow,
 	sidebarMoveItemsForDrag,
+	sidebarRowClickMode,
 	sidebarRowKey,
 	snapSidebarSelection,
 } from "./Sidebar";
@@ -126,6 +127,56 @@ describe("sidebarCreationFolderId", () => {
 				selectedKeys: new Set(["folder:project/", "file:/workspace/a.md"]),
 			}),
 		).toBeNull();
+	});
+});
+
+describe("sidebarRowClickMode", () => {
+	it("keeps Shift+click as range select", () => {
+		expect(
+			sidebarRowClickMode(
+				{ shiftKey: true, metaKey: false, ctrlKey: false },
+				"file",
+			),
+		).toBe("range");
+		expect(
+			sidebarRowClickMode(
+				{ shiftKey: true, metaKey: true, ctrlKey: false },
+				"folder",
+			),
+		).toBe("range");
+	});
+
+	it("uses Cmd/Ctrl-click on a file to open a tab, not to multi-select", () => {
+		expect(
+			sidebarRowClickMode(
+				{ shiftKey: false, metaKey: true, ctrlKey: false },
+				"file",
+			),
+		).toBe("new-tab");
+		expect(
+			sidebarRowClickMode(
+				{ shiftKey: false, metaKey: false, ctrlKey: true },
+				"file",
+			),
+		).toBe("new-tab");
+	});
+
+	it("does not treat Cmd/Ctrl-click on a folder as a new tab", () => {
+		expect(
+			sidebarRowClickMode(
+				{ shiftKey: false, metaKey: true, ctrlKey: false },
+				"folder",
+			),
+		).toBe("replace");
+	});
+
+	it("opens on a plain click", () => {
+		expect(
+			sidebarRowClickMode(
+				{ shiftKey: false, metaKey: false, ctrlKey: false },
+				"file",
+			),
+		).toBe("replace");
 	});
 });
 

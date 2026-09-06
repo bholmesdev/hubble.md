@@ -59,9 +59,12 @@ import {
 import { isCompactWindow, useCompactWindow } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { isDefaultLanguage, languageName } from "./lib/spellcheckLanguages";
+import { useScrollMemory } from "./lib/useScrollMemory";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
 import {
+	activateAdjacentTab,
+	closeActiveTab,
 	createWorkspaceWithSidebar,
 	editorDocumentId,
 	forceKeepLocalEdits,
@@ -72,6 +75,7 @@ import {
 	loadPath,
 	loadSettingsState,
 	openChangelog,
+	openTabForPath,
 	openWorkspace,
 	openWorkspaceWithSidebar,
 	reconcileWorkspacePath,
@@ -98,6 +102,7 @@ import {
 	shortcutBindingsStore,
 	sidebarOpenStore,
 	spellcheckStore,
+	tabsStore,
 	telemetryConsentStore,
 	terminalPositionStore,
 	uiStore,
@@ -199,11 +204,13 @@ function App() {
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
 	const shortcutBindings = useStoreValue(shortcutBindingsStore);
+	const tabs = useStoreValue(tabsStore);
 	const hasWorkspace = workspacePath !== null;
 	const { canGoBack: menuCanGoBack, canGoForward: menuCanGoForward } =
 		useHistoryNav();
 	const [scrollContainerEl, setScrollContainerEl] =
 		useState<HTMLDivElement | null>(null);
+	useScrollMemory(state.currentPath, scrollContainerEl);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [copyAsMarkdownRequest, setCopyAsMarkdownRequest] = useState(0);
 	const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(
@@ -220,6 +227,7 @@ function App() {
 	};
 	const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
+	const [searchOpensInNewTab, setSearchOpensInNewTab] = useState(false);
 	const [searchFolderParent, setSearchFolderParent] = useState<string | null>(
 		null,
 	);
@@ -255,7 +263,12 @@ function App() {
 	}, [compact]);
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
+		else setSearchOpensInNewTab(false);
 		setSearchOpen(open);
+	};
+	const openSearch = (mode: "current" | "new-tab") => {
+		setSearchOpensInNewTab(mode === "new-tab");
+		changeSearchOpen(true);
 	};
 	const paletteCommands = buildAppCommands(
 		{
@@ -263,6 +276,7 @@ function App() {
 			requestCopyAsMarkdown: () =>
 				setCopyAsMarkdownRequest((request) => request + 1),
 			focusSidebar: focusSidebarNav,
+			openNewTab: () => openSearch("new-tab"),
 		},
 		{
 			currentPath: state.currentPath ?? null,
@@ -399,6 +413,8 @@ function App() {
 			isSourceMode: state.viewMode === "source",
 			canGoBack: menuCanGoBack,
 			canGoForward: menuCanGoForward,
+			hasTabs: tabs.order.length > 0,
+			hasMultipleTabs: tabs.order.length > 1,
 		});
 	}, [
 		hasWorkspace,
@@ -406,6 +422,7 @@ function App() {
 		menuCanGoForward,
 		state.currentPath,
 		state.viewMode,
+		tabs.order.length,
 	]);
 
 	useEffect(() => {
@@ -450,7 +467,8 @@ function App() {
 				"app.settings": () => setSettingsOpen(true),
 				"app.open-recent": () => setWorkspaceSwitcherOpen(true),
 				// The File menu accelerator fires too, but opening is idempotent.
-				"app.go-to-file": () => changeSearchOpen(true),
+				"app.go-to-file": () => openSearch("current"),
+				"app.new-tab": () => openSearch("new-tab"),
 				"app.open-folder": openWorkspaceWithSidebar,
 				"app.open-file": openFilePicker,
 				"app.copy-path": () => copyFilePath(currentPath),
@@ -478,7 +496,7 @@ function App() {
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen, focusedCreationFolder, focusedSidebarPath]);
+	}, [openSearch, focusedCreationFolder, focusedSidebarPath]);
 
 	useEffect(() => {
 		let active = true;
@@ -529,11 +547,15 @@ function App() {
 			desktopApi.onMenuShowWorkspaceSwitcher(() =>
 				setWorkspaceSwitcherOpen(true),
 			),
-			desktopApi.onMenuGoToFile(() => changeSearchOpen(true)),
+			desktopApi.onMenuGoToFile(() => openSearch("current")),
+			desktopApi.onMenuNewTab(() => openSearch("new-tab")),
 			desktopApi.onMenuSyncWorkspace(() => void refreshFiles()),
 			desktopApi.onMenuToggleTerminal(() => toggleTerminal()),
 			desktopApi.onMenuGoBack(() => void goBack()),
 			desktopApi.onMenuGoForward(() => void goForward()),
+			desktopApi.onMenuCloseTab(() => void closeActiveTab()),
+			desktopApi.onMenuNextTab(() => void activateAdjacentTab(1)),
+			desktopApi.onMenuPreviousTab(() => void activateAdjacentTab(-1)),
 			desktopApi.onMenuToggleSourceMode(() => {
 				const current = viewerStore.get();
 				if (
@@ -549,7 +571,7 @@ function App() {
 			for (const dispose of disposers) dispose();
 		};
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen, focusedCreationFolder]);
+	}, [openSearch, focusedCreationFolder]);
 
 	useEffect(() => {
 		// Window focus can fire in bursts when switching apps, so debounce the
@@ -687,6 +709,7 @@ function App() {
 						whatsNewVersion !== null ||
 						telemetryConsent === "unset")
 				}
+				onNewTab={hasWorkspace ? () => openSearch("new-tab") : undefined}
 			/>
 			<div className="relative flex min-h-0 flex-1 overflow-hidden">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
@@ -748,45 +771,47 @@ function App() {
 					aria-live="polite"
 					onFocusCapture={closeSidebarOverlay}
 				>
-					<div className="flex-1 min-h-0 min-w-0 relative">
-						{state.status === "loading" && <p>Loading…</p>}
-						{state.status === "error" && (
-							<p>{state.error ?? "Failed to open file."}</p>
-						)}
-						{state.status !== "loading" &&
-							state.status !== "error" &&
-							!state.currentPath && (
-								<div className="flex h-full items-center justify-center p-6">
-									{hasWorkspace ? (
-										<Button onClick={() => void openFilePicker()}>
-											Open file
-										</Button>
-									) : (
-										<WelcomeScreen
-											onCreateFolder={() => void createWorkspaceWithSidebar()}
-											onOpenFolder={() => void openWorkspaceWithSidebar()}
+					<div className="flex-1 min-h-0 min-w-0 flex flex-col">
+						<div className="flex-1 min-h-0 min-w-0 relative">
+							{state.status === "loading" && <p>Loading…</p>}
+							{state.status === "error" && (
+								<p>{state.error ?? "Failed to open file."}</p>
+							)}
+							{state.status !== "loading" &&
+								state.status !== "error" &&
+								!state.currentPath && (
+									<div className="flex h-full items-center justify-center p-6">
+										{hasWorkspace ? (
+											<Button onClick={() => void openFilePicker()}>
+												Open file
+											</Button>
+										) : (
+											<WelcomeScreen
+												onCreateFolder={() => void createWorkspaceWithSidebar()}
+												onOpenFolder={() => void openWorkspaceWithSidebar()}
+											/>
+										)}
+									</div>
+								)}
+							{state.status === "ready" && state.currentPath && (
+								<div className="flex h-full min-h-0 flex-col">
+									{state.externalChange.kind === "conflict" && (
+										<ExternalChangeBanner
+											onKeepMyEdits={() => void forceKeepLocalEdits()}
+											onReloadFromDisk={reloadFromDiskConflict}
 										/>
 									)}
+									<DocumentViewer
+										path={state.currentPath}
+										content={state.content}
+										copyAsMarkdownRequest={copyAsMarkdownRequest}
+										viewMode={state.viewMode}
+										spellcheckStatus={spellcheckStatus}
+										onScrollContainerChange={setScrollContainerEl}
+									/>
 								</div>
 							)}
-						{state.status === "ready" && state.currentPath && (
-							<div className="flex h-full min-h-0 flex-col">
-								{state.externalChange.kind === "conflict" && (
-									<ExternalChangeBanner
-										onKeepMyEdits={() => void forceKeepLocalEdits()}
-										onReloadFromDisk={reloadFromDiskConflict}
-									/>
-								)}
-								<DocumentViewer
-									path={state.currentPath}
-									content={state.content}
-									copyAsMarkdownRequest={copyAsMarkdownRequest}
-									viewMode={state.viewMode}
-									spellcheckStatus={spellcheckStatus}
-									onScrollContainerChange={setScrollContainerEl}
-								/>
-							</div>
-						)}
+						</div>
 					</div>
 					<TerminalPanel />
 				</section>
@@ -795,7 +820,9 @@ function App() {
 				open={searchOpen}
 				onOpenChange={changeSearchOpen}
 				files={paletteFiles}
-				onSelectFile={(path) => void loadPath(path)}
+				onSelectFile={(path) =>
+					void (searchOpensInNewTab ? openTabForPath(path) : loadPath(path))
+				}
 				searchContents={searchFileContents}
 				commands={paletteCommands}
 				recentCommandIds={recentCommandIds}

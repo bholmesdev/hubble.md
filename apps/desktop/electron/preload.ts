@@ -150,6 +150,7 @@ const desktopApi = {
 	onMenuShowWorkspaceSwitcher: (callback) =>
 		subscribe("desktop:menu-show-workspace-switcher", callback),
 	onMenuGoToFile: (callback) => subscribe("desktop:menu-go-to-file", callback),
+	onMenuNewTab: (callback) => subscribe("desktop:menu-new-tab", callback),
 	onMenuSyncWorkspace: (callback) =>
 		subscribe("desktop:menu-sync-workspace", callback),
 	onWorkspaceChanged: (callback) =>
@@ -158,6 +159,10 @@ const desktopApi = {
 		subscribe("desktop:menu-toggle-terminal", callback),
 	onMenuGoBack: (callback) => subscribe("desktop:menu-go-back", callback),
 	onMenuGoForward: (callback) => subscribe("desktop:menu-go-forward", callback),
+	onMenuCloseTab: (callback) => subscribe("desktop:menu-close-tab", callback),
+	onMenuNextTab: (callback) => subscribe("desktop:menu-next-tab", callback),
+	onMenuPreviousTab: (callback) =>
+		subscribe("desktop:menu-previous-tab", callback),
 	onMenuToggleSourceMode: (callback) =>
 		subscribe("desktop:menu-toggle-source-mode", callback),
 	onUndoDelete: (callback) => subscribe("desktop:undo-delete", callback),

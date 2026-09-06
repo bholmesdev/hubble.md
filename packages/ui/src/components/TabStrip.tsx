@@ -1,0 +1,266 @@
+import {
+	type CSSProperties,
+	type KeyboardEvent as ReactKeyboardEvent,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import MingcuteAddLine from "~icons/mingcute/add-line";
+import MingcuteCloseLine from "~icons/mingcute/close-line";
+import { horizontalOverflowEdges } from "../lib/scrollOverflow";
+import { cn } from "../lib/utils";
+import { Button } from "../primitives/button";
+
+/** Comfortable width for a single title; tabs grow to this when space allows. */
+export const TAB_MAX_WIDTH_CLASS = "max-w-48";
+/** Stop shrinking here so the stem stays readable, then scroll. */
+export const TAB_MIN_WIDTH_CLASS = "min-w-24";
+
+const NO_DRAG_STYLE = {
+	WebkitAppRegion: "no-drag",
+} as CSSProperties;
+
+export type TabStripItem = {
+	id: string;
+	label: string;
+	/** Shown on hover, where the full path disambiguates two similar labels. */
+	title: string;
+	/** File name without a folder prefix. Used when renaming. */
+	name?: string;
+};
+
+export type TabStripProps = {
+	tabs: TabStripItem[];
+	activeTabId: string | null;
+	onActivate: (id: string) => void;
+	onClose: (id: string) => void;
+	onNewTab?: () => void;
+	newTabTitle?: string;
+	onRename?: (id: string, nextName: string) => void;
+};
+
+const tabAt = (strip: HTMLElement | null, index: number) =>
+	strip?.querySelectorAll<HTMLElement>('[role="tab"]')[index];
+
+/**
+ * Open notes in the top bar, where the file name used to sit. The strip is
+ * one stop in the page's tab order; arrow keys move between notes from there.
+ */
+export function TabStrip({
+	tabs,
+	activeTabId,
+	onActivate,
+	onClose,
+	onNewTab,
+	newTabTitle = "New tab",
+	onRename,
+}: TabStripProps) {
+	const stripRef = useRef<HTMLDivElement | null>(null);
+	const renameInputRef = useRef<HTMLInputElement | null>(null);
+	const [editingId, setEditingId] = useState<string | null>(null);
+	const [draft, setDraft] = useState("");
+	const [overflow, setOverflow] = useState({ start: false, end: false });
+
+	const anchor = Math.max(
+		0,
+		tabs.findIndex((tab) => tab.id === activeTabId),
+	);
+
+	useEffect(() => {
+		tabAt(stripRef.current, anchor)?.scrollIntoView?.({
+			block: "nearest",
+			inline: "nearest",
+		});
+	}, [anchor]);
+
+	useEffect(() => {
+		if (tabs.length === 0) {
+			setOverflow({ start: false, end: false });
+			return;
+		}
+		const el = stripRef.current;
+		if (!el) return;
+		const update = () => setOverflow(horizontalOverflowEdges(el));
+		update();
+		el.addEventListener("scroll", update, { passive: true });
+		window.addEventListener("resize", update);
+		const resize = new ResizeObserver(update);
+		resize.observe(el);
+		return () => {
+			el.removeEventListener("scroll", update);
+			window.removeEventListener("resize", update);
+			resize.disconnect();
+		};
+	}, [tabs.length]);
+
+	useEffect(() => {
+		if (!editingId) return;
+		renameInputRef.current?.focus();
+		renameInputRef.current?.select();
+	}, [editingId]);
+
+	useEffect(() => {
+		if (editingId && !tabs.some((tab) => tab.id === editingId)) {
+			setEditingId(null);
+			setDraft("");
+		}
+	}, [editingId, tabs]);
+
+	const beginRename = (tab: TabStripItem) => {
+		if (!onRename) return;
+		setDraft(tab.name ?? tab.label);
+		setEditingId(tab.id);
+	};
+
+	const cancelRename = () => {
+		setEditingId(null);
+		setDraft("");
+	};
+
+	const commitRename = (id: string) => {
+		const nextName = draft.trim();
+		const current = tabs.find((tab) => tab.id === id);
+		cancelRename();
+		const original = current?.name ?? current?.label;
+		if (!nextName || !current || nextName === original || !onRename) return;
+		onRename(id, nextName);
+	};
+
+	const focusTabAt = (index: number) => {
+		tabAt(stripRef.current, index)?.focus();
+	};
+
+	const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+		if (editingId) return;
+		const target =
+			event.key === "ArrowLeft"
+				? (anchor - 1 + tabs.length) % tabs.length
+				: event.key === "ArrowRight"
+					? (anchor + 1) % tabs.length
+					: event.key === "Home"
+						? 0
+						: event.key === "End"
+							? tabs.length - 1
+							: null;
+		if (target !== null) {
+			event.preventDefault();
+			onActivate(tabs[target].id);
+			focusTabAt(target);
+			return;
+		}
+		if (event.key === "Delete" || event.key === "Backspace") {
+			event.preventDefault();
+			onClose(tabs[anchor].id);
+		}
+	};
+
+	if (tabs.length === 0 && !onNewTab) return null;
+
+	return (
+		<div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
+			{tabs.length > 0 ? (
+				<div
+					className={cn(
+						"min-w-0 flex-1",
+						overflow.start && "[border-inline-start:1px_dashed_var(--border)]",
+						overflow.end && "[border-inline-end:1px_dashed_var(--border)]",
+					)}
+				>
+					<div
+						ref={stripRef}
+						role="tablist"
+						aria-label="Open notes"
+						onKeyDown={onKeyDown}
+						className="flex min-w-0 items-stretch gap-px overflow-x-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+					>
+						{tabs.map((tab, index) => {
+							const active = tab.id === activeTabId;
+							const editing = editingId === tab.id;
+							return (
+								<div
+									key={tab.id}
+									data-selected={active ? "true" : undefined}
+									className={cn(
+										"group flex h-7 min-w-0 flex-1 items-center gap-0.5 rounded-sm pr-0.5 pl-2",
+										TAB_MIN_WIDTH_CLASS,
+										TAB_MAX_WIDTH_CLASS,
+										active
+											? "bg-muted text-foreground"
+											: "text-muted-foreground hover:bg-muted/60",
+									)}
+									style={NO_DRAG_STYLE}
+								>
+									{editing ? (
+										<input
+											ref={renameInputRef}
+											className="h-5 w-28 min-w-0 select-text rounded-sm bg-transparent px-0.5 text-xs text-foreground outline-none"
+											value={draft}
+											aria-label={`Rename ${tab.label}`}
+											onBlur={() => commitRename(tab.id)}
+											onChange={(event) => setDraft(event.target.value)}
+											onKeyDown={(event) => {
+												event.stopPropagation();
+												if (event.key === "Enter") {
+													event.preventDefault();
+													commitRename(tab.id);
+												} else if (event.key === "Escape") {
+													event.preventDefault();
+													cancelRename();
+												}
+											}}
+										/>
+									) : (
+										<button
+											type="button"
+											role="tab"
+											aria-selected={active}
+											tabIndex={index === anchor ? 0 : -1}
+											title={tab.title}
+											onClick={() => onActivate(tab.id)}
+											onDoubleClick={() => {
+												if (active) beginRename(tab);
+											}}
+											onAuxClick={(event) => {
+												if (event.button !== 1) return;
+												event.preventDefault();
+												onClose(tab.id);
+											}}
+											className="min-w-0 flex-1 truncate py-0.5 text-start text-xs"
+										>
+											{tab.label}
+										</button>
+									)}
+									<button
+										type="button"
+										tabIndex={-1}
+										aria-label={`Close ${tab.label}`}
+										onClick={() => onClose(tab.id)}
+										className={cn(
+											"shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
+											active && "opacity-100",
+										)}
+									>
+										<MingcuteCloseLine className="size-3" />
+									</button>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+			) : null}
+			{onNewTab ? (
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					aria-label="New tab"
+					title={newTabTitle}
+					onClick={onNewTab}
+					className="shrink-0"
+					style={NO_DRAG_STYLE}
+				>
+					<MingcuteAddLine className="size-3.5" />
+				</Button>
+			) : null}
+		</div>
+	);
+}
