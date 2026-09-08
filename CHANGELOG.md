@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Opening a Markdown file from Finder now restores Hubble and brings it to the foreground. Thanks [@HDPark95](https://github.com/HDPark95) for the suggestion! [#288](https://github.com/bholmesdev/hubble.md/pull/288)
+
 ## [0.1.28] - 2026-08-19
 
 ### Added
