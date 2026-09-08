@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Opening a Markdown file from Finder now brings Hubble to the front, and opens a window when the app is running with none open. [#287](https://github.com/bholmesdev/hubble.md/issues/287)
+
 ## [0.1.28] - 2026-08-19
 
 ### Added
