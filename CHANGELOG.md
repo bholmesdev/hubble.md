@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Comment thread actions stay visible while long discussions scroll. Thanks [@LarrySequino](https://github.com/LarrySequino) for the suggestion! [#286](https://github.com/bholmesdev/hubble.md/pull/286)
+
 ## [0.1.28] - 2026-08-19
 
 ### Added
