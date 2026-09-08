@@ -649,58 +649,62 @@ export function ReviewCommentPopover({
 						/>
 					) : activeComment ? (
 						<div className="group/thread flex min-h-0 flex-1 flex-col">
-							<div className="min-h-0 flex-1 overflow-y-auto p-3">
-								<div className="flex h-6 items-center gap-2">
-									<span className="text-xs font-semibold">
-										{authorLabel(
-											activeComment.attrs.metadata?.author === "agent"
-												? "agent"
-												: "human",
+							<div
+								className="flex h-9 shrink-0 items-center gap-2 bg-popover px-3 pt-1.5"
+								data-review-comment-header
+							>
+								<span className="text-xs font-semibold">
+									{authorLabel(
+										activeComment.attrs.metadata?.author === "agent"
+											? "agent"
+											: "human",
+									)}
+								</span>
+								<div className="ms-auto flex items-center gap-0.5">
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-xs"
+										aria-label={
+											activeComment.attrs.resolved ? "Reopen" : "Resolve"
+										}
+										title={activeComment.attrs.resolved ? "Reopen" : "Resolve"}
+										onClick={toggleResolved}
+									>
+										{activeComment.attrs.resolved ? (
+											<MingcuteCheckCircleFill className="text-brand" />
+										) : (
+											<MingcuteCheckLine />
 										)}
-									</span>
-									<div className="ms-auto flex items-center gap-0.5">
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon-xs"
-											aria-label={
-												activeComment.attrs.resolved ? "Reopen" : "Resolve"
-											}
-											title={
-												activeComment.attrs.resolved ? "Reopen" : "Resolve"
-											}
-											onClick={toggleResolved}
-										>
-											{activeComment.attrs.resolved ? (
-												<MingcuteCheckCircleFill className="text-brand" />
-											) : (
-												<MingcuteCheckLine />
-											)}
-										</Button>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon-xs"
-											data-review-copy-agent-prompt
-											aria-label="Copy agent prompt"
-											title="Copy a prompt asking an agent to address this comment"
-											onClick={copyThreadPrompt}
-										>
-											<MingcuteCopy2Line />
-										</Button>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon-xs"
-											aria-label="Delete comment"
-											title="Delete comment"
-											className="hover:bg-destructive/10 hover:text-destructive"
-											onClick={removeComment}
-										>
-											<MingcuteDelete2Line />
-										</Button>
-									</div>
+									</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-xs"
+										data-review-copy-agent-prompt
+										aria-label="Copy agent prompt"
+										title="Copy a prompt asking an agent to address this comment"
+										onClick={copyThreadPrompt}
+									>
+										<MingcuteCopy2Line />
+									</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-xs"
+										aria-label="Delete comment"
+										title="Delete comment"
+										className="hover:bg-destructive/10 hover:text-destructive"
+										onClick={removeComment}
+									>
+										<MingcuteDelete2Line />
+									</Button>
 								</div>
+							</div>
+							<div
+								className="min-h-0 flex-1 overflow-y-auto px-3 pb-3"
+								data-review-comment-content
+							>
 								<blockquote className="mt-1 line-clamp-2 border-s-2 border-brand-accent ps-2 text-xs leading-snug text-muted-foreground">
 									{editor.state.doc.textBetween(
 										activeComment.from,

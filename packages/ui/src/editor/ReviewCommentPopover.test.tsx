@@ -132,6 +132,41 @@ describe("ReviewCommentPopover", () => {
 		);
 	});
 
+	it("keeps thread actions outside the scrolling content", async () => {
+		const editor = new Editor({
+			element: document.createElement("div"),
+			extensions: [StarterKit, ReviewMarkExtension],
+			content: markdownToTiptapDoc("{==commented==}{>>A note<<}{#c1}"),
+		});
+		editors.push(editor);
+
+		const viewport = document.createElement("div");
+		viewport.append(editor.view.dom);
+		document.body.append(viewport);
+		renderPopover(editor, viewport);
+
+		const mark = editor.view.dom.querySelector(
+			'[data-review-type="reviewComment"]',
+		);
+		await act(async () => {
+			mark?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+
+		const header = document.querySelector("[data-review-comment-header]");
+		const content = document.querySelector("[data-review-comment-content]");
+		expect(header).toBeInstanceOf(HTMLElement);
+		expect(content).toBeInstanceOf(HTMLElement);
+		expect(content?.contains(header)).toBe(false);
+		expect(header?.querySelector('[aria-label="Resolve"]')).not.toBeNull();
+		expect(
+			header?.querySelector("[data-review-copy-agent-prompt]"),
+		).not.toBeNull();
+		expect(
+			header?.querySelector('[aria-label="Delete comment"]'),
+		).not.toBeNull();
+		expect(content?.querySelector('[aria-label="Reply text"]')).not.toBeNull();
+	});
+
 	it("publishes threads and acts on one by id", async () => {
 		const editor = new Editor({
 			element: document.createElement("div"),
