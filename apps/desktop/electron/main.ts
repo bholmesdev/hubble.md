@@ -1997,6 +1997,14 @@ if (!singleInstanceLock) {
 		const resolved = resolvePath(filePath);
 		grantFileWithParent(resolved);
 		pendingOpenPath = resolved;
+		if (!mainWindow || mainWindow.isDestroyed()) {
+			if (app.isReady()) void createWindow();
+			return;
+		}
+		if (mainWindow.isMinimized()) mainWindow.restore();
+		mainWindow.show();
+		app.focus({ steal: true });
+		mainWindow.focus();
 		sendToRenderer("desktop:open-file", toRendererPath(resolved));
 	});
 
