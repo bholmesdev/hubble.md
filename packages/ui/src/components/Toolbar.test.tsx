@@ -95,6 +95,17 @@ describe("Toolbar", () => {
 		expect(document.querySelector("input")).toBeInstanceOf(HTMLInputElement);
 	});
 
+	it("replaces the file name with a center slot", () => {
+		renderToolbar({
+			centerSlot: <span data-testid="tabs">tabs</span>,
+		});
+
+		expect(document.querySelector("[data-testid='tabs']")?.textContent).toBe(
+			"tabs",
+		);
+		expect(titleButtonOrNull()).toBeNull();
+	});
+
 	it("updates shortcut hints when bindings change", () => {
 		renderToolbar({ onToggleSidebar: () => {} });
 		const toggle = document.querySelector('[aria-label="Toggle sidebar"]');
@@ -114,9 +125,11 @@ describe("Toolbar", () => {
 function renderToolbar({
 	onMoveWindow,
 	onToggleSidebar,
+	centerSlot,
 }: {
 	onMoveWindow?: (x: number, y: number) => void;
 	onToggleSidebar?: () => void;
+	centerSlot?: ReactNode;
 } = {}) {
 	const container = document.createElement("div");
 	document.body.append(container);
@@ -130,13 +143,22 @@ function renderToolbar({
 				onToggleSidebar={onToggleSidebar}
 				onRenameCurrentPath={() => {}}
 				onMoveWindow={onMoveWindow}
+				centerSlot={centerSlot}
 			/>,
 		);
 	});
 }
 
+function titleButtonOrNull() {
+	return (
+		[...document.querySelectorAll("button")].find(
+			(button) => button.textContent === "note.md",
+		) ?? null
+	);
+}
+
 function titleButton() {
-	const button = document.querySelector("button");
+	const button = titleButtonOrNull();
 	if (!button) throw new Error("Missing title button");
 	return button;
 }

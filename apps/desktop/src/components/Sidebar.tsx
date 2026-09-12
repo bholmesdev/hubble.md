@@ -19,6 +19,7 @@ import {
 	deleteSidebarItems,
 	loadPath,
 	moveSidebarItems,
+	openBackgroundTab,
 	openPathInDefaultApp,
 	openWorkspace,
 	renameFolder,
@@ -115,6 +116,7 @@ export function Sidebar({
 				void loadPath(path);
 				if (compact) collapseSidebar();
 			}}
+			onOpenFileInNewTab={(path) => void openBackgroundTab(path)}
 			onOpenFileInDefaultApp={(path) => void openPathInDefaultApp(path)}
 			onRevealFile={(path) => void desktopApi.revealFile(path)}
 			onCopyFilePath={(path) => void copyFilePath(path)}

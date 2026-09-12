@@ -7,6 +7,7 @@ import {
 	type FolderEntry,
 	type SortMode,
 } from "./state";
+import { emptyTabs, type TabsState } from "./tabs";
 
 type WorkspaceState = {
 	workspacePath: string | null;
@@ -43,6 +44,7 @@ export type CodeFileOpenMode = "hubble" | "default-app";
 export type DesktopState = {
 	workspace: WorkspaceState;
 	document: DocumentState;
+	tabs: TabsState;
 	ui: UiState;
 	settings: SettingsState;
 };
@@ -107,6 +109,9 @@ export function getInitialState(): DesktopState {
 	return {
 		workspace: hydrateWorkspace(p?.workspace),
 		document: emptyDoc(p?.document?.lastOpenedPath ?? null),
+		// Tabs are session state, like the back/forward stacks. Launch restores
+		// the last opened note, which opens a single Tab through the usual path.
+		tabs: emptyTabs(),
 		ui: {
 			sidebarOpen: p?.ui?.sidebarOpen ?? false,
 			isSwitcherOpen: false,

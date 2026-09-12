@@ -8,9 +8,12 @@ import {
 	appStore,
 	emptyDoc,
 	historyStore,
+	tabsStore,
 	viewerStore,
 	workspaceStore,
 } from "./state";
+
+import { findTabByPath, type TabId, withoutTabsMatching } from "./tabs";
 
 const UNDO_MS = 5000;
 
@@ -22,6 +25,10 @@ type PendingDelete = {
 	removedLastOpened: Record<string, string>;
 	historyBefore: ReturnType<typeof historyStore.get>;
 	historyAfter: ReturnType<typeof historyStore.get>;
+	// Snapshotting the whole slice restores closed Tabs at their old positions,
+	// the same trick the history stacks above use.
+	tabsBefore: ReturnType<typeof tabsStore.get>;
+	tabsAfter: ReturnType<typeof tabsStore.get>;
 	pinRemovalSaved: Promise<void>;
 	toastId: string | number | null;
 	claimed: boolean;
@@ -34,7 +41,7 @@ type DeleteDeps = {
 	refreshFileList: () => Promise<void>;
 	loadPath: (
 		path: string,
-		options: { history: "none"; launchExternal: false },
+		options: { history: "none"; launchExternal: false; tab?: TabId },
 	) => Promise<void>;
 	syncPins: () => Promise<void>;
 	stopTitleRenames: (path: string) => void;
@@ -127,11 +134,26 @@ export function createDeleteActions(deps: DeleteDeps) {
 			if (historyStore.get() === deletion.historyAfter) {
 				historyStore.set(deletion.historyBefore);
 			}
+			// Only restore Tabs the user has not rearranged since; otherwise the
+			// undo would throw away newer work to reinstate a stale strip.
+			if (tabsStore.get() === deletion.tabsAfter) {
+				appStore.set((state) => ({ ...state, tabs: deletion.tabsBefore }));
+			}
 			await deps.refreshFiles(deletion.workspacePath);
-			if (deletion.reopenPath && viewerStore.get().currentPath === null) {
+			const restoredTab = deletion.reopenPath
+				? findTabByPath(tabsStore.get(), deletion.reopenPath)
+				: null;
+			// Reopen when the editor is empty, or when restoring put the deleted
+			// note's Tab back in front. Anywhere else the user has moved on.
+			if (
+				deletion.reopenPath &&
+				(viewerStore.get().currentPath === null ||
+					(restoredTab !== null && tabsStore.get().activeTabId === restoredTab))
+			) {
 				await deps.loadPath(deletion.reopenPath, {
 					history: "none",
 					launchExternal: false,
+					tab: restoredTab ?? undefined,
 				});
 			}
 			await deps.syncPins();
@@ -210,16 +232,18 @@ export function createDeleteActions(deps: DeleteDeps) {
 				deletedPath(path),
 			),
 		);
+		// Background Tabs can be showing deleted files too, so their trails are
+		// pruned whether or not the visible note was one of them.
+		for (const item of items) {
+			if (item.kind === "file") pruneHistory(item.path);
+			else pruneHistory(item.folderId, true);
+		}
 		if (deletedCurrent) {
 			if (viewerBefore.currentPath)
 				deps.stopTitleRenames(viewerBefore.currentPath);
 			clearHistory();
-		} else {
-			for (const item of items) {
-				if (item.kind === "file") pruneHistory(item.path);
-				else pruneHistory(item.folderId, true);
-			}
 		}
+		const tabsBefore = tabsStore.get();
 		appStore.set((state) => ({
 			...state,
 			workspace: {
@@ -237,6 +261,7 @@ export function createDeleteActions(deps: DeleteDeps) {
 					),
 				),
 			},
+			tabs: withoutTabsMatching(state.tabs, deletedPath),
 			document: deletedCurrent
 				? emptyDoc(
 						state.document.lastOpenedPath &&
@@ -253,6 +278,21 @@ export function createDeleteActions(deps: DeleteDeps) {
 								: state.document.lastOpenedPath,
 					},
 		}));
+		// Deleting the visible note leaves whichever Tab survived it focused, so
+		// the editor follows rather than sitting empty behind a live Tab strip.
+		if (deletedCurrent) {
+			const survivor = tabsStore.get().activeTabId;
+			const survivorPath = survivor
+				? tabsStore.get().byId[survivor]?.path
+				: null;
+			if (survivor && survivorPath) {
+				await deps.loadPath(survivorPath, {
+					history: "none",
+					launchExternal: false,
+					tab: survivor,
+				});
+			}
+		}
 		const pinRemovalSaved = deps.syncPins();
 		const deletion: PendingDelete = {
 			token,
@@ -262,6 +302,8 @@ export function createDeleteActions(deps: DeleteDeps) {
 			removedLastOpened,
 			historyBefore,
 			historyAfter: historyStore.get(),
+			tabsBefore,
+			tabsAfter: tabsStore.get(),
 			pinRemovalSaved,
 			toastId: null,
 			claimed: false,
@@ -321,6 +363,7 @@ export function createDeleteActions(deps: DeleteDeps) {
 						),
 					),
 				},
+				tabs: withoutTabsMatching(state.tabs, (tabPath) => tabPath === path),
 				document:
 					state.document.currentPath === path
 						? emptyDoc(
@@ -368,6 +411,9 @@ export function createDeleteActions(deps: DeleteDeps) {
 						),
 					),
 				},
+				tabs: withoutTabsMatching(state.tabs, (tabPath) =>
+					pathInFolder(tabPath, path),
+				),
 				document:
 					state.document.currentPath &&
 					pathInFolder(state.document.currentPath, path)

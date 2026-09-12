@@ -11,6 +11,7 @@ import {
 	STORAGE_KEY,
 	serialize,
 } from "./persistence";
+import { type TabId, type TabTarget, withOpenedTab } from "./tabs";
 
 export type SortMode = "alpha" | "recent";
 
@@ -54,7 +55,7 @@ export type HistoryStack = {
 };
 
 export type HistoryState = {
-	byWorkspace: Record<string, HistoryStack>;
+	byTab: Record<TabId, HistoryStack>;
 	isNavigating: boolean;
 };
 
@@ -130,6 +131,7 @@ export function withOpenedDoc(
 	state: DesktopState,
 	path: string,
 	content: string,
+	tab?: TabTarget,
 ): DesktopState {
 	const workspacePath = state.workspace.workspacePath;
 	const workspace =
@@ -146,6 +148,7 @@ export function withOpenedDoc(
 	return {
 		...state,
 		workspace,
+		tabs: withOpenedTab(state.tabs, path, tab),
 		document: {
 			...state.document,
 			currentPath: path,
@@ -166,7 +169,7 @@ export const appStore = store<DesktopState>(initialState, {
 });
 
 export const historyStore = store<HistoryState>({
-	byWorkspace: {},
+	byTab: {},
 	isNavigating: false,
 });
 
@@ -185,6 +188,8 @@ export const telemetryConsentStore = store<TelemetryConsent | null>(null);
 export const workspaceStore = appStore.select("workspace");
 export const viewerStore = appStore.select("document");
 export const uiStore = appStore.select("ui");
+export const tabsStore = appStore.select("tabs");
+export const activeTabIdStore = tabsStore.select("activeTabId");
 
 export const workspacePathStore = workspaceStore.select("workspacePath");
 export const recentWorkspacesStore = workspaceStore.select("recentWorkspaces");

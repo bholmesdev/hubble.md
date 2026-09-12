@@ -18,6 +18,11 @@ export {
 	type SidebarMoveItemInput,
 	type SidebarSortMode,
 } from "./components/Sidebar";
+export {
+	TabStrip,
+	type TabStripItem,
+	type TabStripProps,
+} from "./components/TabStrip";
 export { NewNoteButton, Toolbar } from "./components/Toolbar";
 export { WorkspaceSwitcherMenu } from "./components/WorkspaceSwitcherMenu";
 export {
