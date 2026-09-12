@@ -32,6 +32,8 @@ export type TabStripItem = {
 export type TabStripProps = {
 	tabs: TabStripItem[];
 	activeTabId: string | null;
+	/** Removes the first tab's bottom-left flare so its edge meets the expanded sidebar's divider. */
+	flushStart?: boolean;
 	onActivate: (id: string) => void;
 	onClose: (id: string) => void;
 	onNewTab?: () => void;
@@ -49,6 +51,7 @@ const tabAt = (strip: HTMLElement | null, index: number) =>
 export function TabStrip({
 	tabs,
 	activeTabId,
+	flushStart = false,
 	onActivate,
 	onClose,
 	onNewTab,
@@ -157,14 +160,17 @@ export function TabStrip({
 	if (tabs.length === 0 && !onNewTab) return null;
 
 	return (
-		<div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
+		<div className="relative z-10 flex min-w-0 flex-1 items-end gap-1 overflow-hidden">
 			{tabs.length > 0 ? (
 				<div
 					className={cn(
-						"min-w-0 flex-1",
+						"min-w-0 flex-initial",
 						overflow.start && "[border-inline-start:1px_dashed_var(--border)]",
 						overflow.end && "[border-inline-end:1px_dashed_var(--border)]",
 					)}
+					style={{
+						width: `calc(${tabs.length} * 12rem + ${tabs.length - 1}px)`,
+					}}
 				>
 					<div
 						ref={stripRef}
@@ -181,19 +187,27 @@ export function TabStrip({
 									key={tab.id}
 									data-selected={active ? "true" : undefined}
 									className={cn(
-										"group flex h-7 min-w-0 flex-1 items-center gap-0.5 rounded-sm pr-0.5 pl-2",
+										"group relative isolate flex h-8 min-w-0 flex-1 items-center px-5 pb-1",
 										TAB_MIN_WIDTH_CLASS,
 										TAB_MAX_WIDTH_CLASS,
 										active
-											? "bg-muted text-foreground"
-											: "text-muted-foreground hover:bg-muted/60",
+											? "text-foreground"
+											: "text-muted-foreground hover:text-foreground before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:bottom-1 before:-z-10 before:rounded-md hover:before:bg-muted/60",
+										!active &&
+											(index < tabs.length - 1
+												? tabs[index + 1].id !== activeTabId
+												: onNewTab) &&
+											"after:pointer-events-none after:absolute after:right-0 after:top-1 after:h-5 after:w-px after:bg-border",
 									)}
 									style={NO_DRAG_STYLE}
 								>
+									{active ? (
+										<TabOutline flushStart={flushStart && index === 0} />
+									) : null}
 									{editing ? (
 										<input
 											ref={renameInputRef}
-											className="h-5 w-28 min-w-0 select-text rounded-sm bg-transparent px-0.5 text-xs text-foreground outline-none"
+											className="mr-5 h-5 min-w-0 flex-1 select-text rounded-sm bg-transparent px-0.5 text-xs text-foreground outline-none"
 											value={draft}
 											aria-label={`Rename ${tab.label}`}
 											onBlur={() => commitRename(tab.id)}
@@ -225,7 +239,7 @@ export function TabStrip({
 												event.preventDefault();
 												onClose(tab.id);
 											}}
-											className="min-w-0 flex-1 truncate py-0.5 text-start text-xs"
+											className="min-w-0 flex-1 truncate py-0.5 pr-5 text-start text-xs before:absolute before:inset-0"
 										>
 											{tab.label}
 										</button>
@@ -236,11 +250,11 @@ export function TabStrip({
 										aria-label={`Close ${tab.label}`}
 										onClick={() => onClose(tab.id)}
 										className={cn(
-											"shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
+											"absolute top-1.25 right-4 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
 											active && "opacity-100",
 										)}
 									>
-										<MingcuteCloseLine className="size-3" />
+										<MingcuteCloseLine className="size-3.5" />
 									</button>
 								</div>
 							);
@@ -255,12 +269,40 @@ export function TabStrip({
 					aria-label="New tab"
 					title={newTabTitle}
 					onClick={onNewTab}
-					className="shrink-0"
+					className="w-8 shrink-0 self-center"
 					style={NO_DRAG_STYLE}
 				>
 					<MingcuteAddLine className="size-3.5" />
 				</Button>
 			) : null}
+		</div>
+	);
+}
+
+function TabOutline({ flushStart }: { flushStart: boolean }) {
+	return (
+		<div
+			aria-hidden="true"
+			className="pointer-events-none absolute inset-0 -z-10"
+		>
+			<div className="absolute inset-y-0 inset-x-2.5 border-t border-border bg-background" />
+			{["left-0", "right-0 -scale-x-100"].map((side) => {
+				const edge =
+					flushStart && side === "left-0"
+						? "M.5 32 V6.5 Q.5 .5 6.5 .5 H10"
+						: "M0 31.5 Q4 31.5 4 27.5 V6.5 Q4 .5 10 .5";
+				return (
+					<svg
+						aria-hidden="true"
+						key={side}
+						viewBox="0 0 10 32"
+						className={`absolute top-0 h-8 w-2.5 ${side}`}
+					>
+						<path d={`${edge} V32 H0 Z`} fill="var(--background)" />
+						<path d={edge} fill="none" stroke="var(--border)" />
+					</svg>
+				);
+			})}
 		</div>
 	);
 }

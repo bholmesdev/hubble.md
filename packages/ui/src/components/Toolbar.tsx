@@ -52,7 +52,7 @@ function ToolbarCluster({
 }) {
 	return (
 		<div
-			className={`flex items-center gap-1 px-2 ${align === "end" ? "justify-end" : ""}`}
+			className={`flex items-center gap-1 px-2 ${align === "end" ? "justify-end" : "pe-4"}`}
 			style={{
 				...(width
 					? { flex: "0 0 auto", inlineSize: width, maxInlineSize: width }
@@ -90,6 +90,7 @@ export function Toolbar({
 	scrollContainer?: HTMLDivElement | null;
 	platformInset?: boolean;
 	leftSlot?: React.ReactNode;
+	// Lets desktop supply tabs while other callers keep the editable file title.
 	centerSlot?: React.ReactNode;
 	rightSlot?: React.ReactNode;
 	onToggleSidebar?: () => void;
@@ -222,16 +223,19 @@ export function Toolbar({
 		beginTitleEdit();
 	}
 
-	const borderClass = sidebarOpen
-		? "border-b border-border"
-		: showBorder
-			? "[border-block-end:1px_dashed_var(--border)]"
-			: "border-transparent";
+	// Draw the divider inside the bar so, when tabs are enabled, the active
+	// tab can overlap it and spill into the active editor.
+	const borderClass =
+		centerSlot || sidebarOpen
+			? "after:border-border"
+			: showBorder
+				? "after:border-border after:border-dashed"
+				: "after:border-transparent";
 
 	return (
 		<div
 			{...rootProps}
-			className={`flex h-9 min-w-0 select-none items-center overflow-hidden ${borderClass} ${rootProps?.className ?? ""}`}
+			className={`relative flex h-9 min-w-0 select-none items-center overflow-hidden after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b ${centerSlot ? "bg-linear-to-b from-sidebar to-background" : ""} ${borderClass} ${rootProps?.className ?? ""}`}
 		>
 			<ToolbarCluster
 				width={
@@ -265,7 +269,12 @@ export function Toolbar({
 					)
 				) : null}
 			</ToolbarCluster>
-			<div className="flex min-w-0 justify-center" style={{ flex: "1 1 auto" }}>
+			{/* Stretch tabs to the divider; overlap the sidebar's 1px border so
+			    the first tab and overflow marker line up with that seam. */}
+			<div
+				className={`flex min-w-0 justify-center ${centerSlot ? "-ms-px self-stretch" : ""}`}
+				style={{ flex: "1 1 auto" }}
+			>
 				{centerSlot ? (
 					centerSlot
 				) : editingTitle ? (

@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Tabs use a curved outline, consistent widths, and full-tab click targets, with the new-tab button beside the last tab. [#282](https://github.com/bholmesdev/hubble.md/pull/282)
+
 ### Fixed
 
 - Typing and immediately opening another note no longer loses the last few characters. The open note is now saved before navigating rather than as the editor closes.

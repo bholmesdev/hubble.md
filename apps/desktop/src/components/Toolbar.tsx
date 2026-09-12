@@ -111,7 +111,11 @@ export function Toolbar({
 			onToggleSidebar={toggleSidebar}
 			leftSlot={compact ? null : <NavigationControls />}
 			centerSlot={
-				<DocumentTabs onNewTab={onNewTab} newTabTitle={newTabTitle} />
+				<DocumentTabs
+					onNewTab={onNewTab}
+					newTabTitle={newTabTitle}
+					flushStart={sidebarOpen && !compact}
+				/>
 			}
 			onMoveWindow={(x, y) => void desktopApi.moveWindow(x, y)}
 			rightSlot={

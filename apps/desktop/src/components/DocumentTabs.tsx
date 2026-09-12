@@ -17,9 +17,11 @@ import { tabLabels } from "../store/tabs";
 export function DocumentTabs({
 	onNewTab,
 	newTabTitle,
+	flushStart,
 }: {
 	onNewTab?: () => void;
 	newTabTitle?: string;
+	flushStart: boolean;
 }) {
 	const tabs = useStoreValue(tabsStore);
 	// The changelog takes over the editor without a Tab of its own, so it is
@@ -37,6 +39,7 @@ export function DocumentTabs({
 	return (
 		<TabStrip
 			tabs={items}
+			flushStart={flushStart}
 			activeTabId={onChangelog ? null : tabs.activeTabId}
 			onActivate={(id) => void activateTab(id)}
 			onClose={(id) => void closeTab(id)}
