@@ -1195,7 +1195,8 @@ async function createWindow() {
 		width: windowState.width,
 		height: windowState.height,
 		minWidth: minWindowWidth,
-		// Restore full-screen/maximized state while hidden to avoid animation.
+		// Restore full-screen/maximized state while hidden so the window
+		// opens at its saved size without visibly expanding.
 		show: false,
 		backgroundColor: windowBackgroundColor(),
 		titleBarStyle: "hidden",
