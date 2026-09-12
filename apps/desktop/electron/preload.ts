@@ -2,11 +2,8 @@ import os from "node:os";
 import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type { DesktopApi } from "../src/desktopApi/types";
 
-// The toolbar pads itself past the macOS traffic lights by this much, so it has
-// to be set before the first paint. Main sends it as a launch argument because
-// preload is the earliest point that can reach the document, and anything later
-// would be a round-trip the window has to wait on. Zooming at runtime writes the
-// same variable as an inline style, which outranks this stylesheet.
+// Reserve toolbar space for the macOS traffic lights before the first paint.
+// Runtime zoom changes override this stylesheet with an inline style.
 const insetFlag = "--hubble-traffic-light-inset=";
 const insetArg = process.argv.find((arg) => arg.startsWith(insetFlag));
 if (insetArg) {

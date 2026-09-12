@@ -6,11 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hubble</title>
     <style>
-      /* The window is shown as soon as it exists, before this page has loaded,
-         so the canvas has to be themed without waiting for the CSS bundle. The
-         literals mirror `--background` (theme.css light, index.css `.dark`) and
-         the main process paints the same pair behind the window; once the bundle
-         defines the real token the var takes over. */
+      /* Paint the theme before the CSS bundle loads. Keep fallback colors in sync
+         with theme.css, index.css and windowBackgroundColor in electron/main.ts. */
       :root {
         color-scheme: light;
         background-color: var(--background, #fefdfd);

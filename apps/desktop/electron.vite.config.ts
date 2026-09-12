@@ -15,7 +15,6 @@ export default defineConfig({
 			}),
 		],
 		build: {
-			// electron-vite defaults every target to `minify: false`.
 			minify: "esbuild",
 			lib: {
 				entry: "electron/main.ts",

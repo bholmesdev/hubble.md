@@ -113,10 +113,8 @@ function titleBarOverlayOptions() {
 	return { ...colors, height: toolbarHeight };
 }
 
-// What the native window paints until the renderer's first frame. Mirrors
-// `--background` (light in theme.css, dark in index.css), which index.html falls
-// back to in turn while its CSS bundle is still loading, so the launch frame,
-// the boot canvas and the mounted app are all the same color.
+// Match the page background to avoid a flash before the renderer paints.
+// Keep these colors in sync with index.html, theme.css and index.css.
 function windowBackgroundColor() {
 	return nativeTheme.shouldUseDarkColors ? "#171614" : "#fefdfd";
 }
@@ -1197,8 +1195,7 @@ async function createWindow() {
 		width: windowState.width,
 		height: windowState.height,
 		minWidth: minWindowWidth,
-		// Hidden only long enough to restore full-screen/maximized state below, so
-		// that restore isn't animated.
+		// Restore full-screen/maximized state while hidden to avoid animation.
 		show: false,
 		backgroundColor: windowBackgroundColor(),
 		titleBarStyle: "hidden",
@@ -1248,13 +1245,7 @@ async function createWindow() {
 	} else if (windowState.isMaximized) {
 		window.maximize();
 	}
-	// Show before the page loads. Zoom, the traffic-light inset and the theme are
-	// all settled above, so the window opens as a correctly themed, correctly
-	// scaled frame that content then fills in.
-	//
-	// `ready-to-show` is not the better hook it looks like: with a body of just
-	// `<div id="root">` there is nothing to paint until React mounts, so it fires
-	// with the load event and buys back almost nothing.
+	// Show the themed window while the renderer loads.
 	window.show();
 
 	window.on("focus", () => sendToRenderer("desktop:window-focus"));
