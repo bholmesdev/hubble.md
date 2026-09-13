@@ -10,6 +10,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Added
 
 - HTML Apps can open web links in the system browser and email links in the default email app, from plain `<a>` links or the new `hubble.links.open(url)` API. Thanks [@marcodlk](https://github.com/marcodlk)! [#274](https://github.com/bholmesdev/hubble.md/pull/274)
+- Notes automatically lay out each block from right to left or left to right based on its text. Thanks [@n00ki](https://github.com/n00ki)! [#277](https://github.com/bholmesdev/hubble.md/pull/277)
 
 ### Changed
 
