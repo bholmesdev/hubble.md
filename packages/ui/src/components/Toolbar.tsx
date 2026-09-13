@@ -9,7 +9,7 @@ import {
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteLayoutLeftLine from "~icons/mingcute/layout-left-line";
 import { fileNameFromPath } from "../lib/filePath";
-import { formatCommandShortcut } from "../lib/shortcut";
+import { useCommandShortcutLabel } from "../lib/shortcut";
 import { Button } from "../primitives/button";
 
 const START_INSET = isMac() ? "var(--hubble-traffic-light-inset, 70px)" : "8px";
@@ -96,6 +96,10 @@ export function Toolbar({
 	rootProps?: HTMLAttributes<HTMLDivElement> &
 		Record<`data-${string}`, unknown>;
 }) {
+	const toggleSidebarTitle = useCommandShortcutLabel(
+		"Toggle sidebar",
+		"app.toggle-sidebar",
+	);
 	const [showBorder, setShowBorder] = useState(false);
 	const [editingTitle, setEditingTitle] = useState(false);
 	const [draftTitle, setDraftTitle] = useState("");
@@ -243,7 +247,7 @@ export function Toolbar({
 						className="relative"
 						onClick={onToggleSidebar}
 						aria-label="Toggle sidebar"
-						title={`Toggle sidebar (${formatCommandShortcut("app.toggle-sidebar")})`}
+						title={toggleSidebarTitle}
 					>
 						<MingcuteLayoutLeftLine className="size-4" />
 						{sidebarBadge ? (
@@ -303,13 +307,14 @@ export function Toolbar({
 }
 
 export function NewNoteButton({ onClick }: { onClick: () => void }) {
+	const title = useCommandShortcutLabel("New Markdown File", "app.new-file");
 	return (
 		<Button
 			variant="ghost"
 			size="icon-sm"
 			onClick={onClick}
 			aria-label="New Markdown File"
-			title={`New Markdown File (${formatCommandShortcut("app.new-file")})`}
+			title={title}
 		>
 			<MingcuteAddLine className="size-4" />
 		</Button>

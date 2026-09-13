@@ -102,7 +102,6 @@ export function Sidebar({
 			}))}
 			folders={folders.map((folder) => ({
 				path: folder.path,
-				modifiedAt: folder.modified_at,
 			}))}
 			currentPath={currentPath ?? null}
 			sortMode={sortMode}

@@ -3,7 +3,13 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { type AppCommandId, getCommand } from "@hubble.md/editor/commands";
+import {
+	type AppCommandId,
+	type CommandBindings,
+	getCommand,
+	getCommandBinding,
+	setCommandBindings,
+} from "@hubble.md/editor/commands";
 import hubbleRuntime from "@hubble.md/runtime/global.js?raw";
 import htmlAppTheme from "@hubble.md/runtime/html-app-theme.css?raw";
 import tailwindRuntime from "@tailwindcss/browser?raw";
@@ -58,9 +64,9 @@ import { type WatchHandle, watchWorkspace } from "./workspaceWatcher";
 import {
 	loadZoomFactor,
 	resetWindowZoom,
-	setTrafficLightInset,
 	stepWindowZoom,
 	toolbarHeight,
+	trafficLightInsetForZoom,
 	trafficLightPositionForZoom,
 	zoomStep,
 } from "./zoom";
@@ -105,6 +111,12 @@ function titleBarOverlayOptions() {
 		? { color: "#181715", symbolColor: "#a6a5a0" }
 		: { color: "#ffffff", symbolColor: "#454545" };
 	return { ...colors, height: toolbarHeight };
+}
+
+// Match the page background to avoid a flash before the renderer paints.
+// Keep these colors in sync with index.html, theme.css and index.css.
+function windowBackgroundColor() {
+	return nativeTheme.shouldUseDarkColors ? "#171614" : "#fefdfd";
 }
 
 app.setName(appName);
@@ -785,7 +797,6 @@ type TextContextMenuItem =
 	| {
 			id: "copy-as-markdown";
 			label: string;
-			accelerator?: string;
 			flag: keyof Electron.EditFlags;
 			click: (webContents: Electron.WebContents) => void;
 	  };
@@ -796,7 +807,6 @@ const textContextMenuItems: TextContextMenuItem[] = [
 	{
 		id: "copy-as-markdown",
 		label: getCommand("app.copy-as-markdown").label,
-		accelerator: getCommand("app.copy-as-markdown").defaultBinding,
 		flag: "canCopy",
 		click: (webContents) => {
 			webContents.send("desktop:menu-copy-as-markdown");
@@ -849,7 +859,7 @@ function buildTextContextMenu(
 				: {
 						id: item.id,
 						label: item.label,
-						accelerator: item.accelerator,
+						accelerator: getCommandBinding("app.copy-as-markdown") ?? undefined,
 						enabled: params.editFlags[item.flag],
 						click: () => item.click(webContents),
 					},
@@ -877,7 +887,7 @@ function commandMenuItem(
 	return {
 		id,
 		label: command.label,
-		accelerator: command.defaultBinding,
+		accelerator: getCommandBinding(id) ?? undefined,
 		enabled: command.isEnabled(menuState),
 		click,
 	};
@@ -1185,7 +1195,10 @@ async function createWindow() {
 		width: windowState.width,
 		height: windowState.height,
 		minWidth: minWindowWidth,
+		// Restore full-screen/maximized state while hidden so the window
+		// opens at its saved size without visibly expanding.
 		show: false,
+		backgroundColor: windowBackgroundColor(),
 		titleBarStyle: "hidden",
 		...(process.platform !== "darwin"
 			? { titleBarOverlay: titleBarOverlayOptions() }
@@ -1197,6 +1210,14 @@ async function createWindow() {
 			plugins: true,
 			preload: path.join(__dirname, "../preload/preload.mjs"),
 			sandbox: false,
+			// Both reach the renderer before its first paint: Chromium applies the
+			// zoom itself, and preload reads the inset off this argument. Setting
+			// either one from main after load would need a round-trip the window
+			// then has to wait on.
+			zoomFactor,
+			additionalArguments: [
+				`--hubble-traffic-light-inset=${trafficLightInsetForZoom(zoomFactor)}`,
+			],
 		},
 	});
 	mainWindow = window;
@@ -1225,13 +1246,8 @@ async function createWindow() {
 	} else if (windowState.isMaximized) {
 		window.maximize();
 	}
-	// Apply persisted zoom while hidden so the first visible paint is already scaled.
-	window.webContents.once("did-finish-load", async () => {
-		window.webContents.setZoomFactor(zoomFactor);
-		await setTrafficLightInset(window, zoomFactor);
-		if (window.isDestroyed()) return;
-		window.show();
-	});
+	// Show the themed window while the renderer loads.
+	window.show();
 
 	window.on("focus", () => sendToRenderer("desktop:window-focus"));
 
@@ -1768,8 +1784,8 @@ function registerIpc() {
 	});
 
 	ipcMain.handle("desktop:open-external-url", async (_event, { url }) => {
-		if (typeof url !== "string" || !/^https?:\/\//i.test(url)) {
-			throw new Error("Only http(s) external URLs are allowed");
+		if (typeof url !== "string" || !/^(https?:\/\/|mailto:)/i.test(url)) {
+			throw new Error("Only http(s) and mailto external URLs are allowed");
 		}
 		await shell.openExternal(url);
 	});
@@ -1951,6 +1967,14 @@ function registerIpc() {
 		};
 		buildMenu();
 	});
+
+	ipcMain.handle(
+		"desktop:set-shortcut-bindings",
+		(_event, bindings: CommandBindings) => {
+			setCommandBindings(bindings);
+			buildMenu();
+		},
+	);
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -1965,6 +1989,38 @@ protocol.registerSchemesAsPrivileged([
 	},
 ]);
 
+// While `createWindow` loads saved state, `mainWindow` is still null.
+// Reuse its promise so another open request cannot create a second window.
+let pendingWindowCreation: Promise<void> | null = null;
+function ensureMainWindow() {
+	if (mainWindow && !mainWindow.isDestroyed()) return Promise.resolve();
+	pendingWindowCreation ??= createWindow().finally(() => {
+		pendingWindowCreation = null;
+	});
+	return pendingWindowCreation;
+}
+
+// Set to true after `whenReady()` finishes setup, including IPC registration.
+// Until then, `openFile` saves the path but leaves window creation to startup:
+// a new renderer would call IPC handlers that may not exist yet.
+let appBootstrapped = false;
+
+function openFile(openPath: string) {
+	// New windows read this path during renderer startup.
+	pendingOpenPath = openPath;
+	if (!mainWindow || mainWindow.isDestroyed()) {
+		// Before IPC is ready, leave window creation to `whenReady()`.
+		if (appBootstrapped) void ensureMainWindow();
+		return;
+	}
+	if (mainWindow.isMinimized()) mainWindow.restore();
+	mainWindow.show();
+	// Window focus alone cannot take keyboard focus from another app on macOS.
+	app.focus({ steal: true });
+	mainWindow.focus();
+	sendToRenderer("desktop:open-file", toRendererPath(openPath));
+}
+
 const singleInstanceLock = app.requestSingleInstanceLock();
 if (!singleInstanceLock) {
 	app.quit();
@@ -1972,20 +2028,14 @@ if (!singleInstanceLock) {
 	app.on("second-instance", (_event, argv) => {
 		const openPath = firstExistingFileArg(argv.slice(1));
 		if (!openPath) return;
-		pendingOpenPath = openPath;
-		if (mainWindow) {
-			if (mainWindow.isMinimized()) mainWindow.restore();
-			mainWindow.focus();
-			sendToRenderer("desktop:open-file", toRendererPath(openPath));
-		}
+		openFile(openPath);
 	});
 
 	app.on("open-file", (event, filePath) => {
 		event.preventDefault();
 		const resolved = resolvePath(filePath);
 		grantFileWithParent(resolved);
-		pendingOpenPath = resolved;
-		sendToRenderer("desktop:open-file", toRendererPath(resolved));
+		openFile(resolved);
 	});
 
 	// "Desktop Active" means the app was used that day (TELEMETRY.md): launch
@@ -2010,7 +2060,8 @@ if (!singleInstanceLock) {
 		registerIpc();
 		buildMenu();
 		configureAutoUpdates();
-		await createWindow();
+		appBootstrapped = true;
+		await ensureMainWindow();
 	});
 
 	app.on("window-all-closed", () => {
@@ -2018,8 +2069,6 @@ if (!singleInstanceLock) {
 	});
 
 	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
-			void createWindow();
-		}
+		void ensureMainWindow();
 	});
 }

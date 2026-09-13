@@ -1,5 +1,12 @@
-import { type CommandId, getCommand } from "@hubble.md/editor";
+import {
+	type CommandId,
+	getCommandBinding,
+	getCommandBindings,
+	resolveCommandBinding,
+	subscribeCommandBindings,
+} from "@hubble.md/editor";
 import { isMac } from "keymatch";
+import { useSyncExternalStore } from "react";
 
 // macOS renders modifiers as adjacent glyphs (⌘⌥R); Windows/Linux use
 // "+"-joined words (Ctrl+Alt+R). Keys are matched against the same
@@ -57,6 +64,30 @@ export function formatShortcut(spec: string): string {
 	return mac ? rendered.join("") : rendered.join("+");
 }
 
-export function formatCommandShortcut(id: CommandId): string {
-	return formatShortcut(getCommand(id).defaultBinding);
+export function formatCommandShortcut(
+	id: CommandId,
+	bindings?: ReturnType<typeof getCommandBindings>,
+): string | null {
+	const binding = bindings
+		? resolveCommandBinding(id, bindings)
+		: getCommandBinding(id);
+	return binding ? formatShortcut(binding) : null;
+}
+
+export function useCommandBindings() {
+	return useSyncExternalStore(
+		subscribeCommandBindings,
+		getCommandBindings,
+		getCommandBindings,
+	);
+}
+
+export function useCommandShortcut(id: CommandId) {
+	const bindings = useCommandBindings();
+	return formatCommandShortcut(id, bindings);
+}
+
+export function useCommandShortcutLabel(label: string, id: CommandId) {
+	const shortcut = useCommandShortcut(id);
+	return shortcut ? `${label} (${shortcut})` : label;
 }

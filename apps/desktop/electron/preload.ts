@@ -1,6 +1,17 @@
 import os from "node:os";
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type { DesktopApi } from "../src/desktopApi/types";
+
+// Reserve toolbar space for the macOS traffic lights before the first paint.
+// Runtime zoom changes override this stylesheet with an inline style.
+const insetFlag = "--hubble-traffic-light-inset=";
+const insetArg = process.argv.find((arg) => arg.startsWith(insetFlag));
+if (insetArg) {
+	const inset = Number(insetArg.slice(insetFlag.length));
+	if (Number.isFinite(inset)) {
+		webFrame.insertCSS(`:root { --hubble-traffic-light-inset: ${inset}px }`);
+	}
+}
 
 function subscribe<T extends unknown[]>(
 	channel: string,
@@ -115,6 +126,8 @@ const desktopApi = {
 	setSpellcheckLanguages: (languages) =>
 		ipcRenderer.invoke("desktop:set-spellcheck-languages", { languages }),
 	setMenuState: (state) => ipcRenderer.invoke("desktop:set-menu-state", state),
+	setShortcutBindings: (bindings) =>
+		ipcRenderer.invoke("desktop:set-shortcut-bindings", bindings),
 	getUpdateState: () => ipcRenderer.invoke("desktop:get-update-state"),
 	getTelemetryConsent: () =>
 		ipcRenderer.invoke("desktop:get-telemetry-consent"),

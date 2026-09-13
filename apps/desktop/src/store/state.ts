@@ -1,5 +1,7 @@
+import { setCommandBindings } from "@hubble.md/editor";
 import type { ReviewThread } from "@hubble.md/ui";
 import { store } from "@simplestack/store";
+import type { SpellcheckState, TelemetryConsent } from "../desktopApi/types";
 import type { FileAction } from "../externalFileChange";
 import type { FileKind } from "../lib/filePath";
 import { localStoragePersist } from "../lib/localStoragePersist";
@@ -156,7 +158,10 @@ export function withOpenedDoc(
 
 // ── Stores ──────────────────────────────────────────────────────────
 
-export const appStore = store<DesktopState>(getInitialState(), {
+const initialState = getInitialState();
+setCommandBindings(initialState.settings.shortcutBindings);
+
+export const appStore = store<DesktopState>(initialState, {
 	middleware: [localStoragePersist(STORAGE_KEY, serialize)],
 });
 
@@ -173,6 +178,9 @@ export const titleGenerationPreviewStore = store<{
 	path: string;
 	previewPath: string;
 } | null>(null);
+
+export const spellcheckStore = store<SpellcheckState | null>(null);
+export const telemetryConsentStore = store<TelemetryConsent | null>(null);
 
 export const workspaceStore = appStore.select("workspace");
 export const viewerStore = appStore.select("document");
@@ -197,4 +205,7 @@ export const codeFileOpenModeStore = appStore
 export const lastSeenVersionStore = appStore
 	.select("settings")
 	.select("lastSeenVersion");
+export const shortcutBindingsStore = appStore
+	.select("settings")
+	.select("shortcutBindings");
 export const themePreferenceStore = appStore.select("settings").select("theme");

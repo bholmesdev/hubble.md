@@ -1,4 +1,8 @@
-import { type CommandId, getCommand } from "@hubble.md/editor";
+import {
+	type CommandBindings,
+	type CommandId,
+	getCommandBinding,
+} from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import { Command } from "cmdk";
 import { keymatch } from "keymatch";
@@ -23,7 +27,7 @@ import MingcuteListOrderedLine from "~icons/mingcute/list-ordered-line";
 import MingcuteQuoteLeftLine from "~icons/mingcute/quote-left-line";
 import MingcuteStrikethroughLine from "~icons/mingcute/strikethrough-line";
 import MingcuteTextLine from "~icons/mingcute/text-line";
-import { formatCommandShortcut } from "../lib/shortcut";
+import { formatCommandShortcut, useCommandBindings } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { useCommandMenuPosition } from "./commandMenuPosition";
 import {
@@ -172,6 +176,7 @@ export function FormatCommandMenu({
 	editor: Editor | null;
 	viewportRef: RefObject<HTMLDivElement | null>;
 }) {
+	const commandBindings = useCommandBindings();
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const [position, setPosition] = useState<MenuPosition | null>(null);
@@ -224,8 +229,8 @@ export function FormatCommandMenu({
 					editor.commands.focus(undefined, { scrollIntoView: false });
 					return;
 				}
-				if (!keymatch(event, getCommand("app.format-menu").defaultBinding))
-					return;
+				const binding = getCommandBinding("app.format-menu");
+				if (!binding || !keymatch(event, binding)) return;
 				if (!editor.isFocused && !open) return;
 				if (!open && editor.state.selection.empty) return;
 				event.preventDefault();
@@ -321,8 +326,20 @@ export function FormatCommandMenu({
 						</div>
 					) : (
 						<>
-							{renderGroup("Block", visibleCommands, runCommand, editor)}
-							{renderGroup("Inline", visibleCommands, runCommand, editor)}
+							{renderGroup(
+								"Block",
+								visibleCommands,
+								runCommand,
+								editor,
+								commandBindings,
+							)}
+							{renderGroup(
+								"Inline",
+								visibleCommands,
+								runCommand,
+								editor,
+								commandBindings,
+							)}
 						</>
 					)}
 				</Command.List>
@@ -336,6 +353,7 @@ function renderGroup(
 	commands: FormatCommand[],
 	runCommand: (kind: FormatCommandKind) => void,
 	editor: Editor,
+	commandBindings: CommandBindings,
 ) {
 	const groupCommands = commands.filter((command) => command.group === group);
 	if (groupCommands.length === 0) return null;
@@ -349,6 +367,9 @@ function renderGroup(
 			{groupCommands.map((command) => {
 				const Icon = command.icon;
 				const isApplied = isFormatActive(editor, command.kind);
+				const shortcut = command.shortcut
+					? formatCommandShortcut(command.shortcut, commandBindings)
+					: null;
 				return (
 					<Command.Item
 						key={command.kind}
@@ -369,12 +390,12 @@ function renderGroup(
 						</span>
 						{isApplied ? (
 							<MingcuteCheckLine className="size-3.5 shrink-0 text-muted-foreground" />
-						) : command.shortcut ? (
+						) : shortcut ? (
 							<span
 								className="shrink-0 text-[10px] leading-none text-muted-foreground/60"
 								aria-hidden="true"
 							>
-								{formatCommandShortcut(command.shortcut)}
+								{shortcut}
 							</span>
 						) : null}
 					</Command.Item>

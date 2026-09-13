@@ -15,7 +15,7 @@ import {
 	useSensor,
 	useSensors,
 } from "@dnd-kit/core";
-import { getCommand } from "@hubble.md/editor";
+import { getCommandBinding } from "@hubble.md/editor";
 import { keymatch } from "keymatch";
 import {
 	type CSSProperties,
@@ -50,7 +50,7 @@ import {
 	splitFileName,
 } from "../lib/filePath";
 import { shouldShowFooterDivider } from "../lib/scrollOverflow";
-import { formatCommandShortcut } from "../lib/shortcut";
+import { useCommandShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 import {
@@ -624,11 +624,12 @@ export function Sidebar({
 	const activeIndex = rows.findIndex(
 		(row) => row.kind === "file" && row.file.path === highlightPath,
 	);
-	const activeIndexRef = useRef(activeIndex);
+	const activeItem = activeIndex >= 0 ? rows[activeIndex] : null;
+	const activeItemRef = useRef(activeItem);
 	useLayoutEffect(() => {
-		activeIndexRef.current = activeIndex;
-	}, [activeIndex]);
-	const { focusedIndex, setFocusedIndex, onKeyDown } = useSidebarKeyboardNav({
+		activeItemRef.current = activeItem;
+	}, [activeItem]);
+	const { focusedIndex, focusItem, onKeyDown } = useSidebarKeyboardNav({
 		items: rows,
 		onSelect: activateRow,
 		onEnter: enterRowEdit,
@@ -636,6 +637,7 @@ export function Sidebar({
 		onCollapse: collapseRow,
 		navRef,
 		activeIndex,
+		getItemKey: sidebarRowKey,
 		// Arrow keys leave multi-select mode.
 		onNavigate: replaceSelection,
 	});
@@ -675,9 +677,11 @@ export function Sidebar({
 		for (const folderId of actionable.folders) onDeleteFolder?.(folderId);
 	};
 	const handleTreeKeyDown = (event: React.KeyboardEvent) => {
+		const deleteBinding = getCommandBinding("app.delete");
 		if (
 			!isEditableEventTarget(event.target) &&
-			keymatch(event.nativeEvent, getCommand("app.delete").defaultBinding)
+			deleteBinding &&
+			keymatch(event.nativeEvent, deleteBinding)
 		) {
 			const focusedRow = focusedIndex === null ? null : rows[focusedIndex];
 			const focusedKey = focusedRow ? sidebarRowKey(focusedRow) : null;
@@ -714,9 +718,9 @@ export function Sidebar({
 					pendingFocusDisplayPath,
 		);
 		if (index < 0) return;
-		setFocusedIndex(index);
+		focusItem(rows[index]);
 		setPendingFocusDisplayPath(null);
-	}, [getDisplayPath, pendingFocusDisplayPath, rows, setFocusedIndex]);
+	}, [focusItem, getDisplayPath, pendingFocusDisplayPath, rows]);
 
 	useEffect(() => {
 		setSelection((current) => pruneSidebarSelection(current, rows));
@@ -724,10 +728,7 @@ export function Sidebar({
 
 	useEffect(() => {
 		const selectOpenFile = () => {
-			const index = activeIndexRef.current;
-			setFocusedIndex(
-				selectionCountRef.current > 1 ? null : index >= 0 ? index : null,
-			);
+			focusItem(selectionCountRef.current > 1 ? null : activeItemRef.current);
 			setSelection((current) => snapSidebarSelection(current, highlightPath));
 		};
 		const isEditorTarget = (target: EventTarget | null) =>
@@ -738,7 +739,7 @@ export function Sidebar({
 		if (isEditorTarget(document.activeElement)) selectOpenFile();
 		document.addEventListener("focusin", onFocusIn);
 		return () => document.removeEventListener("focusin", onFocusIn);
-	}, [highlightPath, setFocusedIndex]);
+	}, [focusItem, highlightPath]);
 
 	const handleDragStart = (event: DragStartEvent) => {
 		const data = event.active.data.current as DragItemData | undefined;
@@ -912,7 +913,7 @@ export function Sidebar({
 				enabled={Boolean(onMoveItem)}
 				onBlur={(event) => {
 					if (!event.currentTarget.contains(event.relatedTarget)) {
-						setFocusedIndex(null);
+						focusItem(null);
 					}
 				}}
 				onKeyDown={handleTreeKeyDown}
@@ -1059,7 +1060,7 @@ export function Sidebar({
 										)
 											return;
 										event.preventDefault();
-										setFocusedIndex(index);
+										focusItem(row);
 										if (!isSelected) replaceSelection(row);
 										setOpenActionsPath(
 											row.kind === "file" ? row.file.path : row.id,
@@ -1112,7 +1113,7 @@ export function Sidebar({
 											)}
 											style={rowStyle}
 											onClick={(event) => {
-												setFocusedIndex(index);
+												focusItem(row);
 												handleRowClick(row, event);
 											}}
 											onDoubleClick={(event) => {
@@ -1271,6 +1272,7 @@ export function Sidebar({
 			</DragOverlay>
 		</DndContext>
 	);
+	const sortLabel = sortMode === "recent" ? "Recent" : "Name";
 
 	return (
 		<SidebarFrame onCollapse={onCollapse} storageScope={storageScope}>
@@ -1313,8 +1315,8 @@ export function Sidebar({
 								<Button
 									variant="ghost"
 									size="icon-xs"
-									aria-label="Sort by..."
-									title="Sort by..."
+									aria-label={`Sort files: ${sortLabel}`}
+									title={`Sort files: ${sortLabel}`}
 								/>
 							}
 						>
@@ -1332,9 +1334,6 @@ export function Sidebar({
 								className="isolate z-50"
 							>
 								<Select.Popup className="z-50 w-36 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-									<p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
-										Sort by
-									</p>
 									<SortOption value="recent" label="Recent" />
 									<SortOption value="alpha" label="Name" />
 								</Select.Popup>
@@ -1865,6 +1864,7 @@ function NewFileMenu({
 	onCreateFile: () => void;
 	onCreateHtmlFile?: () => void;
 }) {
+	const newFileShortcut = useCommandShortcut("app.new-file");
 	const [open, setOpen] = useState(false);
 	return (
 		<Menu.Root open={open} onOpenChange={setOpen}>
@@ -1892,7 +1892,7 @@ function NewFileMenu({
 						<ActionItem
 							icon={<MingcuteEditLine />}
 							onClick={onCreateFile}
-							shortcut={formatCommandShortcut("app.new-file")}
+							shortcut={newFileShortcut ?? undefined}
 						>
 							New Note
 						</ActionItem>
@@ -1946,6 +1946,9 @@ function FolderActionsMenu({
 	onTogglePinnedFile?: (path: string) => void;
 	getDisplayPath: (path: string) => string;
 }) {
+	const revealShortcut = useCommandShortcut("app.reveal");
+	const newFileShortcut = useCommandShortcut("app.new-file");
+	const deleteShortcut = useCommandShortcut("app.delete");
 	if (selection.count > 1) {
 		return (
 			<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
@@ -1969,7 +1972,7 @@ function FolderActionsMenu({
 				<ActionItem
 					icon={<MingcuteFolderOpenLine />}
 					onClick={() => onRevealFolder(id)}
-					shortcut={formatCommandShortcut("app.reveal")}
+					shortcut={revealShortcut ?? undefined}
 				>
 					{revealLabel ?? "Reveal in File Manager"}
 				</ActionItem>
@@ -1978,7 +1981,7 @@ function FolderActionsMenu({
 				<ActionItem
 					icon={<MingcuteEditLine />}
 					onClick={() => onCreateFile(id)}
-					shortcut={formatCommandShortcut("app.new-file")}
+					shortcut={newFileShortcut ?? undefined}
 				>
 					New file
 				</ActionItem>
@@ -2011,7 +2014,7 @@ function FolderActionsMenu({
 				<ActionItem
 					destructive
 					icon={<MingcuteDeleteLine />}
-					shortcut={formatCommandShortcut("app.delete")}
+					shortcut={deleteShortcut ?? undefined}
 					onClick={() =>
 						onDeleteSelection
 							? onDeleteSelection({ files: [], folders: [id], count: 1 })
@@ -2059,6 +2062,9 @@ function FileActionsMenu({
 	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	getDisplayPath: (path: string) => string;
 }) {
+	const revealShortcut = useCommandShortcut("app.reveal");
+	const copyPathShortcut = useCommandShortcut("app.copy-path");
+	const deleteShortcut = useCommandShortcut("app.delete");
 	if (selection.count > 1) {
 		return (
 			<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
@@ -2090,7 +2096,7 @@ function FileActionsMenu({
 				<ActionItem
 					icon={<MingcuteFolderOpenLine />}
 					onClick={() => onRevealFile(file.path)}
-					shortcut={formatCommandShortcut("app.reveal")}
+					shortcut={revealShortcut ?? undefined}
 				>
 					{revealLabel ?? "Reveal in File Manager"}
 				</ActionItem>
@@ -2099,7 +2105,7 @@ function FileActionsMenu({
 				<ActionItem
 					icon={<MingcuteCopy2Line />}
 					onClick={() => onCopyFilePath(file.path)}
-					shortcut={formatCommandShortcut("app.copy-path")}
+					shortcut={copyPathShortcut ?? undefined}
 				>
 					Copy file path
 				</ActionItem>
@@ -2124,7 +2130,7 @@ function FileActionsMenu({
 				<ActionItem
 					destructive
 					icon={<MingcuteDeleteLine />}
-					shortcut={formatCommandShortcut("app.delete")}
+					shortcut={deleteShortcut ?? undefined}
 					onClick={() =>
 						onDeleteSelection
 							? onDeleteSelection({ files: [file], folders: [], count: 1 })
@@ -2176,6 +2182,7 @@ function BulkDeleteAction({
 	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	getDisplayPath: (path: string) => string;
 }) {
+	const deleteShortcut = useCommandShortcut("app.delete");
 	const actionable = sidebarDeleteSelection(
 		selection,
 		getDisplayPath,
@@ -2187,7 +2194,7 @@ function BulkDeleteAction({
 		<ActionItem
 			destructive
 			icon={<MingcuteDeleteLine />}
-			shortcut={formatCommandShortcut("app.delete")}
+			shortcut={deleteShortcut ?? undefined}
 			onClick={() => {
 				if (onDeleteSelection) {
 					onDeleteSelection(actionable);
@@ -2441,7 +2448,13 @@ function stripMatchingExtension(name: string, extension: string) {
 		: name;
 }
 
-function SortOption({ value, label }: { value: string; label: string }) {
+function SortOption({
+	value,
+	label,
+}: {
+	value: SidebarSortMode;
+	label: string;
+}) {
 	return (
 		<Select.Item
 			value={value}

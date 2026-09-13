@@ -48,6 +48,7 @@ describe("useSidebarKeyboardNav", () => {
 				onSelect: vi.fn(),
 				onNavigate,
 				navRef,
+				getItemKey: (item) => item,
 			}).onKeyDown;
 			return createElement("div", { ref: navRef });
 		}
@@ -60,6 +61,61 @@ describe("useSidebarKeyboardNav", () => {
 			handleKeyDown(keyEvent("ArrowDown"));
 			handleKeyDown(keyEvent("ArrowDown"));
 		});
+
+		expect(onNavigate.mock.calls).toEqual([["a"], ["b"]]);
+	});
+
+	it("keeps focus on the same item after rows reorder", () => {
+		const onSelect = vi.fn();
+		let onKeyDown: ((event: ReactKeyboardEvent) => void) | undefined;
+		const root = createRoot(
+			document.body.appendChild(document.createElement("div")),
+		);
+		roots.push(root);
+
+		function Harness({ items }: { items: string[] }) {
+			const navRef = useRef<HTMLDivElement>(null);
+			onKeyDown = useSidebarKeyboardNav({
+				items,
+				onSelect,
+				navRef,
+				getItemKey: (item) => item,
+			}).onKeyDown;
+			return createElement("div", { ref: navRef });
+		}
+
+		act(() => root.render(createElement(Harness, { items: ["a", "b", "c"] })));
+		act(() => onKeyDown?.(keyEvent("ArrowDown")));
+		act(() => onKeyDown?.(keyEvent("ArrowDown")));
+		act(() => root.render(createElement(Harness, { items: ["b", "a", "c"] })));
+		act(() => onKeyDown?.(keyEvent("Enter")));
+
+		expect(onSelect).toHaveBeenCalledWith("b");
+	});
+
+	it("skips rows without item keys", () => {
+		const onNavigate = vi.fn();
+		let onKeyDown: ((event: ReactKeyboardEvent) => void) | undefined;
+		const root = createRoot(
+			document.body.appendChild(document.createElement("div")),
+		);
+		roots.push(root);
+
+		function Harness() {
+			const navRef = useRef<HTMLDivElement>(null);
+			onKeyDown = useSidebarKeyboardNav({
+				items: ["a", "section", "b"],
+				onSelect: vi.fn(),
+				onNavigate,
+				navRef,
+				getItemKey: (item) => (item === "section" ? null : item),
+			}).onKeyDown;
+			return createElement("div", { ref: navRef });
+		}
+
+		act(() => root.render(createElement(Harness)));
+		act(() => onKeyDown?.(keyEvent("ArrowDown")));
+		act(() => onKeyDown?.(keyEvent("ArrowDown")));
 
 		expect(onNavigate.mock.calls).toEqual([["a"], ["b"]]);
 	});

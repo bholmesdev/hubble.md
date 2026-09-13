@@ -7,9 +7,11 @@ import { Button } from "./button";
 type Props = {
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
-	title: string;
+	title: ReactNode;
 	description?: string;
 	className?: string;
+	headerClassName?: string;
+	contentClassName?: string;
 	children: ReactNode;
 };
 
@@ -19,6 +21,8 @@ function Modal({
 	title,
 	description,
 	className,
+	headerClassName,
+	contentClassName,
 	children,
 }: Props) {
 	return (
@@ -31,7 +35,12 @@ function Modal({
 						className,
 					)}
 				>
-					<div className="mb-3 flex shrink-0 items-start justify-between gap-3">
+					<div
+						className={cn(
+							"mb-3 flex shrink-0 items-start justify-between gap-3",
+							headerClassName,
+						)}
+					>
 						<div className="flex min-w-0 flex-col gap-1">
 							<Dialog.Title className="m-0 text-sm font-semibold">
 								{title}
@@ -55,7 +64,12 @@ function Modal({
 							}
 						/>
 					</div>
-					<div className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
+					<div
+						className={cn(
+							"-mr-2 min-h-0 flex-1 overflow-y-auto pr-2",
+							contentClassName,
+						)}
+					>
 						{children}
 					</div>
 				</Dialog.Popup>

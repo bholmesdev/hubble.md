@@ -1,10 +1,23 @@
 export { ContextMenuSpellcheckExtension } from "./ContextMenuSpellcheckExtension.js";
 export {
 	type AppCommandId,
+	type CommandBindings,
 	type CommandContext,
 	type CommandId,
+	cleanCommandBindings,
+	commandRegistry,
+	type EditorCommandId,
+	findCommandBindingConflicts,
 	getCommand,
+	getCommandBinding,
+	getCommandBindings,
+	isDefaultCommandBinding,
+	resolveCommandBinding,
+	setCommandBindings,
+	sortCommandBinding,
+	subscribeCommandBindings,
 	tiptapBinding,
+	toTiptapBinding,
 } from "./commandRegistry.js";
 export { FakeSelectionExtension } from "./FakeSelectionExtension.js";
 export {

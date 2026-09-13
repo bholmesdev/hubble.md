@@ -1,3 +1,4 @@
+import type { CommandBindings } from "@hubble.md/editor";
 import type { FileKind } from "../lib/filePath";
 import type { ThemePreference } from "../theme";
 
@@ -207,6 +208,7 @@ export type DesktopApi = {
 	setSpellcheckEnabled(enabled: boolean): Promise<void>;
 	setSpellcheckLanguages(languages: string[]): Promise<void>;
 	setMenuState(state: MenuState): Promise<void>;
+	setShortcutBindings(bindings: CommandBindings): Promise<void>;
 	getUpdateState(): Promise<DesktopUpdateState>;
 	getTelemetryConsent(): Promise<TelemetryConsent>;
 	setTelemetryConsent(consent: TelemetryChoice): Promise<TelemetryConsent>;

@@ -3,10 +3,11 @@ import type { AppCommandId } from "@hubble.md/editor";
 import {
 	Button,
 	commandReviewThread,
-	formatCommandShortcut,
 	ReviewCommentSummary,
 	type ReviewCommentSummaryProps,
 	Toolbar as SharedToolbar,
+	useCommandShortcut,
+	useCommandShortcutLabel,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { type CSSProperties, useEffect, useState } from "react";
@@ -161,8 +162,8 @@ export function Toolbar({
 
 function NavigationControls() {
 	const { canGoBack, canGoForward } = useHistoryNav();
-	const backLabel = `Go Back (${formatCommandShortcut("app.go-back")})`;
-	const forwardLabel = `Go Forward (${formatCommandShortcut("app.go-forward")})`;
+	const backLabel = useCommandShortcutLabel("Go Back", "app.go-back");
+	const forwardLabel = useCommandShortcutLabel("Go Forward", "app.go-forward");
 	return (
 		<div className="flex items-center gap-1">
 			<Button
@@ -349,14 +350,15 @@ function ActionsMenu({
 	);
 }
 
-// Stable IDs keep hints synchronized with command bindings.
 function ShortcutHint({ commandId }: { commandId: AppCommandId }) {
+	const shortcut = useCommandShortcut(commandId);
+	if (!shortcut) return null;
 	return (
 		<span
 			className="ms-auto shrink-0 text-[11px] leading-none text-muted-foreground/60"
 			aria-hidden="true"
 		>
-			{formatCommandShortcut(commandId)}
+			{shortcut}
 		</span>
 	);
 }

@@ -9,13 +9,38 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- HTML Apps can open web links in the system browser and email links in the default email app, from plain `<a>` links or the new `hubble.links.open(url)` API. Thanks [@marcodlk](https://github.com/marcodlk)! [#274](https://github.com/bholmesdev/hubble.md/pull/274)
 - Notes automatically lay out each block from right to left or left to right based on its text. Thanks [@n00ki](https://github.com/n00ki)! [#277](https://github.com/bholmesdev/hubble.md/pull/277)
+
+### Changed
+
+- The app window now appears about 200ms sooner on launch, already in the right theme, instead of staying hidden behind a bouncing dock icon until the whole app had loaded. Thanks [@zcuric](https://github.com/zcuric)! [#281](https://github.com/bholmesdev/hubble.md/pull/281)
+- The desktop download is smaller: the app bundle dropped from 131 MB to 56 MB and the app code itself is half the size, so updates download faster. Thanks [@zcuric](https://github.com/zcuric)! [#281](https://github.com/bholmesdev/hubble.md/pull/281)
+
+### Fixed
+
+- Opening a Markdown file from Finder now brings Hubble to the front, and opens a window when the app is running with none open. Thanks [@HDPark95](https://github.com/HDPark95)! [#289](https://github.com/bholmesdev/hubble.md/pull/289)
+
+## [0.1.28] - 2026-08-19
+
+### Added
+
+- Customize keyboard shortcuts from Settings. Thanks [@Mamdouh66](https://github.com/Mamdouh66)! [#204](https://github.com/bholmesdev/hubble.md/pull/204)
+
+## [0.1.27] - 2026-08-16
+
+### Added
+
 - Add a spellcheck option to Settings. Allows for enabling / disabling, and selecting custom spellcheck dictionaries on Windows and Linux. Thanks [@JoeJoeflyn](https://github.com/JoeJoeflyn)! [#234](https://github.com/bholmesdev/hubble.md/pull/234)
 
 ### Changed
 
+- Sidebar folders stay alphabetized while files are sorted by Recent or Name. Thanks [@n00ki](https://github.com/n00ki)! [#258](https://github.com/bholmesdev/hubble.md/pull/258)
+
 ### Fixed
 
+- Sidebar keyboard focus stays on the same file or folder when sorting changes. [#267](https://github.com/bholmesdev/hubble.md/pull/267)
+- Code blocks scroll horizontally instead of wrapping long lines. Thanks [@ggbao666](https://github.com/ggbao666) for the suggestion! [#260](https://github.com/bholmesdev/hubble.md/pull/260)
 - Clicking elsewhere in a note now closes the formatting menu and clears its old text highlight. [#256](https://github.com/bholmesdev/hubble.md/pull/256)
 - Pinned notes remain visible after restarting or updating the desktop app. [#254](https://github.com/bholmesdev/hubble.md/pull/254)
 - Pressing Enter in a list item containing an image now creates a new list item instead of dropping out of the list. Thanks [@MonisMS](https://github.com/MonisMS)! [#241](https://github.com/bholmesdev/hubble.md/pull/241)
