@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { Button, useCommandShortcutLabel } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, Ref } from "react";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
 import MingcuteDownLine from "~icons/mingcute/down-line";
 import { isChangelogPath } from "../lib/changelogNote";
@@ -18,8 +18,12 @@ const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
 export function AllTabsMenu({
 	open,
 	onOpenChange,
+	tabsCollapsed = false,
+	triggerRef,
 }: {
 	open: boolean;
+	tabsCollapsed?: boolean;
+	triggerRef?: Ref<HTMLButtonElement>;
 	onOpenChange: (open: boolean) => void;
 }) {
 	const tabs = useStoreValue(tabsStore);
@@ -32,6 +36,7 @@ export function AllTabsMenu({
 			<Menu.Trigger
 				render={
 					<Button
+						ref={triggerRef}
 						variant="ghost"
 						size="icon-sm"
 						className="mx-1 shrink-0"
@@ -41,7 +46,9 @@ export function AllTabsMenu({
 					/>
 				}
 			>
-				<MingcuteDownLine className="size-4" />
+				<MingcuteDownLine
+					className={`size-4 ${tabsCollapsed ? "motion-safe:animate-[tab-menu-pulse_450ms_ease-in-out_2]" : ""}`}
+				/>
 			</Menu.Trigger>
 			<Menu.Portal>
 				<Menu.Positioner

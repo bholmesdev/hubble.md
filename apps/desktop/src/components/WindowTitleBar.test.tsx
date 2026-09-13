@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act } from "react";
+import { act, type Ref } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WindowTitleBar } from "./WindowTitleBar";
@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
 	sidebarOpen: false,
 	compact: false,
 	fullScreen: false,
+	onCollapsedChange: undefined as ((value: boolean) => void) | undefined,
 	onFullScreenChange: undefined as ((value: boolean) => void) | undefined,
 	toggleSidebar: vi.fn(),
 	unsubscribe: vi.fn(),
@@ -35,16 +36,40 @@ vi.mock("../store/state", () => ({
 vi.mock("../store/actions", () => ({ toggleSidebar: state.toggleSidebar }));
 vi.mock("../lib/layout", () => ({ useCompactWindow: () => state.compact }));
 vi.mock("./AllTabsMenu", () => ({
-	AllTabsMenu: () => <button type="button">All tabs</button>,
+	AllTabsMenu: ({
+		triggerRef,
+		tabsCollapsed,
+	}: {
+		triggerRef: Ref<HTMLButtonElement>;
+		tabsCollapsed: boolean;
+	}) => (
+		<button
+			type="button"
+			ref={triggerRef}
+			data-all-tabs
+			data-collapsed={String(tabsCollapsed)}
+		>
+			All tabs
+		</button>
+	),
 }));
 vi.mock("./DocumentTabs", () => ({
-	DocumentTabs: ({ flushStart }: { flushStart: boolean }) => (
-		<div role="tablist" data-tabs-flush-start={String(flushStart)}>
-			<button type="button" role="tab" aria-selected="true">
-				Note
-			</button>
-		</div>
-	),
+	DocumentTabs: ({
+		flushStart,
+		onCollapsedChange,
+	}: {
+		flushStart: boolean;
+		onCollapsedChange: (value: boolean) => void;
+	}) => {
+		state.onCollapsedChange = onCollapsedChange;
+		return (
+			<div role="tablist" data-tabs-flush-start={String(flushStart)}>
+				<button type="button" role="tab" aria-selected="true">
+					Note
+				</button>
+			</div>
+		);
+	},
 }));
 
 describe("WindowTitleBar", () => {
@@ -107,6 +132,21 @@ describe("WindowTitleBar", () => {
 				.querySelector("[data-tabs-flush-start]")
 				?.getAttribute("data-tabs-flush-start"),
 		).toBe(flush);
+	});
+
+	it("moves keyboard focus to the dropdown when tabs collapse", async () => {
+		await render();
+		const tab = container.querySelector<HTMLButtonElement>('[role="tab"]');
+		const dropdown =
+			container.querySelector<HTMLButtonElement>("[data-all-tabs]");
+		tab?.focus();
+		if (tab) vi.spyOn(tab, "matches").mockReturnValue(true);
+		await act(async () => state.onCollapsedChange?.(true));
+		expect(document.activeElement).toBe(dropdown);
+		expect(dropdown?.getAttribute("data-collapsed")).toBe("true");
+		await act(async () => state.onCollapsedChange?.(false));
+		expect(dropdown?.getAttribute("data-collapsed")).toBe("false");
+		expect(document.activeElement).toBe(dropdown);
 	});
 
 	it("releases traffic-light space in fullscreen and restores it on exit", async () => {

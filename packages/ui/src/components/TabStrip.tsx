@@ -28,6 +28,8 @@ export type TabStripProps = {
 	activeTabId: string | null;
 	/** Removes the first tab's bottom-left flare so its edge meets the expanded sidebar's divider. */
 	flushStart?: boolean;
+	/** Enables hiding crowded tabs when the caller provides another way to select them. */
+	onCollapsedChange?: (collapsed: boolean) => void;
 	onActivate: (id: string) => void;
 	onClose: (id: string) => void;
 	onNewTab?: () => void;
@@ -45,6 +47,7 @@ export function TabStrip({
 	tabs,
 	activeTabId,
 	flushStart = false,
+	onCollapsedChange,
 	onActivate,
 	onClose,
 	onNewTab,
@@ -55,6 +58,31 @@ export function TabStrip({
 	const renameInputRef = useRef<HTMLInputElement | null>(null);
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [draft, setDraft] = useState("");
+	const [collapsed, setCollapsed] = useState(false);
+	const collapsedRef = useRef(false);
+	const tabCount = tabs.length;
+
+	useEffect(() => {
+		const update = (next: boolean) => {
+			if (next === collapsedRef.current) return;
+			collapsedRef.current = next;
+			// Let the caller move focus before the tabs become inert.
+			onCollapsedChange?.(next);
+			setCollapsed(next);
+		};
+		const strip = stripRef.current;
+		if (!onCollapsedChange || !strip || tabCount === 0) {
+			update(false);
+			return;
+		}
+		const measure = (width: number) => update(width / tabCount < 48);
+		measure(strip.getBoundingClientRect().width);
+		const observer = new ResizeObserver(([entry]) => {
+			measure(entry.contentRect.width);
+		});
+		observer.observe(strip);
+		return () => observer.disconnect();
+	}, [onCollapsedChange, tabCount]);
 
 	const anchor = Math.max(
 		0,
@@ -137,8 +165,16 @@ export function TabStrip({
 						ref={stripRef}
 						role="tablist"
 						aria-label="Open notes"
+						aria-hidden={collapsed || undefined}
+						inert={collapsed}
 						onKeyDown={onKeyDown}
-						className="flex min-w-0 items-stretch overflow-hidden"
+						// Keep the measured width while hidden so collapsing cannot trigger a resize loop.
+						className={cn(
+							"flex min-w-0 items-stretch overflow-hidden transition-[opacity,visibility] [transition-duration:150ms,0ms] motion-reduce:transition-none",
+							collapsed
+								? "invisible opacity-0 [transition-delay:0ms,150ms]"
+								: "visible opacity-100",
+						)}
 					>
 						{tabs.map((tab, index) => {
 							const active = tab.id === activeTabId;
@@ -229,7 +265,7 @@ export function TabStrip({
 					aria-label="New tab"
 					title={newTabTitle}
 					onClick={onNewTab}
-					className="w-8 shrink-0 self-center"
+					className={cn("w-8 shrink-0 self-center", collapsed && "ms-auto")}
 					style={NO_DRAG_STYLE}
 				>
 					<MingcuteAddLine className="size-3.5" />
