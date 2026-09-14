@@ -7,6 +7,7 @@ import {
 import { useStoreValue } from "@simplestack/store/react";
 import type { ReactNode } from "react";
 import { desktopApi } from "../desktopApi";
+import { focusMarkdownEditorAfterRender } from "../fileActions";
 import { copyText } from "../lib/clipboard";
 import { useCompactWindow } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
@@ -132,7 +133,13 @@ export function Sidebar({
 				});
 			}}
 			revealLabel={revealFileLabel(desktopApi.platform)}
-			onRenameFile={(path, nextName) => void renameMarkdownFile(path, nextName)}
+			onRenameFile={(path, nextName, { origin, commit }) => {
+				void renameMarkdownFile(path, nextName).then((renamedPath) => {
+					if (origin === "new-note" && commit === "enter" && renamedPath) {
+						focusMarkdownEditorAfterRender(renamedPath);
+					}
+				});
+			}}
 			onRenameFolder={(folderId, nextName, targetDisplayPath) =>
 				void renameFolder(
 					absolutePath(folderId),
