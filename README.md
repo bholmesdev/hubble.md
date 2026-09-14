@@ -26,6 +26,24 @@ Hubble ships as a desktop app. Install the latest build from the [releases page]
 
 macOS, Windows, and Linux are supported. macOS builds are signed and notarized; Windows and Linux builds are unsigned, so your OS may warn before the first launch.
 
+### Homebrew (macOS)
+
+For macOS users, you can also install Hubble via Homebrew:
+
+```sh
+brew tap PARAM-ship/hubble
+brew install --cask hubble-md
+```
+
+To update an existing installation:
+
+```sh
+brew update
+brew upgrade --cask hubble-md
+```
+
+The Homebrew tap is maintained by the community and automatically updates when new Hubble.md releases are published.
+
 ## Compile from source
 
 Want to build Hubble directly? First, install the prerequisites:
