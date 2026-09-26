@@ -16,18 +16,16 @@ import {
 afterEach(() => setCommandBindings({}));
 
 describe("commandRegistry", () => {
-	it("allows default binding conflicts only within declared groups", () => {
-		const bindings = new Map<string, string | undefined>();
+	it("allows default binding conflicts only when both commands opt in", () => {
+		const bindings = new Map<string, boolean>();
 		for (const command of Object.values(commandRegistry)) {
-			const group =
-				"sharedBindingGroup" in command
-					? command.sharedBindingGroup
-					: undefined;
+			const allowsConflicts =
+				"allowConflicts" in command && command.allowConflicts;
 			if (bindings.has(command.defaultBinding)) {
-				expect(group).toBeTruthy();
-				expect(group).toBe(bindings.get(command.defaultBinding));
+				expect(allowsConflicts).toBe(true);
+				expect(bindings.get(command.defaultBinding)).toBe(true);
 			}
-			bindings.set(command.defaultBinding, group);
+			bindings.set(command.defaultBinding, allowsConflicts);
 		}
 		expect(getCommandBinding("app.go-to-file")).toBe("CmdOrCtrl+K");
 		expect(getCommandBinding("editor.link")).toBe("CmdOrCtrl+K");
@@ -36,7 +34,7 @@ describe("commandRegistry", () => {
 		]);
 	});
 
-	it("keeps grouped commands active when both are remapped", () => {
+	it("keeps opted-in commands active when both are remapped", () => {
 		setCommandBindings({
 			"app.go-to-file": "CmdOrCtrl+Alt+K",
 			"editor.link": "CmdOrCtrl+Alt+K",

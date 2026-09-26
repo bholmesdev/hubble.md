@@ -14,8 +14,8 @@ export type CommandDefinition = {
 	defaultBinding: string;
 	label: string;
 	isEnabled: (context: CommandContext) => boolean;
-	/** Commands in the same group may share a binding when context picks the handler. */
-	sharedBindingGroup?: string;
+	/** A shared binding stays active when both commands allow conflicts. */
+	allowConflicts?: boolean;
 };
 
 const always = () => true;
@@ -55,7 +55,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Go to File...",
 		isEnabled: hasWorkspace,
-		sharedBindingGroup: "selection-link-palette",
+		allowConflicts: true,
 	},
 	"app.all-tabs": {
 		defaultBinding: "CmdOrCtrl+Shift+A",
@@ -159,7 +159,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Link",
 		isEnabled: always,
-		sharedBindingGroup: "selection-link-palette",
+		allowConflicts: true,
 	},
 	"editor.strike": {
 		defaultBinding: "CmdOrCtrl+Shift+X",
@@ -258,11 +258,7 @@ export function getCommandBinding(id: CommandId) {
 		const otherBinding = resolveCommandBinding(commandId, commandBindings);
 		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
 			const otherCommand: CommandDefinition = commandRegistry[commandId];
-			if (
-				command.sharedBindingGroup &&
-				command.sharedBindingGroup === otherCommand.sharedBindingGroup
-			)
-				continue;
+			if (command.allowConflicts && otherCommand.allowConflicts) continue;
 			return null;
 		}
 	}
