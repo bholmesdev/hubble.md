@@ -50,7 +50,6 @@ type MachineState = {
 type MachineEvent =
 	| { type: "LINK_SESSION_CHANGED"; activeKey: string | null }
 	| { type: "EXPAND_REQUESTED" }
-	| { type: "TOGGLE_ACTIONS_REQUESTED" }
 	| { type: "ESCAPE_REQUESTED" }
 	| { type: "CREATION_REQUESTED" }
 	| { type: "CREATION_CONFIRMED" }
@@ -102,12 +101,6 @@ function machineReducer(
 			if (state.mode === "creating") return state;
 			if (!state.activeKey) return state;
 			return { ...state, mode: "actions" };
-		}
-		case "TOGGLE_ACTIONS_REQUESTED": {
-			if (!state.activeKey) return state;
-			if (state.mode === "preview") return { ...state, mode: "actions" };
-			if (state.mode === "actions") return { ...state, mode: "preview" };
-			return state;
 		}
 		case "ESCAPE_REQUESTED": {
 			if (state.mode === "creating") return INITIAL_MACHINE_STATE;
@@ -973,7 +966,7 @@ export function LinkPopover({
 		[editor, dispatchMachineEvent],
 	);
 
-	// ── Listen for LINK_CREATION_REQUESTED_EVENT (empty-selection Cmd+K) ──
+	// ── Listen for link creation from [[ ──
 	useEffect(
 		() => {
 			const onCreationRequested = (event: Event) => {
@@ -1120,11 +1113,6 @@ export function LinkPopover({
 				editor.commands.focus(undefined, { scrollIntoView: false });
 				return;
 			}
-
-			if (keymatch(event, "CmdOrCtrl+K")) {
-				event.preventDefault();
-				event.stopPropagation();
-			}
 		};
 		window.addEventListener("keydown", onKeyDown, true);
 		return () => window.removeEventListener("keydown", onKeyDown, true);
@@ -1212,14 +1200,6 @@ export function LinkPopover({
 						});
 					}
 				});
-				return;
-			}
-
-			if (keymatch(event, "CmdOrCtrl+K")) {
-				if (!isVisible) return;
-				event.preventDefault();
-				event.stopPropagation();
-				dispatchMachineEvent({ type: "TOGGLE_ACTIONS_REQUESTED" });
 				return;
 			}
 		};

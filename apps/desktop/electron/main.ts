@@ -28,6 +28,7 @@ import {
 	shell,
 } from "electron";
 import electronUpdater from "electron-updater";
+import { keymatch } from "keymatch";
 import { z } from "zod/v4";
 import type {
 	DesktopUpdateState,
@@ -919,9 +920,12 @@ function buildMenu() {
 					sendToRenderer("desktop:menu-show-workspace-switcher"),
 				),
 				{ type: "separator" },
-				commandMenuItem("app.go-to-file", () =>
-					sendToRenderer("desktop:menu-go-to-file"),
-				),
+				{
+					...commandMenuItem("app.go-to-file", () =>
+						sendToRenderer("desktop:menu-go-to-file"),
+					),
+					registerAccelerator: false,
+				},
 				commandMenuItem("app.new-tab", () =>
 					sendToRenderer("desktop:menu-new-tab"),
 				),
@@ -1281,6 +1285,27 @@ async function createWindow() {
 	window.show();
 
 	window.on("focus", () => sendToRenderer("desktop:window-focus"));
+	if (process.platform === "darwin") {
+		window.webContents.on("before-input-event", (_event, input) => {
+			const binding = getCommandBinding("app.go-to-file");
+			// macOS still registers accelerators with registerAccelerator: false.
+			window.webContents.setIgnoreMenuShortcuts(
+				input.type === "keyDown" &&
+					binding !== null &&
+					keymatch(
+						{
+							key: input.key,
+							code: input.code,
+							metaKey: input.meta,
+							ctrlKey: input.control,
+							altKey: input.alt,
+							shiftKey: input.shift,
+						} as KeyboardEvent,
+						binding,
+					),
+			);
+		});
+	}
 
 	// On Linux/Windows the menu bar is hidden by the custom title bar, so menu
 	// accelerators (incl. DevTools) don't fire. Bind the DevTools toggle directly.

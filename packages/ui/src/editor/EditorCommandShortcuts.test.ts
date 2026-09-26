@@ -12,6 +12,7 @@ import {
 	EditorCommandShortcuts,
 	starterKitWithRegistryShortcuts,
 } from "./EditorCommandShortcuts";
+import { SmartLinkExtension } from "./SmartLinkExtension";
 
 const editors: Editor[] = [];
 
@@ -91,6 +92,19 @@ describe("EditorCommandShortcuts", () => {
 		expect(editor.isActive("italic")).toBe(false);
 	});
 
+	it("handles the link shortcut only with selected text", () => {
+		const editor = createEditor();
+
+		editor.commands.keyboardShortcut("Mod-k");
+		expect(editor.getHTML()).toBe("<p>hello</p>");
+
+		editor.commands.setTextSelection({ from: 1, to: 6 });
+		editor.commands.keyboardShortcut("Mod-k");
+		expect(editor.getHTML()).toContain(
+			'<a target="_blank" rel="noopener noreferrer nofollow" href="">hello</a>',
+		);
+	});
+
 	it("runs only the first command when shortcuts conflict", () => {
 		const editor = createEditor();
 		editor.commands.selectAll();
@@ -116,6 +130,7 @@ function createEditor() {
 			InlineCodeExtension,
 			...listExtensions,
 			TaskItem.configure({ nested: true }),
+			SmartLinkExtension,
 			EditorCommandShortcuts,
 		],
 		content: "<p>hello</p>",

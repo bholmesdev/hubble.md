@@ -50,7 +50,7 @@ export const commandRegistry = {
 		isEnabled: always,
 	},
 	"app.go-to-file": {
-		defaultBinding: "CmdOrCtrl+P",
+		defaultBinding: "CmdOrCtrl+K",
 		label: "Go to File...",
 		isEnabled: hasWorkspace,
 	},
@@ -252,6 +252,11 @@ export function getCommandBinding(id: CommandId) {
 		if (commandId === id) return binding;
 		const otherBinding = resolveCommandBinding(commandId, commandBindings);
 		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
+			if (
+				(id === "app.go-to-file" && commandId === "editor.link") ||
+				(id === "editor.link" && commandId === "app.go-to-file")
+			)
+				continue;
 			return null;
 		}
 	}

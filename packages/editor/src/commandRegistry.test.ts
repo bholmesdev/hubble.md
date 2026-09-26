@@ -16,11 +16,19 @@ import {
 afterEach(() => setCommandBindings({}));
 
 describe("commandRegistry", () => {
-	it("owns unique bindings for every command", () => {
+	it("shares only the contextual link and palette binding", () => {
 		const bindings = Object.values(commandRegistry).map(
 			(command) => command.defaultBinding,
 		);
-		expect(new Set(bindings).size).toBe(bindings.length);
+		expect(
+			bindings.filter((binding) => binding === "CmdOrCtrl+K"),
+		).toHaveLength(2);
+		expect(new Set(bindings).size).toBe(bindings.length - 1);
+		expect(getCommandBinding("app.go-to-file")).toBe("CmdOrCtrl+K");
+		expect(getCommandBinding("editor.link")).toBe("CmdOrCtrl+K");
+		expect(findCommandBindingConflicts("editor.link", {})).toEqual([
+			"app.go-to-file",
+		]);
 	});
 
 	it("resolves context-dependent enablement", () => {
