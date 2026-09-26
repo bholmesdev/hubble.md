@@ -14,8 +14,8 @@ export type CommandDefinition = {
 	defaultBinding: string;
 	label: string;
 	isEnabled: (context: CommandContext) => boolean;
-	/** A shared binding stays active when both commands allow conflicts. */
-	allowConflicts?: boolean;
+	/** The renderer resolves this binding from focus and selection. */
+	routing?: "contextual";
 };
 
 const always = () => true;
@@ -55,7 +55,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Go to File...",
 		isEnabled: hasWorkspace,
-		allowConflicts: true,
+		routing: "contextual",
 	},
 	"app.all-tabs": {
 		defaultBinding: "CmdOrCtrl+Shift+A",
@@ -159,7 +159,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Link",
 		isEnabled: always,
-		allowConflicts: true,
+		routing: "contextual",
 	},
 	"editor.strike": {
 		defaultBinding: "CmdOrCtrl+Shift+X",
@@ -258,7 +258,11 @@ export function getCommandBinding(id: CommandId) {
 		const otherBinding = resolveCommandBinding(commandId, commandBindings);
 		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
 			const otherCommand: CommandDefinition = commandRegistry[commandId];
-			if (command.allowConflicts && otherCommand.allowConflicts) continue;
+			if (
+				command.routing === "contextual" &&
+				otherCommand.routing === "contextual"
+			)
+				continue;
 			return null;
 		}
 	}

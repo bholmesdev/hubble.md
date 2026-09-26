@@ -6,6 +6,7 @@ import path from "node:path";
 import {
 	type AppCommandId,
 	type CommandBindings,
+	type CommandDefinition,
 	getCommand,
 	getCommandBinding,
 	setCommandBindings,
@@ -886,11 +887,12 @@ function commandMenuItem(
 	id: AppCommandId,
 	click: () => void,
 ): Electron.MenuItemConstructorOptions {
-	const command = getCommand(id);
+	const command: CommandDefinition = getCommand(id);
 	return {
 		id,
 		label: command.label,
 		accelerator: getCommandBinding(id) ?? undefined,
+		...(command.routing === "contextual" ? { registerAccelerator: false } : {}),
 		enabled: command.isEnabled(menuState),
 		click,
 	};
@@ -922,12 +924,9 @@ function buildMenu() {
 				{ type: "separator" },
 				// The default shortcut (cmd+k) may be bound to hyperlinks. Avoid registering
 				// the accelerator and check text selection in-app to route the keybinding appropriately.
-				{
-					...commandMenuItem("app.go-to-file", () =>
-						sendToRenderer("desktop:menu-go-to-file"),
-					),
-					registerAccelerator: false,
-				},
+				commandMenuItem("app.go-to-file", () =>
+					sendToRenderer("desktop:menu-go-to-file"),
+				),
 				commandMenuItem("app.new-tab", () =>
 					sendToRenderer("desktop:menu-new-tab"),
 				),
@@ -1289,7 +1288,11 @@ async function createWindow() {
 	window.on("focus", () => sendToRenderer("desktop:window-focus"));
 	if (process.platform === "darwin") {
 		window.webContents.on("before-input-event", (_event, input) => {
-			const binding = getCommandBinding("app.go-to-file");
+			const command: CommandDefinition = getCommand("app.go-to-file");
+			const binding =
+				command.routing === "contextual"
+					? getCommandBinding("app.go-to-file")
+					: null;
 			// macOS still registers accelerators with registerAccelerator: false.
 			window.webContents.setIgnoreMenuShortcuts(
 				input.type === "keyDown" &&
