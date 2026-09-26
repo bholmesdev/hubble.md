@@ -14,6 +14,8 @@ export type CommandDefinition = {
 	defaultBinding: string;
 	label: string;
 	isEnabled: (context: CommandContext) => boolean;
+	/** Commands in the same group may share a binding when context picks the handler. */
+	sharedBindingGroup?: string;
 };
 
 const always = () => true;
@@ -53,6 +55,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Go to File...",
 		isEnabled: hasWorkspace,
+		sharedBindingGroup: "selection-link-palette",
 	},
 	"app.all-tabs": {
 		defaultBinding: "CmdOrCtrl+Shift+A",
@@ -156,6 +159,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Link",
 		isEnabled: always,
+		sharedBindingGroup: "selection-link-palette",
 	},
 	"editor.strike": {
 		defaultBinding: "CmdOrCtrl+Shift+X",
@@ -248,14 +252,15 @@ export function getCommandBinding(id: CommandId) {
 	const binding = resolveCommandBinding(id, commandBindings);
 	if (!binding) return binding;
 	const bindingKey = sortCommandBinding(binding);
+	const command: CommandDefinition = commandRegistry[id];
 	for (const commandId of commandIds) {
 		if (commandId === id) return binding;
 		const otherBinding = resolveCommandBinding(commandId, commandBindings);
 		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
-			// Selection routes the shared shortcut to Link; otherwise the palette runs.
+			const otherCommand: CommandDefinition = commandRegistry[commandId];
 			if (
-				(id === "app.go-to-file" && commandId === "editor.link") ||
-				(id === "editor.link" && commandId === "app.go-to-file")
+				command.sharedBindingGroup &&
+				command.sharedBindingGroup === otherCommand.sharedBindingGroup
 			)
 				continue;
 			return null;

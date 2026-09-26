@@ -16,19 +16,33 @@ import {
 afterEach(() => setCommandBindings({}));
 
 describe("commandRegistry", () => {
-	it("shares only the contextual link and palette binding", () => {
-		const bindings = Object.values(commandRegistry).map(
-			(command) => command.defaultBinding,
-		);
-		expect(
-			bindings.filter((binding) => binding === "CmdOrCtrl+K"),
-		).toHaveLength(2);
-		expect(new Set(bindings).size).toBe(bindings.length - 1);
+	it("allows default binding conflicts only within declared groups", () => {
+		const bindings = new Map<string, string | undefined>();
+		for (const command of Object.values(commandRegistry)) {
+			const group =
+				"sharedBindingGroup" in command
+					? command.sharedBindingGroup
+					: undefined;
+			if (bindings.has(command.defaultBinding)) {
+				expect(group).toBeTruthy();
+				expect(group).toBe(bindings.get(command.defaultBinding));
+			}
+			bindings.set(command.defaultBinding, group);
+		}
 		expect(getCommandBinding("app.go-to-file")).toBe("CmdOrCtrl+K");
 		expect(getCommandBinding("editor.link")).toBe("CmdOrCtrl+K");
 		expect(findCommandBindingConflicts("editor.link", {})).toEqual([
 			"app.go-to-file",
 		]);
+	});
+
+	it("keeps grouped commands active when both are remapped", () => {
+		setCommandBindings({
+			"app.go-to-file": "CmdOrCtrl+Alt+K",
+			"editor.link": "CmdOrCtrl+Alt+K",
+		});
+		expect(getCommandBinding("app.go-to-file")).toBe("CmdOrCtrl+Alt+K");
+		expect(getCommandBinding("editor.link")).toBe("CmdOrCtrl+Alt+K");
 	});
 
 	it("resolves context-dependent enablement", () => {
