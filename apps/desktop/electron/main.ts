@@ -920,6 +920,8 @@ function buildMenu() {
 					sendToRenderer("desktop:menu-show-workspace-switcher"),
 				),
 				{ type: "separator" },
+				// The default shortcut (cmd+k) may be bound to hyperlinks. Avoid registering
+				// the accelerator and check text selection in-app to route the keybinding appropriately.
 				{
 					...commandMenuItem("app.go-to-file", () =>
 						sendToRenderer("desktop:menu-go-to-file"),
