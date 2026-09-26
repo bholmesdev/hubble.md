@@ -11,6 +11,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Cmd+K opens search, or link controls when text is selected; Cmd+P no longer opens search. [#296](https://github.com/bholmesdev/hubble.md/pull/296)
+
 ### Fixed
 
 ## [0.2.0] - 2026-09-14
