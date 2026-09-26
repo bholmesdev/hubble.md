@@ -480,7 +480,6 @@ function App() {
 				"app.new-file": createNewFile,
 				"app.settings": () => setSettingsOpen(true),
 				"app.open-recent": () => setWorkspaceSwitcherOpen(true),
-				// The File menu accelerator fires too, but opening is idempotent.
 				"app.go-to-file": () => openSearch("current"),
 				"app.new-tab": () => openSearch("new-tab"),
 				"app.all-tabs": () => setAllTabsOpen((open) => !open),

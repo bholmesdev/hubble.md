@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Change the default keybinding for search from cmd+P to cmd+K. You can change this binding back to cmd+P from Settings > Keybindings. [#296](https://github.com/bholmesdev/hubble.md/pull/296)
+
 ### Fixed
 
 ## [0.2.0] - 2026-09-14

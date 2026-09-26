@@ -290,7 +290,7 @@ function GlobalSearchPalette({
 
 				    `initialFocus` rather than `autoFocus` on the input: the popup stays
 				    mounted after close, so `autoFocus` fires only on the first open and
-				    a second Cmd+P would leave the caret in the editor. A manual focus()
+				    a second Cmd+K would leave the caret in the editor. A manual focus()
 				    call races base-ui's own focus management; this does not. */}
 				<Dialog.Popup
 					initialFocus={inputRef}

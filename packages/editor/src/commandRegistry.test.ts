@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	type CommandDefinition,
 	cleanCommandBindings,
 	commandRegistry,
 	findCommandBindingConflicts,
@@ -16,11 +17,34 @@ import {
 afterEach(() => setCommandBindings({}));
 
 describe("commandRegistry", () => {
-	it("owns unique bindings for every command", () => {
-		const bindings = Object.values(commandRegistry).map(
-			(command) => command.defaultBinding,
-		);
-		expect(new Set(bindings).size).toBe(bindings.length);
+	it("allows duplicate defaults only for mutually paired commands", () => {
+		const commands: Record<string, CommandDefinition> = commandRegistry;
+		const bindings = new Map<string, string>();
+		for (const [id, command] of Object.entries(commands)) {
+			if (command.allowConflictWith) {
+				expect(commands[command.allowConflictWith]?.allowConflictWith).toBe(id);
+			}
+			const earlierId = bindings.get(command.defaultBinding);
+			if (earlierId) {
+				expect(command.allowConflictWith).toBe(earlierId);
+				expect(commands[earlierId]?.allowConflictWith).toBe(id);
+			}
+			bindings.set(command.defaultBinding, id);
+		}
+		expect(getCommandBinding("app.go-to-file")).toBe("CmdOrCtrl+K");
+		expect(getCommandBinding("editor.link")).toBe("CmdOrCtrl+K");
+		expect(findCommandBindingConflicts("editor.link", {})).toEqual([
+			"app.go-to-file",
+		]);
+	});
+
+	it("keeps paired commands active when both are remapped", () => {
+		setCommandBindings({
+			"app.go-to-file": "CmdOrCtrl+Alt+K",
+			"editor.link": "CmdOrCtrl+Alt+K",
+		});
+		expect(getCommandBinding("app.go-to-file")).toBe("CmdOrCtrl+Alt+K");
+		expect(getCommandBinding("editor.link")).toBe("CmdOrCtrl+Alt+K");
 	});
 
 	it("resolves context-dependent enablement", () => {
