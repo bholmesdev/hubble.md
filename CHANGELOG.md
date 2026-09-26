@@ -11,7 +11,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
-- Cmd+K opens search, or link controls when text is selected; Cmd+P no longer opens search. [#296](https://github.com/bholmesdev/hubble.md/pull/296)
+- Change the default keybinding for search from cmd+P to cmd+K. You can change this binding back to cmd+P from Settings > Keybindings. [#296](https://github.com/bholmesdev/hubble.md/pull/296)
 
 ### Fixed
 
