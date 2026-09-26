@@ -7,6 +7,7 @@ import {
 } from "@floating-ui/dom";
 import {
 	getActiveLinkRange,
+	getCommandBinding,
 	wikiDisplayNameForTarget,
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
@@ -1063,6 +1064,20 @@ export function LinkPopover({
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes this render-local callback.
 		dispatchMachineEvent,
 	]);
+
+	useEffect(() => {
+		if (machineState.mode !== "creating" && machineState.mode !== "actions")
+			return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (document.activeElement !== inputRef.current) return;
+			const binding = getCommandBinding("app.go-to-file");
+			if (!binding || !keymatch(event, binding)) return;
+			event.preventDefault();
+			event.stopPropagation();
+		};
+		window.addEventListener("keydown", onKeyDown, true);
+		return () => window.removeEventListener("keydown", onKeyDown, true);
+	}, [machineState.mode]);
 
 	// ── Keyboard: creating mode ─────────────────────────────────────
 	useEffect(() => {

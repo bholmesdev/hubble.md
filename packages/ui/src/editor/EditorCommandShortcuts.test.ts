@@ -2,6 +2,7 @@
 
 import {
 	InlineCodeExtension,
+	LinkExtension,
 	listExtensions,
 	setCommandBindings,
 } from "@hubble.md/editor";
@@ -96,13 +97,15 @@ describe("EditorCommandShortcuts", () => {
 		const editor = createEditor();
 
 		editor.commands.keyboardShortcut("Mod-k");
-		expect(editor.getHTML()).toBe("<p>hello</p>");
+		expect(editor.getJSON().content?.[0]?.content?.[0]?.marks).toBeUndefined();
 
 		editor.commands.setTextSelection({ from: 1, to: 6 });
 		editor.commands.keyboardShortcut("Mod-k");
-		expect(editor.getHTML()).toContain(
-			'<a target="_blank" rel="noopener noreferrer nofollow" href="">hello</a>',
-		);
+		expect(editor.getJSON().content?.[0]?.content?.[0]).toEqual({
+			type: "text",
+			text: "hello",
+			marks: [{ type: "link", attrs: { href: "", kind: "url", target: null } }],
+		});
 	});
 
 	it("runs only the first command when shortcuts conflict", () => {
@@ -126,10 +129,15 @@ function createEditor() {
 	const editor = new Editor({
 		element: document.createElement("div"),
 		extensions: [
-			...starterKitWithRegistryShortcuts({ code: false, listItem: false }),
+			...starterKitWithRegistryShortcuts({
+				code: false,
+				link: false,
+				listItem: false,
+			}),
 			InlineCodeExtension,
 			...listExtensions,
 			TaskItem.configure({ nested: true }),
+			LinkExtension,
 			SmartLinkExtension,
 			EditorCommandShortcuts,
 		],
