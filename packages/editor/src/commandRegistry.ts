@@ -253,18 +253,19 @@ export function getCommandBinding(id: CommandId) {
 	if (!binding) return binding;
 	const bindingKey = sortCommandBinding(binding);
 	const command: CommandDefinition = commandRegistry[id];
-	for (const commandId of commandIds) {
-		if (commandId === id) return binding;
-		const otherBinding = resolveCommandBinding(commandId, commandBindings);
-		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
-			const otherCommand: CommandDefinition = commandRegistry[commandId];
-			if (
-				command.routing === "contextual" &&
-				otherCommand.routing === "contextual"
-			)
-				continue;
-			return null;
-		}
+	for (const earlierId of commandIds) {
+		if (earlierId === id) break;
+		const earlierBinding = resolveCommandBinding(earlierId, commandBindings);
+		if (!earlierBinding || sortCommandBinding(earlierBinding) !== bindingKey)
+			continue;
+
+		const earlierCommand: CommandDefinition = commandRegistry[earlierId];
+		if (
+			command.routing === "contextual" &&
+			earlierCommand.routing === "contextual"
+		)
+			continue;
+		return null;
 	}
 	return binding;
 }
