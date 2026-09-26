@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	type CommandDefinition,
 	cleanCommandBindings,
 	commandRegistry,
 	findCommandBindingConflicts,
@@ -16,15 +17,19 @@ import {
 afterEach(() => setCommandBindings({}));
 
 describe("commandRegistry", () => {
-	it("allows default binding conflicts only for contextual commands", () => {
-		const bindings = new Map<string, string | undefined>();
-		for (const command of Object.values(commandRegistry)) {
-			const routing = "routing" in command ? command.routing : undefined;
-			if (bindings.has(command.defaultBinding)) {
-				expect(routing).toBe("contextual");
-				expect(bindings.get(command.defaultBinding)).toBe("contextual");
+	it("allows duplicate defaults only for mutually paired commands", () => {
+		const commands: Record<string, CommandDefinition> = commandRegistry;
+		const bindings = new Map<string, string>();
+		for (const [id, command] of Object.entries(commands)) {
+			if (command.allowConflictWith) {
+				expect(commands[command.allowConflictWith]?.allowConflictWith).toBe(id);
 			}
-			bindings.set(command.defaultBinding, routing);
+			const earlierId = bindings.get(command.defaultBinding);
+			if (earlierId) {
+				expect(command.allowConflictWith).toBe(earlierId);
+				expect(commands[earlierId]?.allowConflictWith).toBe(id);
+			}
+			bindings.set(command.defaultBinding, id);
 		}
 		expect(getCommandBinding("app.go-to-file")).toBe("CmdOrCtrl+K");
 		expect(getCommandBinding("editor.link")).toBe("CmdOrCtrl+K");
@@ -33,7 +38,7 @@ describe("commandRegistry", () => {
 		]);
 	});
 
-	it("keeps contextual commands active when both are remapped", () => {
+	it("keeps paired commands active when both are remapped", () => {
 		setCommandBindings({
 			"app.go-to-file": "CmdOrCtrl+Alt+K",
 			"editor.link": "CmdOrCtrl+Alt+K",

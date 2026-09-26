@@ -892,7 +892,7 @@ function commandMenuItem(
 		id,
 		label: command.label,
 		accelerator: getCommandBinding(id) ?? undefined,
-		...(command.routing === "contextual" ? { registerAccelerator: false } : {}),
+		...(command.allowConflictWith ? { registerAccelerator: false } : {}),
 		enabled: command.isEnabled(menuState),
 		click,
 	};
@@ -1289,10 +1289,9 @@ async function createWindow() {
 	if (process.platform === "darwin") {
 		window.webContents.on("before-input-event", (_event, input) => {
 			const command: CommandDefinition = getCommand("app.go-to-file");
-			const binding =
-				command.routing === "contextual"
-					? getCommandBinding("app.go-to-file")
-					: null;
+			const binding = command.allowConflictWith
+				? getCommandBinding("app.go-to-file")
+				: null;
 			// macOS still registers accelerators with registerAccelerator: false.
 			window.webContents.setIgnoreMenuShortcuts(
 				input.type === "keyDown" &&

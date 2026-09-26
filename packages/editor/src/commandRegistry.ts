@@ -14,8 +14,8 @@ export type CommandDefinition = {
 	defaultBinding: string;
 	label: string;
 	isEnabled: (context: CommandContext) => boolean;
-	/** The renderer resolves this binding from focus and selection. */
-	routing?: "contextual";
+	/** This command may share its binding with the named command. */
+	allowConflictWith?: string;
 };
 
 const always = () => true;
@@ -55,7 +55,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Go to File...",
 		isEnabled: hasWorkspace,
-		routing: "contextual",
+		allowConflictWith: "editor.link",
 	},
 	"app.all-tabs": {
 		defaultBinding: "CmdOrCtrl+Shift+A",
@@ -159,7 +159,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Link",
 		isEnabled: always,
-		routing: "contextual",
+		allowConflictWith: "app.go-to-file",
 	},
 	"editor.strike": {
 		defaultBinding: "CmdOrCtrl+Shift+X",
@@ -250,8 +250,9 @@ export function getCommand<Id extends CommandId>(id: Id) {
 
 /**
  * Return the shortcut a command can use, or null if disabled or claimed by an
- * earlier command. Contextual commands may share a shortcut. Use
- * resolveCommandBinding to read the assigned shortcut without this conflict check.
+ * earlier command. Commands that name each other in allowConflictWith may share
+ * a shortcut. Use resolveCommandBinding to read the assigned shortcut without
+ * this conflict check.
  */
 export function getCommandBinding(id: CommandId) {
 	const binding = resolveCommandBinding(id, commandBindings);
@@ -264,8 +265,8 @@ export function getCommandBinding(id: CommandId) {
 		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
 			const otherCommand: CommandDefinition = commandRegistry[commandId];
 			if (
-				command.routing === "contextual" &&
-				otherCommand.routing === "contextual"
+				command.allowConflictWith === commandId &&
+				otherCommand.allowConflictWith === id
 			)
 				continue;
 			return null;
