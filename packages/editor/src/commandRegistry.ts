@@ -252,6 +252,7 @@ export function getCommandBinding(id: CommandId) {
 		if (commandId === id) return binding;
 		const otherBinding = resolveCommandBinding(commandId, commandBindings);
 		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
+			// Selection routes the shared shortcut to Link; otherwise the palette runs.
 			if (
 				(id === "app.go-to-file" && commandId === "editor.link") ||
 				(id === "editor.link" && commandId === "app.go-to-file")
