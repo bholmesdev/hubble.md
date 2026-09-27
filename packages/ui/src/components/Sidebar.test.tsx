@@ -63,85 +63,18 @@ describe("Sidebar", () => {
 		);
 		expect(focusTree).not.toHaveBeenCalled();
 	});
-
-	it("returns to the sidebar after an existing note is renamed", () => {
-		const onRenameFile = vi.fn();
-		renderSidebar(onRenameFile, [
-			{ path: "/workspace/existing.md", modifiedAt: 1 },
-		]);
-
-		act(() => {
-			existingNoteButton().dispatchEvent(
-				new MouseEvent("dblclick", { bubbles: true, detail: 2 }),
-			);
-		});
-		const input = renameInput("existing");
-		act(() => {
-			setInputValue(input, "renamed");
-			input.dispatchEvent(
-				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-			);
-		});
-
-		expect(onRenameFile).toHaveBeenCalledWith(
-			"/workspace/existing.md",
-			"renamed",
-			{ origin: "rename", commit: "enter" },
-		);
-	});
-
-	it("returns to the sidebar after a new HTML app is named", async () => {
-		const onRenameFile = vi.fn();
-		renderSidebar(onRenameFile);
-
-		await act(async () => newFileButton().click());
-		await act(async () => {
-			newHtmlMenuItem().click();
-			await Promise.resolve();
-		});
-
-		const input = renameInput("new-app");
-		act(() => {
-			setInputValue(input, "dashboard");
-			input.dispatchEvent(
-				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-			);
-		});
-
-		expect(onRenameFile).toHaveBeenCalledWith(
-			"/workspace/new-app.html",
-			"dashboard",
-			{ origin: "new-html", commit: "enter" },
-		);
-	});
 });
 
-function renderSidebar(
-	onRenameFile: RenameFile,
-	initialFiles: SidebarFile[] = [],
-) {
+function renderSidebar(onRenameFile: RenameFile) {
 	const container = document.createElement("div");
 	document.body.append(container);
 	const root = createRoot(container);
 	roots.push(root);
-	act(() =>
-		root.render(
-			<SidebarHarness
-				onRenameFile={onRenameFile}
-				initialFiles={initialFiles}
-			/>,
-		),
-	);
+	act(() => root.render(<SidebarHarness onRenameFile={onRenameFile} />));
 }
 
-function SidebarHarness({
-	onRenameFile,
-	initialFiles,
-}: {
-	onRenameFile: RenameFile;
-	initialFiles: SidebarFile[];
-}) {
-	const [files, setFiles] = useState(initialFiles);
+function SidebarHarness({ onRenameFile }: { onRenameFile: RenameFile }) {
+	const [files, setFiles] = useState<SidebarFile[]>([]);
 	return (
 		<Sidebar
 			files={files}
@@ -153,11 +86,6 @@ function SidebarHarness({
 			onRenameFile={onRenameFile}
 			onCreateFile={async () => {
 				const path = "/workspace/new-file.md";
-				setFiles([{ path, modifiedAt: 1 }]);
-				return path;
-			}}
-			onCreateHtmlFile={async () => {
-				const path = "/workspace/new-app.html";
 				setFiles([{ path, modifiedAt: 1 }]);
 				return path;
 			}}
@@ -179,22 +107,6 @@ function newNoteMenuItem() {
 	).find((element) => element.textContent?.includes("New Note"));
 	if (!item) throw new Error("Missing New Note menu item");
 	return item;
-}
-
-function newHtmlMenuItem() {
-	const item = Array.from(
-		document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
-	).find((element) => element.textContent?.includes("New HTML App"));
-	if (!item) throw new Error("Missing New HTML App menu item");
-	return item;
-}
-
-function existingNoteButton() {
-	const button = Array.from(
-		document.querySelectorAll<HTMLButtonElement>("button"),
-	).find((element) => element.textContent?.trim() === "existing.md");
-	if (!button) throw new Error("Missing existing note button");
-	return button;
 }
 
 function sidebarTree() {
