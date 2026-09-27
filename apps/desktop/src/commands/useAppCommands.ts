@@ -12,7 +12,6 @@ import {
 } from "@hubble.md/ui";
 import { toast } from "sonner";
 import { desktopApi } from "../desktopApi";
-import { createMarkdownFile } from "../fileActions";
 import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
@@ -22,12 +21,17 @@ import {
 	supportsSourceToggle,
 } from "../lib/filePath";
 import {
+	activateAdjacentTab,
+	closeActiveTab,
+	closeAllTabs,
+	closeOtherTabs,
 	createFolderInFolder,
 	deleteMarkdownFile,
 	goBack,
 	goForward,
 	openChangelog,
 	openWorkspaceWithSidebar,
+	reopenClosedTab,
 	requestChatAboutNote,
 	setSidebarOpen,
 	setThemePreference,
@@ -38,13 +42,13 @@ import {
 	toggleTerminal,
 } from "../store/actions";
 import { canGoBack, canGoForward } from "../store/history";
+import { tabsStore } from "../store/tabStore";
 
 const CONTRIBUTING_URL =
 	"https://github.com/bholmesdev/hubble.md/blob/main/CONTRIBUTING.md";
 
 export type AppCommandContext = {
 	currentPath: string | null;
-	newFileParent: string | null;
 	newFolderParent: string | null;
 	workspacePath: string | null;
 	isSourceMode: boolean;
@@ -54,9 +58,12 @@ export type AppCommandContext = {
 };
 
 export type AppCommandActions = {
+	createNewFile: () => Promise<void>;
 	openSettings: () => void;
 	requestCopyAsMarkdown: () => void;
 	focusSidebar: () => void;
+	openNewTab: () => void;
+	toggleAllTabs: () => void;
 };
 
 function toRegistryContext(context: AppCommandContext): RegistryContext {
@@ -70,6 +77,8 @@ function toRegistryContext(context: AppCommandContext): RegistryContext {
 		isSourceMode: context.isSourceMode,
 		canGoBack: canGoBack(),
 		canGoForward: canGoForward(),
+		tabCount: tabsStore.get().order.length,
+		hasClosedTabs: tabsStore.get().closed.length > 0,
 	};
 }
 
@@ -145,8 +154,11 @@ function defineCommands(
 
 	return [
 		// File
-		fromRegistry("app.new-file", "File", ["create", "markdown", "note"], () =>
-			createMarkdownFile(context.newFileParent),
+		fromRegistry(
+			"app.new-file",
+			"File",
+			["create", "markdown", "note"],
+			actions.createNewFile,
 		),
 		paletteOnly({
 			id: "app.new-folder",
@@ -205,6 +217,55 @@ function defineCommands(
 		),
 
 		// Navigate
+		fromRegistry(
+			"app.all-tabs",
+			"Navigate",
+			["tab", "list", "switch"],
+			actions.toggleAllTabs,
+		),
+		fromRegistry(
+			"app.new-tab",
+			"Navigate",
+			["tab", "open", "palette"],
+			actions.openNewTab,
+		),
+		fromRegistry(
+			"app.close-tab",
+			"Navigate",
+			["tab", "close"],
+			closeActiveTab,
+			// The window-close role owns this accelerator; the native menu decides
+			// between closing a tab and closing the window.
+			{ globalShortcut: false },
+		),
+		paletteOnly({
+			id: "app.close-other-tabs",
+			label: "Close Other Tabs",
+			group: "Navigate",
+			keywords: ["tab", "close", "clean"],
+			isEnabled: () => tabsStore.get().order.length > 1,
+			run: closeOtherTabs,
+		}),
+		paletteOnly({
+			id: "app.close-all-tabs",
+			label: "Close All Tabs",
+			group: "Navigate",
+			keywords: ["tab", "close", "clean"],
+			isEnabled: () => tabsStore.get().order.length > 0,
+			run: closeAllTabs,
+		}),
+		fromRegistry(
+			"app.reopen-closed-tab",
+			"Navigate",
+			["tab", "restore", "undo"],
+			reopenClosedTab,
+		),
+		fromRegistry("app.next-tab", "Navigate", ["tab", "switch"], () =>
+			activateAdjacentTab(1),
+		),
+		fromRegistry("app.previous-tab", "Navigate", ["tab", "switch"], () =>
+			activateAdjacentTab(-1),
+		),
 		fromRegistry("app.go-back", "Navigate", ["history", "previous"], goBack),
 		fromRegistry("app.go-forward", "Navigate", ["history", "next"], goForward),
 		fromRegistry(

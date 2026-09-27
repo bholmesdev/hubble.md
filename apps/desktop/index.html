@@ -5,6 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hubble</title>
+    <style>
+      /* Paint the theme before the CSS bundle loads. Keep fallback colors in sync
+         with theme.css, index.css and windowBackgroundColor in electron/main.ts. */
+      :root {
+        color-scheme: light;
+        background-color: var(--background, #fefdfd);
+      }
+      :root.dark {
+        color-scheme: dark;
+        background-color: var(--background, #171614);
+      }
+    </style>
     <script>
       // Apply the theme class before first paint so a cold launch doesn't flash
       // the wrong scheme. Same persisted key as src/store/persistence.ts.

@@ -11,7 +11,6 @@ import { desktopApi } from "../desktopApi";
 import type { TelemetryChoice, WorkspaceDelta } from "../desktopApi/types";
 import { classifyFileChange } from "../externalFileChange";
 import {
-	CHANGELOG_PATH,
 	isChangelogPath,
 	prepareChangelogMarkdown,
 } from "../lib/changelogNote";
@@ -43,6 +42,11 @@ import {
 	rewriteMovedLinks,
 } from "../lib/markdownLinkRewrite";
 import {
+	captureScroll,
+	forgetScrollPositions,
+	rewriteScrollMemory,
+} from "../lib/scrollMemory";
+import {
 	setThemePreference as applyThemePreference,
 	initTheme,
 	type ThemePreference,
@@ -52,8 +56,10 @@ import {
 	activeHistory,
 	canGoBack,
 	canGoForward,
+	dropHistory,
 	normalizeStack,
 	pushHistory,
+	resetHistory,
 	rewriteHistory,
 	setHistory,
 } from "./history";
@@ -89,6 +95,17 @@ import {
 	withOpenedDoc,
 	workspaceStore,
 } from "./state";
+import { createTabActions } from "./tabActions";
+import { tabsStore } from "./tabStore";
+import {
+	emptyTabs,
+	findTabByPath,
+	type TabTarget,
+	tabSession,
+	tabsFromSession,
+	withClosedTab,
+	withRewrittenTabPaths,
+} from "./tabs";
 import { createTitleManager } from "./titleManagement";
 import { applyWorkspaceDelta } from "./workspaceDelta";
 
@@ -508,6 +525,8 @@ type LoadPathOptions = {
 	missing?: "toast" | "silent";
 	/** `false` keeps code files in Hubble regardless of the default-app preference. */
 	launchExternal?: boolean;
+	/** Defaults to the active tab. */
+	tab?: TabTarget;
 };
 
 export function getPendingRenameTarget(path: string) {
@@ -679,7 +698,12 @@ export function clearPendingTerminalCommand() {
 export function clearViewer() {
 	const path = viewerStore.get().currentPath;
 	if (path) titleManager.stop(path);
-	viewerStore.set((state) => emptyDoc(state.lastOpenedPath));
+	resetHistory();
+	appStore.set((state) => ({
+		...state,
+		tabs: emptyTabs(),
+		document: emptyDoc(),
+	}));
 }
 
 /** Opens a workspace and reveals the sidebar. */
@@ -718,6 +742,28 @@ export function removeRecentWorkspace(path: string) {
 	});
 }
 
+let workspaceRequest = 0;
+
+export const {
+	restoreTabs,
+	openTabForPath,
+	openBackgroundTab,
+	activateTab,
+	reorderTab,
+	closeTab,
+	reopenClosedTab,
+	closeOtherTabs,
+	closeTabsToLeft,
+	closeAllTabs,
+	closeActiveTab,
+	activateAdjacentTab,
+	openChangelog,
+} = createTabActions({
+	loadPath,
+	leaveCurrentDocument,
+	getWorkspaceRequest: () => workspaceRequest,
+});
+
 /** Opens a workspace by path. If no path given, shows a folder picker first. */
 export async function openWorkspace(path?: string) {
 	let nextPath = path;
@@ -726,30 +772,43 @@ export async function openWorkspace(path?: string) {
 		if (typeof selected !== "string") return;
 		nextPath = selected;
 	}
+	const request = ++workspaceRequest;
+	if (!(await leaveCurrentDocument())) return;
+	if (request !== workspaceRequest) return;
 	if (workspaceStore.get().workspacePath !== nextPath) {
 		await expireDeleteUndo();
 	}
-
-	workspaceStore.set((state) => {
-		const filtered = state.recentWorkspaces.filter((p) => p !== nextPath);
+	if (request !== workspaceRequest) return;
+	invalidateLoadPath();
+	appStore.set((state) => {
+		const filtered = state.workspace.recentWorkspaces.filter(
+			(p) => p !== nextPath,
+		);
+		const tabSessions = {
+			...state.tabSessions,
+			[state.workspace.workspacePath ?? ""]: tabSession(state.tabs),
+		};
 		return {
 			...state,
-			workspacePath: nextPath,
-			recentWorkspaces: [nextPath, ...filtered].slice(0, MAX_RECENT),
-			files: [],
-			pinnedNotes: [],
+			tabSessions,
+			tabs: tabsFromSession(tabSessions[nextPath]),
+			document: emptyDoc(),
+			workspace: {
+				...state.workspace,
+				workspacePath: nextPath,
+				recentWorkspaces: [nextPath, ...filtered].slice(0, MAX_RECENT),
+				files: [],
+				folders: [],
+				pinnedNotes: [],
+			},
 		};
 	});
+	resetHistory();
+	forgetScrollPositions();
 	switcherOpenStore.set(false);
 	await Promise.all([refreshFileList(nextPath), loadPinnedNotes(nextPath)]);
-
-	const lastFile = workspaceStore.get().lastOpenedPaths[nextPath];
-	if (lastFile) {
-		await loadPath(lastFile, { missing: "silent", launchExternal: false });
-		return;
-	}
-
-	clearViewer();
+	if (request !== workspaceRequest) return;
+	await restoreTabs();
 }
 
 export function updateEditorContent(path: string, content: string) {
@@ -890,6 +949,31 @@ export function savePathContent(
 	);
 }
 
+/**
+ * Save edits and scroll before switching documents. The editor's unmount flush
+ * runs too late: saves for a path that is no longer current are dropped.
+ * Block navigation until save errors or disk conflicts are resolved.
+ */
+async function leaveCurrentDocument(nextPath?: string): Promise<boolean> {
+	const { currentPath, content } = viewerStore.get();
+	if (!currentPath) return true;
+	// The file watcher reloads this path on read failure; saving could recreate a deleted file.
+	if (nextPath && pathEquals(currentPath, nextPath)) return true;
+	// The shared scroll container resets when the next document renders.
+	captureScroll(currentPath);
+	try {
+		await savePathContent(currentPath, content, { throwOnError: true });
+	} catch {
+		return false;
+	}
+	if (viewerStore.get().externalChange.kind !== "conflict") return true;
+	// The conflict banner may be hidden behind the sidebar.
+	toast.error("This note changed on disk", {
+		description: "Choose which version to keep before leaving it.",
+	});
+	return false;
+}
+
 const deletionActions = createDeleteActions({
 	saveBeforeDelete: (path, content) =>
 		saves.run(path, () =>
@@ -950,6 +1034,9 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 		if (movedAssetFolder) movedFiles.push(movedAssetFolder);
 		await updateMovedLinks(movedFiles, filesBeforeRename);
 		rewriteHistory(path, nextPath);
+		rewriteScrollMemory((scrolled) =>
+			scrolled === path ? nextPath : scrolled,
+		);
 		appStore.set((state) => ({
 			...state,
 			workspace: {
@@ -960,25 +1047,16 @@ export async function renameMarkdownFile(path: string, nextName: string) {
 				pinnedNotes: state.workspace.pinnedNotes.map((pinnedPath) =>
 					pinnedPath === path ? nextPath : pinnedPath,
 				),
-				lastOpenedPaths: Object.fromEntries(
-					Object.entries(state.workspace.lastOpenedPaths).map(
-						([workspacePath, openedPath]) => [
-							workspacePath,
-							openedPath === path ? nextPath : openedPath,
-						],
-					),
-				),
 			},
+			tabs: withRewrittenTabPaths(state.tabs, (tabPath) =>
+				tabPath === path ? nextPath : tabPath,
+			),
 			document: {
 				...state.document,
 				currentPath:
 					state.document.currentPath === path
 						? nextPath
 						: state.document.currentPath,
-				lastOpenedPath:
-					state.document.lastOpenedPath === path
-						? nextPath
-						: state.document.lastOpenedPath,
 			},
 		}));
 		await syncPinnedNotes();
@@ -1079,6 +1157,9 @@ export async function renameFolder(
 		await desktopApi.renameFile(path, nextPath);
 		await deleteEmptySourceAncestors(path, nextPath, workspacePath);
 		rewriteHistory(path, nextPath, true);
+		rewriteScrollMemory((scrolled) =>
+			replacePathPrefix(scrolled, path, nextPath),
+		);
 		appStore.set((state) => ({
 			...state,
 			workspace: {
@@ -1094,22 +1175,14 @@ export async function renameFolder(
 				pinnedNotes: state.workspace.pinnedNotes.map((pinnedPath) =>
 					replacePathPrefix(pinnedPath, path, nextPath),
 				),
-				lastOpenedPaths: Object.fromEntries(
-					Object.entries(state.workspace.lastOpenedPaths).map(
-						([workspace, openedPath]) => [
-							workspace,
-							replacePathPrefix(openedPath, path, nextPath),
-						],
-					),
-				),
 			},
+			tabs: withRewrittenTabPaths(state.tabs, (tabPath) =>
+				replacePathPrefix(tabPath, path, nextPath),
+			),
 			document: {
 				...state.document,
 				currentPath: state.document.currentPath
 					? replacePathPrefix(state.document.currentPath, path, nextPath)
-					: null,
-				lastOpenedPath: state.document.lastOpenedPath
-					? replacePathPrefix(state.document.lastOpenedPath, path, nextPath)
 					: null,
 			},
 		}));
@@ -1190,6 +1263,9 @@ export async function moveSidebarItem(
 				? await moveAssociatedAssetFolder(sourcePath, nextPath)
 				: null;
 		rewriteHistory(sourcePath, nextPath, isFolder);
+		rewriteScrollMemory((scrolled) =>
+			replacePathPrefix(scrolled, sourcePath, nextPath),
+		);
 		appStore.set((state) => ({
 			...state,
 			workspace: {
@@ -1201,26 +1277,14 @@ export async function moveSidebarItem(
 				pinnedNotes: state.workspace.pinnedNotes.map((pinnedPath) =>
 					replacePathPrefix(pinnedPath, sourcePath, nextPath),
 				),
-				lastOpenedPaths: Object.fromEntries(
-					Object.entries(state.workspace.lastOpenedPaths).map(
-						([workspace, openedPath]) => [
-							workspace,
-							replacePathPrefix(openedPath, sourcePath, nextPath),
-						],
-					),
-				),
 			},
+			tabs: withRewrittenTabPaths(state.tabs, (tabPath) =>
+				replacePathPrefix(tabPath, sourcePath, nextPath),
+			),
 			document: {
 				...state.document,
 				currentPath: state.document.currentPath
 					? replacePathPrefix(state.document.currentPath, sourcePath, nextPath)
-					: null,
-				lastOpenedPath: state.document.lastOpenedPath
-					? replacePathPrefix(
-							state.document.lastOpenedPath,
-							sourcePath,
-							nextPath,
-						)
 					: null,
 			},
 		}));
@@ -1248,6 +1312,7 @@ async function createEmptyFileInFolder(
 	parentPath: string,
 	stem: string,
 	extension: string,
+	tab?: TabTarget,
 ) {
 	const path = uniqueFilePath(parentPath, stem, extension);
 	try {
@@ -1263,7 +1328,7 @@ async function createEmptyFileInFolder(
 				{ path, modified_at, kind: fileKindForPath(path) },
 			],
 		}));
-		await loadPath(path);
+		await loadPath(path, { tab });
 		await refreshFileList();
 		return path;
 	} catch (err) {
@@ -1274,8 +1339,11 @@ async function createEmptyFileInFolder(
 	}
 }
 
-export function createMarkdownFileInFolder(parentPath: string) {
-	return createEmptyFileInFolder(parentPath, "new-file", ".md");
+export function createMarkdownFileInFolder(
+	parentPath: string,
+	tab?: TabTarget,
+) {
+	return createEmptyFileInFolder(parentPath, "new-file", ".md", tab);
 }
 
 export function createHtmlFileInFolder(parentPath: string) {
@@ -1343,6 +1411,8 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 		const historyMode = options?.history ?? "push";
 		const missingMode = options?.missing ?? "toast";
 		const fileKind = fileKindForPath(path);
+		if (!(await leaveCurrentDocument(path))) return;
+		if (isStale()) return;
 		const timer = window.setTimeout(() => {
 			if (isStale()) return;
 			viewerStore.set((state) => ({
@@ -1354,7 +1424,9 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 
 		try {
 			let content = "";
-			if (fileKind === "viewer") {
+			if (isChangelogPath(path)) {
+				content = prepareChangelogMarkdown(changelogRaw);
+			} else if (fileKind === "viewer") {
 				if (!(await desktopApi.pathExists(path))) throw new Error("ENOENT");
 			} else {
 				content = await desktopApi.readFileText(path);
@@ -1364,7 +1436,9 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 			if (currentPath && !pathEquals(currentPath, path)) {
 				titleManager.stop(currentPath);
 			}
-			appStore.set((state) => withOpenedDoc(state, path, content));
+			appStore.set((state) =>
+				withOpenedDoc(state, path, content, options?.tab),
+			);
 			if (historyMode === "push") pushHistory(path);
 		} catch (err) {
 			if (isStale()) return;
@@ -1378,23 +1452,31 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 						? { ...state, status: state.currentPath ? "ready" : "idle" }
 						: state,
 				);
+			} else if (!missingPathErrorPattern.test(message)) {
+				viewerStore.set((state) => ({
+					...state,
+					currentPath: path,
+					status: "error",
+					error: message,
+				}));
 			} else {
+				// Close missing files, but keep tabs with temporary read errors.
+				const gone = findTabByPath(tabsStore.get(), path);
+				if (gone) dropHistory(gone);
 				appStore.set((state) => ({
 					...state,
-					workspace: {
-						...state.workspace,
-						lastOpenedPaths: Object.fromEntries(
-							Object.entries(state.workspace.lastOpenedPaths).filter(
-								([, openedPath]) => openedPath !== path,
-							),
-						),
-					},
-					document: emptyDoc(
-						state.document.lastOpenedPath === path
-							? null
-							: state.document.lastOpenedPath,
-					),
+					tabs: gone ? withClosedTab(state.tabs, gone) : state.tabs,
+					document: emptyDoc(),
 				}));
+				const fallback = tabsStore.get().activeTabId;
+				const next = fallback ? tabsStore.get().byId[fallback]?.path : null;
+				if (next) {
+					void loadPath(next, {
+						history: "none",
+						launchExternal: false,
+						tab: fallback ?? undefined,
+					});
+				}
 			}
 		} finally {
 			window.clearTimeout(timer);
@@ -1403,6 +1485,10 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 );
 
 export async function loadPath(path: string, options?: LoadPathOptions) {
+	if (isChangelogPath(path)) {
+		await loadInternalPath(path, options);
+		return;
+	}
 	if (
 		isCodeFile(path) &&
 		codeFileOpenModeStore.get() === "default-app" &&
@@ -1424,30 +1510,6 @@ export async function loadPath(path: string, options?: LoadPathOptions) {
 	}
 }
 
-/**
- * Opens the app changelog as an ephemeral note. It never touches disk or
- * history: `lastOpenedPath` and the workspace's `lastOpenedPaths` keep the
- * real note so relaunch restores it, and the stack index stays put so back
- * returns to the note the user was on. Returns whether it opened.
- */
-export async function openChangelog(): Promise<boolean> {
-	const current = viewerStore.get();
-	if (isChangelogPath(current.currentPath)) return true;
-	if (current.currentPath) {
-		await savePathContent(current.currentPath, current.content);
-		if (viewerStore.get().externalChange.kind === "conflict") return false;
-	}
-	// An in-flight loadPath must not resolve over the changelog.
-	invalidateLoadPath();
-	viewerStore.set((state) => ({
-		...state,
-		currentPath: CHANGELOG_PATH,
-		...cleanFileState(prepareChangelogMarkdown(changelogRaw)),
-		viewMode: "rich",
-	}));
-	return true;
-}
-
 async function navigateHistory(delta: -1 | 1) {
 	// Keep the toolbar's stack-derived availability stable while preventing a
 	// second navigation from racing the in-flight save and load.
@@ -1456,24 +1518,17 @@ async function navigateHistory(delta: -1 | 1) {
 
 	const current = viewerStore.get();
 	if (current.externalChange.kind === "conflict") return;
-	// The changelog note is never pushed, so back re-opens the entry the user
-	// was on (`entries[index]`, not `index - 1`). Forward never gets here:
-	// canGoForward is false on the changelog.
-	const fromChangelog = isChangelogPath(current.currentPath);
 
 	// Block concurrent history ops for the whole leave (save + load).
 	historyStore.set((state) => ({ ...state, isNavigating: true }));
 	try {
-		if (current.currentPath) {
-			await savePathContent(current.currentPath, current.content);
-			if (viewerStore.get().externalChange.kind === "conflict") return;
-		}
+		if (!(await leaveCurrentDocument())) return;
 
 		let working = activeHistory();
-		let nextIndex = working.index + (fromChangelog ? 0 : delta);
+		let nextIndex = working.index + delta;
 		while (nextIndex >= 0 && nextIndex < working.entries.length) {
 			const target = working.entries[nextIndex];
-			if (await desktopApi.pathExists(target)) {
+			if (isChangelogPath(target) || (await desktopApi.pathExists(target))) {
 				setHistory({ entries: working.entries, index: nextIndex });
 				await loadPath(target, {
 					history: "none",

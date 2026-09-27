@@ -119,7 +119,7 @@ function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
 	const [selectOpen, setSelectOpen] = useState(false);
 
 	return (
-		<NodeViewWrapper className="pm-code-block" as="div">
+		<NodeViewWrapper className="pm-code-block" as="div" dir="ltr">
 			<div
 				className="pm-code-block-controls"
 				contentEditable={false}

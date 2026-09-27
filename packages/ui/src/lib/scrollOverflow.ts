@@ -1,3 +1,6 @@
+const MEANINGFUL_OVERFLOW_PX = 8;
+const AT_EDGE_PX = 2;
+
 /**
  * Returns whether a footer should show a divider because scrollable content
  * continues beneath it. The small threshold avoids flicker from sub-pixel
@@ -9,7 +12,7 @@ export function shouldShowFooterDivider(scrollContainer: HTMLElement | null) {
 		scrollContainer.scrollHeight - scrollContainer.clientHeight,
 		0,
 	);
-	const hasMeaningfulOverflow = maxScrollTop > 8;
-	const isAtBottom = maxScrollTop - scrollContainer.scrollTop <= 2;
+	const hasMeaningfulOverflow = maxScrollTop > MEANINGFUL_OVERFLOW_PX;
+	const isAtBottom = maxScrollTop - scrollContainer.scrollTop <= AT_EDGE_PX;
 	return hasMeaningfulOverflow && !isAtBottom;
 }

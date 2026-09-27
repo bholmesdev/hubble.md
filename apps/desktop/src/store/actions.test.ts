@@ -1,96 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-type MockDesktopApi = {
-	readFileText: ReturnType<typeof vi.fn>;
-	writeFileText: ReturnType<typeof vi.fn>;
-	listDirectory: ReturnType<typeof vi.fn>;
-	readWorkspaceConfig: ReturnType<typeof vi.fn>;
-	writeWorkspaceConfig: ReturnType<typeof vi.fn>;
-	createFolder: ReturnType<typeof vi.fn>;
-	renameFile: ReturnType<typeof vi.fn>;
-	deleteFile: ReturnType<typeof vi.fn>;
-	stageDelete: ReturnType<typeof vi.fn>;
-	restoreDelete: ReturnType<typeof vi.fn>;
-	finalizeDelete: ReturnType<typeof vi.fn>;
-	setDeleteUndoAvailable: ReturnType<typeof vi.fn>;
-	undoText: ReturnType<typeof vi.fn>;
-	pathExists: ReturnType<typeof vi.fn>;
-	openPathFromLink: ReturnType<typeof vi.fn>;
-	openPathInDefaultApp: ReturnType<typeof vi.fn>;
-	sidebarDeltaForPath: ReturnType<typeof vi.fn>;
-	setThemeSource: ReturnType<typeof vi.fn>;
-	getTelemetryConsent: ReturnType<typeof vi.fn>;
-	setTelemetryConsent: ReturnType<typeof vi.fn>;
-	recordTelemetryActivity: ReturnType<typeof vi.fn>;
-	getSpellcheckState: ReturnType<typeof vi.fn>;
-	setSpellcheckEnabled: ReturnType<typeof vi.fn>;
-	setSpellcheckLanguages: ReturnType<typeof vi.fn>;
-};
+import {
+	createDesktopApi,
+	loadStoreActions as loadStoreActionsBase,
+	type MockDesktopApi,
+} from "./testUtils";
 
-function createDesktopApi(): MockDesktopApi {
-	return {
-		readFileText: vi.fn(async () => "before"),
-		writeFileText: vi.fn(async () => {}),
-		listDirectory: vi.fn(async () => ({ files: [], folders: [] })),
-		readWorkspaceConfig: vi.fn(async () => ({ version: 1, pinnedNotes: [] })),
-		writeWorkspaceConfig: vi.fn(async () => {}),
-		createFolder: vi.fn(async () => {}),
-		renameFile: vi.fn(async () => {}),
-		deleteFile: vi.fn(async () => {}),
-		stageDelete: vi.fn(async () => "delete-token"),
-		restoreDelete: vi.fn(async () => {}),
-		finalizeDelete: vi.fn(async () => {}),
-		setDeleteUndoAvailable: vi.fn(async () => {}),
-		undoText: vi.fn(async () => {}),
-		pathExists: vi.fn(async () => false),
-		openPathFromLink: vi.fn(async () => ({ kind: "opened" })),
-		openPathInDefaultApp: vi.fn(async () => {}),
-		sidebarDeltaForPath: vi.fn(async () => null),
-		setThemeSource: vi.fn(async () => {}),
-		getTelemetryConsent: vi.fn(async () => "unset"),
-		setTelemetryConsent: vi.fn(async (choice) => choice),
-		recordTelemetryActivity: vi.fn(async () => {}),
-		getSpellcheckState: vi.fn(async () => ({
-			enabled: true,
-			languages: ["en-US"],
-			availableLanguages: ["en-US", "fr"],
-			systemLanguage: "en-US",
-		})),
-		setSpellcheckEnabled: vi.fn(async () => {}),
-		setSpellcheckLanguages: vi.fn(async () => {}),
-	};
-}
-
-/**
- * Actions capture window.desktopApi at import time, so each test stubs globals
- * before importing the store modules.
- */
 async function loadStoreActions(
 	api: MockDesktopApi,
 	persisted: string | null = null,
 ) {
-	vi.resetModules();
-	vi.stubGlobal("localStorage", {
-		getItem: vi.fn(() => persisted),
-		setItem: vi.fn(),
-	});
-	vi.stubGlobal("window", {
-		desktopApi: api,
-		setTimeout,
-		clearTimeout,
-		matchMedia: () => ({
-			get matches() {
-				return systemPrefersDark;
-			},
-			addEventListener() {},
-			removeEventListener() {},
-		}),
-	});
-
-	const actions = await import("./actions");
-	const history = await import("./history");
-	const state = await import("./state");
-	return { ...actions, ...history, ...state };
+	return loadStoreActionsBase(api, persisted, () => systemPrefersDark);
 }
 
 /** What the stubbed `matchMedia` reports. Under a forced `themeSource` that is the override, not the OS. */
@@ -336,7 +256,6 @@ describe("desktop savePathContent", () => {
 			document: {
 				...current.document,
 				currentPath: path,
-				lastOpenedPath: path,
 				content: "draft 1",
 				diskContent: "before",
 				externalChange: { kind: "none" },
@@ -381,7 +300,6 @@ describe("desktop savePathContent", () => {
 			document: {
 				...current.document,
 				currentPath: path,
-				lastOpenedPath: path,
 				content: "draft 1",
 				diskContent: "before",
 				externalChange: { kind: "none" },
@@ -423,7 +341,6 @@ describe("desktop savePathContent", () => {
 			document: {
 				...current.document,
 				currentPath: path,
-				lastOpenedPath: path,
 				content: "draft 1",
 				diskContent: "before",
 				externalChange: { kind: "none" },
@@ -452,7 +369,6 @@ describe("desktop savePathContent", () => {
 			document: {
 				...current.document,
 				currentPath: path,
-				lastOpenedPath: path,
 				content: "draft",
 				diskContent: "before",
 				externalChange: { kind: "none" },
@@ -478,7 +394,6 @@ describe("desktop savePathContent", () => {
 			document: {
 				...current.document,
 				currentPath: "/workspace/old.md",
-				lastOpenedPath: "/workspace/old.md",
 				content: "old file",
 				diskContent: "old file",
 				externalChange: { kind: "none" },
@@ -718,7 +633,7 @@ describe("desktop renameMarkdownFile", () => {
 			files: [{ path: "/workspace/renamed.md", modified_at: 1 }],
 			folders: [],
 		});
-		const { appStore, renameMarkdownFile, viewerStore, workspaceStore } =
+		const { appStore, renameMarkdownFile, viewerStore } =
 			await loadStoreActions(api);
 		const path = "/workspace/original.md";
 
@@ -728,12 +643,10 @@ describe("desktop renameMarkdownFile", () => {
 				...current.workspace,
 				workspacePath: "/workspace",
 				files: [{ path, modified_at: 1 }],
-				lastOpenedPaths: { "/workspace": path },
 			},
 			document: {
 				...current.document,
 				currentPath: path,
-				lastOpenedPath: path,
 				content: "embed content",
 				diskContent: "embed content",
 				externalChange: { kind: "none" },
@@ -748,9 +661,6 @@ describe("desktop renameMarkdownFile", () => {
 		expect(api.readFileText).toHaveBeenLastCalledWith("/workspace/renamed.md");
 		expect(viewerStore.get().currentPath).toBe("/workspace/renamed.md");
 		expect(viewerStore.get().content).toBe("embed content");
-		expect(workspaceStore.get().lastOpenedPaths["/workspace"]).toBe(
-			"/workspace/renamed.md",
-		);
 	});
 
 	it("preserves the existing extension and dotted stem suffixes", async () => {
@@ -821,7 +731,6 @@ describe("desktop renameMarkdownFile", () => {
 			document: {
 				...current.document,
 				currentPath: "/workspace/notes/plan.md",
-				lastOpenedPath: "/workspace/notes/plan.md",
 				content: "plan",
 				diskContent: "plan",
 				externalChange: { kind: "none" },
@@ -862,7 +771,6 @@ describe("desktop renameMarkdownFile", () => {
 			document: {
 				...current.document,
 				currentPath: "C:\\workspace\\notes\\plan.md",
-				lastOpenedPath: "C:\\workspace\\notes\\plan.md",
 				content: "plan",
 				diskContent: "plan",
 				externalChange: { kind: "none" },
@@ -1035,7 +943,6 @@ describe("desktop renameMarkdownFile", () => {
 			document: {
 				...current.document,
 				currentPath: "/workspace/source.md",
-				lastOpenedPath: "/workspace/source.md",
 				content: "[Target](target.md)\nunsaved edit",
 				diskContent: "[Target](target.md)",
 				externalChange: { kind: "none" },
@@ -1532,12 +1439,10 @@ describe("desktop folder actions", () => {
 				files: [{ path: "/workspace/drafts/plan.md", modified_at: 1 }],
 				folders: [{ path: "/workspace/drafts", modified_at: 1 }],
 				pinnedNotes: ["/workspace/drafts/plan.md"],
-				lastOpenedPaths: { "/workspace": "/workspace/drafts/plan.md" },
 			},
 			document: {
 				...current.document,
 				currentPath: "/workspace/drafts/plan.md",
-				lastOpenedPath: "/workspace/drafts/plan.md",
 				content: "[Self](plan.md)",
 				diskContent: "[Self](plan.md)",
 				externalChange: { kind: "none" },
@@ -1906,12 +1811,10 @@ describe("desktop moveSidebarItem", () => {
 					{ path: "/workspace/archive/existing.md", modified_at: 1 },
 				],
 				pinnedNotes: ["/workspace/note.md"],
-				lastOpenedPaths: { "/workspace": "/workspace/note.md" },
 			},
 			document: {
 				...current.document,
 				currentPath: "/workspace/note.md",
-				lastOpenedPath: "/workspace/note.md",
 				content: "draft",
 				diskContent: "draft",
 				externalChange: { kind: "none" },
@@ -2040,7 +1943,6 @@ describe("desktop moveSidebarItem", () => {
 			document: {
 				...current.document,
 				currentPath: "/workspace/client/brief.md",
-				lastOpenedPath: "/workspace/client/brief.md",
 				content: "[Outside](../outside.md)",
 				diskContent: "[Outside](../outside.md)",
 				externalChange: { kind: "none" },
@@ -2392,13 +2294,14 @@ describe("desktop loadPath", () => {
 		expect(canGoForward()).toBe(false);
 	});
 
-	it("keeps navigation history separate per workspace", async () => {
+	it("forgets navigation history when another workspace is opened", async () => {
 		const api = createDesktopApi();
 		api.pathExists.mockResolvedValue(true);
 		api.readFileText.mockImplementation(
 			async (path: string) => `content:${path}`,
 		);
-		const { appStore, canGoBack, loadPath } = await loadStoreActions(api);
+		const { appStore, canGoBack, loadPath, openWorkspace } =
+			await loadStoreActions(api);
 
 		appStore.set((current) => ({
 			...current,
@@ -2408,12 +2311,44 @@ describe("desktop loadPath", () => {
 		await loadPath("/workspace-a/b.md");
 		expect(canGoBack()).toBe(true);
 
-		appStore.set((current) => ({
-			...current,
-			workspace: { ...current.workspace, workspacePath: "/workspace-b" },
-		}));
+		await openWorkspace("/workspace-b");
 
 		expect(canGoBack()).toBe(false);
+	});
+
+	it("saves dirty content before opening another file", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { loadPath, updateEditorContent } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		updateEditorContent("/workspace/a.md", "dirty");
+		// The editor's own debounced flush runs after the store has moved on, so
+		// the save has to happen here or the edit is dropped.
+		await loadPath("/workspace/b.md");
+
+		expect(api.writeFileText).toHaveBeenCalledWith("/workspace/a.md", "dirty");
+	});
+
+	it("does not write the current file back when reopening the same path", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockImplementation(
+			async (path: string) => `content:${path}`,
+		);
+		const { loadPath, updateEditorContent } = await loadStoreActions(api);
+
+		await loadPath("/workspace/a.md");
+		updateEditorContent("/workspace/a.md", "dirty");
+		api.writeFileText.mockClear();
+		// The active-file watcher reloads the open path when a read fails. Saving
+		// first would restore a file that just disappeared.
+		await loadPath("/workspace/a.md");
+
+		expect(api.writeFileText).not.toHaveBeenCalled();
 	});
 
 	it("saves dirty content before navigating history", async () => {
@@ -2473,11 +2408,6 @@ describe("desktop loadPath", () => {
 			workspace: {
 				...current.workspace,
 				workspacePath: "/workspace",
-				lastOpenedPaths: { "/workspace": missingPath },
-			},
-			document: {
-				...current.document,
-				lastOpenedPath: missingPath,
 			},
 		}));
 
@@ -2485,8 +2415,6 @@ describe("desktop loadPath", () => {
 
 		expect(viewerStore.get().currentPath).toBeNull();
 		expect(viewerStore.get().status).toBe("idle");
-		expect(viewerStore.get().lastOpenedPath).toBeNull();
-		expect(appStore.get().workspace.lastOpenedPaths).toEqual({});
 		expect(toastError).not.toHaveBeenCalled();
 	});
 

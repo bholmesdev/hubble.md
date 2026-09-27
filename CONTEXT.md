@@ -60,6 +60,21 @@ User-facing structured fields attached to a Markdown File. File Properties are d
 
 A Markdown File opened directly from the filesystem, not through a Workspace Folder or Plain Folder. The desktop app can read and edit it with access scoped to the file and nearby assets; nothing syncs.
 
+### Tab
+
+A note the user has open in the desktop editor, shown as one entry in the tab strip in the top bar.
+
+A Tab records **where** a note is, not what it holds: its path and its own back/forward trail. The open document itself stays singular — one [[Markdown File]] is loaded at a time, in one editor, with one file watcher. Activating a Tab saves the current note and loads the Tab's note from disk, the same thing clicking a sidebar row already does. Background Tabs therefore hold no unsaved text, no dirty state, and no conflict state; there is nothing in a Tab to go stale.
+
+Each workspace’s ordered Tab paths and Active Tab are saved in local storage. Reloading the app or returning to a workspace restores that set, skipping files that no longer exist. An empty set stays empty. Each workspace also saves up to 40 recently closed Tabs, recording their paths and former positions. Reopening restores the most recently closed Tab and focuses it. Back/forward trails remain in memory; document contents stay on disk.
+_Avoid_: buffer, pane, window.
+
+### Active Tab
+
+The Tab whose note is currently in the editor. Back and forward act on the Active Tab's trail, so each Tab navigates independently.
+
+The editor shows the Active Tab's content. The app changelog opens in its own read-only Tab, using bundled content instead of a file on disk.
+
 ### Asset
 
 A binary file referenced by a Markdown File, such as an image. Asset paths in markdown use the desktop-canonical `<markdown-file-stem>.assets/<hash>.<ext>` convention relative to the Markdown File's folder.

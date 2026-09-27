@@ -70,7 +70,7 @@ export function trafficLightPositionForZoom(zoomFactor: number) {
 	};
 }
 
-function trafficLightInsetForZoom(zoomFactor: number) {
+export function trafficLightInsetForZoom(zoomFactor: number) {
 	const { x } = trafficLightPositionForZoom(zoomFactor);
 	return (x + trafficLightWidth + trafficLightGap) / zoomFactor;
 }

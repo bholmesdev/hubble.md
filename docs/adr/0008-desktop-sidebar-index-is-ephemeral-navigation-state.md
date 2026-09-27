@@ -8,7 +8,7 @@ The watcher setup must not await a discovery pass or build a user-space watcher 
 
 The active editor file is different. Hubble keeps a direct non-recursive watcher on the currently open file so external edits can still trigger the existing disk-change conflict behavior.
 
-Folder expansion in the sidebar is presentational. Expanding a folder reveals paths from the current snapshot; external directory additions scan only that subtree. Ignored files and files outside the sidebar snapshot can still be opened when the user explicitly picks them or when Hubble restores a readable last-opened file. Ignore rules filter sidebar discovery; they are not an access boundary. Ignore-file changes reconcile the affected directory subtree.
+Folder expansion in the sidebar is presentational. Expanding a folder reveals paths from the current snapshot; external directory additions scan only that subtree. Ignored files and files outside the sidebar snapshot can still be opened when the user explicitly picks them or when Hubble restores persisted tabs. Ignore rules filter sidebar discovery; they are not an access boundary. Ignore-file changes reconcile the affected directory subtree.
 
 The first implementation will not persist the sidebar snapshot between app launches. Rebuilding the snapshot on boot avoids stale-cache invalidation for renamed folders, deleted files, changed ignore rules, and Hubble version changes.
 

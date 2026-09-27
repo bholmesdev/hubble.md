@@ -51,6 +51,7 @@ export type GlobalSearchPaletteProps = {
 	onOpenChange: (open: boolean) => void;
 	files: PaletteFile[];
 	onSelectFile: (path: string) => void;
+	pinnedCommandIds?: string[];
 	searchContents: (query: string) => Promise<PaletteContentResult>;
 	commands?: PaletteCommand[];
 	recentCommandIds?: string[];
@@ -167,6 +168,7 @@ function GlobalSearchPalette({
 	onOpenChange,
 	files,
 	onSelectFile,
+	pinnedCommandIds = [],
 	searchContents,
 	commands = [],
 	recentCommandIds = [],
@@ -188,7 +190,17 @@ function GlobalSearchPalette({
 		? rankCommands(query, commands, recentCommandIds)
 		: rankSearchCommands(query, commands, recentCommandIds);
 	const commandResults = commandMode ? groupCommands(rankedCommands) : [];
-	const searchCommandResults = commandMode ? [] : rankedCommands;
+	const pinnedCommands = commands.filter((command) =>
+		pinnedCommandIds.includes(command.id),
+	);
+	const searchCommandResults = commandMode
+		? []
+		: [
+				...pinnedCommands,
+				...rankedCommands.filter(
+					(command) => !pinnedCommandIds.includes(command.id),
+				),
+			];
 
 	const changeQuery = (next: string) => {
 		if (!commandMode && isCommandQuery(next)) {
@@ -278,7 +290,7 @@ function GlobalSearchPalette({
 
 				    `initialFocus` rather than `autoFocus` on the input: the popup stays
 				    mounted after close, so `autoFocus` fires only on the first open and
-				    a second Cmd+P would leave the caret in the editor. A manual focus()
+				    a second Cmd+K would leave the caret in the editor. A manual focus()
 				    call races base-ui's own focus management; this does not. */}
 				<Dialog.Popup
 					initialFocus={inputRef}

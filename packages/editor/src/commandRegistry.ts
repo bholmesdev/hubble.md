@@ -6,12 +6,16 @@ export type CommandContext = {
 	isSourceMode?: boolean;
 	canGoBack?: boolean;
 	canGoForward?: boolean;
+	tabCount?: number;
+	hasClosedTabs?: boolean;
 };
 
 export type CommandDefinition = {
 	defaultBinding: string;
 	label: string;
 	isEnabled: (context: CommandContext) => boolean;
+	/** This command may share its binding with the named command. */
+	allowConflictWith?: string;
 };
 
 const always = () => true;
@@ -48,8 +52,19 @@ export const commandRegistry = {
 		isEnabled: always,
 	},
 	"app.go-to-file": {
-		defaultBinding: "CmdOrCtrl+P",
+		defaultBinding: "CmdOrCtrl+K",
 		label: "Go to File...",
+		isEnabled: hasWorkspace,
+		allowConflictWith: "editor.link",
+	},
+	"app.all-tabs": {
+		defaultBinding: "CmdOrCtrl+Shift+A",
+		label: "Show All Tabs",
+		isEnabled: always,
+	},
+	"app.new-tab": {
+		defaultBinding: "CmdOrCtrl+T",
+		label: "New Tab",
 		isEnabled: hasWorkspace,
 	},
 	"app.settings": {
@@ -66,6 +81,28 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+]",
 		label: "Go Forward",
 		isEnabled: (context) => context.canGoForward === true,
+	},
+	// `CmdOrCtrl+W` also carries Electron's window-close role. The menu item
+	// closes a Tab when there is one and falls back to closing the window.
+	"app.close-tab": {
+		defaultBinding: "CmdOrCtrl+W",
+		label: "Close Tab",
+		isEnabled: (context) => (context.tabCount ?? 0) > 0,
+	},
+	"app.reopen-closed-tab": {
+		defaultBinding: "CmdOrCtrl+Shift+T",
+		label: "Reopen Closed Tab",
+		isEnabled: (context) => context.hasClosedTabs === true,
+	},
+	"app.next-tab": {
+		defaultBinding: "Ctrl+Tab",
+		label: "Next Tab",
+		isEnabled: (context) => (context.tabCount ?? 0) > 1,
+	},
+	"app.previous-tab": {
+		defaultBinding: "Ctrl+Shift+Tab",
+		label: "Previous Tab",
+		isEnabled: (context) => (context.tabCount ?? 0) > 1,
 	},
 	"app.toggle-terminal": {
 		defaultBinding: "CmdOrCtrl+J",
@@ -122,6 +159,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Link",
 		isEnabled: always,
+		allowConflictWith: "app.go-to-file",
 	},
 	"editor.strike": {
 		defaultBinding: "CmdOrCtrl+Shift+X",
@@ -210,14 +248,27 @@ export function getCommand<Id extends CommandId>(id: Id) {
 	return commandRegistry[id];
 }
 
+/**
+ * Return the shortcut a command can use, or null if disabled or claimed by an
+ * earlier command. Commands that name each other in allowConflictWith may share
+ * a shortcut. Use resolveCommandBinding to read the assigned shortcut without
+ * this conflict check.
+ */
 export function getCommandBinding(id: CommandId) {
 	const binding = resolveCommandBinding(id, commandBindings);
 	if (!binding) return binding;
 	const bindingKey = sortCommandBinding(binding);
+	const command: CommandDefinition = commandRegistry[id];
 	for (const commandId of commandIds) {
 		if (commandId === id) return binding;
 		const otherBinding = resolveCommandBinding(commandId, commandBindings);
 		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
+			const otherCommand: CommandDefinition = commandRegistry[commandId];
+			if (
+				command.allowConflictWith === commandId &&
+				otherCommand.allowConflictWith === id
+			)
+				continue;
 			return null;
 		}
 	}

@@ -4,10 +4,12 @@ on:
   push:
     tags:
       - "desktop-v*"
+  workflow_dispatch:
 
 jobs:
   prepare-release:
     name: Prepare GitHub Release
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -50,6 +52,7 @@ jobs:
   release-macos:
     name: Build and publish desktop app (macOS)
     needs: prepare-release
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.prepare-release.result == 'success')
     runs-on: macos-latest
     permissions:
       contents: write
@@ -75,6 +78,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Verify tag matches desktop version
+        if: github.event_name == 'push'
         run: |
           VERSION="$(node -p "require('./apps/desktop/package.json').version")"
           TAG="${GITHUB_REF_NAME#desktop-v}"
@@ -104,6 +108,7 @@ jobs:
   release-linux:
     name: Build and publish desktop app (Linux ${{ matrix.arch }})
     needs: prepare-release
+    if: github.event_name == 'push'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -158,6 +163,7 @@ jobs:
   release-windows:
     name: Build and publish desktop app (Windows ${{ matrix.arch }})
     needs: prepare-release
+    if: github.event_name == 'push'
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -209,7 +215,7 @@ jobs:
   publish-winget:
     name: Submit WinGet update
     needs: release-windows
-    if: vars.WINGET_SUBMIT_ENABLED == 'true'
+    if: github.event_name == 'push' && vars.WINGET_SUBMIT_ENABLED == 'true'
     runs-on: windows-latest
 
     steps:

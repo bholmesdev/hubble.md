@@ -11,6 +11,9 @@ import {
 	viewerStore,
 	workspaceStore,
 } from "./state";
+import { tabsStore } from "./tabStore";
+
+import { findTabByPath, type TabId, withoutTabsMatching } from "./tabs";
 
 const UNDO_MS = 5000;
 
@@ -19,9 +22,11 @@ type PendingDelete = {
 	workspacePath: string;
 	reopenPath: string | null;
 	removedPins: string[];
-	removedLastOpened: Record<string, string>;
 	historyBefore: ReturnType<typeof historyStore.get>;
 	historyAfter: ReturnType<typeof historyStore.get>;
+	// Keep tab positions so undo can restore the original order.
+	tabsBefore: ReturnType<typeof tabsStore.get>;
+	tabsAfter: ReturnType<typeof tabsStore.get>;
 	pinRemovalSaved: Promise<void>;
 	toastId: string | number | null;
 	claimed: boolean;
@@ -34,7 +39,7 @@ type DeleteDeps = {
 	refreshFileList: () => Promise<void>;
 	loadPath: (
 		path: string,
-		options: { history: "none"; launchExternal: false },
+		options: { history: "none"; launchExternal: false; tab?: TabId },
 	) => Promise<void>;
 	syncPins: () => Promise<void>;
 	stopTitleRenames: (path: string) => void;
@@ -119,19 +124,28 @@ export function createDeleteActions(deps: DeleteDeps) {
 				pinnedNotes: [
 					...new Set([...state.pinnedNotes, ...deletion.removedPins]),
 				],
-				lastOpenedPaths: {
-					...state.lastOpenedPaths,
-					...deletion.removedLastOpened,
-				},
 			}));
 			if (historyStore.get() === deletion.historyAfter) {
 				historyStore.set(deletion.historyBefore);
 			}
+			// Do not overwrite tab changes made since the deletion.
+			if (tabsStore.get() === deletion.tabsAfter) {
+				appStore.set((state) => ({ ...state, tabs: deletion.tabsBefore }));
+			}
 			await deps.refreshFiles(deletion.workspacePath);
-			if (deletion.reopenPath && viewerStore.get().currentPath === null) {
+			const restoredTab = deletion.reopenPath
+				? findTabByPath(tabsStore.get(), deletion.reopenPath)
+				: null;
+			// Only reopen if the user has not moved to another note.
+			if (
+				deletion.reopenPath &&
+				(viewerStore.get().currentPath === null ||
+					(restoredTab !== null && tabsStore.get().activeTabId === restoredTab))
+			) {
 				await deps.loadPath(deletion.reopenPath, {
 					history: "none",
 					launchExternal: false,
+					tab: restoredTab ?? undefined,
 				});
 			}
 			await deps.syncPins();
@@ -205,21 +219,17 @@ export function createDeleteActions(deps: DeleteDeps) {
 			viewerBefore.currentPath !== null &&
 			deletedPath(viewerBefore.currentPath);
 		const removedPins = workspaceBefore.pinnedNotes.filter(deletedPath);
-		const removedLastOpened = Object.fromEntries(
-			Object.entries(workspaceBefore.lastOpenedPaths).filter(([, path]) =>
-				deletedPath(path),
-			),
-		);
+		// Deleted files may also appear in background tabs' history.
+		for (const item of items) {
+			if (item.kind === "file") pruneHistory(item.path);
+			else pruneHistory(item.folderId, true);
+		}
 		if (deletedCurrent) {
 			if (viewerBefore.currentPath)
 				deps.stopTitleRenames(viewerBefore.currentPath);
 			clearHistory();
-		} else {
-			for (const item of items) {
-				if (item.kind === "file") pruneHistory(item.path);
-				else pruneHistory(item.folderId, true);
-			}
 		}
+		const tabsBefore = tabsStore.get();
 		appStore.set((state) => ({
 			...state,
 			workspace: {
@@ -231,37 +241,34 @@ export function createDeleteActions(deps: DeleteDeps) {
 				pinnedNotes: state.workspace.pinnedNotes.filter(
 					(pin) => !deletedPath(pin),
 				),
-				lastOpenedPaths: Object.fromEntries(
-					Object.entries(state.workspace.lastOpenedPaths).filter(
-						([, openedPath]) => !deletedPath(openedPath),
-					),
-				),
 			},
-			document: deletedCurrent
-				? emptyDoc(
-						state.document.lastOpenedPath &&
-							deletedPath(state.document.lastOpenedPath)
-							? null
-							: state.document.lastOpenedPath,
-					)
-				: {
-						...state.document,
-						lastOpenedPath:
-							state.document.lastOpenedPath &&
-							deletedPath(state.document.lastOpenedPath)
-								? null
-								: state.document.lastOpenedPath,
-					},
+			tabs: withoutTabsMatching(state.tabs, deletedPath),
+			document: deletedCurrent ? emptyDoc() : state.document,
 		}));
+		// Load the surviving active tab after deleting the visible note.
+		if (deletedCurrent) {
+			const survivor = tabsStore.get().activeTabId;
+			const survivorPath = survivor
+				? tabsStore.get().byId[survivor]?.path
+				: null;
+			if (survivor && survivorPath) {
+				await deps.loadPath(survivorPath, {
+					history: "none",
+					launchExternal: false,
+					tab: survivor,
+				});
+			}
+		}
 		const pinRemovalSaved = deps.syncPins();
 		const deletion: PendingDelete = {
 			token,
 			workspacePath: workspaceBefore.workspacePath,
 			reopenPath: deletedCurrent ? viewerBefore.currentPath : null,
 			removedPins,
-			removedLastOpened,
 			historyBefore,
 			historyAfter: historyStore.get(),
+			tabsBefore,
+			tabsAfter: tabsStore.get(),
 			pinRemovalSaved,
 			toastId: null,
 			claimed: false,
@@ -315,26 +322,10 @@ export function createDeleteActions(deps: DeleteDeps) {
 					pinnedNotes: state.workspace.pinnedNotes.filter(
 						(pinnedPath) => pinnedPath !== path,
 					),
-					lastOpenedPaths: Object.fromEntries(
-						Object.entries(state.workspace.lastOpenedPaths).filter(
-							([, openedPath]) => openedPath !== path,
-						),
-					),
 				},
+				tabs: withoutTabsMatching(state.tabs, (tabPath) => tabPath === path),
 				document:
-					state.document.currentPath === path
-						? emptyDoc(
-								state.document.lastOpenedPath === path
-									? null
-									: state.document.lastOpenedPath,
-							)
-						: {
-								...state.document,
-								lastOpenedPath:
-									state.document.lastOpenedPath === path
-										? null
-										: state.document.lastOpenedPath,
-							},
+					state.document.currentPath === path ? emptyDoc() : state.document,
 			}));
 			await deps.syncPins();
 			await deps.refreshFileList();
@@ -362,29 +353,15 @@ export function createDeleteActions(deps: DeleteDeps) {
 					pinnedNotes: state.workspace.pinnedNotes.filter(
 						(pinnedPath) => !pathInFolder(pinnedPath, path),
 					),
-					lastOpenedPaths: Object.fromEntries(
-						Object.entries(state.workspace.lastOpenedPaths).filter(
-							([, openedPath]) => !pathInFolder(openedPath, path),
-						),
-					),
 				},
+				tabs: withoutTabsMatching(state.tabs, (tabPath) =>
+					pathInFolder(tabPath, path),
+				),
 				document:
 					state.document.currentPath &&
 					pathInFolder(state.document.currentPath, path)
-						? emptyDoc(
-								state.document.lastOpenedPath &&
-									pathInFolder(state.document.lastOpenedPath, path)
-									? null
-									: state.document.lastOpenedPath,
-							)
-						: {
-								...state.document,
-								lastOpenedPath:
-									state.document.lastOpenedPath &&
-									pathInFolder(state.document.lastOpenedPath, path)
-										? null
-										: state.document.lastOpenedPath,
-							},
+						? emptyDoc()
+						: state.document,
 			}));
 			await deps.syncPins();
 			await deps.refreshFileList();

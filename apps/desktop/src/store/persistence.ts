@@ -1,4 +1,5 @@
 import { type CommandBindings, cleanCommandBindings } from "@hubble.md/editor";
+import { z } from "zod";
 import type { ThemePreference } from "../theme";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
 import {
@@ -7,11 +8,17 @@ import {
 	type FolderEntry,
 	type SortMode,
 } from "./state";
+import {
+	MAX_CLOSED_TABS,
+	type TabSession,
+	type TabsState,
+	tabSession,
+	tabsFromSession,
+} from "./tabs";
 
 type WorkspaceState = {
 	workspacePath: string | null;
 	recentWorkspaces: string[];
-	lastOpenedPaths: Record<string, string>;
 	sortMode: SortMode;
 	files: FileEntry[];
 	folders: FolderEntry[];
@@ -43,18 +50,19 @@ export type CodeFileOpenMode = "hubble" | "default-app";
 export type DesktopState = {
 	workspace: WorkspaceState;
 	document: DocumentState;
+	tabs: TabsState;
+	tabSessions: Record<string, TabSession>;
 	ui: UiState;
 	settings: SettingsState;
 };
 
 type Persisted = {
+	tabSessions?: Record<string, TabSession>;
 	workspace?: {
 		workspacePath?: string | null;
 		recentWorkspaces?: string[];
-		lastOpenedPaths?: Record<string, string>;
 		sortMode?: SortMode;
 	};
-	document?: { lastOpenedPath?: string | null };
 	ui?: {
 		sidebarOpen?: boolean;
 		isTerminalOpen?: boolean;
@@ -89,12 +97,6 @@ function hydrateWorkspace(ws: Persisted["workspace"]): WorkspaceState {
 		recentWorkspaces: Array.isArray(ws?.recentWorkspaces)
 			? ws.recentWorkspaces
 			: [],
-		lastOpenedPaths:
-			ws?.lastOpenedPaths &&
-			typeof ws.lastOpenedPaths === "object" &&
-			!Array.isArray(ws.lastOpenedPaths)
-				? ws.lastOpenedPaths
-				: {},
 		sortMode: ws?.sortMode === "alpha" ? "alpha" : "recent",
 		files: [],
 		folders: [],
@@ -104,9 +106,13 @@ function hydrateWorkspace(ws: Persisted["workspace"]): WorkspaceState {
 
 export function getInitialState(): DesktopState {
 	const p = readStorage<Persisted>(STORAGE_KEY);
+	const workspace = hydrateWorkspace(p?.workspace);
+	const tabSessions = readTabSessions(p?.tabSessions);
 	return {
-		workspace: hydrateWorkspace(p?.workspace),
-		document: emptyDoc(p?.document?.lastOpenedPath ?? null),
+		workspace,
+		tabSessions,
+		document: emptyDoc(),
+		tabs: tabsFromSession(tabSessions[workspace.workspacePath ?? ""]),
 		ui: {
 			sidebarOpen: p?.ui?.sidebarOpen ?? false,
 			isSwitcherOpen: false,
@@ -144,14 +150,14 @@ export function getInitialState(): DesktopState {
 
 export function serialize(state: DesktopState): Persisted {
 	return {
+		tabSessions: {
+			...state.tabSessions,
+			[state.workspace.workspacePath ?? ""]: tabSession(state.tabs),
+		},
 		workspace: {
 			workspacePath: state.workspace.workspacePath,
 			recentWorkspaces: state.workspace.recentWorkspaces,
-			lastOpenedPaths: state.workspace.lastOpenedPaths,
 			sortMode: state.workspace.sortMode,
-		},
-		document: {
-			lastOpenedPath: state.document.lastOpenedPath,
 		},
 		ui: {
 			sidebarOpen: state.ui.sidebarOpen,
@@ -166,4 +172,43 @@ export function serialize(state: DesktopState): Persisted {
 			theme: state.settings.theme,
 		},
 	};
+}
+
+const closedTabSchema = z.object({
+	path: z.string().min(1),
+	index: z.number().int().nonnegative(),
+});
+
+const tabSessionSchema = z
+	.object({
+		paths: z
+			.array(z.string().min(1).catch(""))
+			.transform((paths) => [...new Set(paths.filter(Boolean))]),
+		activePath: z.string().nullable().catch(null),
+		closed: z
+			.array(closedTabSchema)
+			.catch([])
+			.transform((closed) => closed.slice(-MAX_CLOSED_TABS)),
+	})
+	.transform(
+		({ paths, activePath, closed }): TabSession => ({
+			closed,
+			paths,
+			activePath:
+				activePath && paths.includes(activePath)
+					? activePath
+					: (paths[0] ?? null),
+		}),
+	);
+
+const tabSessionsSchema = z
+	.record(z.string(), tabSessionSchema.nullable().catch(null))
+	.catch({});
+
+function readTabSessions(value: unknown): Record<string, TabSession> {
+	return Object.fromEntries(
+		Object.entries(tabSessionsSchema.parse(value)).filter(
+			(entry): entry is [string, TabSession] => entry[1] !== null,
+		),
+	);
 }

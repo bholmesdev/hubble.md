@@ -11,6 +11,7 @@ import {
 	STORAGE_KEY,
 	serialize,
 } from "./persistence";
+import { type TabId, type TabTarget, withOpenedTab } from "./tabs";
 
 export type SortMode = "alpha" | "recent";
 
@@ -33,7 +34,6 @@ type ExternalChange =
 
 type DocumentState = {
 	currentPath: string | null;
-	lastOpenedPath: string | null;
 	content: string;
 	diskContent: string;
 	externalChange: ExternalChange;
@@ -54,15 +54,12 @@ export type HistoryStack = {
 };
 
 export type HistoryState = {
-	byWorkspace: Record<string, HistoryStack>;
+	byTab: Record<TabId, HistoryStack>;
 	isNavigating: boolean;
 };
 
-export const emptyDoc = (
-	lastOpenedPath: string | null = null,
-): DocumentState => ({
+export const emptyDoc = (): DocumentState => ({
 	currentPath: null,
-	lastOpenedPath,
 	content: "",
 	diskContent: "",
 	externalChange: NO_CONFLICT,
@@ -130,26 +127,14 @@ export function withOpenedDoc(
 	state: DesktopState,
 	path: string,
 	content: string,
+	tab?: TabTarget,
 ): DesktopState {
-	const workspacePath = state.workspace.workspacePath;
-	const workspace =
-		workspacePath && isInWorkspace(path, workspacePath)
-			? {
-					...state.workspace,
-					lastOpenedPaths: {
-						...state.workspace.lastOpenedPaths,
-						[workspacePath]: path,
-					},
-				}
-			: state.workspace;
-
 	return {
 		...state,
-		workspace,
+		tabs: withOpenedTab(state.tabs, path, tab),
 		document: {
 			...state.document,
 			currentPath: path,
-			lastOpenedPath: path,
 			...cleanFileState(content),
 			viewMode: "rich",
 		},
@@ -166,7 +151,7 @@ export const appStore = store<DesktopState>(initialState, {
 });
 
 export const historyStore = store<HistoryState>({
-	byWorkspace: {},
+	byTab: {},
 	isNavigating: false,
 });
 

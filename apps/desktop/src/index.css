@@ -124,3 +124,16 @@
 		}
 	}
 }
+
+/* Paint over the title-bar divider on the same pixel, including beneath tabs. */
+[data-sidebar-overlay] [data-sidebar-root]::before {
+	content: "";
+	position: absolute;
+	inset-block-start: -1px;
+	inset-inline: 0 -1px;
+	height: 1px;
+	z-index: 40;
+	pointer-events: none;
+	background: var(--sidebar);
+	border-top: 1px solid var(--border);
+}

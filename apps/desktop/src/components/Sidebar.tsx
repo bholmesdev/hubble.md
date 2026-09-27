@@ -19,7 +19,9 @@ import {
 	deleteSidebarItems,
 	loadPath,
 	moveSidebarItems,
+	openBackgroundTab,
 	openPathInDefaultApp,
+	openTabForPath,
 	openWorkspace,
 	renameFolder,
 	renameMarkdownFile,
@@ -114,6 +116,14 @@ export function Sidebar({
 			onSelectFile={(path) => {
 				void loadPath(path);
 				if (compact) collapseSidebar();
+			}}
+			onOpenFileInNewTab={(path, options) => {
+				if (options?.background) {
+					void openBackgroundTab(path);
+				} else {
+					void openTabForPath(path);
+					if (compact) collapseSidebar();
+				}
 			}}
 			onOpenFileInDefaultApp={(path) => void openPathInDefaultApp(path)}
 			onRevealFile={(path) => void desktopApi.revealFile(path)}

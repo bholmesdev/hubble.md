@@ -7,6 +7,7 @@ import {
 } from "@floating-ui/dom";
 import {
 	getActiveLinkRange,
+	getCommandBinding,
 	wikiDisplayNameForTarget,
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
@@ -50,7 +51,6 @@ type MachineState = {
 type MachineEvent =
 	| { type: "LINK_SESSION_CHANGED"; activeKey: string | null }
 	| { type: "EXPAND_REQUESTED" }
-	| { type: "TOGGLE_ACTIONS_REQUESTED" }
 	| { type: "ESCAPE_REQUESTED" }
 	| { type: "CREATION_REQUESTED" }
 	| { type: "CREATION_CONFIRMED" }
@@ -102,12 +102,6 @@ function machineReducer(
 			if (state.mode === "creating") return state;
 			if (!state.activeKey) return state;
 			return { ...state, mode: "actions" };
-		}
-		case "TOGGLE_ACTIONS_REQUESTED": {
-			if (!state.activeKey) return state;
-			if (state.mode === "preview") return { ...state, mode: "actions" };
-			if (state.mode === "actions") return { ...state, mode: "preview" };
-			return state;
 		}
 		case "ESCAPE_REQUESTED": {
 			if (state.mode === "creating") return INITIAL_MACHINE_STATE;
@@ -973,7 +967,7 @@ export function LinkPopover({
 		[editor, dispatchMachineEvent],
 	);
 
-	// ── Listen for LINK_CREATION_REQUESTED_EVENT (empty-selection Cmd+K) ──
+	// ── Listen for link creation from [[ ──
 	useEffect(
 		() => {
 			const onCreationRequested = (event: Event) => {
@@ -1071,6 +1065,20 @@ export function LinkPopover({
 		dispatchMachineEvent,
 	]);
 
+	useEffect(() => {
+		if (machineState.mode !== "creating" && machineState.mode !== "actions")
+			return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (document.activeElement !== inputRef.current) return;
+			const binding = getCommandBinding("app.go-to-file");
+			if (!binding || !keymatch(event, binding)) return;
+			event.preventDefault();
+			event.stopPropagation();
+		};
+		window.addEventListener("keydown", onKeyDown, true);
+		return () => window.removeEventListener("keydown", onKeyDown, true);
+	}, [machineState.mode]);
+
 	// ── Keyboard: creating mode ─────────────────────────────────────
 	useEffect(() => {
 		if (!editor || machineState.mode !== "creating") return;
@@ -1119,11 +1127,6 @@ export function LinkPopover({
 				dispatchMachineEvent({ type: "ESCAPE_REQUESTED" });
 				editor.commands.focus(undefined, { scrollIntoView: false });
 				return;
-			}
-
-			if (keymatch(event, "CmdOrCtrl+K")) {
-				event.preventDefault();
-				event.stopPropagation();
 			}
 		};
 		window.addEventListener("keydown", onKeyDown, true);
@@ -1212,14 +1215,6 @@ export function LinkPopover({
 						});
 					}
 				});
-				return;
-			}
-
-			if (keymatch(event, "CmdOrCtrl+K")) {
-				if (!isVisible) return;
-				event.preventDefault();
-				event.stopPropagation();
-				dispatchMachineEvent({ type: "TOGGLE_ACTIONS_REQUESTED" });
 				return;
 			}
 		};

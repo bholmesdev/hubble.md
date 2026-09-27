@@ -3,19 +3,20 @@ import type { AppCommandId } from "@hubble.md/editor";
 import {
 	Button,
 	commandReviewThread,
+	EditableFileTitle,
 	ReviewCommentSummary,
 	type ReviewCommentSummaryProps,
-	Toolbar as SharedToolbar,
 	useCommandShortcut,
 	useCommandShortcutLabel,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { type CSSProperties, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import MingcuteArrowLeftLine from "~icons/mingcute/arrow-left-line";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
+import MingcuteDeleteLine from "~icons/mingcute/delete-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
@@ -25,6 +26,8 @@ import type { AgentClient } from "../desktopApi/types";
 import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
+	basename,
+	dirname,
 	hasHtmlExtension,
 	hasMarkdownExtension,
 	hasTextExtension,
@@ -36,70 +39,60 @@ import {
 import { useCompactWindow } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
+	deleteSidebarItems,
 	goBack,
 	goForward,
 	openPathInDefaultApp,
 	renameCurrentMarkdownFile,
 	requestChatAboutNote,
 	setViewerMode,
-	toggleSidebar,
 	toggleTerminal,
 } from "../store/actions";
 import { useHistoryNav } from "../store/hooks";
 import {
 	currentPathStore,
+	isInWorkspace,
 	reviewThreadsStore,
-	sidebarOpenStore,
 	titleGenerationPreviewStore,
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
 import { ClaudeLogo, CodexLogo } from "./AgentLogos";
 
-const dragRegionStyle = {
-	WebkitAppRegion: "drag",
-} as CSSProperties;
+const menuItemClass =
+	"flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent";
 
-type TitlePreview = { path: string; previewPath: string } | null;
-
-export function toolbarPathForTitlePreview(
-	currentPath: string | null | undefined,
-	titlePreview: TitlePreview,
-) {
-	if (!currentPath || titlePreview?.path !== currentPath) return currentPath;
-	return pathEquals(currentPath, titlePreview.previewPath)
-		? currentPath
-		: titlePreview.previewPath;
-}
-
-// Traffic lights are hidden in fullscreen, so drop their reserved inset.
-function useIsFullScreen() {
-	const [isFullScreen, setIsFullScreen] = useState(false);
-	useEffect(() => {
-		void desktopApi.getFullScreen().then(setIsFullScreen);
-		return desktopApi.onFullScreenChange(setIsFullScreen);
-	}, []);
-	return isFullScreen;
-}
-
-export function Toolbar({
+export function FileInfoBar({
 	scrollContainer,
-	showSidebarBadge = false,
 }: {
 	scrollContainer: HTMLDivElement | null;
-	showSidebarBadge?: boolean;
 }) {
 	const workspacePath = useStoreValue(workspacePathStore);
-	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
 	const titlePreview = useStoreValue(titleGenerationPreviewStore);
+	const titlePath = filePathForTitlePreview(currentPath, titlePreview);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
-	const isFullScreen = useIsFullScreen();
 	const compact = useCompactWindow();
+	const [showBorder, setShowBorder] = useState(false);
+
+	useEffect(() => {
+		if (!scrollContainer) {
+			setShowBorder(false);
+			return;
+		}
+		const update = () => setShowBorder(scrollContainer.scrollTop > 0);
+		update();
+		scrollContainer.addEventListener("scroll", update, { passive: true });
+		return () => scrollContainer.removeEventListener("scroll", update);
+	}, [scrollContainer]);
+
 	// The changelog note is virtual: show a friendly title and disable the
 	// file actions (rename, reveal, copy path) that assume a file on disk.
 	const isChangelog = isChangelogPath(currentPath);
-	const toolbarPath = toolbarPathForTitlePreview(currentPath, titlePreview);
+	const folder =
+		titlePath && !isChangelog
+			? dirname(relativeWorkspacePath(titlePath, workspacePath ?? null))
+			: null;
 	const actionPath = currentPath && !isChangelog ? currentPath : null;
 	const comments: ReviewCommentSummaryProps | null =
 		currentPath && hasMarkdownExtension(currentPath)
@@ -113,23 +106,41 @@ export function Toolbar({
 			: null;
 
 	return (
-		<SharedToolbar
-			currentPath={isChangelog ? "What's new" : (toolbarPath ?? null)}
-			sidebarOpen={sidebarOpen}
-			sidebarOverlays={compact}
-			sidebarBadge={showSidebarBadge}
-			scrollContainer={scrollContainer}
-			platformInset={!isFullScreen}
-			rootProps={{ style: dragRegionStyle }}
-			onToggleSidebar={toggleSidebar}
-			leftSlot={compact ? null : <NavigationControls />}
-			onMoveWindow={(x, y) => void desktopApi.moveWindow(x, y)}
-			onRenameCurrentPath={
-				isChangelog
-					? undefined
-					: (nextName) => void renameCurrentMarkdownFile(nextName)
-			}
-			rightSlot={
+		<div
+			key={currentPath ?? "empty"}
+			data-file-info-bar
+			className={`relative flex h-9 min-w-0 shrink-0 items-center overflow-hidden px-3 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
+		>
+			<div className="flex flex-[0_100_114px] items-center pe-4">
+				{compact ? null : <NavigationControls />}
+			</div>
+			<div className="flex min-w-0 flex-auto items-center justify-center gap-1 [&>button]:px-0 [&>input]:px-0">
+				{folder ? (
+					<>
+						<span
+							className="min-w-0 max-w-[50%] truncate text-xs text-muted-foreground"
+							title={folder}
+						>
+							{folder.split(/[\\/]/).join(" / ")}
+						</span>
+						<span
+							aria-hidden="true"
+							className="text-xs text-muted-foreground/60"
+						>
+							/
+						</span>
+					</>
+				) : null}
+				<EditableFileTitle
+					currentPath={isChangelog ? "What's new" : (titlePath ?? null)}
+					onRename={
+						isChangelog
+							? undefined
+							: (nextName) => void renameCurrentMarkdownFile(nextName)
+					}
+				/>
+			</div>
+			<div className="flex flex-[0_100_114px] items-center justify-end ps-2">
 				<div className="flex items-center gap-1">
 					{!compact && (
 						<Button
@@ -146,6 +157,9 @@ export function Toolbar({
 					{(compact || actionPath) && (
 						<ActionsMenu
 							path={actionPath}
+							canDelete={Boolean(
+								actionPath && isInWorkspace(actionPath, workspacePath ?? null),
+							)}
 							showTerminal={compact}
 							workspacePath={
 								workspacePath && actionPath && isEditableFile(actionPath)
@@ -155,8 +169,8 @@ export function Toolbar({
 						/>
 					)}
 				</div>
-			}
-		/>
+			</div>
+		</div>
 	);
 }
 
@@ -192,10 +206,12 @@ function NavigationControls() {
 
 function ActionsMenu({
 	path,
+	canDelete,
 	workspacePath,
 	showTerminal,
 }: {
 	path: string | null;
+	canDelete: boolean;
 	workspacePath: string | null;
 	showTerminal: boolean;
 }) {
@@ -242,6 +258,12 @@ function ActionsMenu({
 		}
 	}
 
+	function deleteFile() {
+		if (!path || !canDelete || !window.confirm(`Delete ${basename(path)}?`))
+			return;
+		void deleteSidebarItems([{ kind: "file", path }]);
+	}
+
 	return (
 		<Menu.Root>
 			<Menu.Trigger
@@ -266,10 +288,7 @@ function ActionsMenu({
 					<Menu.Popup className="z-50 w-52 origin-(--transform-origin) rounded-sm border border-border bg-popover p-1 text-[11px] text-popover-foreground outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
 						{showTerminal && (
 							<>
-								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
-									onClick={toggleTerminal}
-								>
+								<Menu.Item className={menuItemClass} onClick={toggleTerminal}>
 									<MingcuteTerminalLine className="size-3 shrink-0" />
 									<span className="min-w-0 flex-1">Toggle terminal</span>
 									<ShortcutHint commandId="app.toggle-terminal" />
@@ -280,7 +299,7 @@ function ActionsMenu({
 						{path && workspacePath && (
 							<>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className={menuItemClass}
 									onClick={requestChatAboutNote}
 								>
 									<MingcuteTerminalLine className="size-3 shrink-0" />
@@ -288,14 +307,14 @@ function ActionsMenu({
 									<ShortcutHint commandId="app.chat-about-note" />
 								</Menu.Item>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className={menuItemClass}
 									onClick={() => void openInAgent("codex")}
 								>
 									<CodexLogo className="size-3 shrink-0" />
 									<span className="min-w-0 flex-1">Open in Codex</span>
 								</Menu.Item>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className={menuItemClass}
 									onClick={() => void openInAgent("claude")}
 								>
 									<ClaudeLogo className="size-3 shrink-0" />
@@ -306,7 +325,7 @@ function ActionsMenu({
 						)}
 						{path && supportsSourceToggle(path) && (
 							<Menu.Item
-								className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+								className={menuItemClass}
 								onClick={() => setViewerMode(isSourceMode ? "rich" : "source")}
 							>
 								<MingcuteCodeLine className="size-3 shrink-0" />
@@ -317,14 +336,14 @@ function ActionsMenu({
 						{path && (
 							<>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className={menuItemClass}
 									onClick={() => void openPathInDefaultApp(path)}
 								>
 									<MingcuteExternalLinkLine className="size-3 shrink-0" />
 									<span className="min-w-0 flex-1">Open in default app</span>
 								</Menu.Item>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className={menuItemClass}
 									onClick={() => void revealFile()}
 								>
 									<MingcuteFolderOpenLine className="size-3 shrink-0" />
@@ -334,13 +353,25 @@ function ActionsMenu({
 									<ShortcutHint commandId="app.reveal" />
 								</Menu.Item>
 								<Menu.Item
-									className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent"
+									className={menuItemClass}
 									onClick={() => void copyFilePath()}
 								>
 									<MingcuteCopy2Line className="size-3 shrink-0" />
 									<span className="min-w-0 flex-1">Copy file path</span>
 									<ShortcutHint commandId="app.copy-path" />
 								</Menu.Item>
+								{canDelete ? (
+									<>
+										<Menu.Separator className="my-1 h-px bg-border" />
+										<Menu.Item
+											className={`${menuItemClass} text-destructive`}
+											onClick={deleteFile}
+										>
+											<MingcuteDeleteLine className="size-3 shrink-0" />
+											<span className="min-w-0 flex-1">Delete</span>
+										</Menu.Item>
+									</>
+								) : null}
 							</>
 						)}
 					</Menu.Popup>
@@ -361,4 +392,14 @@ function ShortcutHint({ commandId }: { commandId: AppCommandId }) {
 			{shortcut}
 		</span>
 	);
+}
+
+export function filePathForTitlePreview(
+	currentPath: string | null | undefined,
+	titlePreview: { path: string; previewPath: string } | null,
+) {
+	if (!currentPath || titlePreview?.path !== currentPath) return currentPath;
+	return pathEquals(currentPath, titlePreview.previewPath)
+		? currentPath
+		: titlePreview.previewPath;
 }

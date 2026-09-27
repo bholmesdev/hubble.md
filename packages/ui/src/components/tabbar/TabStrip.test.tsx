@@ -1,0 +1,482 @@
+// @vitest-environment happy-dom
+
+import { act, type ReactNode } from "react";
+// @ts-expect-error This package does not ship @types/react-dom; the test only
+// needs createRoot's render/unmount surface.
+import { createRoot } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { TabStrip, type TabStripProps } from "./TabStrip";
+
+type Root = {
+	render(children: ReactNode): void;
+	unmount(): void;
+};
+
+const roots: Root[] = [];
+
+(
+	globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
+afterEach(() => {
+	act(() => {
+		for (const root of roots) root.unmount();
+	});
+	roots.length = 0;
+	document.body.replaceChildren();
+	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
+});
+
+function renderStrip(props: Partial<TabStripProps> = {}) {
+	const onActivate = vi.fn();
+	const onClose = vi.fn();
+	const container = document.createElement("div");
+	document.body.appendChild(container);
+	const root = createRoot(container) as Root;
+	roots.push(root);
+	const render = (next: Partial<TabStripProps> = {}) =>
+		act(() =>
+			root.render(
+				<TabStrip
+					tabs={[
+						{ id: "a", label: "plan", title: "/w/plan.md" },
+						{ id: "b", label: "notes", title: "/w/notes.md" },
+					]}
+					activeTabId="a"
+					onActivate={onActivate}
+					onClose={onClose}
+					{...props}
+					{...next}
+				/>,
+			),
+		);
+	render();
+	return { onActivate, onClose, rerender: render };
+}
+
+const tabs = () => [...document.querySelectorAll<HTMLElement>("[role=tab]")];
+
+describe("TabStrip", () => {
+	it("hides below 48px per tab and restores at the threshold without changing layout", () => {
+		const resize = mockResize(96);
+		const onCollapsedChange = vi.fn();
+		renderStrip({ onCollapsedChange, onNewTab: vi.fn() });
+		const strip = document.querySelector<HTMLElement>("[role=tablist]");
+		const wrapperStyle = strip?.parentElement?.getAttribute("style");
+		expect(strip?.hasAttribute("inert")).toBe(false);
+		onCollapsedChange.mockImplementation((collapsed: boolean) => {
+			if (collapsed) expect(strip?.hasAttribute("inert")).toBe(false);
+		});
+
+		resize(95);
+		expect(onCollapsedChange).toHaveBeenLastCalledWith(true);
+		expect(strip?.getAttribute("aria-hidden")).toBe("true");
+		expect(strip?.hasAttribute("inert")).toBe(true);
+		expect(strip?.classList.contains("invisible")).toBe(true);
+		expect(strip?.parentElement?.getAttribute("style")).toBe(wrapperStyle);
+		expect(
+			document.querySelector("[aria-label='New tab']")?.closest("[inert]"),
+		).toBeNull();
+		expect(
+			document
+				.querySelector("[aria-label='New tab']")
+				?.classList.contains("ms-auto"),
+		).toBe(true);
+
+		const calls = onCollapsedChange.mock.calls.length;
+		resize(95);
+		expect(onCollapsedChange).toHaveBeenCalledTimes(calls);
+		resize(96);
+		expect(onCollapsedChange).toHaveBeenLastCalledWith(false);
+		expect(strip?.hasAttribute("inert")).toBe(false);
+		expect(strip?.hasAttribute("aria-hidden")).toBe(false);
+	});
+
+	it("remeasures after tabs close and resets when the last tab closes", () => {
+		mockResize(80);
+		const onCollapsedChange = vi.fn();
+		const { rerender } = renderStrip({ onCollapsedChange });
+		expect(onCollapsedChange).toHaveBeenLastCalledWith(true);
+		rerender({ tabs: [{ id: "a", label: "plan", title: "/w/plan.md" }] });
+		expect(onCollapsedChange).toHaveBeenLastCalledWith(false);
+		rerender();
+		expect(onCollapsedChange).toHaveBeenLastCalledWith(true);
+		rerender({ tabs: [] });
+		expect(onCollapsedChange).toHaveBeenLastCalledWith(false);
+	});
+
+	it("does not hide tabs without an alternate tab selector and disconnects on unmount", () => {
+		const resize = mockResize(40);
+		const { rerender } = renderStrip();
+		expect(
+			document.querySelector("[role=tablist]")?.hasAttribute("inert"),
+		).toBe(false);
+		expect(resize.observe).not.toHaveBeenCalled();
+		rerender({ onCollapsedChange: vi.fn() });
+		expect(resize.observe).toHaveBeenCalledTimes(1);
+		act(() => roots.pop()?.unmount());
+		expect(resize.disconnect).toHaveBeenCalledTimes(1);
+	});
+
+	it("shows from the first note, so the editor never shifts", () => {
+		renderStrip({ tabs: [{ id: "a", label: "plan", title: "/w/plan.md" }] });
+
+		expect(document.querySelector("[role=tablist]")).not.toBeNull();
+		expect(tabs()).toHaveLength(1);
+	});
+
+	it("renders nothing when no note is open", () => {
+		renderStrip({ tabs: [], activeTabId: null });
+
+		expect(document.querySelector("[role=tablist]")).toBeNull();
+	});
+
+	it("marks the active tab and reports activation", () => {
+		const { onActivate } = renderStrip();
+
+		expect(tabs().map((tab) => tab.getAttribute("aria-selected"))).toEqual([
+			"true",
+			"false",
+		]);
+
+		act(() => tabs()[1].click());
+
+		expect(onActivate).toHaveBeenCalledWith("b");
+	});
+
+	it("costs one tab stop, not one per note", () => {
+		renderStrip();
+
+		expect(tabs().map((tab) => tab.tabIndex)).toEqual([0, -1]);
+		// The close buttons are reachable by mouse and by Delete, but they must
+		// not sit between the strip and the editor in the tab order.
+		expect(
+			[...document.querySelectorAll<HTMLElement>("[aria-label^='Close ']")].map(
+				(button) => button.tabIndex,
+			),
+		).toEqual([-1, -1]);
+	});
+
+	it("stays reachable while the changelog covers the editor", () => {
+		// Nothing is selected then, and a strip with no tab stop would be the
+		// one place the keyboard cannot get back to a note.
+		const { onActivate } = renderStrip({ activeTabId: null });
+
+		expect(tabs().map((tab) => tab.tabIndex)).toEqual([0, -1]);
+
+		act(() => {
+			tabs()[0].dispatchEvent(
+				new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+			);
+		});
+
+		expect(onActivate).toHaveBeenCalledWith("b");
+	});
+
+	it("moves between notes with the arrow keys and wraps", () => {
+		const { onActivate } = renderStrip();
+
+		const press = (key: string) =>
+			act(() => {
+				tabs()[0].dispatchEvent(
+					new KeyboardEvent("keydown", { key, bubbles: true }),
+				);
+			});
+
+		press("ArrowRight");
+		expect(onActivate).toHaveBeenLastCalledWith("b");
+		press("ArrowLeft");
+		expect(onActivate).toHaveBeenLastCalledWith("b");
+		press("End");
+		expect(onActivate).toHaveBeenLastCalledWith("b");
+		press("Home");
+		expect(onActivate).toHaveBeenLastCalledWith("a");
+	});
+
+	it("closes the open note on Delete", () => {
+		const { onClose } = renderStrip();
+
+		act(() => {
+			tabs()[0].dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Delete", bubbles: true }),
+			);
+		});
+
+		expect(onClose).toHaveBeenCalledWith("a");
+	});
+
+	it("closes from the button and from a middle click", () => {
+		const { onClose, onActivate } = renderStrip();
+
+		const close = document.querySelector<HTMLElement>(
+			"[aria-label='Close notes']",
+		);
+		act(() => close?.click());
+		expect(onClose).toHaveBeenCalledWith("b");
+
+		act(() => {
+			tabs()[0].dispatchEvent(
+				new MouseEvent("auxclick", { bubbles: true, button: 1 }),
+			);
+		});
+		expect(onClose).toHaveBeenLastCalledWith("a");
+		// Middle-clicking closes without also switching to the tab.
+		expect(onActivate).not.toHaveBeenCalled();
+	});
+
+	it("keeps the new-tab control outside the tab list", () => {
+		const onNewTab = vi.fn();
+		renderStrip({ onNewTab });
+
+		const strip = document.querySelector("[role=tablist]");
+		const add = document.querySelector("[aria-label='New tab']");
+		expect(strip?.contains(add)).toBe(false);
+		expect(add?.parentElement).toBe(strip?.parentElement?.parentElement);
+	});
+
+	it("offers a new-tab control even when no note is open", () => {
+		const onNewTab = vi.fn();
+		renderStrip({ tabs: [], activeTabId: null, onNewTab });
+
+		expect(document.querySelector("[role=tablist]")).toBeNull();
+		const add = document.querySelector<HTMLElement>("[aria-label='New tab']");
+		act(() => add?.click());
+		expect(onNewTab).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not rename from a single click on the active tab", () => {
+		const onRename = vi.fn();
+		const { onActivate } = renderStrip({ onRename });
+
+		act(() => tabs()[0].click());
+
+		expect(onActivate).toHaveBeenCalledWith("a");
+		expect(document.querySelector("input")).toBeNull();
+		expect(onRename).not.toHaveBeenCalled();
+	});
+
+	it("renames from a double click on the active tab", () => {
+		const onRename = vi.fn();
+		const onActivate = vi.fn();
+		renderStrip({ onRename, onActivate });
+
+		act(() => {
+			tabs()[0].dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+		});
+
+		const input = document.querySelector("input");
+		if (!(input instanceof HTMLInputElement)) {
+			throw new Error("Missing rename field");
+		}
+		expect(input.value).toBe("plan");
+		act(() => {
+			input.focus();
+			Object.getOwnPropertyDescriptor(
+				HTMLInputElement.prototype,
+				"value",
+			)?.set?.call(input, "renamed");
+			input.dispatchEvent(new Event("input", { bubbles: true }));
+			input.dispatchEvent(new Event("change", { bubbles: true }));
+		});
+		act(() => {
+			input.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
+		});
+		expect(onRename).toHaveBeenCalledWith("a", "renamed");
+	});
+
+	it("renames from the file name, not a folder-qualified label", () => {
+		const onRename = vi.fn();
+		renderStrip({
+			onRename,
+			tabs: [
+				{
+					id: "a",
+					label: "notes/index",
+					title: "/w/notes/index.md",
+					name: "index",
+				},
+			],
+		});
+
+		act(() => {
+			tabs()[0].dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+		});
+		const input = document.querySelector("input");
+		if (!(input instanceof HTMLInputElement)) {
+			throw new Error("Missing rename field");
+		}
+		expect(input.value).toBe("index");
+		act(() => {
+			input.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
+		});
+		expect(onRename).not.toHaveBeenCalled();
+	});
+
+	it("activates an inactive tab instead of renaming it", () => {
+		const onRename = vi.fn();
+		const { onActivate } = renderStrip({ onRename });
+
+		act(() => tabs()[1].click());
+		expect(onActivate).toHaveBeenCalledWith("b");
+		expect(document.querySelector("input")).toBeNull();
+		expect(onRename).not.toHaveBeenCalled();
+	});
+
+	it("does not rename from a double click on an inactive tab", () => {
+		const onRename = vi.fn();
+		renderStrip({ onRename });
+
+		act(() => {
+			tabs()[1].dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+		});
+
+		expect(document.querySelector("input")).toBeNull();
+		expect(onRename).not.toHaveBeenCalled();
+	});
+});
+
+describe("tab dragging", () => {
+	function setup() {
+		const onReorder = vi.fn();
+		const result = renderStrip({ onReorder });
+		const [active, inactive] = tabs();
+		for (const button of [active, inactive]) {
+			let captured = false;
+			Object.assign(button, {
+				setPointerCapture: vi.fn(() => {
+					captured = true;
+				}),
+				hasPointerCapture: vi.fn(() => captured),
+				releasePointerCapture: vi.fn(() => {
+					captured = false;
+				}),
+			});
+			vi.spyOn(
+				button.closest<HTMLElement>("[data-tab-item]") as HTMLElement,
+				"getBoundingClientRect",
+			).mockReturnValue({
+				width: 120,
+			} as DOMRect);
+		}
+		return { ...result, onReorder, active, inactive };
+	}
+
+	function pointer(button: HTMLElement, type: string, clientX: number) {
+		act(() => {
+			button.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					cancelable: true,
+					pointerId: 1,
+					isPrimary: true,
+					button: 0,
+					clientX,
+				}),
+			);
+		});
+	}
+
+	it("keeps small pointer movements as a normal tab click", () => {
+		const { inactive, onActivate, onReorder } = setup();
+		pointer(inactive, "pointerdown", 180);
+		pointer(inactive, "pointermove", 178);
+		pointer(inactive, "pointerup", 178);
+		act(() => inactive.click());
+		expect(onActivate).toHaveBeenCalledWith("b");
+		expect(onReorder).not.toHaveBeenCalled();
+		expect(inactive.parentElement?.style.transform).toBe("");
+	});
+
+	it("previews beneath the active tab and reorders and activates only on release", () => {
+		const { active, inactive, onActivate, onReorder } = setup();
+		pointer(inactive, "pointerdown", 180);
+		pointer(inactive, "pointermove", 80);
+		expect(inactive.parentElement?.style.transform).toBe("translateX(-100px)");
+		expect(active.parentElement?.style.transform).toBe("translateX(120px)");
+		expect(active.parentElement?.classList.contains("z-30")).toBe(true);
+		expect(inactive.parentElement?.classList.contains("z-20")).toBe(true);
+		expect(tabs()).toEqual([active, inactive]);
+		expect(onReorder).not.toHaveBeenCalled();
+		expect(onActivate).not.toHaveBeenCalled();
+
+		pointer(inactive, "pointerup", 80);
+		act(() => inactive.click());
+		expect(onReorder).toHaveBeenCalledExactlyOnceWith("b", 0);
+		expect(onActivate).toHaveBeenCalledExactlyOnceWith("b");
+		expect(inactive.parentElement?.style.transform).toBe("");
+	});
+
+	it("activates a dragged tab released in its original position", () => {
+		const { inactive, onActivate, onReorder } = setup();
+		pointer(inactive, "pointerdown", 180);
+		pointer(inactive, "pointermove", 160);
+		pointer(inactive, "pointerup", 160);
+		act(() => inactive.click());
+		expect(onReorder).not.toHaveBeenCalled();
+		expect(onActivate).toHaveBeenCalledExactlyOnceWith("b");
+	});
+
+	it.each([
+		"Escape",
+		"pointercancel",
+	])("cancels with %s without reordering", (cancel) => {
+		const { active, inactive, onActivate, onReorder } = setup();
+		pointer(inactive, "pointerdown", 180);
+		pointer(inactive, "pointermove", 60);
+		if (cancel === "Escape") {
+			act(() =>
+				inactive.dispatchEvent(
+					new KeyboardEvent("keydown", {
+						key: "Escape",
+						bubbles: true,
+					}),
+				),
+			);
+		} else {
+			pointer(inactive, cancel, 60);
+		}
+		pointer(inactive, "pointerup", 60);
+		act(() => inactive.click());
+		expect(onReorder).not.toHaveBeenCalled();
+		expect(onActivate).not.toHaveBeenCalled();
+		expect(active.parentElement?.style.transform).toBe("");
+		expect(inactive.parentElement?.style.transform).toBe("");
+	});
+});
+
+function mockResize(initialWidth: number) {
+	let width = initialWidth;
+	let callback: ResizeObserverCallback;
+	const observe = vi.fn();
+	const disconnect = vi.fn();
+	vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+		() => ({ width }) as DOMRect,
+	);
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			constructor(onResize: ResizeObserverCallback) {
+				callback = onResize;
+			}
+			observe = observe;
+			disconnect = disconnect;
+		},
+	);
+	return Object.assign(
+		(nextWidth: number) => {
+			width = nextWidth;
+			act(() =>
+				callback(
+					[{ contentRect: { width } } as ResizeObserverEntry],
+					{} as ResizeObserver,
+				),
+			);
+		},
+		{ observe, disconnect },
+	);
+}

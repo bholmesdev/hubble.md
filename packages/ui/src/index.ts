@@ -1,4 +1,5 @@
 export { AppShellFrame } from "./components/AppShellFrame";
+export { EditableFileTitle } from "./components/EditableFileTitle";
 export {
 	GlobalSearchPalette,
 	type GlobalSearchPaletteProps,
@@ -7,6 +8,7 @@ export {
 	type PaletteFile,
 	type PaletteFileMatches,
 } from "./components/GlobalSearchPalette";
+export { NewNoteButton } from "./components/NewNoteButton";
 export {
 	Sidebar,
 	type SidebarDeleteItem,
@@ -18,7 +20,11 @@ export {
 	type SidebarMoveItemInput,
 	type SidebarSortMode,
 } from "./components/Sidebar";
-export { NewNoteButton, Toolbar } from "./components/Toolbar";
+export {
+	TabStrip,
+	type TabStripItem,
+	type TabStripProps,
+} from "./components/tabbar/TabStrip";
 export { WorkspaceSwitcherMenu } from "./components/WorkspaceSwitcherMenu";
 export {
 	clearActiveEditor,
