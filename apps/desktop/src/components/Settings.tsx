@@ -2,6 +2,7 @@ import {
 	type CommandId,
 	findCommandBindingConflicts,
 	getCommand,
+	getCommandBinding,
 	resolveCommandBinding,
 } from "@hubble.md/editor";
 import { Button, formatShortcut, Input } from "@hubble.md/ui";
@@ -294,7 +295,8 @@ function ShortcutSettings({
 	useEffect(() => {
 		if (!open || state.recordingId) return;
 		const onKeyDown = (event: KeyboardEvent) => {
-			if (!keymatch(event, "CmdOrCtrl+F")) return;
+			const binding = getCommandBinding("app.find");
+			if (!binding || !keymatch(event, binding)) return;
 			event.preventDefault();
 			event.stopPropagation();
 			scrollRef.current?.scrollTo({ top: 0 });
