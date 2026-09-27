@@ -6,7 +6,15 @@ import {
 } from "@hubble.md/editor";
 import { Button, formatShortcut, Input } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { type ReactNode, type Ref, useEffect, useRef, useState } from "react";
+import { keymatch } from "keymatch";
+import {
+	type ReactNode,
+	type Ref,
+	type RefObject,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import MingcuteRefresh2Line from "~icons/mingcute/refresh-2-line";
@@ -44,26 +52,38 @@ import { UpdatesSection } from "./UpdatesSection";
 type SettingsPage = "general" | "chat" | "shortcuts";
 type Errors = Partial<Record<CommandId, string>>;
 
+export type SettingsTarget = {
+	page: SettingsPage;
+	shortcutId?: CommandId;
+	requestId: number;
+};
+
 export function Settings({
 	open,
 	onOpenChange,
+	target,
 	updateState,
 	onUpdateAction,
 	onViewChangelog,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	target?: SettingsTarget;
 	updateState: DesktopUpdateState | null;
 	onUpdateAction: () => void;
 	onViewChangelog: () => void;
 }) {
 	const [page, setPage] = useState<SettingsPage>("general");
 	const activeTabRef = useRef<HTMLButtonElement>(null);
+	const contentRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
-		if (!open) return;
+		if (open && target) setPage(target.page);
+	}, [open, target]);
+	useEffect(() => {
+		if (!open || target?.shortcutId) return;
 		const timeout = window.setTimeout(() => activeTabRef.current?.focus());
 		return () => window.clearTimeout(timeout);
-	}, [open]);
+	}, [open, target]);
 
 	return (
 		<SettingsDialog
@@ -100,7 +120,10 @@ export function Settings({
 						Shortcuts
 					</NavButton>
 				</nav>
-				<div className="min-w-0 flex-1 overflow-y-auto bg-popover">
+				<div
+					ref={contentRef}
+					className="min-w-0 flex-1 overflow-y-auto bg-popover"
+				>
 					{page === "general" ? (
 						<GeneralSettings
 							updateState={updateState}
@@ -110,7 +133,11 @@ export function Settings({
 					) : page === "chat" ? (
 						<ChatSettings />
 					) : (
-						<ShortcutSettings />
+						<ShortcutSettings
+							open={open}
+							scrollRef={contentRef}
+							revealTarget={target?.page === "shortcuts" ? target : undefined}
+						/>
 					)}
 				</div>
 			</div>
@@ -247,14 +274,37 @@ function ChatSettings() {
 	);
 }
 
-function ShortcutSettings() {
-	const state = useShortcutState();
+function ShortcutSettings({
+	open,
+	scrollRef,
+	revealTarget,
+}: {
+	open: boolean;
+	scrollRef: RefObject<HTMLDivElement | null>;
+	revealTarget?: SettingsTarget;
+}) {
+	const state = useShortcutState(revealTarget);
 	const groups = filterShortcutGroups(state.query, state.bindings);
+	const searchRef = useRef<HTMLInputElement>(null);
+
+	useEffect(() => {
+		if (!open || state.recordingId) return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (!keymatch(event, "CmdOrCtrl+F")) return;
+			event.preventDefault();
+			event.stopPropagation();
+			scrollRef.current?.scrollTo({ top: 0 });
+			searchRef.current?.focus();
+		};
+		window.addEventListener("keydown", onKeyDown, true);
+		return () => window.removeEventListener("keydown", onKeyDown, true);
+	}, [open, scrollRef, state.recordingId]);
 
 	return (
 		<div className="p-4">
 			<header className="flex gap-2">
 				<Input
+					ref={searchRef}
 					className="flex-1 bg-transparent dark:bg-transparent"
 					placeholder="Search shortcuts…"
 					value={state.query}
@@ -388,13 +438,19 @@ function CommandRow({
 	);
 }
 
-function useShortcutState() {
+function useShortcutState(revealTarget?: SettingsTarget) {
 	const bindings = useStoreValue(shortcutBindingsStore);
 	const [errors, setErrors] = useState<Errors>({});
 	const [recordingId, setRecordingId] = useState<CommandId | null>(null);
 	const [query, setQuery] = useState("");
 	// Conflict links change this ID to scroll to and pulse the matching row.
 	const [revealId, setRevealId] = useState<CommandId | null>(null);
+
+	useEffect(() => {
+		if (!revealTarget?.shortcutId) return;
+		setQuery("");
+		setRevealId(revealTarget.shortcutId);
+	}, [revealTarget]);
 
 	useEffect(() => {
 		if (!revealId) return;
