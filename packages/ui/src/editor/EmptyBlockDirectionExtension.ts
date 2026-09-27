@@ -34,26 +34,27 @@ export const EmptyBlockDirectionExtension = Extension.create({
 
 function emptyBlockDirections(doc: ProseMirrorNode) {
 	const decorations: Decoration[] = [];
-	let previousText: string | undefined;
+	let previousBlock: ProseMirrorNode | undefined;
 	let previousDirection: TextDirection | undefined;
 
 	doc.descendants((node, pos) => {
 		if (!node.isTextblock) return;
 
 		if (node.type.name === "codeBlock") {
-			previousText = undefined;
+			previousBlock = undefined;
 			previousDirection = "ltr";
 			return;
 		}
 
 		if (node.content.size > 0) {
-			previousText = node.textContent;
+			// Read text lazily; only blocks followed by an empty block need it.
+			previousBlock = node;
 			previousDirection = undefined;
 			return;
 		}
 
-		if (!previousDirection && previousText !== undefined) {
-			previousDirection = directionOf(previousText);
+		if (!previousDirection && previousBlock) {
+			previousDirection = directionOf(previousBlock.textContent);
 		}
 		if (!previousDirection) return;
 
