@@ -648,19 +648,12 @@ export function ReviewCommentPopover({
 							ariaLabel="Comment text"
 						/>
 					) : activeComment ? (
-						<div className="group/thread flex min-h-0 flex-1 flex-col">
+						<div className="group/thread relative flex min-h-0 flex-1 flex-col">
 							<div
-								className="flex h-9 shrink-0 items-center gap-2 bg-popover px-3 pt-1.5"
+								className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-9 items-center justify-end px-3"
 								data-review-comment-header
 							>
-								<span className="text-xs font-semibold">
-									{authorLabel(
-										activeComment.attrs.metadata?.author === "agent"
-											? "agent"
-											: "human",
-									)}
-								</span>
-								<div className="ms-auto flex items-center gap-0.5">
+								<div className="pointer-events-auto flex items-center gap-0.5 bg-popover">
 									<Button
 										type="button"
 										variant="ghost"
@@ -705,24 +698,33 @@ export function ReviewCommentPopover({
 								className="min-h-0 flex-1 overflow-y-auto px-3 pb-3"
 								data-review-comment-content
 							>
-								<blockquote className="mt-1 line-clamp-2 border-s-2 border-brand-accent ps-2 text-xs leading-snug text-muted-foreground">
-									{editor.state.doc.textBetween(
-										activeComment.from,
-										activeComment.to,
-										"\n",
-									)}
-								</blockquote>
-								<p className="mt-1.5 whitespace-pre-wrap text-[0.8125rem] leading-relaxed">
-									{activeComment.attrs.body}
-								</p>
+								<div>
+									<div className="sticky top-0 z-1 flex min-h-9 items-center bg-popover pe-24 text-xs font-semibold">
+										{authorLabel(
+											activeComment.attrs.metadata?.author === "agent"
+												? "agent"
+												: "human",
+										)}
+									</div>
+									<blockquote className="line-clamp-2 border-s-2 border-brand-accent ps-2 text-xs leading-snug text-muted-foreground">
+										{editor.state.doc.textBetween(
+											activeComment.from,
+											activeComment.to,
+											"\n",
+										)}
+									</blockquote>
+									<p className="mt-1.5 whitespace-pre-wrap text-[0.8125rem] leading-relaxed">
+										{activeComment.attrs.body}
+									</p>
+								</div>
 								{(activeComment.attrs.replies ?? []).map((reply) => (
 									<div key={reply.id} className="mt-2.5">
-										<div className="flex items-baseline gap-2">
-											<span className="text-xs font-semibold">
+										<div className="sticky top-0 z-1 flex min-h-9 items-center gap-2 bg-popover pe-24">
+											<span className="shrink-0 text-xs font-semibold">
 												{authorLabel(reply.author)}
 											</span>
 											{formatRelativeTime(reply.createdAt) && (
-												<span className="text-[11px] text-muted-foreground">
+												<span className="truncate text-[11px] text-muted-foreground">
 													{formatRelativeTime(reply.createdAt)}
 												</span>
 											)}
