@@ -516,7 +516,7 @@ function App() {
 					return;
 				}
 			}
-			// Editor commands can claim Cmd-P without appearing in the app handlers above.
+			// The palette's binding can claim Cmd-P even when unavailable here; editor commands can too.
 			if (
 				!event.repeat &&
 				keymatch(event, "CmdOrCtrl+P") &&

@@ -9,7 +9,6 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Pressing an unassigned Command-P shows the current Command palette shortcut and links to its setting; your Find shortcut focuses shortcut search in Settings. [#297](https://github.com/bholmesdev/hubble.md/pull/297)
 - Tabs now have right-click actions to close other tabs or tabs to the left, and open files can be deleted from the file bar overflow menu. [#294](https://github.com/bholmesdev/hubble.md/pull/294)
 
 ### Changed
