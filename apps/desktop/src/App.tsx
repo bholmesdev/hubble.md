@@ -23,7 +23,7 @@ import {
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import {
 	recentCommandIdsStore,
@@ -220,6 +220,7 @@ function App() {
 	useScrollMemory(state.currentPath, scrollContainerEl);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [settingsTarget, setSettingsTarget] = useState<SettingsTarget>();
+	const settingsRequestId = useRef(0);
 	const changeSettingsOpen = (open: boolean) => {
 		setSettingsOpen(open);
 		if (!open) setSettingsTarget(undefined);
@@ -538,11 +539,12 @@ function App() {
 						action: {
 							label: "Modify in settings",
 							onClick: () => {
-								setSettingsTarget((current) => ({
+								settingsRequestId.current += 1;
+								setSettingsTarget({
 									page: "shortcuts",
 									shortcutId: "app.go-to-file",
-									requestId: (current?.requestId ?? 0) + 1,
-								}));
+									requestId: settingsRequestId.current,
+								});
 								setSettingsOpen(true);
 							},
 						},

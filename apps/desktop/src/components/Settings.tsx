@@ -74,6 +74,7 @@ export function Settings({
 	onViewChangelog: () => void;
 }) {
 	const [page, setPage] = useState<SettingsPage>("general");
+	const handledRequestId = useRef<number | null>(null);
 	const activeTabRef = useRef<HTMLButtonElement>(null);
 	const contentRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
@@ -137,6 +138,7 @@ export function Settings({
 							open={open}
 							scrollRef={contentRef}
 							revealTarget={target?.page === "shortcuts" ? target : undefined}
+							handledRequestId={handledRequestId}
 						/>
 					)}
 				</div>
@@ -278,12 +280,14 @@ function ShortcutSettings({
 	open,
 	scrollRef,
 	revealTarget,
+	handledRequestId,
 }: {
 	open: boolean;
 	scrollRef: RefObject<HTMLDivElement | null>;
 	revealTarget?: SettingsTarget;
+	handledRequestId: RefObject<number | null>;
 }) {
-	const state = useShortcutState(revealTarget);
+	const state = useShortcutState(handledRequestId, revealTarget);
 	const groups = filterShortcutGroups(state.query, state.bindings);
 	const searchRef = useRef<HTMLInputElement>(null);
 
@@ -438,7 +442,10 @@ function CommandRow({
 	);
 }
 
-function useShortcutState(revealTarget?: SettingsTarget) {
+function useShortcutState(
+	handledRequestId: RefObject<number | null>,
+	revealTarget?: SettingsTarget,
+) {
 	const bindings = useStoreValue(shortcutBindingsStore);
 	const [errors, setErrors] = useState<Errors>({});
 	const [recordingId, setRecordingId] = useState<CommandId | null>(null);
@@ -447,13 +454,18 @@ function useShortcutState(revealTarget?: SettingsTarget) {
 	const [revealId, setRevealId] = useState<CommandId | null>(null);
 
 	useEffect(() => {
-		if (!revealTarget?.shortcutId) return;
+		if (
+			!revealTarget?.shortcutId ||
+			handledRequestId.current === revealTarget.requestId
+		)
+			return;
 		setQuery("");
 		setRevealId(revealTarget.shortcutId);
-	}, [revealTarget]);
+	}, [revealTarget, handledRequestId]);
 
 	useEffect(() => {
 		if (!revealId) return;
+		let focusFrame = 0;
 		const frame = requestAnimationFrame(() => {
 			const row = document.getElementById(shortcutRowId(revealId));
 			if (!row) return;
@@ -463,12 +475,22 @@ function useShortcutState(revealTarget?: SettingsTarget) {
 					: "smooth",
 				block: "center",
 			});
-			row.focus({ preventScroll: true });
-			pulseShortcutRow(row);
-			setRevealId(null);
+			// The dialog may set its own focus after this frame.
+			focusFrame = requestAnimationFrame(() => {
+				if (!row.isConnected) return;
+				row.focus({ preventScroll: true });
+				pulseShortcutRow(row);
+				if (revealTarget?.shortcutId === revealId) {
+					handledRequestId.current = revealTarget.requestId;
+				}
+				setRevealId(null);
+			});
 		});
-		return () => cancelAnimationFrame(frame);
-	}, [revealId]);
+		return () => {
+			cancelAnimationFrame(frame);
+			cancelAnimationFrame(focusFrame);
+		};
+	}, [revealId, revealTarget, handledRequestId]);
 
 	useEffect(() => {
 		if (!recordingId) return;
