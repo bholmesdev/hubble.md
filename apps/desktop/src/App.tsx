@@ -515,6 +515,7 @@ function App() {
 					return;
 				}
 			}
+			// Editor commands can claim Cmd-P without appearing in the app handlers above.
 			if (
 				!event.repeat &&
 				keymatch(event, "CmdOrCtrl+P") &&
