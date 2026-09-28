@@ -17,6 +17,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Creating a new note now focuses the editor automatically. Thanks [@n00ki](https://github.com/n00ki)! [#278](https://github.com/bholmesdev/hubble.md/pull/278)
+
 ## [0.2.0] - 2026-09-14
 
 ### Added
