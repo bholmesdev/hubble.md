@@ -1,13 +1,17 @@
 import {
 	type AppCommandId,
+	commandRegistry,
 	getCommand,
 	getCommandBinding,
+	getCommandBindings,
+	resolveCommandBinding,
 	wikiDisplayNameForTarget,
 } from "@hubble.md/editor";
 import {
 	Button,
 	classifyHref,
 	EditorView,
+	formatShortcut,
 	GlobalSearchPalette,
 	getActiveEditor,
 	MarkdownSourceEditor,
@@ -19,7 +23,7 @@ import {
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import {
 	recentCommandIdsStore,
@@ -28,7 +32,7 @@ import {
 import { buildAppCommands } from "./commands/useAppCommands";
 import { FileInfoBar } from "./components/FileInfoBar";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
-import { Settings } from "./components/Settings";
+import { Settings, type SettingsTarget } from "./components/Settings";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
 import { TelemetryConsentCallout } from "./components/TelemetrySection";
 import { TerminalPanel } from "./components/TerminalPanel";
@@ -215,6 +219,12 @@ function App() {
 		useState<HTMLDivElement | null>(null);
 	useScrollMemory(state.currentPath, scrollContainerEl);
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [settingsTarget, setSettingsTarget] = useState<SettingsTarget>();
+	const settingsRequestId = useRef(0);
+	const changeSettingsOpen = (open: boolean) => {
+		setSettingsOpen(open);
+		if (!open) setSettingsTarget(undefined);
+	};
 	const [allTabsOpen, setAllTabsOpen] = useState(false);
 	const [copyAsMarkdownRequest, setCopyAsMarkdownRequest] = useState(0);
 	const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(
@@ -348,7 +358,7 @@ function App() {
 	}, [currentVersion, lastSeenVersion]);
 
 	const openWhatsNew = () => {
-		setSettingsOpen(false);
+		changeSettingsOpen(false);
 		void openChangelog();
 	};
 
@@ -506,6 +516,41 @@ function App() {
 					return;
 				}
 			}
+			// The palette's binding can claim Cmd-P even when unavailable here; editor commands can too.
+			if (
+				!event.repeat &&
+				keymatch(event, "CmdOrCtrl+P") &&
+				!Object.keys(commandRegistry).some((id) => {
+					const binding = resolveCommandBinding(
+						id as keyof typeof commandRegistry,
+						getCommandBindings(),
+					);
+					return binding && keymatch(event, binding);
+				})
+			) {
+				event.preventDefault();
+				const binding = getCommandBinding("app.go-to-file");
+				toast(
+					binding
+						? `Command palette can now be opened with ${formatShortcut(binding)}`
+						: "Command palette has no shortcut",
+					{
+						id: "command-p-shortcut-hint",
+						action: {
+							label: "Modify in settings",
+							onClick: () => {
+								settingsRequestId.current += 1;
+								setSettingsTarget({
+									page: "shortcuts",
+									shortcutId: "app.go-to-file",
+									requestId: settingsRequestId.current,
+								});
+								setSettingsOpen(true);
+							},
+						},
+					},
+				);
+			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
@@ -550,7 +595,7 @@ function App() {
 			desktopApi.onMenuOpenFolder(() => void openWorkspaceWithSidebar()),
 			desktopApi.onMenuOpenSettings(() => setSettingsOpen(true)),
 			desktopApi.onMenuOpenChangelog(() => {
-				setSettingsOpen(false);
+				changeSettingsOpen(false);
 				void openChangelog();
 			}),
 			desktopApi.onMenuCopyAsMarkdown(() =>
@@ -584,7 +629,7 @@ function App() {
 			for (const dispose of disposers) dispose();
 		};
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [openSearch, createNewFile, focusedCreationFolder]);
+	}, [openSearch, createNewFile, focusedCreationFolder, changeSettingsOpen]);
 
 	useEffect(() => {
 		// Window focus can fire in bursts when switching apps, so debounce the
@@ -832,7 +877,8 @@ function App() {
 			/>
 			<Settings
 				open={settingsOpen}
-				onOpenChange={setSettingsOpen}
+				target={settingsTarget}
+				onOpenChange={changeSettingsOpen}
 				updateState={updateState}
 				onUpdateAction={() => void triggerPrimaryUpdateAction()}
 				onViewChangelog={openWhatsNew}
