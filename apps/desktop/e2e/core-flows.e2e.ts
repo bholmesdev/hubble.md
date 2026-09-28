@@ -36,10 +36,13 @@ const test = base.extend<{ hubble: Hubble }>({
 			workspace,
 			// Relaunches share user data, so persisted session state carries over.
 			launch: async ({ openWorkspace = true } = {}) => {
+				await close();
+				// Drop any inherited workspace so relaunch tests prove session restore.
+				const { HUBBLE_DESKTOP_DEV_WORKSPACE: _, ...env } = process.env;
 				app = await electron.launch({
 					args: [appDir],
 					env: {
-						...process.env,
+						...env,
 						HUBBLE_DESKTOP_DEV_USER_DATA: path.join(root, "user-data"),
 						...(openWorkspace && { HUBBLE_DESKTOP_DEV_WORKSPACE: workspace }),
 					},
