@@ -17,7 +17,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
-- New notes are ready for typing right away, whether created with Cmd+N, the File menu, the command palette, or the toolbar. Naming a new note in the sidebar and pressing Enter also moves you into the note. Thanks [@n00ki](https://github.com/n00ki)! [#278](https://github.com/bholmesdev/hubble.md/pull/278)
+- Creating a new note now focuses the editor automatically. Thanks [@n00ki](https://github.com/n00ki)! [#278](https://github.com/bholmesdev/hubble.md/pull/278)
 
 ## [0.2.0] - 2026-09-14
 
