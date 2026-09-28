@@ -35,6 +35,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Comment thread author headings and actions stay visible while long discussions scroll. Thanks [@LarrySequino](https://github.com/LarrySequino) for the suggestion! [#286](https://github.com/bholmesdev/hubble.md/pull/286)
 - Typing and immediately opening another note no longer loses the last few characters. The open note is now saved before navigating rather than as the editor closes. [#282](https://github.com/bholmesdev/hubble.md/pull/282)
 - Opening a Markdown file from Finder now brings Hubble to the front, and opens a window when the app is running with none open. Thanks [@HDPark95](https://github.com/HDPark95)! [#289](https://github.com/bholmesdev/hubble.md/pull/289)
 
