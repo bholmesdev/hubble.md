@@ -24,11 +24,11 @@ Prioritize:
 1. Correctness, data loss, security, crashes, and broken user behavior.
 2. Lifecycle, concurrency, stale state, cleanup, and error-handling problems.
 3. Material performance regressions on demonstrated hot paths.
-4. Missing tests only when they cover a distinct behavior or edge case.
+4. Missing or weak tests, judged by `.agents/skills/writing-tests/SKILL.md`.
 
 Avoid speculative findings. Trace relevant callers, state transitions, cleanup paths, and existing tests before reporting an issue. Do not flag untouched code unless the change makes it unsafe.
 
-Treat robustness ideas as suggestions unless they present a concrete correctness, security, or data-loss risk. Do not request tests that merely vary constructor inputs or fields already covered by the same behavior.
+Treat robustness ideas as suggestions unless they present a concrete correctness, security, or data-loss risk.
 
 ## Finding rules
 
