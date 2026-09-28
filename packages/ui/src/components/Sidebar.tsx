@@ -85,7 +85,11 @@ export type SidebarFocusedItem =
 	| null;
 
 type RenameItem =
-	| { kind: "file"; path: string }
+	| {
+			kind: "file";
+			path: string;
+			origin?: "new-note" | "new-html";
+	  }
 	| {
 			kind: "folder";
 			path: string;
@@ -458,7 +462,14 @@ export function Sidebar({
 	onRevealFolder?: (folderId: string) => void;
 	onFocusedItemChange?: (item: SidebarFocusedItem) => void;
 	revealLabel?: string;
-	onRenameFile?: (path: string, nextName: string) => void;
+	onRenameFile?: (
+		path: string,
+		nextName: string,
+		options: {
+			origin: "new-note" | "new-html" | "rename";
+			commit: "enter" | "blur";
+		},
+	) => void;
 	onRenameFolder?: (
 		folderId: string,
 		nextName: string,
@@ -538,7 +549,7 @@ export function Sidebar({
 		const path = await onCreateFile(folderId);
 		if (!path) return;
 		beginRename(
-			{ kind: "file", path },
+			{ kind: "file", path, origin: "new-note" },
 			fileNameFromPath(getDisplayPath(path)),
 			{
 				deleteOnUnchangedCancel: true,
@@ -552,7 +563,7 @@ export function Sidebar({
 		const path = await onCreateHtmlFile(folderId);
 		if (!path) return;
 		beginRename(
-			{ kind: "file", path },
+			{ kind: "file", path, origin: "new-html" },
 			fileNameFromPath(getDisplayPath(path)),
 			{
 				deleteOnUnchangedCancel: true,
@@ -883,13 +894,14 @@ export function Sidebar({
 		return `A ${item.kind} ${targetName} already exists at this location.`;
 	};
 
-	const commitRename = (focusTree = false) => {
+	const commitRename = (commit: "enter" | "blur") => {
 		const item = renamingItem;
 		if (!item) return;
 		const nextName = renameDraft.trim();
 		if (!nextName) {
 			resetRename();
-			if (focusTree) requestAnimationFrame(() => navRef.current?.focus());
+			if (commit === "enter")
+				requestAnimationFrame(() => navRef.current?.focus());
 			return;
 		}
 		const error = getRenameError(item, nextName);
@@ -898,14 +910,20 @@ export function Sidebar({
 			requestAnimationFrame(() => renameInputRef.current?.focus());
 			return;
 		}
-		if (focusTree) {
+		const origin = item.kind === "file" ? (item.origin ?? "rename") : "rename";
+		const handsOffFocus = origin === "new-note" && commit === "enter";
+		if (commit === "enter" && !handsOffFocus) {
 			setPendingFocusDisplayPath(
 				renameTargetDisplayPath(item, nextName, getDisplayPath),
 			);
 			requestAnimationFrame(() => navRef.current?.focus());
 		}
 		resetRename();
-		if (item.kind === "file") onRenameFile?.(item.path, nextName);
+		if (item.kind === "file")
+			onRenameFile?.(item.path, nextName, {
+				origin,
+				commit,
+			});
 		else
 			onRenameFolder?.(
 				item.path,
@@ -2350,7 +2368,7 @@ function FileRenameInput({
 	error: string | null;
 	onChange: (value: string) => void;
 	onCancel: () => void;
-	onCommit: (focusTree?: boolean) => void;
+	onCommit: (commit: "enter" | "blur") => void;
 }) {
 	return (
 		<span className="relative flex min-w-0 flex-1 items-center">
@@ -2359,12 +2377,12 @@ function FileRenameInput({
 				aria-invalid={error ? true : undefined}
 				className="min-w-0 flex-1 rounded-none border-0 bg-muted/70 p-0 text-[13px] text-sidebar-foreground outline-none selection:bg-selected/70 selection:text-sidebar-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
 				value={value}
-				onBlur={() => onCommit()}
+				onBlur={() => onCommit("blur")}
 				onChange={(event) => onChange(event.target.value)}
 				onKeyDown={(event) => {
 					if (event.key === "Enter") {
 						event.preventDefault();
-						onCommit(true);
+						onCommit("enter");
 					} else if (event.key === "Escape") {
 						event.preventDefault();
 						onCancel();

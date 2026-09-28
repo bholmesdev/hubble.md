@@ -1,0 +1,133 @@
+// @vitest-environment happy-dom
+
+import { act, type ComponentProps, type ReactNode, useState } from "react";
+// @ts-expect-error This package does not ship @types/react-dom; the test only
+// needs createRoot's render/unmount surface.
+import { createRoot } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Sidebar, type SidebarFile } from "./Sidebar";
+
+type Root = {
+	render(children: ReactNode): void;
+	unmount(): void;
+};
+type RenameFile = NonNullable<ComponentProps<typeof Sidebar>["onRenameFile"]>;
+
+const roots: Root[] = [];
+
+(
+	globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
+afterEach(() => {
+	act(() => {
+		for (const root of roots) root.unmount();
+	});
+	roots.length = 0;
+	document.body.replaceChildren();
+	vi.restoreAllMocks();
+});
+
+describe("Sidebar", () => {
+	it("continues editing after a new note name is submitted", async () => {
+		const onRenameFile = vi.fn();
+		renderSidebar(onRenameFile);
+
+		await act(async () => newFileButton().click());
+		await act(async () => {
+			newNoteMenuItem().click();
+			await Promise.resolve();
+		});
+
+		const input = renameInput("new-file");
+		const focusTree = vi.spyOn(sidebarTree(), "focus");
+		const frames: FrameRequestCallback[] = [];
+		vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+			frames.push(callback);
+			return frames.length;
+		});
+		act(() => {
+			setInputValue(input, "daily-notes");
+			input.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
+		});
+		act(() => {
+			for (const frame of frames) frame(0);
+		});
+
+		expect(onRenameFile).toHaveBeenCalledWith(
+			"/workspace/new-file.md",
+			"daily-notes",
+			{ origin: "new-note", commit: "enter" },
+		);
+		expect(focusTree).not.toHaveBeenCalled();
+	});
+});
+
+function renderSidebar(onRenameFile: RenameFile) {
+	const container = document.createElement("div");
+	document.body.append(container);
+	const root = createRoot(container);
+	roots.push(root);
+	act(() => root.render(<SidebarHarness onRenameFile={onRenameFile} />));
+}
+
+function SidebarHarness({ onRenameFile }: { onRenameFile: RenameFile }) {
+	const [files, setFiles] = useState<SidebarFile[]>([]);
+	return (
+		<Sidebar
+			files={files}
+			currentPath={null}
+			sortMode="alpha"
+			getDisplayPath={(path) => path.replace("/workspace/", "")}
+			onSortModeChange={() => {}}
+			onSelectFile={() => {}}
+			onRenameFile={onRenameFile}
+			onCreateFile={async () => {
+				const path = "/workspace/new-file.md";
+				setFiles([{ path, modifiedAt: 1 }]);
+				return path;
+			}}
+		/>
+	);
+}
+
+function newFileButton() {
+	const button = document.querySelector<HTMLButtonElement>(
+		'button[aria-label="New file"]',
+	);
+	if (!button) throw new Error("Missing new file button");
+	return button;
+}
+
+function newNoteMenuItem() {
+	const item = Array.from(
+		document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+	).find((element) => element.textContent?.includes("New Note"));
+	if (!item) throw new Error("Missing New Note menu item");
+	return item;
+}
+
+function sidebarTree() {
+	const tree = document.querySelector<HTMLElement>('[role="tree"]');
+	if (!tree) throw new Error("Missing sidebar tree");
+	return tree;
+}
+
+function renameInput(value: string) {
+	const input = Array.from(
+		document.querySelectorAll<HTMLInputElement>("input"),
+	).find((element) => element.value === value);
+	if (!input) throw new Error("Missing rename input");
+	return input;
+}
+
+function setInputValue(input: HTMLInputElement, value: string) {
+	const setter = Object.getOwnPropertyDescriptor(
+		HTMLInputElement.prototype,
+		"value",
+	)?.set;
+	setter?.call(input, value);
+	input.dispatchEvent(new Event("input", { bubbles: true }));
+}

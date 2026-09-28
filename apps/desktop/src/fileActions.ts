@@ -1,8 +1,9 @@
+import { getActiveEditor } from "@hubble.md/ui";
 import {
 	createHtmlFileInFolder,
 	createMarkdownFileInFolder,
 } from "./store/actions";
-import { workspaceStore } from "./store/state";
+import { viewerStore, workspaceStore } from "./store/state";
 import type { TabTarget } from "./store/tabs";
 
 export async function createMarkdownFile(
@@ -11,7 +12,16 @@ export async function createMarkdownFile(
 ) {
 	const targetPath = parentPath ?? workspaceStore.get().workspacePath;
 	if (!targetPath) return;
-	await createMarkdownFileInFolder(targetPath, tab);
+	const path = await createMarkdownFileInFolder(targetPath, tab);
+	if (!path) return;
+	focusMarkdownEditorAfterRender(path);
+}
+
+export function focusMarkdownEditorAfterRender(path: string) {
+	requestAnimationFrame(() => {
+		if (viewerStore.get().currentPath !== path) return;
+		getActiveEditor()?.commands.focus("end");
+	});
 }
 
 export async function createHtmlFile(parentPath?: string | null) {
