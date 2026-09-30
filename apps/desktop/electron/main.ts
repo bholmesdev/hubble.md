@@ -122,7 +122,12 @@ function windowBackgroundColor() {
 }
 
 app.setName(appName);
-if (devAppName) {
+const devUserDataPath = isDev
+	? process.env.HUBBLE_DESKTOP_DEV_USER_DATA
+	: undefined;
+if (devUserDataPath) {
+	app.setPath("userData", resolvePath(devUserDataPath));
+} else if (devAppName) {
 	app.setPath("userData", path.join(app.getPath("appData"), devAppName));
 }
 
