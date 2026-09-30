@@ -32,7 +32,7 @@ happy-dom has no layout. Verify sticky, scroll, overflow, and positioning by han
 
 ## Mock at the seam
 
-Fake only what crosses a process or time boundary: `desktopApi`/IPC, the filesystem, the network, timers, `requestAnimationFrame`. Keep stores, components, and the editor real. `store/actions.test.ts` shows the pattern: a fake desktop API with the real store behind it.
+Fake only what crosses a process or time boundary: `desktopApi`/IPC, the filesystem, the network, timers, `requestAnimationFrame`. Keep stores, components, and the editor real. `apps/desktop/src/store/actions.test.ts` shows the pattern: a fake desktop API with the real store behind it.
 
 If a test needs to mock internal modules to reach the behavior, move it one layer up so those modules run for real.
 
