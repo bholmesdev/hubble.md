@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Copy a folder path from its sidebar menu. Thanks [@nisan1101](https://github.com/nisan1101) for the suggestion! [#304](https://github.com/bholmesdev/hubble.md/pull/304)
+
 ### Changed
 
 ### Fixed
