@@ -11,8 +11,7 @@ const maxZoomFactor = 3;
 // macOS 26 (Darwin 25) spaces the buttons wider and no longer needs the
 // optical nudge up to center on the toolbar icons.
 const isMacOS26OrLater =
-	process.platform === "darwin" &&
-	Number.parseInt(os.release(), 10) >= 25;
+	process.platform === "darwin" && Number.parseInt(os.release(), 10) >= 25;
 const trafficLightX = 12;
 const trafficLightWidth = isMacOS26OrLater ? 60 : 54;
 const trafficLightGap = 4;
