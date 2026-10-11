@@ -1,4 +1,5 @@
 import fsSync from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { app, type BrowserWindow } from "electron";
 import { z } from "zod/v4";
@@ -7,11 +8,16 @@ const defaultZoomFactor = 1;
 export const zoomStep = 0.1;
 const minZoomFactor = 0.5;
 const maxZoomFactor = 3;
+// macOS 26 (Darwin 25) spaces the buttons wider and no longer needs the
+// optical nudge up to center on the toolbar icons.
+const isMacOS26OrLater =
+	process.platform === "darwin" &&
+	Number.parseInt(os.release(), 10) >= 25;
 const trafficLightX = 12;
-const trafficLightWidth = 54;
+const trafficLightWidth = isMacOS26OrLater ? 60 : 54;
 const trafficLightGap = 4;
 const trafficLightHeight = 14;
-const trafficLightYOffset = -1;
+const trafficLightYOffset = isMacOS26OrLater ? 0 : -1;
 export const toolbarHeight = 36;
 
 const zoomStateSchema = z.object({
