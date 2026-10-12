@@ -1,3 +1,4 @@
+import { useCommandShortcutLabel } from "@hubble.md/ui";
 import { useEffect, useState } from "react";
 import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteFolderLine from "~icons/mingcute/folder-line";
@@ -44,11 +45,13 @@ export function SidebarViewToggle({
 		{
 			value: "folders",
 			label: "Folders",
+			title: useCommandShortcutLabel("Folders", "app.show-folders"),
 			Icon: MingcuteFoldersLine,
 		},
 		{
 			value: "inbox",
 			label: "Inbox",
+			title: useCommandShortcutLabel("Inbox", "app.show-inbox"),
 			Icon: MingcuteInboxLine,
 		},
 	] as const;
@@ -57,13 +60,13 @@ export function SidebarViewToggle({
 			aria-label="Sidebar view"
 			className="flex shrink-0 items-center rounded-md bg-muted p-0.5"
 		>
-			{options.map(({ value, label, Icon }) => (
+			{options.map(({ value, label, title, Icon }) => (
 				<button
 					key={value}
 					type="button"
 					aria-pressed={view === value}
 					aria-label={label}
-					title={label}
+					title={title}
 					onClick={() => onChange(value)}
 					className={cn(
 						"inline-flex h-5 w-7 cursor-pointer items-center justify-center rounded-[5px] text-muted-foreground transition-colors hover:text-foreground",

@@ -39,6 +39,7 @@ import {
 	setWorkspaceSwitcherOpen,
 	togglePinnedNote,
 	toggleSidebar,
+	toggleSidebarView,
 	toggleTerminal,
 } from "../store/actions";
 import { canGoBack, canGoForward } from "../store/history";
@@ -334,6 +335,18 @@ function defineCommands(
 			["files", "panel", "explorer"],
 			toggleSidebar,
 			{ label: context.sidebarOpen ? "Hide Sidebar" : "Show Sidebar" },
+		),
+		fromRegistry(
+			"app.show-folders",
+			"View",
+			["files", "tree", "explorer", "sidebar"],
+			() => void toggleSidebarView("folders"),
+		),
+		fromRegistry(
+			"app.show-inbox",
+			"View",
+			["recent", "notes", "sidebar"],
+			() => void toggleSidebarView("inbox"),
 		),
 		fromRegistry(
 			"app.toggle-terminal",

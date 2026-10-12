@@ -98,6 +98,7 @@ import {
 	setTelemetryConsent,
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
+	toggleSidebarView,
 	toggleTerminal,
 	undoDelete,
 	updateEditorContent,
@@ -503,6 +504,12 @@ function App() {
 					setSidebarOpen(opening);
 					if (opening) requestAnimationFrame(() => focusSidebarNav());
 				},
+				"app.show-folders": () => {
+					if (toggleSidebarView("folders")) {
+						requestAnimationFrame(() => focusSidebarNav());
+					}
+				},
+				"app.show-inbox": () => void toggleSidebarView("inbox"),
 			};
 			for (const [id, handler] of Object.entries(handlers) as [
 				AppCommandId,

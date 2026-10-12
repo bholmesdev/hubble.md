@@ -136,9 +136,19 @@ export const commandRegistry = {
 			context.hasEditableFile === true && context.hasWorkspace === true,
 	},
 	"app.toggle-sidebar": {
-		defaultBinding: "CmdOrCtrl+Shift+E",
+		defaultBinding: "CmdOrCtrl+\\",
 		label: "Toggle Sidebar",
 		isEnabled: always,
+	},
+	"app.show-folders": {
+		defaultBinding: "CmdOrCtrl+Shift+E",
+		label: "Show Folders",
+		isEnabled: hasWorkspace,
+	},
+	"app.show-inbox": {
+		defaultBinding: "CmdOrCtrl+Shift+I",
+		label: "Show Inbox",
+		isEnabled: hasWorkspace,
 	},
 	"app.delete": {
 		defaultBinding: "CmdOrCtrl+Backspace",
