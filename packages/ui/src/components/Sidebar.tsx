@@ -496,6 +496,10 @@ export function Sidebar({
 	const [renamingItem, setRenamingItem] = useState<RenameItem | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 	const [showFooterBorder, setShowFooterBorder] = useState(false);
+	// Which list (the tree or a replacement view) has scrolled away from its top.
+	const [scrolledList, setScrolledList] = useState<"tree" | "children" | null>(
+		null,
+	);
 	const [deleteOnCancel, setDeleteOnCancel] = useState<{
 		kind: RenameItem["kind"];
 		path: string;
@@ -1321,9 +1325,19 @@ export function Sidebar({
 	);
 	const sortLabel = sortMode === "recent" ? "Recent" : "Name";
 
+	const list = children ? "children" : "tree";
+
 	return (
 		<SidebarFrame onCollapse={onCollapse} storageScope={storageScope}>
-			<div className="flex items-center justify-between border-b border-sidebar-border px-2.5 py-1.5">
+			<div
+				className={cn(
+					// Dashed divider only once the list scrolls beneath the header.
+					"relative flex items-center justify-between px-2.5 py-1.5 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed",
+					scrolledList === list
+						? "after:border-sidebar-border"
+						: "after:border-transparent",
+				)}
+			>
 				{header ?? (
 					<span className="text-[11px] font-medium uppercase text-muted-foreground">
 						Files
@@ -1394,7 +1408,15 @@ export function Sidebar({
 					)}
 				</div>
 			</div>
-			{children ?? tree}
+			<div
+				className="contents"
+				onScrollCapture={(event) => {
+					const scrolled = (event.target as HTMLElement).scrollTop > 0;
+					setScrolledList(scrolled ? list : null);
+				}}
+			>
+				{children ?? tree}
+			</div>
 			{footer ? (
 				<div
 					className={cn(
