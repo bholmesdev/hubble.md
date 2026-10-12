@@ -1,5 +1,10 @@
 import { useCommandShortcutLabel } from "@hubble.md/ui";
-import { useEffect, useState } from "react";
+import {
+	type FocusEvent,
+	type KeyboardEvent as ReactKeyboardEvent,
+	useEffect,
+	useState,
+} from "react";
 import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteFolderLine from "~icons/mingcute/folder-line";
 import MingcuteFoldersLine from "~icons/mingcute/folders-line";
@@ -126,6 +131,30 @@ export function InboxView({
 		...groupInboxItems(recent, (note) => note.modifiedAt),
 	];
 	const previews = useNotePreviews([...pinned, ...recent]);
+	const order = groups.flatMap((group) => group.items.map((note) => note.path));
+
+	// Arrow keys move through notes in list order and open each one.
+	function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+		const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+		if (!step || event.metaKey || event.ctrlKey || event.altKey) return;
+		event.preventDefault();
+		const focused =
+			(document.activeElement as HTMLElement | null)?.dataset.inboxPath ??
+			currentPath;
+		const index = focused ? order.indexOf(focused) : -1;
+		const next = index === -1 ? order[0] : order[index + step];
+		if (!next || next === focused) return;
+		onOpen(next);
+		focusRow(event.currentTarget, next);
+	}
+
+	// The sidebar focuses this nav (e.g. Cmd+Shift+I); hand focus to the open note.
+	function handleFocus(event: FocusEvent<HTMLElement>) {
+		if (event.target !== event.currentTarget) return;
+		const target =
+			currentPath && order.includes(currentPath) ? currentPath : order[0];
+		if (target) focusRow(event.currentTarget, target);
+	}
 
 	if (groups.length === 0) {
 		return (
@@ -139,6 +168,10 @@ export function InboxView({
 	return (
 		<nav
 			aria-label="Recent files"
+			data-sidebar-nav
+			tabIndex={-1}
+			onKeyDown={handleKeyDown}
+			onFocus={handleFocus}
 			className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 [--muted-warm:oklch(from_var(--muted-foreground)_l_calc(c+0.02)_75)]"
 		>
 			{groups.map((group) => (
@@ -165,6 +198,7 @@ export function InboxView({
 								>
 									<button
 										type="button"
+										data-inbox-path={note.path}
 										aria-current={isCurrent ? "page" : undefined}
 										onClick={(event) =>
 											event.metaKey || event.ctrlKey
@@ -271,6 +305,14 @@ async function readPreview(key: string) {
 		}
 	}
 	previewCache.set(key, preview);
+}
+
+function focusRow(nav: HTMLElement, path: string) {
+	const row = [...nav.querySelectorAll<HTMLElement>("[data-inbox-path]")].find(
+		(element) => element.dataset.inboxPath === path,
+	);
+	row?.focus({ preventScroll: true });
+	row?.scrollIntoView({ block: "nearest" });
 }
 
 /** Tracks whether Option (Alt) is held, resetting when the window loses focus. */
