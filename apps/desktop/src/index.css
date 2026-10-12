@@ -125,7 +125,9 @@
 	}
 }
 
-/* Paint over the title-bar divider on the same pixel, including beneath tabs. */
+/* Paint over the title-bar divider on the same pixel, including beneath tabs.
+ * A docked sidebar flows into the title bar with no divider; the compact
+ * overlay keeps one so it reads as sitting on top of the editor. */
 [data-sidebar-overlay] [data-sidebar-root]::before {
 	content: "";
 	position: absolute;
@@ -135,5 +137,9 @@
 	z-index: 40;
 	pointer-events: none;
 	background: var(--sidebar);
-	border-top: 1px solid var(--border);
+}
+@media (width < 40rem) {
+	[data-sidebar-overlay] [data-sidebar-root]::before {
+		border-top: 1px solid var(--border);
+	}
 }
