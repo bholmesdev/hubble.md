@@ -25,6 +25,20 @@ export function generatedTitleStem(markdown: string): string | null {
 	return null;
 }
 
+export type NotePreview = {
+	title: string | null;
+	description: string | null;
+};
+
+/** Reads the first two lines with visible text as a note's title and preview. */
+export function notePreview(markdown: string): NotePreview {
+	const [title = null, description = null] = parseMarkdownFrontMatter(markdown)
+		.body.split("\n")
+		.map(meaningfulText)
+		.filter(Boolean);
+	return { title, description };
+}
+
 /** Strips Markdown syntax that does not read as title text. */
 function meaningfulText(line: string): string {
 	const trimmed = line.trim();
