@@ -139,7 +139,7 @@ export function InboxView({
 	return (
 		<nav
 			aria-label="Recent files"
-			className="min-h-0 flex-1 overflow-y-auto px-2 pb-3"
+			className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 [--muted-warm:oklch(from_var(--muted-foreground)_l_calc(c+0.02)_75)]"
 		>
 			{groups.map((group) => (
 				<section key={group.label} aria-label={group.label}>
@@ -160,7 +160,8 @@ export function InboxView({
 							return (
 								<li
 									key={note.path}
-									className="not-first:border-t border-sidebar-border"
+									// Separators inset to the text, hidden beside a highlighted row.
+									className="relative not-first:before:absolute not-first:before:inset-x-2 not-first:before:top-0 not-first:before:h-px not-first:before:bg-sidebar-border has-[>button:hover]:before:hidden has-[>button[aria-current]]:before:hidden [li:has(>button:hover)+&]:before:hidden [li:has(>button[aria-current])+&]:before:hidden"
 								>
 									<button
 										type="button"
@@ -171,9 +172,10 @@ export function InboxView({
 												: onOpen(note.path)
 										}
 										className={cn(
-											"my-0.5 flex w-full cursor-pointer flex-col gap-0.5 rounded-md px-2 py-2 text-start",
+											// Warm the muted text on yellow so it doesn't read muddy.
+											"my-0.5 flex w-full cursor-pointer flex-col gap-0.5 rounded-md px-2 py-2 text-start [--row-muted:var(--muted-foreground)] hover:[--row-muted:var(--muted-warm)]",
 											isCurrent
-												? "bg-sidebar-accent text-sidebar-accent-foreground"
+												? "bg-sidebar-accent text-sidebar-accent-foreground [--row-muted:var(--muted-warm)]"
 												: "hover:bg-accent",
 										)}
 									>
@@ -184,14 +186,14 @@ export function InboxView({
 											<span className="shrink-0 tabular-nums text-sidebar-foreground">
 												{inboxDateLabel(note.modifiedAt)}
 											</span>
-											<span className="truncate text-muted-foreground">
+											<span className="truncate text-(--row-muted)">
 												{preview
 													? (preview.description ?? "No additional text")
 													: ""}
 											</span>
 										</span>
 										<span
-											className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
+											className="flex min-w-0 items-center gap-1 text-xs text-(--row-muted)"
 											title={fullPath}
 										>
 											{showFullPath ? (
