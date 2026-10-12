@@ -28,9 +28,11 @@ type WorkspaceState = {
 type DocumentState = ReturnType<typeof emptyDoc>;
 
 export type TerminalPosition = "bottom" | "right";
+export type SidebarView = "folders" | "inbox";
 
 type UiState = {
 	sidebarOpen: boolean;
+	sidebarView: SidebarView;
 	isSwitcherOpen: boolean;
 	isTerminalOpen: boolean;
 	terminalPosition: TerminalPosition;
@@ -65,6 +67,7 @@ type Persisted = {
 	};
 	ui?: {
 		sidebarOpen?: boolean;
+		sidebarView?: SidebarView;
 		isTerminalOpen?: boolean;
 		terminalPosition?: TerminalPosition;
 	};
@@ -115,6 +118,7 @@ export function getInitialState(): DesktopState {
 		tabs: tabsFromSession(tabSessions[workspace.workspacePath ?? ""]),
 		ui: {
 			sidebarOpen: p?.ui?.sidebarOpen ?? false,
+			sidebarView: p?.ui?.sidebarView === "inbox" ? "inbox" : "folders",
 			isSwitcherOpen: false,
 			isTerminalOpen: p?.ui?.isTerminalOpen ?? false,
 			terminalPosition:
@@ -161,6 +165,7 @@ export function serialize(state: DesktopState): Persisted {
 		},
 		ui: {
 			sidebarOpen: state.ui.sidebarOpen,
+			sidebarView: state.ui.sidebarView,
 			isTerminalOpen: state.ui.isTerminalOpen,
 			terminalPosition: state.ui.terminalPosition,
 		},

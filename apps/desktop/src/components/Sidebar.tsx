@@ -27,14 +27,17 @@ import {
 	renameFolder,
 	renameMarkdownFile,
 	setSidebarOpen,
+	setSidebarView,
 	setSortMode,
 	togglePinnedNote,
 } from "../store/actions";
 import {
 	currentPathStore,
 	sidebarOpenStore,
+	sidebarViewStore,
 	workspaceStore,
 } from "../store/state";
+import { InboxView, SidebarViewToggle } from "./InboxView";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export type DesktopSidebarFocus = {
@@ -52,6 +55,7 @@ export function Sidebar({
 	const workspace = useStoreValue(workspaceStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
+	const sidebarView = useStoreValue(sidebarViewStore);
 	const compact = useCompactWindow();
 	const { workspacePath, files, folders, pinnedNotes, sortMode } = workspace;
 	const pinnedSet = new Set(pinnedNotes);
@@ -95,6 +99,14 @@ export function Sidebar({
 			: `${workspacePath}/${normalized}`;
 	};
 	const copyFilePath = (path: string) => copyText(path, "File path");
+	const selectFile = (path: string) => {
+		void loadPath(path);
+		if (compact) collapseSidebar();
+	};
+	const openFileInNewTab = (path: string) => {
+		void openTabForPath(path);
+		if (compact) collapseSidebar();
+	};
 
 	return (
 		<SharedSidebar
@@ -110,20 +122,22 @@ export function Sidebar({
 			sortMode={sortMode}
 			storageScope={workspacePath}
 			header={<WorkspaceSwitcher />}
+			// Wide windows show the view toggle in the title bar above the sidebar.
+			viewToggle={
+				compact ? (
+					<SidebarViewToggle view={sidebarView} onChange={setSidebarView} />
+				) : undefined
+			}
 			footer={footer}
 			getDisplayPath={relativePath}
 			onCollapse={collapseSidebar}
 			onSortModeChange={setSortMode}
-			onSelectFile={(path) => {
-				void loadPath(path);
-				if (compact) collapseSidebar();
-			}}
+			onSelectFile={selectFile}
 			onOpenFileInNewTab={(path, options) => {
 				if (options?.background) {
 					void openBackgroundTab(path);
 				} else {
-					void openTabForPath(path);
-					if (compact) collapseSidebar();
+					openFileInNewTab(path);
 				}
 			}}
 			onOpenFileInDefaultApp={(path) => void openPathInDefaultApp(path)}
@@ -181,6 +195,17 @@ export function Sidebar({
 			onMoveItem={({ items, targetFolderId }) =>
 				void moveSidebarItems(items, absolutePath(targetFolderId))
 			}
-		/>
+		>
+			{sidebarView === "inbox" ? (
+				<InboxView
+					workspacePath={workspacePath}
+					files={files}
+					pinnedNotes={pinnedNotes}
+					currentPath={currentPath ?? null}
+					onOpen={selectFile}
+					onOpenInNewTab={openFileInNewTab}
+				/>
+			) : null}
+		</SharedSidebar>
 	);
 }
