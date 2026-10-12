@@ -414,6 +414,8 @@ export function Sidebar({
 	sortMode,
 	storageScope,
 	header,
+	viewToggle,
+	children,
 	footer,
 	emptyState,
 	getDisplayPath = defaultGetDisplayPath,
@@ -446,6 +448,10 @@ export function Sidebar({
 	/** Stable key used to persist folder expansion for one workspace/open folder. */
 	storageScope?: string | null;
 	header?: ReactNode;
+	/** Switches between views of the files, shown before the file actions. */
+	viewToggle?: ReactNode;
+	/** Replaces the file tree, e.g. with another view over the same files. */
+	children?: ReactNode;
 	footer?: ReactNode;
 	emptyState?: ReactNode;
 	getDisplayPath?: (path: string) => string;
@@ -1324,6 +1330,7 @@ export function Sidebar({
 					</span>
 				)}
 				<div className="flex items-center gap-1">
+					{viewToggle}
 					{onCreateFile && (
 						<NewFileMenu
 							onCreateFile={() => void createFile(creationFolderId)}
@@ -1334,56 +1341,60 @@ export function Sidebar({
 							}
 						/>
 					)}
-					{onCreateFolder && (
-						<Button
-							variant="ghost"
-							size="icon-xs"
-							aria-label="New folder"
-							title="New folder"
-							onClick={() => void createFolder(null)}
-						>
-							<MingcuteNewFolderLine className="size-3.5" />
-						</Button>
-					)}
-					<Select.Root
-						value={sortMode}
-						onValueChange={(mode) => {
-							if (mode) onSortModeChange(mode);
-						}}
-					>
-						<Select.Trigger
-							render={
+					{children ? null : (
+						<>
+							{onCreateFolder && (
 								<Button
 									variant="ghost"
 									size="icon-xs"
-									aria-label={`Sort files: ${sortLabel}`}
-									title={`Sort files: ${sortLabel}`}
-								/>
-							}
-						>
-							{sortMode === "alpha" ? (
-								<MingcuteAzSortAscendingLettersLine className="size-3.5" />
-							) : (
-								<MingcuteSortDescendingLine className="size-3.5" />
+									aria-label="New folder"
+									title="New folder"
+									onClick={() => void createFolder(null)}
+								>
+									<MingcuteNewFolderLine className="size-3.5" />
+								</Button>
 							)}
-						</Select.Trigger>
-						<Select.Portal>
-							<Select.Positioner
-								align="end"
-								side="bottom"
-								sideOffset={4}
-								className="isolate z-50"
+							<Select.Root
+								value={sortMode}
+								onValueChange={(mode) => {
+									if (mode) onSortModeChange(mode);
+								}}
 							>
-								<Select.Popup className="z-50 w-36 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-									<SortOption value="recent" label="Recent" />
-									<SortOption value="alpha" label="Name" />
-								</Select.Popup>
-							</Select.Positioner>
-						</Select.Portal>
-					</Select.Root>
+								<Select.Trigger
+									render={
+										<Button
+											variant="ghost"
+											size="icon-xs"
+											aria-label={`Sort files: ${sortLabel}`}
+											title={`Sort files: ${sortLabel}`}
+										/>
+									}
+								>
+									{sortMode === "alpha" ? (
+										<MingcuteAzSortAscendingLettersLine className="size-3.5" />
+									) : (
+										<MingcuteSortDescendingLine className="size-3.5" />
+									)}
+								</Select.Trigger>
+								<Select.Portal>
+									<Select.Positioner
+										align="end"
+										side="bottom"
+										sideOffset={4}
+										className="isolate z-50"
+									>
+										<Select.Popup className="z-50 w-36 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+											<SortOption value="recent" label="Recent" />
+											<SortOption value="alpha" label="Name" />
+										</Select.Popup>
+									</Select.Positioner>
+								</Select.Portal>
+							</Select.Root>
+						</>
+					)}
 				</div>
 			</div>
-			{tree}
+			{children ?? tree}
 			{footer ? (
 				<div
 					className={cn(
