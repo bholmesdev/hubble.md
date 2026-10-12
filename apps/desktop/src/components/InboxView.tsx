@@ -58,7 +58,7 @@ export function SidebarViewToggle({
 	return (
 		<fieldset
 			aria-label="Sidebar view"
-			className="flex shrink-0 items-center rounded-md bg-muted p-0.5"
+			className="flex shrink-0 items-center rounded-sm bg-muted"
 		>
 			{options.map(({ value, label, title, Icon }) => (
 				<button
@@ -69,8 +69,11 @@ export function SidebarViewToggle({
 					title={title}
 					onClick={() => onChange(value)}
 					className={cn(
-						"inline-flex h-5 w-7 cursor-pointer items-center justify-center rounded-[5px] text-muted-foreground transition-colors hover:text-foreground",
-						view === value && "bg-background text-foreground shadow-xs",
+						// Full-height and flush, so the selected button is the container's edge.
+						"inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-sm border transition-colors",
+						view === value
+							? "border-border bg-background text-foreground"
+							: "border-transparent text-muted-foreground hover:text-foreground",
 					)}
 				>
 					{/* Hovering the SVG would otherwise hide the button's native title tooltip. */}
