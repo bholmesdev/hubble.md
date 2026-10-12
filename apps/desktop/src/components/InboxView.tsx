@@ -3,6 +3,7 @@ import {
 	type FocusEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
 	useEffect,
+	useRef,
 	useState,
 } from "react";
 import MingcuteFileLine from "~icons/mingcute/file-line";
@@ -105,6 +106,16 @@ export function InboxView({
 	onOpenInNewTab: (path: string) => void;
 }) {
 	const showFullPath = useOptionKeyHeld();
+	const navRef = useRef<HTMLElement>(null);
+
+	// Reveal the open note when the inbox appears or another note opens,
+	// without taking focus.
+	useEffect(() => {
+		if (!currentPath) return;
+		navRef.current
+			?.querySelector('[aria-current="page"]')
+			?.scrollIntoView({ block: "nearest" });
+	}, [currentPath]);
 	// Only list files Hubble can create as notes. Mtimes are stored in seconds.
 	const notes = new Map(
 		files
@@ -167,6 +178,7 @@ export function InboxView({
 
 	return (
 		<nav
+			ref={navRef}
 			aria-label="Recent files"
 			data-sidebar-nav
 			tabIndex={-1}
