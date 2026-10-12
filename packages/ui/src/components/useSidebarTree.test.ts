@@ -249,6 +249,48 @@ describe("useSidebarTree", () => {
 		);
 		expect(folderRow(harness.current.rows, "gamma/delta/").expanded).toBe(true);
 	});
+
+	it("expands and collapses every folder", () => {
+		const harness = renderTree({
+			files: nestedFiles,
+			highlightPath: null,
+			storageScope: "workspace",
+		});
+
+		expect(harness.current.hasFolders).toBe(true);
+		expect(harness.current.hasExpandedFolders).toBe(false);
+
+		act(() => harness.current.expandAllFolders());
+
+		expect(harness.current.hasExpandedFolders).toBe(true);
+		expect(filePaths(harness.current.rows)).toEqual([
+			"/workspace/alpha/beta/one.md",
+			"/workspace/gamma/delta/two.md",
+		]);
+		expect(
+			JSON.parse(
+				localStorage.getItem("hubble-sidebar-expanded-folders:workspace") ??
+					"[]",
+			),
+		).toEqual(["alpha/", "alpha/beta/", "gamma/", "gamma/delta/"]);
+
+		act(() => harness.current.collapseAllFolders());
+
+		expect(harness.current.hasExpandedFolders).toBe(false);
+		expect(filePaths(harness.current.rows)).toEqual([]);
+		expect(
+			localStorage.getItem("hubble-sidebar-expanded-folders:workspace"),
+		).toBe("[]");
+	});
+
+	it("reports when the tree has no folders", () => {
+		const harness = renderTree({
+			files: [{ path: "/workspace/note.md" }],
+		});
+
+		expect(harness.current.hasFolders).toBe(false);
+		expect(harness.current.hasExpandedFolders).toBe(false);
+	});
 });
 
 const nestedFiles: SidebarFile[] = [
