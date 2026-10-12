@@ -513,6 +513,8 @@ export function Sidebar({
 	const [activeDragKeys, setActiveDragKeys] = useState<Set<string>>(new Set());
 	const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
 	const highlightPath = pendingPath ?? currentPath;
+	// Whether the file tree or a replacement view (`children`) is showing.
+	const list = children ? "children" : "tree";
 	const uncompactFolderId =
 		deleteOnCancel?.kind === "folder" ? deleteOnCancel.path : null;
 	const { collapseFolder, expandFolder, rows, toggleFolder } = useSidebarTree({
@@ -767,6 +769,9 @@ export function Sidebar({
 		setSelection((current) => pruneSidebarSelection(current, rows));
 	}, [rows]);
 
+	// The selection follows the open file, so a bold row is always highlighted
+	// too, however the file was opened. Returning to the editor also snaps a
+	// selection that keyboard navigation moved back to the open file.
 	useEffect(() => {
 		const selectOpenFile = () => {
 			focusItem(selectionCountRef.current > 1 ? null : activeItemRef.current);
@@ -777,10 +782,22 @@ export function Sidebar({
 		const onFocusIn = (event: FocusEvent) => {
 			if (isEditorTarget(event.target)) selectOpenFile();
 		};
-		if (isEditorTarget(document.activeElement)) selectOpenFile();
+		selectOpenFile();
 		document.addEventListener("focusin", onFocusIn);
 		return () => document.removeEventListener("focusin", onFocusIn);
 	}, [focusItem, highlightPath]);
+
+	// Each list remounts at its top when shown. Reveal the open file when the
+	// tree comes back, since it may have changed while another view showed.
+	useEffect(() => {
+		setScrolledList(null);
+		if (list !== "tree") return;
+		const nav = navRef.current;
+		nav
+			?.querySelector('[aria-current="page"]')
+			?.scrollIntoView({ block: "nearest" });
+		if (nav && nav.scrollTop > 0) setScrolledList("tree");
+	}, [list]);
 
 	const handleDragStart = (event: DragStartEvent) => {
 		const data = event.active.data.current as DragItemData | undefined;
@@ -1324,8 +1341,6 @@ export function Sidebar({
 		</DndContext>
 	);
 	const sortLabel = sortMode === "recent" ? "Recent" : "Name";
-
-	const list = children ? "children" : "tree";
 
 	return (
 		<SidebarFrame onCollapse={onCollapse} storageScope={storageScope}>
