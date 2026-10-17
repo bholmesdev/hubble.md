@@ -1,5 +1,6 @@
-import { useCommandShortcutLabel } from "@hubble.md/ui";
+import { SidebarFileActionsMenu, useCommandShortcutLabel } from "@hubble.md/ui";
 import {
+	type ComponentProps,
 	type FocusEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
 	useEffect,
@@ -29,6 +30,15 @@ import type { SidebarView } from "../store/persistence";
 import type { FileEntry } from "../store/state";
 
 type InboxNote = { path: string; modifiedAt: number };
+type InboxActions = Omit<
+	ComponentProps<typeof SidebarFileActionsMenu>,
+	| "file"
+	| "label"
+	| "open"
+	| "onOpenChange"
+	| "onRenameFile"
+	| "onDeleteSelection"
+>;
 
 const nameCollator = new Intl.Collator(undefined, {
 	numeric: true,
@@ -96,16 +106,18 @@ export function InboxView({
 	pinnedNotes,
 	currentPath,
 	onOpen,
-	onOpenInNewTab,
+	actions,
 }: {
 	workspacePath: string;
 	files: FileEntry[];
 	pinnedNotes: string[];
 	currentPath: string | null;
 	onOpen: (path: string) => void;
-	onOpenInNewTab: (path: string) => void;
+	/** The tree's file actions, minus the tree-only ones (rename, bulk). */
+	actions: InboxActions;
 }) {
 	const showFullPath = useOptionKeyHeld();
+	const [menuPath, setMenuPath] = useState<string | null>(null);
 	const navRef = useRef<HTMLElement>(null);
 
 	// Reveal the open note when the inbox appears or another note opens,
@@ -202,11 +214,13 @@ export function InboxView({
 							// Lead with the workspace folder so top-level notes still show a dir.
 							const fullPath = `${basename(workspacePath)}/${relativePath}`;
 							const isCurrent = note.path === currentPath;
+							const title = preview?.title ?? basename(note.path);
+							const isPinned = pinnedSet.has(note.path);
 							return (
 								<li
 									key={note.path}
 									// Separators inset to the text, hidden beside a highlighted row.
-									className="relative not-first:before:absolute not-first:before:inset-x-2 not-first:before:top-0 not-first:before:h-px not-first:before:bg-sidebar-border has-[>button:hover]:before:hidden has-[>button[aria-current]]:before:hidden [li:has(>button:hover)+&]:before:hidden [li:has(>button[aria-current])+&]:before:hidden"
+									className="group/sidebar-row relative not-first:before:absolute not-first:before:inset-x-2 not-first:before:top-0 not-first:before:h-px not-first:before:bg-sidebar-border has-[>button:hover]:before:hidden has-[>button[aria-current]]:before:hidden [li:has(>button:hover)+&]:before:hidden [li:has(>button[aria-current])+&]:before:hidden"
 								>
 									<button
 										type="button"
@@ -214,9 +228,13 @@ export function InboxView({
 										aria-current={isCurrent ? "page" : undefined}
 										onClick={(event) =>
 											event.metaKey || event.ctrlKey
-												? onOpenInNewTab(note.path)
+												? actions.onOpenFileInNewTab?.(note.path)
 												: onOpen(note.path)
 										}
+										onContextMenu={(event) => {
+											event.preventDefault();
+											setMenuPath(note.path);
+										}}
 										className={cn(
 											// Warm the muted text on yellow so it doesn't read muddy.
 											"my-0.5 flex w-full cursor-pointer flex-col gap-0.5 rounded-md px-2 py-2 text-start [--row-muted:var(--muted-foreground)] hover:[--row-muted:var(--muted-warm)]",
@@ -225,8 +243,14 @@ export function InboxView({
 												: "hover:bg-accent",
 										)}
 									>
-										<span className="truncate text-[13px] font-semibold text-sidebar-foreground">
-											{preview?.title ?? basename(note.path)}
+										{/* Leaves room for the actions buttons over this line. */}
+										<span
+											className={cn(
+												"truncate text-[13px] font-semibold text-sidebar-foreground",
+												isPinned ? "pe-11" : "pe-6",
+											)}
+										>
+											{title}
 										</span>
 										<span className="flex min-w-0 gap-1.5 text-xs">
 											<span className="shrink-0 tabular-nums text-sidebar-foreground">
@@ -259,6 +283,17 @@ export function InboxView({
 											)}
 										</span>
 									</button>
+									<div className="absolute end-1.5 top-[7px] flex">
+										<SidebarFileActionsMenu
+											{...actions}
+											file={{ path: note.path, pinned: isPinned }}
+											label={title}
+											open={menuPath === note.path}
+											onOpenChange={(open) =>
+												setMenuPath(open ? note.path : null)
+											}
+										/>
+									</div>
 								</li>
 							);
 						})}

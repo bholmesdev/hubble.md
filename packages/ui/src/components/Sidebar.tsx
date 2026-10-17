@@ -2156,9 +2156,6 @@ function FileActionsMenu({
 	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	getDisplayPath: (path: string) => string;
 }) {
-	const revealShortcut = useCommandShortcut("app.reveal");
-	const copyPathShortcut = useCommandShortcut("app.copy-path");
-	const deleteShortcut = useCommandShortcut("app.delete");
 	if (selection.count > 1) {
 		return (
 			<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
@@ -2178,6 +2175,57 @@ function FileActionsMenu({
 	}
 	return (
 		<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
+			<FileActionItems
+				file={file}
+				label={label}
+				onRevealFile={onRevealFile}
+				onOpenFileInNewTab={onOpenFileInNewTab}
+				onOpenFileInDefaultApp={onOpenFileInDefaultApp}
+				onCopyFilePath={onCopyFilePath}
+				revealLabel={revealLabel}
+				onRenameFile={onRenameFile}
+				onTogglePinnedFile={onTogglePinnedFile}
+				onDeleteFile={onDeleteFile}
+				onDeleteSelection={onDeleteSelection}
+			/>
+		</ActionsMenu>
+	);
+}
+
+type FileActionHandlers = {
+	onRevealFile?: (path: string) => void;
+	onOpenFileInNewTab?: (
+		path: string,
+		options?: { background: boolean },
+	) => void;
+	onOpenFileInDefaultApp?: (path: string) => void;
+	onCopyFilePath?: (path: string) => void;
+	revealLabel?: string;
+	onRenameFile?: (file: SidebarFile, label: string) => void;
+	onTogglePinnedFile?: (path: string) => void;
+	onDeleteFile?: (path: string) => void;
+	onDeleteSelection?: (selection: SidebarActionSelection) => void;
+};
+
+/** One file's actions; each appears only when its handler is given. */
+function FileActionItems({
+	file,
+	label,
+	onRevealFile,
+	onOpenFileInNewTab,
+	onOpenFileInDefaultApp,
+	onCopyFilePath,
+	revealLabel,
+	onRenameFile,
+	onTogglePinnedFile,
+	onDeleteFile,
+	onDeleteSelection,
+}: FileActionHandlers & { file: SidebarFile; label: string }) {
+	const revealShortcut = useCommandShortcut("app.reveal");
+	const copyPathShortcut = useCommandShortcut("app.copy-path");
+	const deleteShortcut = useCommandShortcut("app.delete");
+	return (
+		<>
 			{onOpenFileInNewTab && (
 				<ActionItem
 					icon={<MingcuteAddLine />}
@@ -2242,7 +2290,43 @@ function FileActionsMenu({
 					Delete
 				</ActionItem>
 			)}
-		</ActionsMenu>
+		</>
+	);
+}
+
+/**
+ * The tree's row actions for a file shown outside the tree (e.g. an inbox
+ * row): an unpin button for pinned files and the "more" menu. Both appear
+ * while a `group/sidebar-row` ancestor is hovered.
+ */
+export function SidebarFileActionsMenu({
+	open,
+	onOpenChange,
+	...items
+}: FileActionHandlers & {
+	file: SidebarFile;
+	label: string;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
+	const { file, onTogglePinnedFile } = items;
+	return (
+		<>
+			{file.pinned && onTogglePinnedFile && (
+				<button
+					type="button"
+					className={sidebarRowActionButtonClass}
+					aria-label="Unpin"
+					title="Unpin"
+					onClick={() => onTogglePinnedFile(file.path)}
+				>
+					<MingcutePinFill className="size-3.5" />
+				</button>
+			)}
+			<ActionsMenu label={items.label} open={open} onOpenChange={onOpenChange}>
+				<FileActionItems {...items} />
+			</ActionsMenu>
+		</>
 	);
 }
 

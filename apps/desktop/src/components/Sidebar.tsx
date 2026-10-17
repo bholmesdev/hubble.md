@@ -107,6 +107,11 @@ export function Sidebar({
 		void openTabForPath(path);
 		if (compact) collapseSidebar();
 	};
+	const openFileInDefaultApp = (path: string) =>
+		void openPathInDefaultApp(path);
+	const revealFile = (path: string) => void desktopApi.revealFile(path);
+	const togglePinned = (path: string) => void togglePinnedNote(path);
+	const revealLabel = revealFileLabel(desktopApi.platform);
 
 	return (
 		<SharedSidebar
@@ -140,9 +145,9 @@ export function Sidebar({
 					openFileInNewTab(path);
 				}
 			}}
-			onOpenFileInDefaultApp={(path) => void openPathInDefaultApp(path)}
-			onRevealFile={(path) => void desktopApi.revealFile(path)}
-			onCopyFilePath={(path) => void copyFilePath(path)}
+			onOpenFileInDefaultApp={openFileInDefaultApp}
+			onRevealFile={revealFile}
+			onCopyFilePath={copyFilePath}
 			onRevealFolder={(folderId) =>
 				void desktopApi.revealFile(absolutePath(folderId))
 			}
@@ -156,7 +161,7 @@ export function Sidebar({
 					path: item.kind === "file" ? item.path : absolutePath(item.folderId),
 				});
 			}}
-			revealLabel={revealFileLabel(desktopApi.platform)}
+			revealLabel={revealLabel}
 			onRenameFile={(path, nextName, { origin, commit }) => {
 				void renameMarkdownFile(path, nextName).then((renamedPath) => {
 					if (origin === "new-note" && commit === "enter" && renamedPath) {
@@ -181,7 +186,7 @@ export function Sidebar({
 					),
 				)
 			}
-			onTogglePinnedFile={(path) => void togglePinnedNote(path)}
+			onTogglePinnedFile={togglePinned}
 			onCreateFile={(folderId) =>
 				createMarkdownFileInFolder(absolutePath(folderId))
 			}
@@ -203,7 +208,16 @@ export function Sidebar({
 					pinnedNotes={pinnedNotes}
 					currentPath={currentPath ?? null}
 					onOpen={selectFile}
-					onOpenInNewTab={openFileInNewTab}
+					actions={{
+						onOpenFileInNewTab: openFileInNewTab,
+						onOpenFileInDefaultApp: openFileInDefaultApp,
+						onRevealFile: revealFile,
+						revealLabel,
+						onCopyFilePath: copyFilePath,
+						onTogglePinnedFile: togglePinned,
+						onDeleteFile: (path) =>
+							void deleteSidebarItems([{ kind: "file", path }]),
+					}}
 				/>
 			) : null}
 		</SharedSidebar>
