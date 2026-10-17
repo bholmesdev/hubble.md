@@ -1,4 +1,5 @@
 import { SidebarFileActionsMenu, useCommandShortcutLabel } from "@hubble.md/ui";
+import { useStoreValue } from "@simplestack/store/react";
 import {
 	type ComponentProps,
 	type FocusEvent,
@@ -27,7 +28,7 @@ import {
 import { type NotePreview, notePreview } from "../lib/titleGeneration";
 import { cn } from "../lib/utils";
 import type { SidebarView } from "../store/persistence";
-import type { FileEntry } from "../store/state";
+import { type FileEntry, viewerStore } from "../store/state";
 
 type InboxNote = { path: string; modifiedAt: number };
 type InboxActions = Omit<
@@ -218,6 +219,9 @@ export function InboxView({
 							const fullPath = `${basename(workspacePath)}/${relativePath}`;
 							const isCurrent = note.path === currentPath;
 							const title = preview?.title ?? basename(note.path);
+							const description = preview
+								? (preview.description ?? "No additional text")
+								: "";
 							const isPinned = pinnedSet.has(note.path);
 							return (
 								<li
@@ -253,16 +257,32 @@ export function InboxView({
 												isPinned ? "pe-11" : "pe-6",
 											)}
 										>
-											{title}
+											{isCurrent ? (
+												<LiveText
+													path={note.path}
+													field="title"
+													saved={title}
+													empty={basename(note.path)}
+												/>
+											) : (
+												title
+											)}
 										</span>
 										<span className="flex min-w-0 gap-1.5 text-xs">
 											<span className="shrink-0 tabular-nums text-sidebar-foreground">
 												{inboxDateLabel(note.modifiedAt)}
 											</span>
 											<span className="truncate text-(--row-muted)">
-												{preview
-													? (preview.description ?? "No additional text")
-													: ""}
+												{isCurrent ? (
+													<LiveText
+														path={note.path}
+														field="description"
+														saved={description}
+														empty="No additional text"
+													/>
+												) : (
+													description
+												)}
 											</span>
 										</span>
 										<span
@@ -336,6 +356,33 @@ function useNotePreviews(notes: InboxNote[]) {
 
 	return (note: InboxNote) =>
 		previewCache.get(previewKey(note)) ?? latestPreview.get(note.path);
+}
+
+/**
+ * The open note's title or preview, following the editor as you type. It
+ * selects the string, not the text, so edits past the first lines don't
+ * re-render even this row.
+ */
+function LiveText({
+	path,
+	field,
+	saved,
+	empty,
+}: {
+	path: string;
+	field: keyof NotePreview;
+	/** Shown until the editor has this note's text. */
+	saved: string;
+	/** Shown when the live text has no such line. */
+	empty: string;
+}) {
+	const live = useStoreValue(viewerStore, (doc) => {
+		if (doc.status !== "ready" || doc.currentPath !== path) return undefined;
+		if (!hasMarkdownExtension(path)) return undefined;
+		return notePreview(doc.content)[field];
+	});
+	if (live === undefined) return saved;
+	return live ?? empty;
 }
 
 function isCreatableNote(path: string) {

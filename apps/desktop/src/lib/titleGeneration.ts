@@ -32,11 +32,14 @@ export type NotePreview = {
 
 /** Reads the first two lines with visible text as a note's title and preview. */
 export function notePreview(markdown: string): NotePreview {
-	const [title = null, description = null] = parseMarkdownFrontMatter(markdown)
-		.body.split("\n")
-		.map(meaningfulText)
-		.filter(Boolean);
-	return { title, description };
+	// Runs as the open note is edited, so stop at the second line of text.
+	const lines: string[] = [];
+	for (const line of parseMarkdownFrontMatter(markdown).body.split("\n")) {
+		const text = meaningfulText(line);
+		if (text) lines.push(text);
+		if (lines.length === 2) break;
+	}
+	return { title: lines[0] ?? null, description: lines[1] ?? null };
 }
 
 /** Strips Markdown syntax that does not read as title text. */
