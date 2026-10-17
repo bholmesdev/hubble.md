@@ -3,6 +3,7 @@ import { useStoreValue } from "@simplestack/store/react";
 import {
 	type ComponentProps,
 	type FocusEvent,
+	memo,
 	type KeyboardEvent as ReactKeyboardEvent,
 	useEffect,
 	useRef,
@@ -210,114 +211,24 @@ export function InboxView({
 					<ul>
 						{group.items.map((note) => {
 							const preview = previewFor(note);
-							const relativePath = relativeWorkspacePath(
-								note.path,
-								workspacePath,
-							);
-							const folder = dirname(relativePath);
-							// Lead with the workspace folder so top-level notes still show a dir.
-							const fullPath = `${basename(workspacePath)}/${relativePath}`;
-							const isCurrent = note.path === currentPath;
-							const title = preview?.title ?? basename(note.path);
-							const description = preview
-								? (preview.description ?? "No additional text")
-								: "";
-							const isPinned = pinnedSet.has(note.path);
 							return (
-								<li
+								<InboxRow
 									key={note.path}
-									// Separators inset to the text, hidden beside a highlighted row.
-									className="group/sidebar-row relative not-first:before:absolute not-first:before:inset-x-2 not-first:before:top-0 not-first:before:h-px not-first:before:bg-sidebar-border has-[>button:hover]:before:hidden has-[>button[aria-current]]:before:hidden [li:has(>button:hover)+&]:before:hidden [li:has(>button[aria-current])+&]:before:hidden"
-								>
-									<button
-										type="button"
-										data-inbox-path={note.path}
-										aria-current={isCurrent ? "page" : undefined}
-										onClick={(event) =>
-											event.metaKey || event.ctrlKey
-												? actions.onOpenFileInNewTab?.(note.path)
-												: onOpen(note.path)
-										}
-										onContextMenu={(event) => {
-											event.preventDefault();
-											setMenuPath(note.path);
-										}}
-										className={cn(
-											// Warm the muted text on yellow so it doesn't read muddy.
-											"my-0.5 flex w-full cursor-pointer flex-col gap-0.5 rounded-md px-2 py-2 text-start [--row-muted:var(--muted-foreground)] hover:[--row-muted:var(--muted-warm)]",
-											isCurrent
-												? "bg-sidebar-accent text-sidebar-accent-foreground [--row-muted:var(--muted-warm)]"
-												: "hover:bg-accent",
-										)}
-									>
-										{/* Leaves room for the actions buttons over this line. */}
-										<span
-											className={cn(
-												"truncate text-[13px] font-semibold text-sidebar-foreground",
-												isPinned ? "pe-11" : "pe-6",
-											)}
-										>
-											{isCurrent ? (
-												<LiveText
-													path={note.path}
-													field="title"
-													saved={title}
-													empty={basename(note.path)}
-												/>
-											) : (
-												title
-											)}
-										</span>
-										<span className="flex min-w-0 gap-1.5 text-xs">
-											<span className="shrink-0 tabular-nums text-sidebar-foreground">
-												{inboxDateLabel(note.modifiedAt)}
-											</span>
-											<span className="truncate text-(--row-muted)">
-												{isCurrent ? (
-													<LiveText
-														path={note.path}
-														field="description"
-														saved={description}
-														empty="No additional text"
-													/>
-												) : (
-													description
-												)}
-											</span>
-										</span>
-										<span
-											className="flex min-w-0 items-center gap-1 text-xs text-(--row-muted)"
-											title={fullPath}
-										>
-											{showFullPath ? (
-												<>
-													<MingcuteFileLine className="pointer-events-none size-3.5 shrink-0" />
-													<span className="truncate">{fullPath}</span>
-												</>
-											) : (
-												<>
-													<MingcuteFolderLine className="pointer-events-none size-3.5 shrink-0" />
-													<span className="truncate">
-														{folder
-															? basename(folder)
-															: basename(workspacePath)}
-													</span>
-												</>
-											)}
-										</span>
-									</button>
-									<div className="absolute end-1.5 top-[7px] flex">
-										<SidebarFileActionsMenu
-											{...actions}
-											file={{ path: note.path, pinned: isPinned }}
-											label={title}
-											open={menuPath === note.path}
-											onOpenChange={(open) =>
-												setMenuPath(open ? note.path : null)
-											}
-										/>
-									</div>
-								</li>
+									path={note.path}
+									modifiedAt={note.modifiedAt}
+									title={preview?.title ?? basename(note.path)}
+									description={
+										preview ? (preview.description ?? "No additional text") : ""
+									}
+									workspacePath={workspacePath}
+									isCurrent={note.path === currentPath}
+									isPinned={pinnedSet.has(note.path)}
+									showFullPath={showFullPath}
+									menuOpen={menuPath === note.path}
+									actions={actions}
+									onOpen={onOpen}
+									setMenuPath={setMenuPath}
+								/>
 							);
 						})}
 					</ul>
@@ -326,6 +237,143 @@ export function InboxView({
 		</nav>
 	);
 }
+
+/**
+ * One inbox row, with plain-value props so unchanged rows can be skipped.
+ * `memo` is deliberate: the React compiler can't reuse elements created in a
+ * loop, so without it every row re-renders on each keystroke and autosave.
+ */
+const InboxRow = memo(function InboxRow({
+	path,
+	modifiedAt,
+	title,
+	description,
+	workspacePath,
+	isCurrent,
+	isPinned,
+	showFullPath,
+	menuOpen,
+	actions,
+	onOpen,
+	setMenuPath,
+}: {
+	path: string;
+	modifiedAt: number;
+	title: string;
+	description: string;
+	workspacePath: string;
+	isCurrent: boolean;
+	isPinned: boolean;
+	showFullPath: boolean;
+	menuOpen: boolean;
+	actions: InboxActions;
+	onOpen: (path: string) => void;
+	// The state setter itself, which never changes, so rows stay memoized.
+	setMenuPath: (path: string | null) => void;
+}) {
+	// The actions menu is only visible on hover, so only build it then; a menu
+	// per row is costly across thousands of notes.
+	const [hovered, setHovered] = useState(false);
+	const relativePath = relativeWorkspacePath(path, workspacePath);
+	const folder = dirname(relativePath);
+	// Lead with the workspace folder so top-level notes still show a dir.
+	const fullPath = `${basename(workspacePath)}/${relativePath}`;
+	return (
+		<li
+			// Separators inset to the text, hidden beside a highlighted row.
+			className="group/sidebar-row relative not-first:before:absolute not-first:before:inset-x-2 not-first:before:top-0 not-first:before:h-px not-first:before:bg-sidebar-border has-[>button:hover]:before:hidden has-[>button[aria-current]]:before:hidden [li:has(>button:hover)+&]:before:hidden [li:has(>button[aria-current])+&]:before:hidden"
+			onPointerEnter={() => setHovered(true)}
+			onPointerLeave={() => setHovered(false)}
+		>
+			<button
+				type="button"
+				data-inbox-path={path}
+				aria-current={isCurrent ? "page" : undefined}
+				onClick={(event) =>
+					event.metaKey || event.ctrlKey
+						? actions.onOpenFileInNewTab?.(path)
+						: onOpen(path)
+				}
+				onContextMenu={(event) => {
+					event.preventDefault();
+					setMenuPath(path);
+				}}
+				className={cn(
+					// Warm the muted text on yellow so it doesn't read muddy.
+					"my-0.5 flex w-full cursor-pointer flex-col gap-0.5 rounded-md px-2 py-2 text-start [--row-muted:var(--muted-foreground)] hover:[--row-muted:var(--muted-warm)]",
+					isCurrent
+						? "bg-sidebar-accent text-sidebar-accent-foreground [--row-muted:var(--muted-warm)]"
+						: "hover:bg-accent",
+				)}
+			>
+				{/* Leaves room for the actions buttons over this line. */}
+				<span
+					className={cn(
+						"truncate text-[13px] font-semibold text-sidebar-foreground",
+						isPinned ? "pe-11" : "pe-6",
+					)}
+				>
+					{isCurrent ? (
+						<LiveText
+							path={path}
+							field="title"
+							saved={title}
+							empty={basename(path)}
+						/>
+					) : (
+						title
+					)}
+				</span>
+				<span className="flex min-w-0 gap-1.5 text-xs">
+					<span className="shrink-0 tabular-nums text-sidebar-foreground">
+						{inboxDateLabel(modifiedAt)}
+					</span>
+					<span className="truncate text-(--row-muted)">
+						{isCurrent ? (
+							<LiveText
+								path={path}
+								field="description"
+								saved={description}
+								empty="No additional text"
+							/>
+						) : (
+							description
+						)}
+					</span>
+				</span>
+				<span
+					className="flex min-w-0 items-center gap-1 text-xs text-(--row-muted)"
+					title={fullPath}
+				>
+					{showFullPath ? (
+						<>
+							<MingcuteFileLine className="pointer-events-none size-3.5 shrink-0" />
+							<span className="truncate">{fullPath}</span>
+						</>
+					) : (
+						<>
+							<MingcuteFolderLine className="pointer-events-none size-3.5 shrink-0" />
+							<span className="truncate">
+								{folder ? basename(folder) : basename(workspacePath)}
+							</span>
+						</>
+					)}
+				</span>
+			</button>
+			{hovered || menuOpen ? (
+				<div className="absolute end-1.5 top-[7px] flex">
+					<SidebarFileActionsMenu
+						{...actions}
+						file={{ path, pinned: isPinned }}
+						label={title}
+						open={menuOpen}
+						onOpenChange={(open) => setMenuPath(open ? path : null)}
+					/>
+				</div>
+			) : null}
+		</li>
+	);
+});
 
 /** Reads each Markdown note's first lines once per mtime. */
 function useNotePreviews(notes: InboxNote[]) {
@@ -359,7 +407,8 @@ function useNotePreviews(notes: InboxNote[]) {
 }
 
 /**
- * The open note's title or preview, following the editor as you type. It
+ * The open note's title or preview, following the editor as you type. Only
+ * the open note's row renders this, so typing never re-renders the list. It
  * selects the string, not the text, so edits past the first lines don't
  * re-render even this row.
  */
