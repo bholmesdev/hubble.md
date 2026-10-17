@@ -47,6 +47,9 @@ const nameCollator = new Intl.Collator(undefined, {
 
 // Keyed by path and mtime so an edited note rereads, and an unchanged one never does.
 const previewCache = new Map<string, NotePreview>();
+// Each note's newest preview, shown while an edited note rereads so the row
+// never flashes back to its file name.
+const latestPreview = new Map<string, NotePreview>();
 const PREVIEW_BATCH_SIZE = 20;
 const previewKey = (note: InboxNote) => `${note.modifiedAt}:${note.path}`;
 
@@ -153,7 +156,7 @@ export function InboxView({
 		...(pinned.length ? [{ label: "Pinned", items: pinned }] : []),
 		...groupInboxItems(recent, (note) => note.modifiedAt),
 	];
-	const previews = useNotePreviews([...pinned, ...recent]);
+	const previewFor = useNotePreviews([...pinned, ...recent]);
 	const order = groups.flatMap((group) => group.items.map((note) => note.path));
 
 	// Arrow keys move through notes in list order and open each one.
@@ -205,7 +208,7 @@ export function InboxView({
 					</h2>
 					<ul>
 						{group.items.map((note) => {
-							const preview = previews.get(previewKey(note));
+							const preview = previewFor(note);
 							const relativePath = relativeWorkspacePath(
 								note.path,
 								workspacePath,
@@ -331,7 +334,8 @@ function useNotePreviews(notes: InboxNote[]) {
 		};
 	}, [missingKey]);
 
-	return previewCache;
+	return (note: InboxNote) =>
+		previewCache.get(previewKey(note)) ?? latestPreview.get(note.path);
 }
 
 function isCreatableNote(path: string) {
@@ -352,6 +356,7 @@ async function readPreview(key: string) {
 		}
 	}
 	previewCache.set(key, preview);
+	latestPreview.set(path, preview);
 }
 
 function focusRow(nav: HTMLElement, path: string) {
