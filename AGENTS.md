@@ -6,6 +6,8 @@ When asked why you made a decision, answer why. Don't take it as a challenge to 
 
 ## Agent skills
 
+Write skills in `.agents/skills/<name>/`, then symlink them into `.claude/skills/`.
+
 ### Issue tracker
 
 GitHub Issues on `bholmesdev/hubble.md` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
