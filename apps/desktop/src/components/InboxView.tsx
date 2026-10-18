@@ -150,12 +150,15 @@ export function InboxView({
 	const pinnedSet = new Set(pinnedNotes);
 	const recent = [...notes.values()]
 		.filter((note) => !pinnedSet.has(note.path))
+		// Name each note once; the comparator runs ~n log n times on every autosave.
+		.map((note) => ({ note, name: basename(note.path) }))
 		// Break mtime ties by name, like the folder view's Recent sort.
 		.sort(
 			(a, b) =>
-				b.modifiedAt - a.modifiedAt ||
-				nameCollator.compare(basename(a.path), basename(b.path)),
-		);
+				b.note.modifiedAt - a.note.modifiedAt ||
+				nameCollator.compare(a.name, b.name),
+		)
+		.map(({ note }) => note);
 	const groups: InboxGroup<InboxNote>[] = [
 		...(pinned.length ? [{ label: "Pinned", items: pinned }] : []),
 		...groupInboxItems(recent, (note) => note.modifiedAt),
