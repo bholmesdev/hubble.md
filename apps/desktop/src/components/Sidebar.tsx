@@ -95,6 +95,8 @@ export function Sidebar({
 			: `${workspacePath}/${normalized}`;
 	};
 	const copyFilePath = (path: string) => copyText(path, "File path");
+	const copyFolderPath = (folderId: string) =>
+		copyText(absolutePath(folderId), "Folder path");
 
 	return (
 		<SharedSidebar
@@ -132,6 +134,7 @@ export function Sidebar({
 			onRevealFolder={(folderId) =>
 				void desktopApi.revealFile(absolutePath(folderId))
 			}
+			onCopyFolderPath={(folderId) => void copyFolderPath(folderId)}
 			onFocusedItemChange={(item: SidebarFocusedItem) => {
 				if (!item) {
 					onFocusedItemChange?.(null);
