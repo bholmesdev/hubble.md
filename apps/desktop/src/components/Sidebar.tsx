@@ -52,9 +52,9 @@ function collapseInCompactWindow() {
 	if (isCompactWindow()) setSidebarOpen(false);
 }
 
-function selectFile(path: string) {
+function selectFile(path: string, options?: { keepSidebarOpen: boolean }) {
 	void loadPath(path);
-	collapseInCompactWindow();
+	if (!options?.keepSidebarOpen) collapseInCompactWindow();
 }
 
 function openFileInNewTab(path: string) {

@@ -33,6 +33,8 @@ import type { SidebarView } from "../store/persistence";
 import { type FileEntry, viewerStore } from "../store/state";
 
 type InboxNote = { path: string; modifiedAt: number };
+// Arrow keys keep the compact overlay open; clicks let it close.
+type OpenNote = (path: string, options?: { keepSidebarOpen: boolean }) => void;
 type InboxActions = Omit<
 	ComponentProps<typeof SidebarFileActionsMenu>,
 	| "file"
@@ -122,7 +124,7 @@ export function InboxView({
 	files: FileEntry[];
 	pinnedNotes: string[];
 	currentPath: string | null;
-	onOpen: (path: string) => void;
+	onOpen: OpenNote;
 	/** The tree's file actions, minus the tree-only ones (rename, bulk). */
 	actions: InboxActions;
 }) {
@@ -180,7 +182,8 @@ export function InboxView({
 		const index = focused ? order.indexOf(focused) : -1;
 		const next = index === -1 ? order[0] : order[index + step];
 		if (!next || next === focused) return;
-		onOpen(next);
+		// Keep the compact overlay open so the arrows can keep walking the list.
+		onOpen(next, { keepSidebarOpen: true });
 		focusRow(event.currentTarget, next);
 	}
 
@@ -279,7 +282,7 @@ const InboxRow = memo(function InboxRow({
 	showFullPath: boolean;
 	menuOpen: boolean;
 	actions: InboxActions;
-	onOpen: (path: string) => void;
+	onOpen: OpenNote;
 	// The state setter itself, which never changes, so rows stay memoized.
 	setMenuPath: (path: string | null) => void;
 }) {
