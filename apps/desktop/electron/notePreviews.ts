@@ -12,13 +12,13 @@ const EMPTY: NotePreview = { title: null, description: null };
 
 /**
  * Titles and first lines for many notes in one call, reading only the start of
- * each file. Unreadable or unauthorized paths get an empty preview.
+ * each file. Unreadable or unauthorized paths return null, distinct from an empty note.
  */
 export async function readNotePreviews(
 	paths: string[],
 	resolve: (path: string) => string,
-): Promise<Record<string, NotePreview>> {
-	const previews: Record<string, NotePreview> = {};
+): Promise<Record<string, NotePreview | null>> {
+	const previews: Record<string, NotePreview | null> = {};
 	let cursor = 0;
 	async function worker() {
 		while (cursor < paths.length) {
@@ -27,7 +27,7 @@ export async function readNotePreviews(
 			try {
 				previews[path] = await readPreview(resolve(path));
 			} catch {
-				previews[path] = EMPTY;
+				previews[path] = null;
 			}
 		}
 	}

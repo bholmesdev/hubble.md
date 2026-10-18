@@ -52,7 +52,10 @@ const nameCollator = new Intl.Collator(undefined, {
 // after it changes, and keeps its old preview until then, so rows never flash
 // back to the file name. Rows subscribe to their own entry.
 const previewsStore = store<
-	Record<string, { modifiedAt: number; preview: NotePreview }>
+	Record<
+		string,
+		{ modifiedAt: number; preview?: NotePreview; failed?: boolean }
+	>
 >({});
 // One IPC call per chunk, in list order, so the first screen arrives first.
 const PREVIEW_CHUNK_SIZE = 200;
@@ -163,7 +166,7 @@ export function InboxView({
 		...(pinned.length ? [{ label: "Pinned", items: pinned }] : []),
 		...groupInboxItems(recent, (note) => note.modifiedAt),
 	];
-	useLoadPreviews([...pinned, ...recent]);
+	const previews = useLoadPreviews([...pinned, ...recent]);
 	const order = groups.flatMap((group) => group.items.map((note) => note.path));
 
 	// Arrow keys move through notes in list order and open each one.
@@ -208,6 +211,21 @@ export function InboxView({
 			onFocus={handleFocus}
 			className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 [--muted-warm:oklch(from_var(--muted-foreground)_l_calc(c+0.02)_75)]"
 		>
+			{previews.failed && (
+				<div className="px-2 pt-3 text-xs text-muted-foreground">
+					<p aria-live="polite">
+						Some note previews couldn’t load. You can still open your notes.
+					</p>
+					<button
+						type="button"
+						disabled={previews.loading}
+						onClick={previews.retry}
+						className="mt-1 cursor-pointer underline disabled:cursor-wait"
+					>
+						{previews.loading ? "Retrying previews…" : "Retry previews"}
+					</button>
+				</div>
+			)}
 			{groups.map((group) => (
 				<section key={group.label} aria-label={group.label}>
 					<h2 className="px-2 pt-4 pb-1.5 text-[13px] font-bold text-sidebar-foreground">
@@ -268,11 +286,14 @@ const InboxRow = memo(function InboxRow({
 	// The actions menu is only visible on hover, so only build it then; a menu
 	// per row is costly across thousands of notes.
 	const [hovered, setHovered] = useState(false);
-	const preview = useStoreValue(previewsStore, (all) => all[path]?.preview);
+	const entry = useStoreValue(previewsStore, (all) => all[path]);
+	const preview = entry?.preview;
 	const title = preview?.title ?? basename(path);
 	const description = preview
 		? (preview.description ?? "No additional text")
-		: "";
+		: entry?.failed
+			? "Preview unavailable"
+			: "";
 	const relativePath = relativeWorkspacePath(path, workspacePath);
 	const folder = dirname(relativePath);
 	// Lead with the workspace folder so top-level notes still show a dir.
@@ -376,10 +397,14 @@ const InboxRow = memo(function InboxRow({
 
 /** Reads previews for notes that are new or changed since they were last read. */
 function useLoadPreviews(notes: InboxNote[]) {
+	const [retryKey, setRetryKey] = useState(0);
+	const [failed, setFailed] = useState(false);
+	const [loading, setLoading] = useState(false);
 	const notesKey = notes
 		.map((note) => `${note.modifiedAt}:${note.path}`)
 		.join("\n");
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: retryKey explicitly retries failed reads without changing the note list.
 	useEffect(() => {
 		let cancelled = false;
 		const current = notesKey
@@ -404,34 +429,51 @@ function useLoadPreviews(notes: InboxNote[]) {
 			);
 		}
 		const stale = current.filter(
-			(note) => loaded[note.path]?.modifiedAt !== note.modifiedAt,
+			(note) =>
+				loaded[note.path]?.modifiedAt !== note.modifiedAt ||
+				loaded[note.path]?.failed,
 		);
+		setLoading(stale.length > 0);
+		setFailed(Object.values(previewsStore.get()).some((entry) => entry.failed));
 		void (async () => {
 			for (let start = 0; start < stale.length; start += PREVIEW_CHUNK_SIZE) {
 				const chunk = stale.slice(start, start + PREVIEW_CHUNK_SIZE);
-				const previews = await desktopApi.readNotePreviews(
-					chunk.map((note) => note.path),
-				);
+				let previews: Record<string, NotePreview | null>;
+				try {
+					previews = await desktopApi.readNotePreviews(
+						chunk.map((note) => note.path),
+					);
+				} catch {
+					// A failed IPC batch must not block later batches or reject unhandled.
+					previews = {};
+				}
 				if (cancelled) return;
 				previewsStore.set((all) => {
 					const next = { ...all };
 					for (const note of chunk) {
-						next[note.path] = {
-							modifiedAt: note.modifiedAt,
-							preview: previews[note.path] ?? {
-								title: null,
-								description: null,
-							},
-						};
+						const preview = previews[note.path];
+						next[note.path] = preview
+							? { modifiedAt: note.modifiedAt, preview }
+							: {
+									...all[note.path],
+									modifiedAt: note.modifiedAt,
+									failed: true,
+								};
 					}
 					return next;
 				});
+				setFailed(
+					Object.values(previewsStore.get()).some((entry) => entry.failed),
+				);
 			}
+			setLoading(false);
 		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [notesKey]);
+	}, [notesKey, retryKey]);
+
+	return { failed, loading, retry: () => setRetryKey((key) => key + 1) };
 }
 
 /**

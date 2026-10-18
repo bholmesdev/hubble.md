@@ -161,7 +161,9 @@ export type DesktopApi = {
 	): Promise<void>;
 	readFileText(path: string): Promise<string>;
 	/** Titles and first lines for many notes, reading only the start of each. */
-	readNotePreviews(paths: string[]): Promise<Record<string, NotePreview>>;
+	readNotePreviews(
+		paths: string[],
+	): Promise<Record<string, NotePreview | null>>;
 	searchFileContents(
 		input: SearchFileContentsInput,
 	): Promise<SearchFileContentsOutput>;

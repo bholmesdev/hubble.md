@@ -1568,7 +1568,7 @@ function DroppableRowButton({
 			style={style}
 			onClick={onClick}
 			onDoubleClick={onDoubleClick}
-			{...dragAttributes}
+			{...(enabled ? dragAttributes : {})}
 			{...dragListeners}
 		>
 			{children}
@@ -1644,7 +1644,7 @@ function FolderSegment({
 					"min-w-0 truncate rounded-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
 					active && "bg-sidebar-accent/70",
 				)}
-				{...attributes}
+				{...(enabled ? attributes : {})}
 				{...listeners}
 			>
 				{segment.name}
