@@ -1,5 +1,6 @@
 import type { CommandBindings } from "@hubble.md/editor";
 import type { FileKind } from "../lib/filePath";
+import type { NotePreview } from "../lib/titleGeneration";
 import type { ThemePreference } from "../theme";
 
 export type FileEntry = {
@@ -159,6 +160,8 @@ export type DesktopApi = {
 		config: WorkspaceConfig,
 	): Promise<void>;
 	readFileText(path: string): Promise<string>;
+	/** Titles and first lines for many notes, reading only the start of each. */
+	readNotePreviews(paths: string[]): Promise<Record<string, NotePreview>>;
 	searchFileContents(
 		input: SearchFileContentsInput,
 	): Promise<SearchFileContentsOutput>;
