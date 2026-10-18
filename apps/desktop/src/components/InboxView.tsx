@@ -1,4 +1,5 @@
 import { SidebarFileActionsMenu, useCommandShortcutLabel } from "@hubble.md/ui";
+import { store } from "@simplestack/store";
 import { useStoreValue } from "@simplestack/store/react";
 import {
 	type ComponentProps,
@@ -47,13 +48,14 @@ const nameCollator = new Intl.Collator(undefined, {
 	sensitivity: "base",
 });
 
-// Keyed by path and mtime so an edited note rereads, and an unchanged one never does.
-const previewCache = new Map<string, NotePreview>();
-// Each note's newest preview, shown while an edited note rereads so the row
-// never flashes back to its file name.
-const latestPreview = new Map<string, NotePreview>();
-const PREVIEW_BATCH_SIZE = 20;
-const previewKey = (note: InboxNote) => `${note.modifiedAt}:${note.path}`;
+// Each note's preview and the modified time it was read at. A note rereads only
+// after it changes, and keeps its old preview until then, so rows never flash
+// back to the file name. Rows subscribe to their own entry.
+const previewsStore = store<
+	Record<string, { modifiedAt: number; preview: NotePreview }>
+>({});
+// One IPC call per chunk, in list order, so the first screen arrives first.
+const PREVIEW_CHUNK_SIZE = 200;
 
 export function SidebarViewToggle({
 	view,
@@ -158,7 +160,7 @@ export function InboxView({
 		...(pinned.length ? [{ label: "Pinned", items: pinned }] : []),
 		...groupInboxItems(recent, (note) => note.modifiedAt),
 	];
-	const previewFor = useNotePreviews([...pinned, ...recent]);
+	useLoadPreviews([...pinned, ...recent]);
 	const order = groups.flatMap((group) => group.items.map((note) => note.path));
 
 	// Arrow keys move through notes in list order and open each one.
@@ -209,28 +211,21 @@ export function InboxView({
 						{group.label}
 					</h2>
 					<ul>
-						{group.items.map((note) => {
-							const preview = previewFor(note);
-							return (
-								<InboxRow
-									key={note.path}
-									path={note.path}
-									modifiedAt={note.modifiedAt}
-									title={preview?.title ?? basename(note.path)}
-									description={
-										preview ? (preview.description ?? "No additional text") : ""
-									}
-									workspacePath={workspacePath}
-									isCurrent={note.path === currentPath}
-									isPinned={pinnedSet.has(note.path)}
-									showFullPath={showFullPath}
-									menuOpen={menuPath === note.path}
-									actions={actions}
-									onOpen={onOpen}
-									setMenuPath={setMenuPath}
-								/>
-							);
-						})}
+						{group.items.map((note) => (
+							<InboxRow
+								key={note.path}
+								path={note.path}
+								modifiedAt={note.modifiedAt}
+								workspacePath={workspacePath}
+								isCurrent={note.path === currentPath}
+								isPinned={pinnedSet.has(note.path)}
+								showFullPath={showFullPath}
+								menuOpen={menuPath === note.path}
+								actions={actions}
+								onOpen={onOpen}
+								setMenuPath={setMenuPath}
+							/>
+						))}
 					</ul>
 				</section>
 			))}
@@ -246,8 +241,6 @@ export function InboxView({
 const InboxRow = memo(function InboxRow({
 	path,
 	modifiedAt,
-	title,
-	description,
 	workspacePath,
 	isCurrent,
 	isPinned,
@@ -259,8 +252,6 @@ const InboxRow = memo(function InboxRow({
 }: {
 	path: string;
 	modifiedAt: number;
-	title: string;
-	description: string;
 	workspacePath: string;
 	isCurrent: boolean;
 	isPinned: boolean;
@@ -274,6 +265,11 @@ const InboxRow = memo(function InboxRow({
 	// The actions menu is only visible on hover, so only build it then; a menu
 	// per row is costly across thousands of notes.
 	const [hovered, setHovered] = useState(false);
+	const preview = useStoreValue(previewsStore, (all) => all[path]?.preview);
+	const title = preview?.title ?? basename(path);
+	const description = preview
+		? (preview.description ?? "No additional text")
+		: "";
 	const relativePath = relativeWorkspacePath(path, workspacePath);
 	const folder = dirname(relativePath);
 	// Lead with the workspace folder so top-level notes still show a dir.
@@ -375,35 +371,64 @@ const InboxRow = memo(function InboxRow({
 	);
 });
 
-/** Reads each Markdown note's first lines once per mtime. */
-function useNotePreviews(notes: InboxNote[]) {
-	const [, setVersion] = useState(0);
-	const missingKey = notes
-		.map(previewKey)
-		.filter((key) => !previewCache.has(key))
+/** Reads previews for notes that are new or changed since they were last read. */
+function useLoadPreviews(notes: InboxNote[]) {
+	const notesKey = notes
+		.map((note) => `${note.modifiedAt}:${note.path}`)
 		.join("\n");
 
 	useEffect(() => {
-		if (!missingKey) return;
 		let cancelled = false;
-		// Read in list order, a batch at a time, so the top rows fill in first.
+		const current = notesKey
+			.split("\n")
+			.filter(Boolean)
+			.map((key) => {
+				const split = key.indexOf(":");
+				return {
+					modifiedAt: Number(key.slice(0, split)),
+					path: key.slice(split + 1),
+				};
+			});
+		// Drop deleted, renamed, and other workspaces' notes so the store holds
+		// one entry per listed note.
+		const paths = new Set(current.map((note) => note.path));
+		const loaded = previewsStore.get();
+		if (Object.keys(loaded).some((path) => !paths.has(path))) {
+			previewsStore.set((all) =>
+				Object.fromEntries(
+					Object.entries(all).filter(([path]) => paths.has(path)),
+				),
+			);
+		}
+		const stale = current.filter(
+			(note) => loaded[note.path]?.modifiedAt !== note.modifiedAt,
+		);
 		void (async () => {
-			const keys = missingKey.split("\n");
-			for (let start = 0; start < keys.length; start += PREVIEW_BATCH_SIZE) {
-				if (cancelled) return;
-				await Promise.all(
-					keys.slice(start, start + PREVIEW_BATCH_SIZE).map(readPreview),
+			for (let start = 0; start < stale.length; start += PREVIEW_CHUNK_SIZE) {
+				const chunk = stale.slice(start, start + PREVIEW_CHUNK_SIZE);
+				const previews = await desktopApi.readNotePreviews(
+					chunk.map((note) => note.path),
 				);
-				if (!cancelled) setVersion((version) => version + 1);
+				if (cancelled) return;
+				previewsStore.set((all) => {
+					const next = { ...all };
+					for (const note of chunk) {
+						next[note.path] = {
+							modifiedAt: note.modifiedAt,
+							preview: previews[note.path] ?? {
+								title: null,
+								description: null,
+							},
+						};
+					}
+					return next;
+				});
 			}
 		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [missingKey]);
-
-	return (note: InboxNote) =>
-		previewCache.get(previewKey(note)) ?? latestPreview.get(note.path);
+	}, [notesKey]);
 }
 
 /**
@@ -436,23 +461,6 @@ function LiveText({
 
 function isCreatableNote(path: string) {
 	return hasMarkdownExtension(path) || hasHtmlExtension(path);
-}
-
-async function readPreview(key: string) {
-	const path = key.slice(key.indexOf(":") + 1);
-	let preview: NotePreview = {
-		title: null,
-		description: hasHtmlExtension(path) ? "HTML App" : null,
-	};
-	if (hasMarkdownExtension(path)) {
-		try {
-			preview = notePreview(await desktopApi.readFileText(path));
-		} catch {
-			// Unreadable files fall back to their file name.
-		}
-	}
-	previewCache.set(key, preview);
-	latestPreview.set(path, preview);
 }
 
 function focusRow(nav: HTMLElement, path: string) {
