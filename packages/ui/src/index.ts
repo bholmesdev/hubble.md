@@ -13,6 +13,7 @@ export {
 	Sidebar,
 	type SidebarDeleteItem,
 	type SidebarFile,
+	SidebarFileActionsMenu,
 	type SidebarFocusedItem,
 	type SidebarFolder,
 	SidebarFrame,

@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { desktopApi } from "../desktopApi";
 import { focusMarkdownEditorAfterRender } from "../fileActions";
 import { copyText } from "../lib/clipboard";
-import { useCompactWindow } from "../lib/layout";
+import { isCompactWindow, useCompactWindow } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
 	createFolderInFolder,
@@ -27,20 +27,51 @@ import {
 	renameFolder,
 	renameMarkdownFile,
 	setSidebarOpen,
+	setSidebarView,
 	setSortMode,
 	togglePinnedNote,
 } from "../store/actions";
 import {
 	currentPathStore,
 	sidebarOpenStore,
+	sidebarViewStore,
 	workspaceStore,
 } from "../store/state";
+import { InboxView, SidebarViewToggle } from "./InboxView";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export type DesktopSidebarFocus = {
 	kind: "file" | "folder";
 	path: string;
 } | null;
+
+// File handlers live at module level so their identity never changes: inbox
+// rows are memoized on them, and a new object per render would re-render
+// every row on each autosave.
+function collapseInCompactWindow() {
+	if (isCompactWindow()) setSidebarOpen(false);
+}
+
+function selectFile(path: string, options?: { keepSidebarOpen: boolean }) {
+	void loadPath(path);
+	if (!options?.keepSidebarOpen) collapseInCompactWindow();
+}
+
+function openFileInNewTab(path: string) {
+	void openTabForPath(path);
+	collapseInCompactWindow();
+}
+
+const fileActions = {
+	onOpenFileInNewTab: openFileInNewTab,
+	onOpenFileInDefaultApp: (path: string) => void openPathInDefaultApp(path),
+	onRevealFile: (path: string) => void desktopApi.revealFile(path),
+	revealLabel: revealFileLabel(desktopApi.platform),
+	onCopyFilePath: (path: string) => void copyText(path, "File path"),
+	onTogglePinnedFile: (path: string) => void togglePinnedNote(path),
+	onDeleteFile: (path: string) =>
+		void deleteSidebarItems([{ kind: "file", path }]),
+};
 
 export function Sidebar({
 	footer,
@@ -52,6 +83,7 @@ export function Sidebar({
 	const workspace = useStoreValue(workspaceStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
+	const sidebarView = useStoreValue(sidebarViewStore);
 	const compact = useCompactWindow();
 	const { workspacePath, files, folders, pinnedNotes, sortMode } = workspace;
 	const pinnedSet = new Set(pinnedNotes);
@@ -94,7 +126,6 @@ export function Sidebar({
 			? `${workspacePath}${normalized}`
 			: `${workspacePath}/${normalized}`;
 	};
-	const copyFilePath = (path: string) => copyText(path, "File path");
 
 	return (
 		<SharedSidebar
@@ -110,25 +141,27 @@ export function Sidebar({
 			sortMode={sortMode}
 			storageScope={workspacePath}
 			header={<WorkspaceSwitcher />}
+			// Wide windows show the view toggle in the title bar above the sidebar.
+			viewToggle={
+				compact ? (
+					<SidebarViewToggle view={sidebarView} onChange={setSidebarView} />
+				) : undefined
+			}
 			footer={footer}
 			getDisplayPath={relativePath}
 			onCollapse={collapseSidebar}
 			onSortModeChange={setSortMode}
-			onSelectFile={(path) => {
-				void loadPath(path);
-				if (compact) collapseSidebar();
-			}}
+			onSelectFile={selectFile}
 			onOpenFileInNewTab={(path, options) => {
 				if (options?.background) {
 					void openBackgroundTab(path);
 				} else {
-					void openTabForPath(path);
-					if (compact) collapseSidebar();
+					openFileInNewTab(path);
 				}
 			}}
-			onOpenFileInDefaultApp={(path) => void openPathInDefaultApp(path)}
-			onRevealFile={(path) => void desktopApi.revealFile(path)}
-			onCopyFilePath={(path) => void copyFilePath(path)}
+			onOpenFileInDefaultApp={fileActions.onOpenFileInDefaultApp}
+			onRevealFile={fileActions.onRevealFile}
+			onCopyFilePath={fileActions.onCopyFilePath}
 			onRevealFolder={(folderId) =>
 				void desktopApi.revealFile(absolutePath(folderId))
 			}
@@ -142,7 +175,7 @@ export function Sidebar({
 					path: item.kind === "file" ? item.path : absolutePath(item.folderId),
 				});
 			}}
-			revealLabel={revealFileLabel(desktopApi.platform)}
+			revealLabel={fileActions.revealLabel}
 			onRenameFile={(path, nextName, { origin, commit }) => {
 				void renameMarkdownFile(path, nextName).then((renamedPath) => {
 					if (origin === "new-note" && commit === "enter" && renamedPath) {
@@ -167,7 +200,7 @@ export function Sidebar({
 					),
 				)
 			}
-			onTogglePinnedFile={(path) => void togglePinnedNote(path)}
+			onTogglePinnedFile={fileActions.onTogglePinnedFile}
 			onCreateFile={(folderId) =>
 				createMarkdownFileInFolder(absolutePath(folderId))
 			}
@@ -181,6 +214,17 @@ export function Sidebar({
 			onMoveItem={({ items, targetFolderId }) =>
 				void moveSidebarItems(items, absolutePath(targetFolderId))
 			}
-		/>
+		>
+			{sidebarView === "inbox" ? (
+				<InboxView
+					workspacePath={workspacePath}
+					files={files}
+					pinnedNotes={pinnedNotes}
+					currentPath={currentPath ?? null}
+					onOpen={selectFile}
+					actions={fileActions}
+				/>
+			) : null}
+		</SharedSidebar>
 	);
 }

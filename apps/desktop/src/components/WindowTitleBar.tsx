@@ -4,11 +4,12 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import MingcuteLayoutLeftLine from "~icons/mingcute/layout-left-line";
 import { desktopApi } from "../desktopApi";
 import { useCompactWindow } from "../lib/layout";
-import { toggleSidebar } from "../store/actions";
-import { sidebarOpenStore } from "../store/state";
+import { setSidebarView, toggleSidebar } from "../store/actions";
+import { sidebarOpenStore, sidebarViewStore } from "../store/state";
 import { tabsStore } from "../store/tabStore";
 import { AllTabsMenu } from "./AllTabsMenu";
 import { DocumentTabs } from "./DocumentTabs";
+import { SidebarViewToggle } from "./InboxView";
 
 const START_INSET =
 	desktopApi.platform === "darwin"
@@ -38,9 +39,12 @@ export function WindowTitleBar({
 	const tabAreaRef = useRef<HTMLDivElement>(null);
 	const allTabsButtonRef = useRef<HTMLButtonElement>(null);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
+	const sidebarView = useStoreValue(sidebarViewStore);
 	const hasTabs = useStoreValue(tabsStore, (tabs) => tabs.order.length > 0);
 	const isFullScreen = useIsFullScreen();
 	const compact = useCompactWindow();
+	// Spans the sidebar, so the view toggle can right-align with the sidebar header.
+	const spansSidebar = sidebarOpen && !compact;
 	const toggleSidebarTitle = useCommandShortcutLabel(
 		"Toggle sidebar",
 		"app.toggle-sidebar",
@@ -66,12 +70,11 @@ export function WindowTitleBar({
 			style={dragRegionStyle}
 		>
 			<div
-				className={`flex items-center ${hasTabs ? "pe-4" : ""}`}
+				className={`flex min-w-0 items-center ${spansSidebar ? "gap-2 pe-2.5" : hasTabs ? "pe-4" : ""}`}
 				style={{
-					flex:
-						sidebarOpen && !compact
-							? "0 0 var(--sidebar-width, 220px)"
-							: `0 100 ${hasTabs ? 114 : 98}px`,
+					flex: spansSidebar
+						? "0 0 var(--sidebar-width, 220px)"
+						: `0 100 ${hasTabs ? 114 : 98}px`,
 					paddingInlineStart: isFullScreen ? 0 : START_INSET,
 				}}
 			>
@@ -90,6 +93,11 @@ export function WindowTitleBar({
 						<span className="absolute top-1 end-1 size-1.5 rounded-full bg-primary" />
 					) : null}
 				</Button>
+				{spansSidebar ? (
+					<div className="ms-auto flex min-w-0" style={noDragStyle}>
+						<SidebarViewToggle view={sidebarView} onChange={setSidebarView} />
+					</div>
+				) : null}
 			</div>
 			{/* Overlap the sidebar seam; the active tab covers the inset divider. */}
 			<div ref={tabAreaRef} className="-ms-px flex min-w-0 flex-1 self-stretch">

@@ -55,6 +55,7 @@ import {
 } from "../src/lib/searchContent";
 import type { ThemePreference } from "../src/theme";
 import { DeleteUndo } from "./deleteUndo";
+import { readNotePreviews } from "./notePreviews";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
 import {
@@ -1489,6 +1490,10 @@ function registerIpc() {
 			const resolved = assertGranted(filePath);
 			return await fs.readFile(resolved, "utf8");
 		},
+	);
+
+	ipcMain.handle("desktop:read-note-previews", async (_event, { paths }) =>
+		readNotePreviews(paths as string[], assertGranted),
 	);
 
 	ipcMain.handle(

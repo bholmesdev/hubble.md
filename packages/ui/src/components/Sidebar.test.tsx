@@ -29,6 +29,31 @@ afterEach(() => {
 });
 
 describe("Sidebar", () => {
+	it("keeps file buttons enabled when drag-and-drop is unavailable", async () => {
+		const onSelectFile = vi.fn();
+		const container = document.createElement("div");
+		document.body.append(container);
+		const root = createRoot(container);
+		roots.push(root);
+		act(() =>
+			root.render(
+				<Sidebar
+					files={[{ path: "note.md", modifiedAt: 1 }]}
+					currentPath={null}
+					sortMode="alpha"
+					onSortModeChange={() => {}}
+					onSelectFile={onSelectFile}
+				/>,
+			),
+		);
+		const button = Array.from(container.querySelectorAll("button")).find(
+			(element) => element.textContent === "note.md",
+		);
+		expect(button).toBeDefined();
+		expect(button?.getAttribute("aria-disabled")).not.toBe("true");
+		await act(async () => button?.click());
+		expect(onSelectFile).toHaveBeenCalledWith("note.md");
+	});
 	it("continues editing after a new note name is submitted", async () => {
 		const onRenameFile = vi.fn();
 		renderSidebar(onRenameFile);

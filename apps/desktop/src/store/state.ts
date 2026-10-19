@@ -175,6 +175,7 @@ export const workspacePathStore = workspaceStore.select("workspacePath");
 export const recentWorkspacesStore = workspaceStore.select("recentWorkspaces");
 export const currentPathStore = viewerStore.select("currentPath");
 export const sidebarOpenStore = uiStore.select("sidebarOpen");
+export const sidebarViewStore = uiStore.select("sidebarView");
 export const switcherOpenStore = uiStore.select("isSwitcherOpen");
 export const terminalOpenStore = uiStore.select("isTerminalOpen");
 export const terminalPositionStore = uiStore.select("terminalPosition");

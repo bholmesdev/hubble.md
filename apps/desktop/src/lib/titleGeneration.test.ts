@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { generatedTitleStem } from "./titleGeneration";
+import { generatedTitleStem, notePreview } from "./titleGeneration";
+
+describe("notePreview", () => {
+	it("reads the first two visible lines after front matter", () => {
+		expect(
+			notePreview(
+				"---\ntags: [a]\n---\n\n# Recipe ideas\n\nPut honey in chili\nMore",
+			),
+		).toEqual({ title: "Recipe ideas", description: "Put honey in chili" });
+	});
+
+	it("has no description for a one-line note", () => {
+		expect(notePreview("Hey there\n")).toEqual({
+			title: "Hey there",
+			description: null,
+		});
+	});
+});
 
 describe("generatedTitleStem", () => {
 	it("slugs the first meaningful line", () => {
