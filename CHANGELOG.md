@@ -9,9 +9,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- An inbox view beside the folder tree lists every note newest first, grouped by date, with each note's title, first line, and folder. Switch views from the title bar, or with cmd+shift+E for folders and cmd+shift+I for the inbox. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
+
 ### Changed
 
+- Change the default keybinding for toggling the sidebar from cmd+shift+E to cmd+\. You can change this binding back from Settings > Keybindings. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
+
 ### Fixed
+
+- The folder tree now highlights the open note however you opened it, not just when you click it in the tree. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
 
 ## [0.2.1] - 2026-09-28
 
