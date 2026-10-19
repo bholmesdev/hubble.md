@@ -3,6 +3,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { viewerStore } from "../store/state";
 import { InboxView } from "./InboxView";
 
 const api = vi.hoisted(() => ({ readNotePreviews: vi.fn() }));
@@ -13,7 +14,11 @@ vi.mock("@hubble.md/ui", () => ({
 }));
 vi.mock("../store/state", async () => {
 	const { store } = await import("@simplestack/store");
-	return { viewerStore: store({ status: "idle" }) };
+	const viewerStore = store({
+		status: "idle",
+		currentPath: null as string | null,
+	});
+	return { viewerStore, currentPathStore: viewerStore.select("currentPath") };
 });
 
 describe("inbox preview recovery", () => {
@@ -34,7 +39,8 @@ describe("inbox preview recovery", () => {
 		container.remove();
 		vi.unstubAllGlobals();
 	});
-	async function render(modified = 1) {
+	async function render(modified = 1, currentPath: string | null = null) {
+		viewerStore.set((doc) => ({ ...doc, currentPath }));
 		await act(async () =>
 			root.render(
 				<InboxView
@@ -45,7 +51,7 @@ describe("inbox preview recovery", () => {
 						kind: "document",
 					}))}
 					pinnedNotes={[]}
-					currentPath={null}
+					currentPath={currentPath}
 					onOpen={() => {}}
 					actions={{}}
 				/>,
@@ -133,6 +139,38 @@ describe("inbox preview recovery", () => {
 		expect(container.textContent).toContain("Saved title");
 		expect(container.textContent).toContain("Saved body");
 		expect(container.textContent).toContain("couldn’t load");
+	});
+	it("rereads the note you leave even when its saved time didn't change", async () => {
+		api.readNotePreviews.mockResolvedValueOnce(
+			Object.fromEntries(
+				paths.map((path) => [path, { title: "Before", description: null }]),
+			),
+		);
+		await render(1, paths[0]);
+		// The save on leaving landed in the same second, so the time stays 1.
+		api.readNotePreviews.mockResolvedValueOnce({
+			[paths[0]]: { title: "After", description: null },
+		});
+		await render(1, paths[1]);
+		expect(api.readNotePreviews.mock.calls[1][0]).toEqual([paths[0]]);
+		expect(container.textContent).toContain("After");
+	});
+	it("rereads a note left while the inbox wasn't showing", async () => {
+		api.readNotePreviews.mockResolvedValueOnce(
+			Object.fromEntries(
+				paths.map((path) => [path, { title: "Before", description: null }]),
+			),
+		);
+		await render(1, paths[0]);
+		await act(async () => root.render(null));
+		// Leave the note from the folder view, in the same second as its last save.
+		viewerStore.set((doc) => ({ ...doc, currentPath: paths[1] }));
+		api.readNotePreviews.mockResolvedValueOnce({
+			[paths[0]]: { title: "After", description: null },
+		});
+		await render(1, paths[1]);
+		expect(api.readNotePreviews.mock.calls[1][0]).toEqual([paths[0]]);
+		expect(container.textContent).toContain("After");
 	});
 	it("continues loading later batches after an IPC batch fails", async () => {
 		paths = Array.from({ length: 201 }, (_, i) => `/batch/${i}.md`);

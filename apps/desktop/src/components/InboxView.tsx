@@ -30,7 +30,7 @@ import {
 import { type NotePreview, notePreview } from "../lib/titleGeneration";
 import { cn } from "../lib/utils";
 import type { SidebarView } from "../store/persistence";
-import { type FileEntry, viewerStore } from "../store/state";
+import { currentPathStore, type FileEntry, viewerStore } from "../store/state";
 
 type InboxNote = { path: string; modifiedAt: number };
 // Arrow keys keep the compact overlay open; clicks let it close.
@@ -61,6 +61,24 @@ const previewsStore = store<
 >({});
 // One IPC call per chunk, in list order, so the first screen arrives first.
 const PREVIEW_CHUNK_SIZE = 200;
+
+// Modified times are whole seconds, so the save on leaving a note can land in
+// the same second as its last autosave and leave its time unchanged. Mark the
+// note you leave as stale whenever the open note changes, including while the
+// inbox isn't showing, so the next load rereads it. -1 matches no real
+// modified time, and the old preview stays on screen until the new one arrives.
+let openPath = currentPathStore.get();
+currentPathStore.subscribe(() => {
+	const left = openPath;
+	openPath = currentPathStore.get();
+	if (!left || left === openPath) return;
+	const entry = previewsStore.get()[left];
+	if (!entry) return;
+	previewsStore.set((all) => ({
+		...all,
+		[left]: { ...entry, modifiedAt: -1 },
+	}));
+});
 
 export function SidebarViewToggle({
 	view,
@@ -168,7 +186,7 @@ export function InboxView({
 		...(pinned.length ? [{ label: "Pinned", items: pinned }] : []),
 		...groupInboxItems(recent, (note) => note.modifiedAt),
 	];
-	const previews = useLoadPreviews([...pinned, ...recent]);
+	const previews = useLoadPreviews([...pinned, ...recent], currentPath);
 	const order = groups.flatMap((group) => group.items.map((note) => note.path));
 
 	// Arrow keys move through notes in list order and open each one.
@@ -399,7 +417,7 @@ const InboxRow = memo(function InboxRow({
 });
 
 /** Reads previews for notes that are new or changed since they were last read. */
-function useLoadPreviews(notes: InboxNote[]) {
+function useLoadPreviews(notes: InboxNote[], currentPath: string | null) {
 	const [retryKey, setRetryKey] = useState(0);
 	const [failed, setFailed] = useState(false);
 	const [loading, setLoading] = useState(false);
@@ -407,7 +425,7 @@ function useLoadPreviews(notes: InboxNote[]) {
 		.map((note) => `${note.modifiedAt}:${note.path}`)
 		.join("\n");
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: retryKey explicitly retries failed reads without changing the note list.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: retryKey explicitly retries failed reads, and currentPath picks up notes marked stale on leaving; neither changes the note list.
 	useEffect(() => {
 		let cancelled = false;
 		const current = notesKey
@@ -474,7 +492,7 @@ function useLoadPreviews(notes: InboxNote[]) {
 		return () => {
 			cancelled = true;
 		};
-	}, [notesKey, retryKey]);
+	}, [notesKey, retryKey, currentPath]);
 
 	return { failed, loading, retry: () => setRetryKey((key) => key + 1) };
 }
