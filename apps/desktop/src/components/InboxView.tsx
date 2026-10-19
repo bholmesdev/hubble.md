@@ -52,12 +52,10 @@ const nameCollator = new Intl.Collator(undefined, {
 
 // Each note's preview and the modified time it was read at. A note rereads only
 // after it changes, and keeps its old preview until then, so rows never flash
-// back to the file name. Rows subscribe to their own entry.
+// back to the file name. An entry with no preview means the read failed. Rows
+// subscribe to their own entry.
 const previewsStore = store<
-	Record<
-		string,
-		{ modifiedAt: number; preview?: NotePreview; failed?: boolean }
-	>
+	Record<string, { modifiedAt: number; preview?: NotePreview }>
 >({});
 // One IPC call per chunk, in list order, so the first screen arrives first.
 const PREVIEW_CHUNK_SIZE = 200;
@@ -186,7 +184,7 @@ export function InboxView({
 		...(pinned.length ? [{ label: "Pinned", items: pinned }] : []),
 		...groupInboxItems(recent, (note) => note.modifiedAt),
 	];
-	const previews = useLoadPreviews([...pinned, ...recent], currentPath);
+	useLoadPreviews([...pinned, ...recent], currentPath);
 	const order = groups.flatMap((group) => group.items.map((note) => note.path));
 
 	// Arrow keys move through notes in list order and open each one.
@@ -232,21 +230,6 @@ export function InboxView({
 			onFocus={handleFocus}
 			className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 [--muted-warm:oklch(from_var(--muted-foreground)_l_calc(c+0.02)_75)]"
 		>
-			{previews.failed && (
-				<div className="px-2 pt-3 text-xs text-muted-foreground">
-					<p aria-live="polite">
-						Some note previews couldn’t load. You can still open your notes.
-					</p>
-					<button
-						type="button"
-						disabled={previews.loading}
-						onClick={previews.retry}
-						className="mt-1 cursor-pointer underline disabled:cursor-wait"
-					>
-						{previews.loading ? "Retrying previews…" : "Retry previews"}
-					</button>
-				</div>
-			)}
 			{groups.map((group) => (
 				<section key={group.label} aria-label={group.label}>
 					<h2 className="px-2 pt-4 pb-1.5 text-[13px] font-bold text-sidebar-foreground">
@@ -312,7 +295,7 @@ const InboxRow = memo(function InboxRow({
 	const title = preview?.title ?? basename(path);
 	const description = preview
 		? (preview.description ?? "No additional text")
-		: entry?.failed
+		: entry
 			? "Preview unavailable"
 			: "";
 	const relativePath = relativeWorkspacePath(path, workspacePath);
@@ -418,14 +401,11 @@ const InboxRow = memo(function InboxRow({
 
 /** Reads previews for notes that are new or changed since they were last read. */
 function useLoadPreviews(notes: InboxNote[], currentPath: string | null) {
-	const [retryKey, setRetryKey] = useState(0);
-	const [failed, setFailed] = useState(false);
-	const [loading, setLoading] = useState(false);
 	const notesKey = notes
 		.map((note) => `${note.modifiedAt}:${note.path}`)
 		.join("\n");
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: retryKey explicitly retries failed reads, and currentPath picks up notes marked stale on leaving; neither changes the note list.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: currentPath picks up a note marked stale on leaving, which doesn't change the note list.
 	useEffect(() => {
 		let cancelled = false;
 		const current = notesKey
@@ -450,12 +430,8 @@ function useLoadPreviews(notes: InboxNote[], currentPath: string | null) {
 			);
 		}
 		const stale = current.filter(
-			(note) =>
-				loaded[note.path]?.modifiedAt !== note.modifiedAt ||
-				loaded[note.path]?.failed,
+			(note) => loaded[note.path]?.modifiedAt !== note.modifiedAt,
 		);
-		setLoading(stale.length > 0);
-		setFailed(Object.values(previewsStore.get()).some((entry) => entry.failed));
 		void (async () => {
 			for (let start = 0; start < stale.length; start += PREVIEW_CHUNK_SIZE) {
 				const chunk = stale.slice(start, start + PREVIEW_CHUNK_SIZE);
@@ -475,26 +451,16 @@ function useLoadPreviews(notes: InboxNote[], currentPath: string | null) {
 						const preview = previews[note.path];
 						next[note.path] = preview
 							? { modifiedAt: note.modifiedAt, preview }
-							: {
-									...all[note.path],
-									modifiedAt: note.modifiedAt,
-									failed: true,
-								};
+							: { ...all[note.path], modifiedAt: note.modifiedAt };
 					}
 					return next;
 				});
-				setFailed(
-					Object.values(previewsStore.get()).some((entry) => entry.failed),
-				);
 			}
-			setLoading(false);
 		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [notesKey, retryKey, currentPath]);
-
-	return { failed, loading, retry: () => setRetryKey((key) => key + 1) };
+	}, [notesKey, currentPath]);
 }
 
 /**

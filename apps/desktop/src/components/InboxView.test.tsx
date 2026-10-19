@@ -21,7 +21,7 @@ vi.mock("../store/state", async () => {
 	return { viewerStore, currentPathStore: viewerStore.select("currentPath") };
 });
 
-describe("inbox preview recovery", () => {
+describe("inbox previews", () => {
 	let container: HTMLDivElement;
 	let root: Root;
 	let sequence = 0;
@@ -58,70 +58,6 @@ describe("inbox preview recovery", () => {
 			),
 		);
 	}
-	async function retry() {
-		const button = [...container.querySelectorAll("button")].find(
-			(b) => b.textContent === "Retry previews",
-		);
-		expect(button).toBeDefined();
-		await act(async () => button?.click());
-	}
-	it("catches IPC rejection and lets the user retry without modifying files", async () => {
-		api.readNotePreviews.mockRejectedValueOnce(new Error("IPC unavailable"));
-		await render();
-		expect(container.textContent).toContain("Some note previews couldn’t load");
-		expect(container.textContent).toContain("Preview unavailable");
-		api.readNotePreviews.mockResolvedValueOnce(
-			Object.fromEntries(
-				paths.map((path) => [
-					path,
-					{ title: "Recovered", description: "Body" },
-				]),
-			),
-		);
-		await retry();
-		expect(container.textContent).toContain("Recovered");
-		expect(container.textContent).not.toContain("couldn’t load");
-	});
-	it("retries only failed paths and distinguishes an empty note from failure", async () => {
-		api.readNotePreviews.mockResolvedValueOnce({
-			[paths[0]]: { title: null, description: null },
-			[paths[1]]: null,
-		});
-		await render();
-		expect(container.textContent).toContain("No additional text");
-		api.readNotePreviews.mockResolvedValueOnce({
-			[paths[1]]: { title: "Recovered", description: null },
-		});
-		await retry();
-		expect(api.readNotePreviews.mock.calls[1][0]).toEqual([paths[1]]);
-		expect(container.textContent).not.toContain("couldn’t load");
-	});
-	it("keeps recovery visible and disables repeated retries while loading", async () => {
-		api.readNotePreviews.mockRejectedValueOnce(new Error("offline"));
-		await render();
-		let resolve!: (
-			previews: Record<string, { title: null; description: null }>,
-		) => void;
-		api.readNotePreviews.mockReturnValueOnce(
-			new Promise((done) => {
-				resolve = done;
-			}),
-		);
-		await retry();
-		const button = [...container.querySelectorAll("button")].find(
-			(element) => element.textContent === "Retrying previews…",
-		);
-		expect(button?.disabled).toBe(true);
-		await act(async () =>
-			resolve(
-				Object.fromEntries(
-					paths.map((path) => [path, { title: null, description: null }]),
-				),
-			),
-		);
-		expect(container.textContent).not.toContain("couldn’t load");
-	});
-
 	it("preserves a saved preview when its refresh fails", async () => {
 		api.readNotePreviews.mockResolvedValueOnce(
 			Object.fromEntries(
@@ -138,7 +74,6 @@ describe("inbox preview recovery", () => {
 		await render(2);
 		expect(container.textContent).toContain("Saved title");
 		expect(container.textContent).toContain("Saved body");
-		expect(container.textContent).toContain("couldn’t load");
 	});
 	it("rereads the note you leave even when its saved time didn't change", async () => {
 		api.readNotePreviews.mockResolvedValueOnce(
@@ -181,14 +116,6 @@ describe("inbox preview recovery", () => {
 		await render();
 		expect(container.textContent).toContain("Last batch");
 		expect(api.readNotePreviews).toHaveBeenCalledTimes(2);
-		api.readNotePreviews.mockResolvedValueOnce(
-			Object.fromEntries(
-				paths
-					.slice(0, 200)
-					.map((path) => [path, { title: null, description: null }]),
-			),
-		);
-		await retry();
-		expect(api.readNotePreviews.mock.calls[2][0]).toEqual(paths.slice(0, 200));
+		expect(container.textContent).toContain("Preview unavailable");
 	});
 });
