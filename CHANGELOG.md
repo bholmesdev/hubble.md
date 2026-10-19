@@ -9,6 +9,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.3.0] - 2026-10-19
+
+### Added
+
 - An inbox view beside the folder tree lists every note newest first, grouped by date, with each note's title, first line, and folder. Switch views from the title bar, or with cmd+shift+E for folders and cmd+shift+I for the inbox. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
 
 ### Changed
