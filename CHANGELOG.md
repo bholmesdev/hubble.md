@@ -11,7 +11,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
-- Holding Option in the inbox view no longer swaps each note's folder for its full path. Hover a note to see its full path. [#310](https://github.com/bholmesdev/hubble.md/pull/310)
+- Holding Option in the inbox view no longer swaps each note's folder for its full path. Hover a note's folder to see its full path. [#310](https://github.com/bholmesdev/hubble.md/pull/310)
 
 ### Fixed
 
