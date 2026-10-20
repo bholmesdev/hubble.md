@@ -10,7 +10,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteFolderLine from "~icons/mingcute/folder-line";
 import MingcuteFoldersLine from "~icons/mingcute/folders-line";
 import MingcuteInboxLine from "~icons/mingcute/inbox-line";
@@ -144,7 +143,6 @@ export function InboxView({
 	/** The tree's file actions, minus the tree-only ones (rename, bulk). */
 	actions: InboxActions;
 }) {
-	const showFullPath = useOptionKeyHeld();
 	const [menuPath, setMenuPath] = useState<string | null>(null);
 	const navRef = useRef<HTMLElement>(null);
 
@@ -244,7 +242,6 @@ export function InboxView({
 								workspacePath={workspacePath}
 								isCurrent={note.path === currentPath}
 								isPinned={pinnedSet.has(note.path)}
-								showFullPath={showFullPath}
 								menuOpen={menuPath === note.path}
 								actions={actions}
 								onOpen={onOpen}
@@ -269,7 +266,6 @@ const InboxRow = memo(function InboxRow({
 	workspacePath,
 	isCurrent,
 	isPinned,
-	showFullPath,
 	menuOpen,
 	actions,
 	onOpen,
@@ -280,7 +276,6 @@ const InboxRow = memo(function InboxRow({
 	workspacePath: string;
 	isCurrent: boolean;
 	isPinned: boolean;
-	showFullPath: boolean;
 	menuOpen: boolean;
 	actions: InboxActions;
 	onOpen: OpenNote;
@@ -369,19 +364,10 @@ const InboxRow = memo(function InboxRow({
 					className="flex min-w-0 items-center gap-1 text-xs text-(--row-muted)"
 					title={fullPath}
 				>
-					{showFullPath ? (
-						<>
-							<MingcuteFileLine className="pointer-events-none size-3.5 shrink-0" />
-							<span className="truncate">{fullPath}</span>
-						</>
-					) : (
-						<>
-							<MingcuteFolderLine className="pointer-events-none size-3.5 shrink-0" />
-							<span className="truncate">
-								{folder ? basename(folder) : basename(workspacePath)}
-							</span>
-						</>
-					)}
+					<MingcuteFolderLine className="pointer-events-none size-3.5 shrink-0" />
+					<span className="truncate">
+						{folder ? basename(folder) : basename(workspacePath)}
+					</span>
 				</span>
 			</button>
 			{hovered || menuOpen ? (
@@ -501,22 +487,4 @@ function focusRow(nav: HTMLElement, path: string) {
 	);
 	row?.focus({ preventScroll: true });
 	row?.scrollIntoView({ block: "nearest" });
-}
-
-/** Tracks whether Option (Alt) is held, resetting when the window loses focus. */
-function useOptionKeyHeld() {
-	const [held, setHeld] = useState(false);
-	useEffect(() => {
-		const update = (event: KeyboardEvent) => setHeld(event.altKey);
-		const reset = () => setHeld(false);
-		window.addEventListener("keydown", update);
-		window.addEventListener("keyup", update);
-		window.addEventListener("blur", reset);
-		return () => {
-			window.removeEventListener("keydown", update);
-			window.removeEventListener("keyup", update);
-			window.removeEventListener("blur", reset);
-		};
-	}, []);
-	return held;
 }
