@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Reference-style links and images no longer disappear from a note when you edit it. [#309](https://github.com/bholmesdev/hubble.md/pull/309)
+
 ## [0.3.0] - 2026-10-19
 
 ### Added
