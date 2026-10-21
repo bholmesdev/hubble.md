@@ -260,6 +260,50 @@ describe("TerminalPanel", () => {
 		expect(appStore.get().ui.pendingTerminalCommand).toBeNull();
 	});
 
+	it("waits for the launch file before starting the first session", async () => {
+		const { api } = createDesktopApi();
+		const { appStore, launchFileSettledStore, TerminalPanel } =
+			await loadTerminalPanel(api);
+		launchFileSettledStore.set(false);
+
+		appStore.set((state) => ({
+			...state,
+			workspace: {
+				...state.workspace,
+				workspacePath: "/workspace-a",
+			},
+			document: {
+				...state.document,
+				currentPath: "/workspace-a/restored.md",
+			},
+			ui: {
+				...state.ui,
+				isTerminalOpen: true,
+			},
+		}));
+
+		await act(async () => {
+			root.render(<TerminalPanel />);
+			await flush();
+		});
+		expect(api.terminalStart).not.toHaveBeenCalled();
+		expect(getButtonByLabel(container, "New Terminal").disabled).toBe(true);
+
+		await act(async () => {
+			appStore.set((state) => ({
+				...state,
+				document: { ...state.document, currentPath: "/elsewhere/opened.md" },
+			}));
+			launchFileSettledStore.set(true);
+			await flush();
+		});
+
+		expect(api.terminalStart).toHaveBeenCalledTimes(1);
+		expect(api.terminalStart).toHaveBeenCalledWith("/workspace-a", {
+			notePath: "/elsewhere/opened.md",
+		});
+	});
+
 	it("shows an error state when the shell backend fails to load", async () => {
 		const { api } = createDesktopApi();
 		const { appStore, TerminalPanel } = await loadTerminalPanel(api);

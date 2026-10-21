@@ -705,8 +705,10 @@ function App() {
 			if (!active) return;
 
 			if (typeof launchPath === "string" && launchPath.length > 0) {
-				await loadPath(launchPath);
-				launchFileSettledStore.set(true);
+				// A failed load must not leave the terminal unable to start.
+				await loadPath(launchPath).finally(() =>
+					launchFileSettledStore.set(true),
+				);
 				return;
 			}
 			launchFileSettledStore.set(true);

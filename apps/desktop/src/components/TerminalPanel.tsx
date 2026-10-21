@@ -468,6 +468,7 @@ export function TerminalPanel() {
 						size="icon-sm"
 						className="ml-1"
 						onClick={() => void startSession("bash")}
+						disabled={!launchFileSettled}
 						aria-label="New Terminal"
 						title="New Terminal"
 					>
