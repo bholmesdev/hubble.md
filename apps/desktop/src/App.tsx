@@ -108,6 +108,7 @@ import { useHistoryNav } from "./store/hooks";
 import type { SidebarView } from "./store/persistence";
 import {
 	lastSeenVersionStore,
+	launchFileSettledStore,
 	shortcutBindingsStore,
 	sidebarOpenStore,
 	spellcheckStore,
@@ -705,8 +706,10 @@ function App() {
 
 			if (typeof launchPath === "string" && launchPath.length > 0) {
 				await loadPath(launchPath);
+				launchFileSettledStore.set(true);
 				return;
 			}
+			launchFileSettledStore.set(true);
 			const launchWorkspacePath = await desktopApi.getLaunchWorkspacePath();
 			if (!active) return;
 

@@ -138,6 +138,7 @@ async function loadTerminalPanel(api: MockDesktopApi) {
 	});
 
 	const state = await import("../store/state");
+	state.launchFileSettledStore.set(true);
 	const actions = await import("../store/actions");
 	const { TerminalPanel } = await import("./TerminalPanel");
 	return { ...actions, ...state, TerminalPanel };
