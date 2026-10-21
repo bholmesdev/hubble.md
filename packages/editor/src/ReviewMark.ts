@@ -22,6 +22,8 @@ export type ReviewMarkAttrs = {
 	resolved?: boolean;
 	metadata?: Record<string, unknown>;
 	type?: ReviewMarkName;
+	/** A Roughdraft-style attribute block kept verbatim, e.g. `{id="c4" by="user"}`. */
+	attributes?: string | null;
 };
 
 const REVIEW_METADATA_PATTERN = /^<!--\s*hubble-review:([\s\S]*?)-->\s*$/;
@@ -53,22 +55,32 @@ export function parseReviewMetadata(
 	const match = value.match(REVIEW_METADATA_PATTERN);
 	if (!match) return null;
 
+	const payload = match[1] ?? "";
+	let parsed: Record<string, unknown> & {
+		replies?: unknown;
+		resolved?: unknown;
+	};
 	try {
-		const parsed = JSON.parse(match[1] ?? "") as Record<string, unknown> & {
-			replies?: unknown;
-			resolved?: unknown;
-		};
-		const replies = Array.isArray(parsed.replies)
-			? parsed.replies.filter(isReviewReply)
-			: [];
-		return {
-			replies,
-			resolved: parsed.resolved === true,
-			metadata: parsed,
-		};
+		parsed = JSON.parse(payload) as typeof parsed;
 	} catch {
-		return null;
+		// Older tools wrote the payload percent-encoded. Nothing emits that
+		// form now, but the files are still in the wild, and an unread
+		// metadata block renders in the note as a visible HTML comment.
+		try {
+			parsed = JSON.parse(decodeURIComponent(payload)) as typeof parsed;
+		} catch {
+			return null;
+		}
 	}
+
+	const replies = Array.isArray(parsed.replies)
+		? parsed.replies.filter(isReviewReply)
+		: [];
+	return {
+		replies,
+		resolved: parsed.resolved === true,
+		metadata: parsed,
+	};
 }
 
 function isReviewReply(value: unknown): value is ReviewReply {
@@ -121,6 +133,14 @@ export const ReviewMarkExtension = Mark.create({
 				renderHTML: (attributes) =>
 					attributes.original
 						? { "data-review-original": attributes.original }
+						: {},
+			},
+			attributes: {
+				default: null,
+				parseHTML: (element) => element.getAttribute("data-review-attributes"),
+				renderHTML: (attributes) =>
+					attributes.attributes
+						? { "data-review-attributes": attributes.attributes }
 						: {},
 			},
 		};

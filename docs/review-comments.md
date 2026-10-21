@@ -9,6 +9,17 @@ Hubble stores review state in the Markdown body. The portable inline forms are:
 {~~original text~>replacement text~~}
 ```
 
+A comment's id can also come from a Roughdraft-style attribute block, which
+carries more than the id and is kept as it is:
+
+```md
+{==anchored text==}{>>comment body<<}{id="c1" by="user" at="2026-09-21T03:14:22.721Z"}
+```
+
+A comment body may span paragraphs. Hubble folds the body back onto one line
+when it reads the file, and writes it back that way, so the body keeps its
+line breaks without breaking the comment.
+
 Text that could be mistaken for review or Markdown syntax is backslash-escaped
 so opening and saving a file is lossless:
 
@@ -30,8 +41,13 @@ and other Markdown tools can safely ignore the HTML comment:
 <!-- hubble-review:{"v":1,"replies":[],"resolved":true}-->
 ```
 
+The metadata block is read whether it sits inline after the comment or on the
+line below it. A percent-encoded payload is read as well, so files written by
+older tools still resolve.
+
 Agents should preserve the anchor id, comment body, edit markers, and unknown
-review metadata when editing the file. To reply, append a reply object to the
+review metadata when editing the file. An unknown attribute block is left in
+the file untouched rather than shown in the note. To reply, append a reply object to the
 metadata `replies` array. Each reply requires a string `id` and `body`; replies
 missing either are silently discarded. `author` and `createdAt` are optional:
 

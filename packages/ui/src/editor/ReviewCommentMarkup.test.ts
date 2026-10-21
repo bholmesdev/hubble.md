@@ -52,3 +52,73 @@ describe("review comment marking", () => {
 		);
 	});
 });
+
+describe("review comment markup in the note", () => {
+	it("does not show raw comment syntax when a body spans blocks", () => {
+		const editor = new Editor({
+			element: document.createElement("div"),
+			extensions: [
+				StarterKit.configure({ code: false, link: false }),
+				InlineCodeExtension,
+				LinkExtension,
+				ReviewMarkExtension,
+			],
+			content: markdownToTiptapDoc(
+				"A {==anchor==}{>>line one\n\nline two<<}{#c4} end.",
+			),
+		});
+		editors.push(editor);
+
+		const visible = editor.view.dom.textContent ?? "";
+		expect(visible).not.toContain("{>>");
+		expect(visible).not.toContain("<<}");
+		expect(visible).not.toContain("{#c4}");
+		expect(
+			editor.view.dom.querySelectorAll('[data-review-type="reviewComment"]'),
+		).toHaveLength(1);
+	});
+
+	it("does not show a Roughdraft-style id attribute in the note", () => {
+		const editor = new Editor({
+			element: document.createElement("div"),
+			extensions: [
+				StarterKit.configure({ code: false, link: false }),
+				InlineCodeExtension,
+				LinkExtension,
+				ReviewMarkExtension,
+			],
+			content: markdownToTiptapDoc(
+				'A {==anchor==}{>>body<<}{id="c4" by="user" at="2026-09-21T03:14:22.721Z"}',
+			),
+		});
+		editors.push(editor);
+
+		expect(editor.view.dom.textContent ?? "").not.toContain("{id=");
+		const mark = editor.view.dom.querySelector(
+			'[data-review-type="reviewComment"]',
+		);
+		expect(mark?.getAttribute("data-review-id")).toBe("c4");
+	});
+
+	it("does not show thread metadata that sits on its own line", () => {
+		const editor = new Editor({
+			element: document.createElement("div"),
+			extensions: [
+				StarterKit.configure({ code: false, link: false }),
+				InlineCodeExtension,
+				LinkExtension,
+				ReviewMarkExtension,
+			],
+			content: markdownToTiptapDoc(
+				'A {==anchor==}{>>body<<}{#c1}\n\n<!-- hubble-review:{"v":1,"replies":[],"resolved":true}-->',
+			),
+		});
+		editors.push(editor);
+
+		expect(editor.view.dom.textContent ?? "").not.toContain("hubble-review");
+		const mark = editor.view.dom.querySelector(
+			'[data-review-type="reviewComment"]',
+		);
+		expect(mark?.hasAttribute("data-review-resolved")).toBe(true);
+	});
+});

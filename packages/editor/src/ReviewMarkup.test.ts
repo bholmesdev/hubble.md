@@ -400,4 +400,100 @@ describe("CriticMarkup review conversion", () => {
 			" for prompts.",
 		]);
 	});
+	it("reads a comment whose body spans blocks", () => {
+		const markdown = "A {==c==}{>>line one\n\nline two<<}{#c4} end.";
+		const doc = markdownToTiptapDoc(markdown);
+		const nodes = textNodes(doc);
+
+		// The body keeps its blank line, and the raw syntax is gone.
+		expect(nodes.map((node) => node.text).join("")).not.toContain("{>>");
+		expect(nodes.map((node) => node.text).join("")).not.toContain("<<}");
+		expect(
+			nodes.find((node) =>
+				node.marks?.some(
+					(mark) =>
+						mark.type === "reviewMark" && mark.attrs?.type === "reviewComment",
+				),
+			)?.marks,
+		).toContainEqual({
+			type: "reviewMark",
+			attrs: {
+				type: "reviewComment",
+				body: "line one\n\nline two",
+				id: "c4",
+			},
+		});
+	});
+
+	it("reads a comment whose id is a Roughdraft-style attribute", () => {
+		const markdown =
+			'A {==c==}{>>body<<}{id="c4" by="user" at="2026-09-21T03:14:22.721Z"} end.';
+		const doc = markdownToTiptapDoc(markdown);
+		const nodes = textNodes(doc);
+
+		expect(nodes.map((node) => node.text).join("")).not.toContain("{id=");
+		expect(
+			nodes.find((node) =>
+				node.marks?.some(
+					(mark) =>
+						mark.type === "reviewMark" && mark.attrs?.type === "reviewComment",
+				),
+			)?.marks,
+		).toContainEqual({
+			type: "reviewMark",
+			attrs: {
+				type: "reviewComment",
+				body: "body",
+				id: "c4",
+				attributes: '{id="c4" by="user" at="2026-09-21T03:14:22.721Z"}',
+			},
+		});
+	});
+
+	it("keeps a Roughdraft-style attribute block when the file is written back", () => {
+		const markdown =
+			'A {==c==}{>>body<<}{id="c4" by="user" at="2026-09-21T03:14:22.721Z"}';
+
+		expect(tiptapDocToMarkdown(markdownToTiptapDoc(markdown))).toBe(markdown);
+	});
+
+	it("merges thread metadata that sits on its own line", () => {
+		const markdown =
+			'A {==c==}{>>body<<}{#c1}\n\n<!-- hubble-review:{"v":1,"replies":[],"resolved":true}-->';
+		const doc = markdownToTiptapDoc(markdown);
+		const nodes = textNodes(doc);
+
+		expect(nodes.map((node) => node.text).join("")).not.toContain(
+			"hubble-review",
+		);
+		expect(
+			nodes.find((node) =>
+				node.marks?.some(
+					(mark) =>
+						mark.type === "reviewMark" && mark.attrs?.type === "reviewComment",
+				),
+			)?.marks,
+		).toContainEqual({
+			type: "reviewMark",
+			attrs: {
+				type: "reviewComment",
+				body: "body",
+				id: "c1",
+				replies: [],
+				resolved: true,
+				metadata: { v: 1, replies: [], resolved: true },
+			},
+		});
+	});
+
+	it("parses legacy percent-encoded thread metadata", () => {
+		const metadata = parseReviewMetadata(
+			"<!-- hubble-review:%7B%22replies%22%3A%5B%5D%2C%22resolved%22%3Atrue%7D-->",
+		);
+
+		expect(metadata).toMatchObject({
+			replies: [],
+			resolved: true,
+		});
+	});
 });
