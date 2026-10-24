@@ -166,6 +166,9 @@ export const titleGenerationPreviewStore = store<{
 
 export const spellcheckStore = store<SpellcheckState | null>(null);
 export const telemetryConsentStore = store<TelemetryConsent | null>(null);
+// Flips once the file Hubble was launched with has loaded, so the first
+// terminal session sees it as $HUBBLE_NOTE_PATH instead of a restored note.
+export const launchFileSettledStore = store(false);
 
 export const workspaceStore = appStore.select("workspace");
 export const viewerStore = appStore.select("document");
