@@ -12,6 +12,7 @@ import { type Plugin, unified } from "unified";
 import { visit } from "unist-util-visit";
 import { wikiDisplayNameForTarget } from "./markdownPath.js";
 import { parseReviewMetadata } from "./ReviewMark.js";
+import { foldCrossBlockBodies } from "./reviewBodyBlocks.js";
 import { unescapeReviewText } from "./reviewEscaping.js";
 
 // Convert Markdown (string) -> TipTap JSONContent (ProseMirror document)
@@ -21,17 +22,55 @@ export function markdownToTiptapDoc(markdown: string): JSONContent {
 		.use(remarkParse)
 		.use(remarkGfm)
 		.use(remarkRemoveEmptyMarkers);
-	const parsed = processor.parse(input);
-	const tree = processor.runSync(parsed) as Root;
+	const parse = (source: string) =>
+		processor.runSync(processor.parse(source)) as Root;
+
+	// A comment body with a blank line in it spans blocks, which puts the
+	// opener and the closer apart and leaves the raw syntax in the note.
+	// Folding the body onto one line lets the inline parser read it.
+	const tree = parse(foldCrossBlockBodies(parse, input));
+
 	return {
 		type: "doc",
-		content: normalizeBlockContent(tree.children).flatMap(blockToPM),
+		content: blocksToPM(normalizeBlockContent(tree.children)),
 	} satisfies JSONContent;
 }
 
 function normalizeBlockContent(children: Content[]): Content[] {
 	// mdast root.children are already block-level. Return as-is for now.
 	return children;
+}
+
+/**
+ * Converts a run of blocks, carrying review metadata across block
+ * boundaries.
+ *
+ * A thread's metadata is written as an HTML comment. When it sits on its own
+ * line it is a block of its own, so the comment it belongs to is in the
+ * previous block. Collecting the blocks first lets the metadata find that
+ * comment, instead of rendering as a visible HTML comment in the note.
+ */
+function blocksToPM(children: Content[]): JSONContent[] {
+	const blocks: JSONContent[] = [];
+	for (const child of children) {
+		const metadata = blockReviewMetadata(child);
+		if (metadata) {
+			if (mergeReviewMetadata(blocks, metadata)) continue;
+			// No comment above it to attach to. Leaving it out keeps the raw
+			// HTML comment out of the note; the file keeps it either way.
+			continue;
+		}
+		blocks.push(...blockToPM(child));
+	}
+	return blocks;
+}
+
+/** The review metadata a block carries, if it is a metadata block. */
+function blockReviewMetadata(node: Content): string | null {
+	if (node.type !== "html") return null;
+	const raw = node.value ?? "";
+	if (!parseReviewMetadata(raw)) return null;
+	return raw;
 }
 
 function blockToPM(node: Content): JSONContent[] {
@@ -69,9 +108,7 @@ function blockToPM(node: Content): JSONContent[] {
 			return [
 				{
 					type: "blockquote",
-					content: (node.children ?? []).flatMap((n) =>
-						blockToPM(n as Content),
-					),
+					content: blocksToPM(node.children ?? []),
 				},
 			];
 		case "code":
@@ -113,6 +150,10 @@ function blockToPM(node: Content): JSONContent[] {
 			// Parse HTML to extract known block nodes, fallback to text for everything else
 			const raw = node.value ?? "";
 			if (raw.trim() === "") return [];
+
+			// A metadata block on its own line belongs to the comment above it.
+			// `blocksToPM` attaches it, so it never reaches the note as text.
+			if (parseReviewMetadata(raw)) return [];
 
 			try {
 				const hastTree = fromHtml(raw, { fragment: true });
@@ -230,9 +271,9 @@ function listItemToPM(li: ListItem, allowChecked: boolean): JSONContent[] {
 		first && first.type === "paragraph"
 			? splitParagraphAroundImages(first.children ?? [])
 			: [];
-	const restBlocks = (
-		first && first.type === "paragraph" ? blocks.slice(1) : blocks
-	).flatMap(blockToPM);
+	const restBlocks = blocksToPM(
+		first && first.type === "paragraph" ? blocks.slice(1) : blocks,
+	);
 	const content: JSONContent[] =
 		firstBlocks[0]?.type === "paragraph"
 			? firstBlocks
@@ -428,6 +469,28 @@ function inlineToPM(children: Content[]): JSONContent[] {
 const REVIEW_SPAN_PATTERN =
 	/\{==((?:\\[\s\S]|(?!==\})[\s\S])+?)==\}(?:\{>>((?:\\[\s\S]|(?!<<\})[\s\S])*)<<\})?(?:\{#([A-Za-z0-9_-]+)\})?|\{\+\+([\s\S]+?)\+\+\}(?:\{#([A-Za-z0-9_-]+)\})?|\{--([\s\S]+?)--\}(?:\{#([A-Za-z0-9_-]+)\})?|\{~~((?:\\[\s\S]|(?!~>)[\s\S])+?)~>([\s\S]+?)~~\}(?:\{#([A-Za-z0-9_-]+)\})?/g;
 
+/**
+ * A Roughdraft-style inline attribute block: `{id="c4" by="user" at="..."}`.
+ * Issue #107 asked for older inline attributes to be preserved, so the id is
+ * read from here too.
+ */
+const REVIEW_ATTRIBUTE_PATTERN =
+	/\{([A-Za-z][A-Za-z0-9_-]*=(?:"[^"]*"|'[^']*')(?:\s+[A-Za-z][A-Za-z0-9_-]*=(?:"[^"]*"|'[^']*'))*)\}/;
+
+/** The same block, anchored to the start of what follows a review span. */
+const REVIEW_ATTRIBUTE_AFTER_SPAN =
+	/^\{([A-Za-z][A-Za-z0-9_-]*=(?:"[^"]*"|'[^']*')(?:\s+[A-Za-z][A-Za-z0-9_-]*=(?:"[^"]*"|'[^']*'))*)\}/;
+
+/** Reads the id out of a Roughdraft-style attribute block, if it has one. */
+function reviewAttributeId(value: string | undefined) {
+	if (!value) return null;
+	const match = value.match(REVIEW_ATTRIBUTE_PATTERN);
+	if (!match) return null;
+	const id = match[1].match(/(?:^|\s)id=(?:"([^"]*)"|'([^']*)')/);
+	if (!id) return null;
+	return id[1] ?? id[2] ?? null;
+}
+
 function reviewSpanFromChildren(children: Content[], index: number) {
 	const first = children[index];
 	if (first?.type !== "text") return null;
@@ -482,11 +545,26 @@ function reviewSpanFromChildren(children: Content[], index: number) {
 				};
 				suffix = suffix.slice(comment[0].length);
 			}
+			// A Roughdraft-style attribute block carries the id instead of
+			// `{#c1}`. It follows the body, so it is read from what the body
+			// match left behind.
+			const attribute = suffix.match(REVIEW_ATTRIBUTE_PATTERN);
+			const attributeId = reviewAttributeId(attribute?.[0]);
+			if (attribute && attributeId) {
+				attrs = { ...attrs, id: attributeId };
+				suffix = suffix.slice(attribute[0].length);
+			}
 		} else {
 			const id = suffix.match(/^\{#([A-Za-z0-9_-]+)\}/);
 			if (id) {
 				attrs = { type, id: id[1] };
 				suffix = suffix.slice(id[0].length);
+			}
+			const attribute = suffix.match(REVIEW_ATTRIBUTE_PATTERN);
+			const attributeId = reviewAttributeId(attribute?.[0]);
+			if (attribute && attributeId) {
+				attrs = { ...attrs, id: attributeId };
+				suffix = suffix.slice(attribute[0].length);
 			}
 		}
 
@@ -511,23 +589,45 @@ function reviewSpanFromChildren(children: Content[], index: number) {
 	return null;
 }
 
+/** Text nodes carrying a review comment mark, in document order. */
+function reviewCommentTextNodes(
+	nodes: JSONContent[],
+	out: JSONContent[] = [],
+): JSONContent[] {
+	for (const node of nodes) {
+		if (node.type === "text") {
+			const isComment = node.marks?.some(
+				(mark) =>
+					mark.type === "reviewMark" && mark.attrs?.type === "reviewComment",
+			);
+			if (isComment) out.push(node);
+			continue;
+		}
+		if (node.content) reviewCommentTextNodes(node.content, out);
+	}
+	return out;
+}
+
+/**
+ * Applies a thread's metadata to the comment it belongs to. The comment is
+ * the last one in the document, and a comment split across several spans
+ * carries the metadata on each of them.
+ */
 function mergeReviewMetadata(nodes: JSONContent[], value: string | undefined) {
 	const metadata = parseReviewMetadata(value);
 	if (!metadata) return false;
 
+	const comments = reviewCommentTextNodes(nodes);
 	let merged = false;
 	let targetId: unknown;
-	for (let index = nodes.length - 1; index >= 0; index -= 1) {
-		const node = nodes[index];
+	for (let index = comments.length - 1; index >= 0; index -= 1) {
+		const node = comments[index] as JSONContent;
 		const reviewMarkIndex =
-			node.type === "text"
-				? node.marks?.findIndex(
-						(mark) =>
-							mark.type === "reviewMark" &&
-							mark.attrs?.type === "reviewComment",
-					)
-				: -1;
-		if (reviewMarkIndex === undefined || reviewMarkIndex === -1) {
+			node.marks?.findIndex(
+				(mark) =>
+					mark.type === "reviewMark" && mark.attrs?.type === "reviewComment",
+			) ?? -1;
+		if (reviewMarkIndex === -1) {
 			if (merged) break;
 			continue;
 		}
@@ -543,7 +643,7 @@ function mergeReviewMetadata(nodes: JSONContent[], value: string | undefined) {
 			...mark,
 			attrs: { ...mark.attrs, ...metadata },
 		};
-		nodes[index] = { ...node, marks };
+		node.marks = marks;
 		merged = true;
 		if (targetId == null) break;
 	}
@@ -678,8 +778,15 @@ function textToPM(text: string): JSONContent[] {
 			}
 
 			const commentText = match[2];
-			const commentId = match[3] ?? match[5] ?? match[7] ?? match[10] ?? null;
-			const mark =
+			const matchEnd = index + match[0].length;
+
+			// A Roughdraft-style attribute block can follow the span. It holds
+			// the id, and it is kept verbatim so the file keeps its shape.
+			const attribute = text.slice(matchEnd).match(REVIEW_ATTRIBUTE_AFTER_SPAN);
+			const attributeId = reviewAttributeId(attribute?.[0]);
+			const commentId =
+				match[3] ?? match[5] ?? match[7] ?? match[10] ?? attributeId;
+			const mark: { type: string; attrs: Record<string, unknown> } =
 				commentText !== undefined
 					? {
 							type: "reviewMark",
@@ -718,11 +825,14 @@ function textToPM(text: string): JSONContent[] {
 			if (mark.attrs?.type === "reviewReplacement") {
 				mark.attrs.original = unescapeReviewText(String(mark.attrs.original));
 			}
+			if (attribute) {
+				mark.attrs.attributes = attribute[0];
+			}
 			const value = unescapeReviewText(
 				match[1] ?? match[4] ?? match[6] ?? match[9] ?? match[0],
 			);
 			out.push({ type: "text", text: value, marks: [mark] });
-			lastIndex = index + match[0].length;
+			lastIndex = matchEnd + (attribute ? attribute[0].length : 0);
 		}
 		if (lastIndex < text.length) {
 			out.push(...textToPM(text.slice(lastIndex)));

@@ -248,7 +248,14 @@ function inlineNodesToMarkdown(nodes: JSONContent[]): string {
 			} else {
 				result += `{==${content}==}`;
 			}
-			if (mark.attrs?.id) result += `{#${mark.attrs.id}}`;
+			// A Roughdraft-style attribute block carries the id too, so only
+			// one of the two forms is written. The block is written back
+			// verbatim so the file keeps the shape it had.
+			if (mark.attrs?.attributes) {
+				result += mark.attrs.attributes;
+			} else if (mark.attrs?.id) {
+				result += `{#${mark.attrs.id}}`;
+			}
 			if (type === "reviewComment") {
 				result += serializeReviewMetadata(mark.attrs ?? {});
 			}

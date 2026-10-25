@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Comments written by an agent no longer show their markup in the note. A comment body that spans paragraphs, a Roughdraft-style `id` attribute, and thread metadata on its own line are all read as comments again, instead of appearing as raw `{==...==}` syntax in the document. [#312](https://github.com/bholmesdev/hubble.md/pull/312)
+
 ## [0.3.1] - 2026-10-20
 
 ### Changed
