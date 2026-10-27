@@ -232,6 +232,7 @@ export type DesktopApi = {
 	): Unsubscribe;
 	onMenuCreateMarkdownFile(callback: () => void): Unsubscribe;
 	onMenuCreateHtmlFile(callback: () => void): Unsubscribe;
+	onMenuCreateDiagramFile(callback: () => void): Unsubscribe;
 	onMenuOpenFile(callback: () => void): Unsubscribe;
 	onMenuOpenFolder(callback: () => void): Unsubscribe;
 	onMenuOpenSettings(callback: () => void): Unsubscribe;

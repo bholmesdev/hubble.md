@@ -151,6 +151,8 @@ const desktopApi = {
 		subscribe("desktop:menu-create-markdown-file", callback),
 	onMenuCreateHtmlFile: (callback) =>
 		subscribe("desktop:menu-create-html-file", callback),
+	onMenuCreateDiagramFile: (callback) =>
+		subscribe("desktop:menu-create-diagram-file", callback),
 	onMenuOpenFile: (callback) => subscribe("desktop:menu-open-file", callback),
 	onMenuOpenFolder: (callback) =>
 		subscribe("desktop:menu-open-folder", callback),

@@ -917,6 +917,11 @@ function buildMenu() {
 					label: "New HTML App",
 					click: () => sendToRenderer("desktop:menu-create-html-file"),
 				},
+				{
+					id: "new-diagram-file",
+					label: "New Diagram",
+					click: () => sendToRenderer("desktop:menu-create-diagram-file"),
+				},
 				{ type: "separator" },
 				commandMenuItem("app.open-file", () =>
 					sendToRenderer("desktop:menu-open-file"),
@@ -1739,6 +1744,7 @@ function registerIpc() {
 				{ name: "Documents", extensions: ["md", "markdown", "mdown", "html"] },
 				{ name: "Text", extensions: ["txt", "text"] },
 				{ name: "PDF", extensions: ["pdf"] },
+				{ name: "Diagram", extensions: ["tldr"] },
 				{ name: "All Files", extensions: ["*"] },
 			],
 		});

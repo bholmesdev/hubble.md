@@ -1374,6 +1374,10 @@ export function createHtmlFileInFolder(parentPath: string) {
 	return createEmptyFileInFolder(parentPath, "new-app", ".html");
 }
 
+export function createDiagramFileInFolder(parentPath: string) {
+	return createEmptyFileInFolder(parentPath, "new-diagram", ".tldr");
+}
+
 export async function createFolderInFolder(parentPath: string) {
 	const path = uniqueFolderPath(parentPath);
 	try {

@@ -41,16 +41,22 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { WindowTitleBar } from "./components/WindowTitleBar";
 import { desktopApi } from "./desktopApi";
 import type { DesktopUpdateState } from "./desktopApi/types";
+import { DiagramView } from "./editor/DiagramView";
 import { createEmbedExtension } from "./editor/EmbedExtension";
 import { handleImageDrop, handleImagePaste } from "./editor/handleImagePaste";
 import { IframeView, toAssetUrl } from "./editor/IframeView";
 import { createImageExtension } from "./editor/ImageExtension";
-import { createHtmlFile, createMarkdownFile } from "./fileActions";
+import {
+	createDiagramFile,
+	createHtmlFile,
+	createMarkdownFile,
+} from "./fileActions";
 import { isChangelogPath } from "./lib/changelogNote";
 import { copyText } from "./lib/clipboard";
 import {
 	dirname,
 	fileKindForPath,
+	hasDiagramExtension,
 	hasHtmlExtension,
 	hasImageExtension,
 	hasPdfExtension,
@@ -599,6 +605,9 @@ function App() {
 			desktopApi.onMenuCreateHtmlFile(
 				() => void createHtmlFile(focusedCreationFolder),
 			),
+			desktopApi.onMenuCreateDiagramFile(
+				() => void createDiagramFile(focusedCreationFolder),
+			),
 			desktopApi.onMenuOpenFile(() => void openFilePicker()),
 			desktopApi.onMenuOpenFolder(() => void openWorkspaceWithSidebar()),
 			desktopApi.onMenuOpenSettings(() => setSettingsOpen(true)),
@@ -911,6 +920,10 @@ function DocumentViewer({
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const documentId = editorDocumentId(path);
+	if (hasDiagramExtension(path)) {
+		return <DiagramView key={path} path={path} content={content} />;
+	}
+
 	if (viewMode === "source" && supportsSourceToggle(path)) {
 		const isHtml = hasHtmlExtension(path);
 		return (

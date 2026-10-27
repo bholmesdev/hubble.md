@@ -12,6 +12,7 @@ import { copyText } from "../lib/clipboard";
 import { isCompactWindow, useCompactWindow } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
+	createDiagramFileInFolder,
 	createFolderInFolder,
 	createHtmlFileInFolder,
 	createMarkdownFileInFolder,
@@ -206,6 +207,9 @@ export function Sidebar({
 			}
 			onCreateHtmlFile={(folderId) =>
 				createHtmlFileInFolder(absolutePath(folderId))
+			}
+			onCreateDiagramFile={(folderId) =>
+				createDiagramFileInFolder(absolutePath(folderId))
 			}
 			onCreateFolder={(folderId) =>
 				createFolderInFolder(absolutePath(folderId))
