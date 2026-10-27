@@ -21,3 +21,7 @@ allowBuilds:
   msw: true
   sharp: true
   node-pty: true
+
+overrides:
+  # tldraw pulls this in; keep it on the workspace's @tiptap/core version.
+  "@tiptap/extension-highlight": 3.20.0

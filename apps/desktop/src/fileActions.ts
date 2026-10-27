@@ -1,5 +1,6 @@
 import { getActiveEditor } from "@hubble.md/ui";
 import {
+	createDiagramFileInFolder,
 	createHtmlFileInFolder,
 	createMarkdownFileInFolder,
 } from "./store/actions";
@@ -28,4 +29,10 @@ export async function createHtmlFile(parentPath?: string | null) {
 	const targetPath = parentPath ?? workspaceStore.get().workspacePath;
 	if (!targetPath) return;
 	await createHtmlFileInFolder(targetPath);
+}
+
+export async function createDiagramFile(parentPath?: string | null) {
+	const targetPath = parentPath ?? workspaceStore.get().workspacePath;
+	if (!targetPath) return;
+	await createDiagramFileInFolder(targetPath);
 }
