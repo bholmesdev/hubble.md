@@ -2,6 +2,7 @@ const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdown)$/i;
 const HTML_EXTENSION_RE = /\.html?$/i;
 const TEXT_EXTENSION_RE = /\.(txt|text)$/i;
 const PDF_EXTENSION_RE = /\.pdf$/i;
+const DIAGRAM_EXTENSION_RE = /\.tldr$/i;
 const IMAGE_EXTENSION_RE = /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i;
 const CODE_EXTENSION_RE =
 	/\.(astro|bash|c|cc|clj|cljs|cmake|coffee|cpp|cs|css|dart|diff|env|fish|go|graphql|h|hpp|ini|java|js|jsx|json|kt|kts|less|lua|m|mdx|mjs|mts|php|pl|prisma|properties|py|r|rb|rs|sass|scala|scss|sh|sql|svelte|swift|toml|ts|tsx|vue|xml|yaml|yml|zsh)$/i;
@@ -112,6 +113,11 @@ export function hasImageExtension(path: string): boolean {
 	return IMAGE_EXTENSION_RE.test(path);
 }
 
+/** tldraw's JSON document format, opened as a full-screen diagram. */
+export function hasDiagramExtension(path: string): boolean {
+	return DIAGRAM_EXTENSION_RE.test(path);
+}
+
 export function isCodeFile(path: string): boolean {
 	return (
 		CODE_EXTENSION_RE.test(path) ||
@@ -125,7 +131,10 @@ export function hasDocumentExtension(path: string): boolean {
 
 export function isEditableFile(path: string): boolean {
 	return (
-		hasDocumentExtension(path) || hasTextExtension(path) || isCodeFile(path)
+		hasDocumentExtension(path) ||
+		hasTextExtension(path) ||
+		hasDiagramExtension(path) ||
+		isCodeFile(path)
 	);
 }
 
