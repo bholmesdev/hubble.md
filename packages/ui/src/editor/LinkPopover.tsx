@@ -1004,9 +1004,7 @@ export function LinkPopover({
 		});
 	}, [machineState.mode]);
 
-	// The clipboard autofill lands after the input was focused and selected while
-	// empty. Select the filled href so an accidental paste replaces it instead of
-	// appending a duplicate link.
+	// Clipboard autofill lands after the input was selected empty; reselect so a paste replaces it.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the href change is the selection signal.
 	useLayoutEffect(() => {
 		if (!selectHrefAfterAutofillRef.current) return;
