@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- When cmd+K fills in a link from your clipboard, the link is now selected, so pasting replaces it instead of adding a duplicate. [#319](https://github.com/bholmesdev/hubble.md/pull/319)
+
 ## [0.3.1] - 2026-10-20
 
 ### Changed
