@@ -55,6 +55,7 @@ import {
 import { desktopApi } from "./desktopApi";
 import type { DesktopUpdateState } from "./desktopApi/types";
 import { DiagramView } from "./editor/DiagramView";
+import { runEditCommand, runZoomCommand } from "./editor/diagramCommands";
 import { createEmbedExtension } from "./editor/EmbedExtension";
 import { handleImageDrop, handleImagePaste } from "./editor/handleImagePaste";
 import { IframeView, toAssetUrl } from "./editor/IframeView";
@@ -521,6 +522,8 @@ function App() {
 			canGoForward: menuCanGoForward,
 			tabCount: tabs.order.length,
 			hasClosedTabs: tabs.closed.length > 0,
+			hasDiagramOpen:
+				typeof currentPath === "string" && hasDiagramExtension(currentPath),
 		});
 	}, [
 		hasWorkspace,
@@ -671,9 +674,11 @@ function App() {
 		const disposers = [
 			desktopApi.onUndoDelete(() => {
 				void undoDelete().then((undone) => {
-					if (!undone) void desktopApi.undoText();
+					if (!undone) runEditCommand("undo");
 				});
 			}),
+			desktopApi.onMenuEdit(runEditCommand),
+			desktopApi.onMenuZoom(runZoomCommand),
 			desktopApi.onMenuCreateMarkdownFile(() => void createNewFile()),
 			desktopApi.onMenuCreateHtmlFile(
 				() => void createHtmlFile(focusedCreationFolder),

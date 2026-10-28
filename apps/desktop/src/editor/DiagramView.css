@@ -114,18 +114,3 @@
 [data-hubble-diagram] .tlui-slider__range {
 	background-color: var(--muted-foreground);
 }
-
-/* The main menu floats as an island, like the toolbar and style panel,
- * instead of a tab notched into the canvas corner. */
-[data-hubble-diagram] .tlui-menu-zone {
-	margin: 8px;
-	border: none;
-	border-radius: var(--tl-radius-3);
-	background-color: var(--tl-color-panel);
-	box-shadow: var(--tl-shadow-2);
-}
-
-[data-hubble-diagram] .tlui-menu-zone [data-state="open"]::after,
-[data-hubble-diagram] .tlui-menu-zone [data-state="open"]:not(:hover)::after {
-	background: var(--tl-color-hint);
-}
