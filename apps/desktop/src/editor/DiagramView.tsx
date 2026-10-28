@@ -22,6 +22,7 @@ import "tldraw/tldraw.css";
 import "./DiagramView.css";
 import { savePathContent, updateEditorContent } from "../store/actions";
 import { isDarkTheme, subscribeTheme } from "../theme";
+import { diagramAssetUrls } from "./diagramIcons";
 
 const SAVE_DEBOUNCE_MS = 300;
 // Matches tldraw's own `.tldr` writer (`serializeTldrawJson`).
@@ -178,6 +179,7 @@ export function DiagramView({
 			<Tldraw
 				store={parsed.store}
 				licenseKey={licenseKey}
+				assetUrls={diagramAssetUrls}
 				components={components}
 				onMount={handleMount}
 			/>
