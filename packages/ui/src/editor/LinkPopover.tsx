@@ -659,6 +659,7 @@ export function LinkPopover({
 	const anchorRef = useRef(INITIAL_LINK_ANCHOR_STATE);
 	const lastSelectionActiveKeyRef = useRef<string | null>(null);
 	const expandNextLinkSessionRef = useRef(false);
+	const selectHrefAfterAutofillRef = useRef(false);
 	const originalWikiTargetRef = useRef<{
 		activeKey: string;
 		target: string;
@@ -945,6 +946,7 @@ export function LinkPopover({
 							const href = clipboardValue.trim();
 							if (!canAutofillLinkFromClipboard(href)) return;
 							updateLinkMark(editor, link, href);
+							selectHrefAfterAutofillRef.current = true;
 							setHrefValue(href);
 							setActiveLink({ ...link, ...linkAttrsForHref(href) });
 							dispatchMachineEvent({ type: "EXPAND_REQUESTED" });
@@ -1001,6 +1003,17 @@ export function LinkPopover({
 			inputRef.current?.select();
 		});
 	}, [machineState.mode]);
+
+	// The clipboard autofill lands after the input was focused and selected while
+	// empty. Select the filled href so an accidental paste replaces it instead of
+	// appending a duplicate link.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the href change is the selection signal.
+	useLayoutEffect(() => {
+		if (!selectHrefAfterAutofillRef.current) return;
+		selectHrefAfterAutofillRef.current = false;
+		inputRef.current?.focus();
+		inputRef.current?.select();
+	}, [hrefValue]);
 
 	// ── Ghost text decoration management ────────────────────────────
 	useEffect(() => {
