@@ -1,0 +1,120 @@
+/* tldraw's UI layers run from z-index 300 up; keep them below app overlays. */
+[data-hubble-diagram] {
+	isolation: isolate;
+}
+
+/* Hubble's palette on tldraw's theme variables. Both theme classes are
+ * overridden because Hubble's own tokens already switch with `.dark`. */
+[data-hubble-diagram] :is(.tl-theme__light, .tl-theme__dark) {
+	--tl-color-background: var(--background);
+	--tl-color-low: var(--secondary);
+	--tl-color-low-border: var(--border);
+	--tl-color-divider: var(--border);
+	--tl-color-panel: var(--popover);
+	--tl-color-panel-contrast: var(--popover);
+	--tl-color-panel-overlay: color-mix(
+		in oklab,
+		var(--popover) 82%,
+		transparent
+	);
+	--tl-color-panel-transparent: color-mix(
+		in oklab,
+		var(--popover) 0%,
+		transparent
+	);
+	/* Grayscale hover and selected, like Hubble's ghost buttons. */
+	--tl-color-muted-2: color-mix(in oklab, var(--muted) 60%, transparent);
+	--tl-color-hint: var(--muted);
+	--tl-color-text: var(--popover-foreground);
+	--tl-color-text-0: var(--popover-foreground);
+	--tl-color-text-1: var(--popover-foreground);
+	--tl-color-text-3: var(--muted-foreground);
+	--tl-color-text-shadow: var(--background);
+
+	/* Panels and menus: bordered overlay surface, like Hubble's popovers. */
+	--tl-shadow-2: 0 0 0 1px var(--border);
+	--tl-shadow-3: 0 0 0 1px var(--border), var(--shadow-overlay);
+	--tl-shadow-4: 0 0 0 1px var(--border), var(--shadow-overlay);
+	--tl-radius-2: var(--radius-row);
+	--tl-radius-3: var(--radius-popover);
+	--tl-radius-4: var(--radius-popover);
+}
+
+/* Menus use Hubble's overlay metrics: p-1 popup, compact 11px rows, amber
+ * highlight. Covers the main menu, its submenus and the context menu. */
+[data-hubble-diagram] .tlui-menu {
+	--tl-color-muted-2: var(--accent);
+	padding-inline: 4px;
+}
+
+[data-hubble-diagram] .tlui-menu__group {
+	padding-block: 4px;
+}
+
+[data-hubble-diagram] .tlui-menu .tlui-button__menu {
+	height: auto;
+	min-height: 0;
+	margin-top: 0;
+	padding: 6px 8px;
+}
+
+[data-hubble-diagram] .tlui-menu .tlui-button__menu::after {
+	inset: 0;
+}
+
+[data-hubble-diagram] .tlui-menu :is(.tlui-button__label, .tlui-kbd) {
+	font-size: 11px;
+}
+
+[data-hubble-diagram]
+	.tlui-menu__submenu__trigger:is(:hover, [data-state="open"])::after {
+	background: var(--tl-color-muted-2);
+}
+
+/* The bottom toolbar keeps Hubble's amber: pale on hover, solid for the
+ * active tool. Everywhere else stays grayscale. */
+[data-hubble-diagram] .tlui-main-toolbar .tlui-button__tool {
+	--tl-color-muted-2: var(--accent);
+}
+
+[data-hubble-diagram]
+	.tlui-main-toolbar
+	.tlui-button__tool[aria-pressed="true"],
+[data-hubble-diagram]
+	.tlui-main-toolbar
+	.tlui-button__tool[aria-pressed="true"]:not(
+		:disabled,
+		[data-disabled],
+		:focus-visible
+	):active {
+	color: var(--selected-foreground);
+}
+
+[data-hubble-diagram]
+	.tlui-main-toolbar
+	.tlui-button__tool[aria-pressed="true"]:not(
+		:disabled,
+		[data-disabled]
+	)::after {
+	background: var(--selected);
+}
+
+/* The slider fill goes grayscale instead of tldraw's blue. */
+[data-hubble-diagram] .tlui-slider__range {
+	background-color: var(--muted-foreground);
+}
+
+/* The main menu floats as an island, like the toolbar and style panel,
+ * instead of a tab notched into the canvas corner. */
+[data-hubble-diagram] .tlui-menu-zone {
+	margin: 8px;
+	border: none;
+	border-radius: var(--tl-radius-3);
+	background-color: var(--tl-color-panel);
+	box-shadow: var(--tl-shadow-2);
+}
+
+[data-hubble-diagram] .tlui-menu-zone [data-state="open"]::after,
+[data-hubble-diagram] .tlui-menu-zone [data-state="open"]:not(:hover)::after {
+	background: var(--tl-color-hint);
+}

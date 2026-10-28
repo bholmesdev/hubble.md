@@ -1,16 +1,25 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
 	createTLStore,
+	DefaultMainMenu,
+	DefaultZoomMenuContent,
 	defaultBindingUtils,
 	defaultShapeUtils,
 	type Editor,
+	EditSubmenu,
+	ExportFileContentSubMenu,
+	ExtrasGroup,
 	loadSnapshot,
+	PreferencesGroup,
 	parseTldrawJsonFile,
 	type TLStore,
 	type TLUiComponents,
 	Tldraw,
+	TldrawUiMenuGroup,
+	TldrawUiMenuSubmenu,
 } from "tldraw";
 import "tldraw/tldraw.css";
+import "./DiagramView.css";
 import { savePathContent, updateEditorContent } from "../store/actions";
 import { isDarkTheme, subscribeTheme } from "../theme";
 
@@ -18,8 +27,32 @@ const SAVE_DEBOUNCE_MS = 300;
 // Matches tldraw's own `.tldr` writer (`serializeTldrawJson`).
 const TLDRAW_FILE_FORMAT_VERSION = 1;
 
+/** tldraw's main menu, with its zoom-only View submenu renamed to Zoom. */
+function DiagramMainMenu() {
+	return (
+		<DefaultMainMenu>
+			<TldrawUiMenuGroup id="basic">
+				<EditSubmenu />
+				<TldrawUiMenuSubmenu id="zoom" label="navigation-zone.zoom">
+					<TldrawUiMenuGroup id="zoom-actions">
+						<DefaultZoomMenuContent />
+					</TldrawUiMenuGroup>
+				</TldrawUiMenuSubmenu>
+				<ExportFileContentSubMenu />
+				<ExtrasGroup />
+			</TldrawUiMenuGroup>
+			<PreferencesGroup />
+		</DefaultMainMenu>
+	);
+}
+
 // A diagram file is one tldraw document, so hide multi-page navigation.
-const components: TLUiComponents = { PageMenu: null };
+// Zoom lives in the main menu instead of the bottom-left pill.
+const components: TLUiComponents = {
+	PageMenu: null,
+	NavigationPanel: null,
+	MainMenu: DiagramMainMenu,
+};
 
 const licenseKey = import.meta.env.VITE_TLDRAW_LICENSE_KEY;
 
