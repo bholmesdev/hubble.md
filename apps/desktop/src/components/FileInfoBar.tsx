@@ -29,6 +29,7 @@ import { copyText } from "../lib/clipboard";
 import {
 	basename,
 	dirname,
+	hasDiagramExtension,
 	hasHtmlExtension,
 	hasMarkdownExtension,
 	hasTextExtension,
@@ -59,6 +60,7 @@ import {
 	workspacePathStore,
 } from "../store/state";
 import { ClaudeLogo, CodexLogo } from "./AgentLogos";
+import { DiagramMenuItems } from "./DiagramMenuItems";
 
 const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
 
@@ -350,6 +352,12 @@ function ActionsMenu({
 								<span className="min-w-0 flex-1">{sourceModeLabel}</span>
 								<ShortcutHint commandId="app.toggle-source-mode" />
 							</Menu.Item>
+						)}
+						{path && hasDiagramExtension(path) && (
+							<>
+								<DiagramMenuItems itemClass={menuItemClass} />
+								<Menu.Separator className="my-1 h-px bg-border" />
+							</>
 						)}
 						{path && (
 							<>
