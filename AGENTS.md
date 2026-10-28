@@ -2,6 +2,8 @@ Check work: `pnpm build:desktop` (builds packages, runs biome check, tsc, vite b
 
 After React changes, run `pnpm check:react-compiler`; CI rejects components the compiler skips.
 
+Every PR with a user-visible change adds a `CHANGELOG.md` entry under `## [Unreleased]` before it opens, however the PR is created. Follow the `changelog` skill.
+
 When asked why you made a decision, answer why. Don't take it as a challenge to your approach, or pressure to change your solution.
 
 ## Agent skills
