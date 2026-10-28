@@ -71,8 +71,19 @@
 	background: var(--tl-color-muted-2);
 }
 
-/* The bottom toolbar keeps Hubble's amber: pale on hover, solid for the
- * active tool. Everywhere else stays grayscale. */
+/* The bottom toolbar keeps Hubble's amber: pale on hover, and the active
+ * tool goes from pale to solid while the toolbar has focus, like the
+ * sidebar's selected row. Everywhere else stays grayscale. */
+[data-hubble-diagram] .tlui-main-toolbar {
+	--tool-active: var(--accent);
+	--tool-active-foreground: var(--accent-foreground);
+}
+
+[data-hubble-diagram] .tlui-main-toolbar:focus-within {
+	--tool-active: var(--selected);
+	--tool-active-foreground: var(--selected-foreground);
+}
+
 [data-hubble-diagram] .tlui-main-toolbar .tlui-button__tool {
 	--tl-color-muted-2: var(--accent);
 }
@@ -87,7 +98,7 @@
 		[data-disabled],
 		:focus-visible
 	):active {
-	color: var(--selected-foreground);
+	color: var(--tool-active-foreground);
 }
 
 [data-hubble-diagram]
@@ -96,7 +107,7 @@
 		:disabled,
 		[data-disabled]
 	)::after {
-	background: var(--selected);
+	background: var(--tool-active);
 }
 
 /* The slider fill goes grayscale instead of tldraw's blue. */
