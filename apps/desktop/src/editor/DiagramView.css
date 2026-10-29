@@ -114,3 +114,72 @@
 [data-hubble-diagram] .tlui-slider__range {
 	background-color: var(--muted-foreground);
 }
+
+/* Text selection uses Hubble's highlight and keeps the shape's own text
+ * color, instead of tldraw's blue highlight with inverted text. Its child
+ * paragraphs inherit this color, so it has to be set here. */
+[data-hubble-diagram]
+	.tl-text-input:not(:has(.ProseMirror-hideselection))::selection {
+	background: color-mix(in oklab, var(--selected) 70%, transparent);
+	color: inherit;
+}
+
+.dark
+	[data-hubble-diagram]
+	.tl-text-input:not(:has(.ProseMirror-hideselection))::selection {
+	background: color-mix(in oklab, #8a764b 88%, transparent);
+}
+
+/* The text formatting toolbar matches Markdown's selection toolbar: p-1,
+ * 28px ghost buttons with 16px icons, and a fade and scale on appear. */
+[data-hubble-diagram] .tlui-rich-text__toolbar {
+	transition: opacity 150ms ease;
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-toolbar {
+	--tl-color-muted-2: var(--muted);
+	--tl-color-hint: var(--muted);
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 4px;
+	transform-origin: center bottom;
+	scale: 0.95;
+	transition: scale 150ms ease;
+}
+
+[data-hubble-diagram]
+	.tlui-rich-text__toolbar[data-visible="true"]
+	.tlui-toolbar {
+	scale: 1;
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-button {
+	height: 28px;
+	min-width: 28px;
+	/* tldraw's row layout overlaps neighbors with -2px margins. */
+	margin: 0;
+	padding: 0;
+	color: var(--muted-foreground);
+	transition: color var(--default-transition-duration) var(--ease-snappy);
+}
+
+[data-hubble-diagram]
+	.tlui-rich-text__toolbar
+	.tlui-button:is(:hover, [data-isactive="true"]) {
+	color: var(--foreground);
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-button::after {
+	inset: 0;
+	border-radius: var(--radius-sm);
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-icon {
+	width: 16px;
+	height: 16px;
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-input__wrapper {
+	height: 28px;
+}
