@@ -41,6 +41,7 @@ import type {
 	ZoomCommand,
 } from "../src/desktopApi/types";
 import {
+	DIAGRAMS_ENABLED,
 	fileKindForPath,
 	HUBBLE_DIR,
 	hasMarkdownExtension,
@@ -949,6 +950,7 @@ function buildMenu() {
 				{
 					id: "new-diagram-file",
 					label: "New Diagram",
+					visible: DIAGRAMS_ENABLED,
 					click: () => sendToRenderer("desktop:menu-create-diagram-file"),
 				},
 				{ type: "separator" },
@@ -1788,7 +1790,9 @@ function registerIpc() {
 				{ name: "Documents", extensions: ["md", "markdown", "mdown", "html"] },
 				{ name: "Text", extensions: ["txt", "text"] },
 				{ name: "PDF", extensions: ["pdf"] },
-				{ name: "Diagram", extensions: ["tldr"] },
+				...(DIAGRAMS_ENABLED
+					? [{ name: "Diagram", extensions: ["tldr"] }]
+					: []),
 				{ name: "All Files", extensions: ["*"] },
 			],
 		});

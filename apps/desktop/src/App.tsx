@@ -57,12 +57,12 @@ import { copyText } from "./lib/clipboard";
 import {
 	dirname,
 	fileKindForPath,
-	hasDiagramExtension,
 	hasHtmlExtension,
 	hasImageExtension,
 	hasPdfExtension,
 	hasTextExtension,
 	isCodeFile,
+	isDiagramFile,
 	isEditableFile,
 	relativeWorkspacePath,
 	sourceLanguageForPath,
@@ -452,7 +452,7 @@ function App() {
 			tabCount: tabs.order.length,
 			hasClosedTabs: tabs.closed.length > 0,
 			hasDiagramOpen:
-				typeof currentPath === "string" && hasDiagramExtension(currentPath),
+				typeof currentPath === "string" && isDiagramFile(currentPath),
 		});
 	}, [
 		hasWorkspace,
@@ -925,7 +925,7 @@ function DocumentViewer({
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
 	const documentId = editorDocumentId(path);
-	if (hasDiagramExtension(path)) {
+	if (isDiagramFile(path)) {
 		return <DiagramView key={path} path={path} content={content} />;
 	}
 

@@ -90,6 +90,8 @@ jobs:
       - name: Build and publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          # Diagrams ship only in builds with a tldraw license key.
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
           # Electron Builder otherwise skips releases published over two hours ago.
           EP_GH_IGNORE_TIME: "true"
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -156,6 +158,8 @@ jobs:
       - name: Build and publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          # Diagrams ship only in builds with a tldraw license key.
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
         run: |
           pnpm --filter @hubble.md/desktop... --if-present build
           pnpm --filter @hubble.md/desktop exec electron-builder --linux --${{ matrix.arch }} --publish always
@@ -208,6 +212,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          # Diagrams ship only in builds with a tldraw license key.
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
         run: |
           pnpm --filter @hubble.md/desktop... --if-present build
           pnpm --filter @hubble.md/desktop exec electron-builder --win --${{ matrix.arch }} --publish always

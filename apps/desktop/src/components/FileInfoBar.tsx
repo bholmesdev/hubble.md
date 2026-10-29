@@ -28,10 +28,10 @@ import { copyText } from "../lib/clipboard";
 import {
 	basename,
 	dirname,
-	hasDiagramExtension,
 	hasHtmlExtension,
 	hasMarkdownExtension,
 	hasTextExtension,
+	isDiagramFile,
 	isEditableFile,
 	pathEquals,
 	relativeWorkspacePath,
@@ -335,7 +335,7 @@ function ActionsMenu({
 								<ShortcutHint commandId="app.toggle-source-mode" />
 							</Menu.Item>
 						)}
-						{path && hasDiagramExtension(path) && (
+						{path && isDiagramFile(path) && (
 							<>
 								<DiagramMenuItems itemClass={menuItemClass} />
 								<Menu.Separator className="my-1 h-px bg-border" />
