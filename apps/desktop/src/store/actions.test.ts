@@ -209,6 +209,21 @@ describe("desktop savePathContent", () => {
 		);
 	});
 
+	it("persists the diagram grid setting", async () => {
+		const api = createDesktopApi();
+		const { diagramGridStore, setDiagramGrid } = await loadStoreActions(api);
+		const { STORAGE_KEY } = await import("./persistence");
+
+		expect(diagramGridStore.get()).toBe(false);
+		setDiagramGrid(true);
+
+		expect(diagramGridStore.get()).toBe(true);
+		expect(localStorage.setItem).toHaveBeenLastCalledWith(
+			STORAGE_KEY,
+			expect.stringContaining('"diagramGrid":true'),
+		);
+	});
+
 	it("hydrates the code-file preference", async () => {
 		const api = createDesktopApi();
 		const { codeFileOpenModeStore } = await loadStoreActions(

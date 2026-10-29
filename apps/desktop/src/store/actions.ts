@@ -76,6 +76,7 @@ import {
 	chatCommandStore,
 	cleanFileState,
 	codeFileOpenModeStore,
+	diagramGridStore,
 	emptyDoc,
 	type FileEntry,
 	type FolderEntry,
@@ -597,6 +598,10 @@ export function setChatCommand(command: string) {
 
 export function setCodeFileOpenMode(mode: CodeFileOpenMode) {
 	codeFileOpenModeStore.set(mode);
+}
+
+export function setDiagramGrid(on: boolean) {
+	diagramGridStore.set(on);
 }
 
 export async function openPathInDefaultApp(path: string) {

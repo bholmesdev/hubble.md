@@ -6,13 +6,19 @@ import {
 	type Editor,
 	loadSnapshot,
 	parseTldrawJsonFile,
+	react,
 	type TLStore,
 	type TLUiComponents,
 	Tldraw,
 } from "tldraw";
 import "tldraw/tldraw.css";
 import "./DiagramView.css";
-import { savePathContent, updateEditorContent } from "../store/actions";
+import {
+	savePathContent,
+	setDiagramGrid,
+	updateEditorContent,
+} from "../store/actions";
+import { diagramGridStore } from "../store/state";
 import { isDarkTheme, subscribeTheme } from "../theme";
 import { clearActiveDiagram, setActiveDiagram } from "./diagramCommands";
 import { diagramAssetUrls } from "./diagramIcons";
@@ -112,6 +118,13 @@ export function DiagramView({
 		editor.user.updateUserPreferences({
 			colorScheme: isDarkTheme() ? "dark" : "light",
 		});
+		// Grid mode is an app-wide setting, so it follows the user between
+		// diagrams. The ⋯ menu and tldraw's shortcut both toggle the editor,
+		// and this keeps the setting in step.
+		editor.updateInstanceState({ isGridMode: diagramGridStore.get() });
+		const stopGridSync = react("diagram grid setting", () =>
+			setDiagramGrid(editor.getInstanceState().isGridMode),
+		);
 		// Only user edits to the document save; camera moves and selection don't.
 		const stopListening = editor.store.listen(
 			() => scheduleDiagramSave(session),
@@ -119,6 +132,7 @@ export function DiagramView({
 		);
 		return () => {
 			stopListening();
+			stopGridSync();
 			clearActiveDiagram(editor);
 		};
 	};
