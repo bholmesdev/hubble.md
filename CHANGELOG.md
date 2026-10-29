@@ -9,7 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Right-click an image in a note to copy it, or to copy its file path (or web address for linked images). [#318](https://github.com/bholmesdev/hubble.md/issues/318)
+- Right-click an image in a note to copy it, or to copy its file path (or web address for linked images). [#321](https://github.com/bholmesdev/hubble.md/pull/321)
 
 ### Changed
 
