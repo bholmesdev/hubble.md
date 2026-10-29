@@ -9,9 +9,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Right-click an image in a note to copy it, or to copy its file path (or web address for linked images). [#321](https://github.com/bholmesdev/hubble.md/pull/321)
-
 ### Changed
+
+### Fixed
+
+## [0.3.2] - 2026-10-29
+
+### Added
+
+- Right-click an image in a note to copy it, or to copy its file path (or web address for linked images). [#321](https://github.com/bholmesdev/hubble.md/pull/321)
 
 ### Fixed
 
