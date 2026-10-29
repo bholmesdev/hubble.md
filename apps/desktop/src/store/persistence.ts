@@ -45,6 +45,8 @@ type SettingsState = {
 	lastSeenVersion: string | null;
 	shortcutBindings: CommandBindings;
 	theme: ThemePreference;
+	/** Grid mode for every diagram, not saved per file. */
+	diagramGrid: boolean;
 };
 
 export type CodeFileOpenMode = "hubble" | "default-app";
@@ -77,6 +79,7 @@ type Persisted = {
 		lastSeenVersion?: string | null;
 		shortcutBindings?: unknown;
 		theme?: ThemePreference;
+		diagramGrid?: boolean;
 	};
 };
 
@@ -148,6 +151,7 @@ export function getInitialState(): DesktopState {
 				p?.settings?.theme === "light" || p?.settings?.theme === "dark"
 					? p.settings.theme
 					: "system",
+			diagramGrid: p?.settings?.diagramGrid === true,
 		},
 	};
 }
@@ -175,6 +179,7 @@ export function serialize(state: DesktopState): Persisted {
 			lastSeenVersion: state.settings.lastSeenVersion,
 			shortcutBindings: state.settings.shortcutBindings,
 			theme: state.settings.theme,
+			diagramGrid: state.settings.diagramGrid,
 		},
 	};
 }
