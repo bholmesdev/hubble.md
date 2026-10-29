@@ -891,8 +891,6 @@ function buildImageContextMenu(
 		},
 	];
 	const source = URL.parse(params.srcURL);
-	// Local assets load through hubble-asset://, which means nothing outside
-	// Hubble, so offer the file path instead of the URL.
 	if (source?.protocol === "hubble-asset:") {
 		const filePath = assetPathFromUrl(source);
 		items.push({
