@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- The tab bar border no longer has a 1px gap where it meets the sidebar. [#323](https://github.com/bholmesdev/hubble.md/pull/323)
+
 ## [0.3.1] - 2026-10-20
 
 ### Changed
