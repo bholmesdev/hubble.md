@@ -13,6 +13,7 @@ import {
 } from "tldraw";
 import "tldraw/tldraw.css";
 import "./DiagramView.css";
+import { recallCamera, rememberCamera } from "../lib/scrollMemory";
 import {
 	savePathContent,
 	setDiagramGrid,
@@ -122,6 +123,15 @@ export function DiagramView({
 		// diagrams. The ⋯ menu and tldraw's shortcut both toggle the editor,
 		// and this keeps the setting in step.
 		editor.updateInstanceState({ isGridMode: diagramGridStore.get() });
+		// Reopening a diagram returns to where the user left it this session,
+		// like a note's scroll position. A first open keeps the file's camera.
+		// Recording every move, not just on close, keeps an entry in memory
+		// for a rename to carry to the new path.
+		const camera = recallCamera(session.path);
+		if (camera) editor.setCamera(camera, { immediate: true });
+		const stopCameraMemory = react("diagram camera memory", () =>
+			rememberCamera(session.path, editor.getCamera()),
+		);
 		const stopGridSync = react("diagram grid setting", () =>
 			setDiagramGrid(editor.getInstanceState().isGridMode),
 		);
@@ -133,6 +143,7 @@ export function DiagramView({
 		return () => {
 			stopListening();
 			stopGridSync();
+			stopCameraMemory();
 			clearActiveDiagram(editor);
 		};
 	};
