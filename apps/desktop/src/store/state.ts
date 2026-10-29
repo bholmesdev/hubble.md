@@ -195,3 +195,6 @@ export const shortcutBindingsStore = appStore
 	.select("settings")
 	.select("shortcutBindings");
 export const themePreferenceStore = appStore.select("settings").select("theme");
+export const diagramGridStore = appStore
+	.select("settings")
+	.select("diagramGrid");
