@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { desktopApi } from "../desktopApi";
 import { focusMarkdownEditorAfterRender } from "../fileActions";
 import { copyText } from "../lib/clipboard";
+import { DIAGRAMS_ENABLED } from "../lib/filePath";
 import { isCompactWindow, useCompactWindow } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
@@ -204,8 +205,10 @@ export function Sidebar({
 			onCreateHtmlFile={(folderId) =>
 				createHtmlFileInFolder(absolutePath(folderId))
 			}
-			onCreateDiagramFile={(folderId) =>
-				createDiagramFileInFolder(absolutePath(folderId))
+			onCreateDiagramFile={
+				DIAGRAMS_ENABLED
+					? (folderId) => createDiagramFileInFolder(absolutePath(folderId))
+					: undefined
 			}
 			onCreateFolder={(folderId) =>
 				createFolderInFolder(absolutePath(folderId))

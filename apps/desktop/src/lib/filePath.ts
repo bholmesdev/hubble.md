@@ -113,9 +113,16 @@ export function hasImageExtension(path: string): boolean {
 	return IMAGE_EXTENSION_RE.test(path);
 }
 
+/**
+ * A production tldraw without a license key blanks the canvas after five
+ * seconds, so release builds only offer diagrams when built with one.
+ */
+export const DIAGRAMS_ENABLED =
+	import.meta.env.DEV || Boolean(import.meta.env.VITE_TLDRAW_LICENSE_KEY);
+
 /** tldraw's JSON document format, opened as a full-screen diagram. */
-export function hasDiagramExtension(path: string): boolean {
-	return DIAGRAM_EXTENSION_RE.test(path);
+export function isDiagramFile(path: string): boolean {
+	return DIAGRAMS_ENABLED && DIAGRAM_EXTENSION_RE.test(path);
 }
 
 export function isCodeFile(path: string): boolean {
@@ -133,7 +140,7 @@ export function isEditableFile(path: string): boolean {
 	return (
 		hasDocumentExtension(path) ||
 		hasTextExtension(path) ||
-		hasDiagramExtension(path) ||
+		isDiagramFile(path) ||
 		isCodeFile(path)
 	);
 }
