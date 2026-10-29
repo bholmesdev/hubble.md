@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
 	captureScroll,
 	forgetScrollPositions,
+	recallCamera,
 	recallScroll,
+	rememberCamera,
 	rememberScroll,
 	rewriteScrollMemory,
 	setScrollContainer,
@@ -18,6 +20,13 @@ describe("scroll memory", () => {
 		expect(recallScroll("/w/a.md")).toBe(120);
 		expect(recallScroll("/w/b.md")).toBe(40);
 		expect(recallScroll("/w/never-opened.md")).toBeUndefined();
+	});
+
+	it("keeps a diagram's camera apart from note scroll offsets", () => {
+		rememberCamera("/w/map.tldr", { x: 10, y: -20, z: 0.5 });
+
+		expect(recallCamera("/w/map.tldr")).toEqual({ x: 10, y: -20, z: 0.5 });
+		expect(recallScroll("/w/map.tldr")).toBeUndefined();
 	});
 
 	it("follows notes through a rename, using the caller's rule", () => {
