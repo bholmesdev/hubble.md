@@ -1,3 +1,4 @@
+import { getAssetUrlsByImport } from "@tldraw/assets/imports.vite";
 import type { TLUiAssetUrlOverrides } from "tldraw";
 import add from "~icons/mingcute/add-line?raw";
 import back from "~icons/mingcute/back-line?raw";
@@ -37,13 +38,19 @@ function iconUrl(svg: string) {
 	return `data:image/svg+xml,${encodeURIComponent(image)}`;
 }
 
+// tldraw otherwise fetches its icons, fonts and translations from its CDN
+// at runtime, which is slow on first load and fails offline.
+const bundled = getAssetUrlsByImport();
+
 /**
  * Hubble's Mingcute icons for tldraw's generic UI icons: actions, menus and
  * text formatting. Tools, styles, shapes and sizes keep tldraw's icons,
  * which have no Mingcute counterpart.
  */
 export const diagramAssetUrls: TLUiAssetUrlOverrides = {
+	...bundled,
 	icons: {
+		...bundled.icons,
 		undo: iconUrl(back),
 		redo: iconUrl(forward),
 		trash: iconUrl(deleteIcon),
