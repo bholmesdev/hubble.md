@@ -16,6 +16,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Fixed
 
 - When cmd+K fills in a link from your clipboard, the link is now selected, so pasting replaces it instead of adding a duplicate. [#319](https://github.com/bholmesdev/hubble.md/pull/319)
+- The tab bar border no longer has a 1px gap where it meets the sidebar. [#323](https://github.com/bholmesdev/hubble.md/pull/323)
 
 ## [0.3.1] - 2026-10-20
 
