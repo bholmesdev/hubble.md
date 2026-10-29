@@ -19,6 +19,7 @@ import chokidar, { type FSWatcher } from "chokidar";
 import {
 	app,
 	BrowserWindow,
+	clipboard,
 	dialog,
 	ipcMain,
 	Menu,
@@ -878,8 +879,39 @@ function buildTextContextMenu(
 	return Menu.buildFromTemplate([...spellingItems, ...editItems]);
 }
 
-function registerTextContextMenu(window: BrowserWindow) {
+function buildImageContextMenu(
+	webContents: Electron.WebContents,
+	params: Electron.ContextMenuParams,
+) {
+	const items: Electron.MenuItemConstructorOptions[] = [
+		{
+			label: "Copy Image",
+			enabled: params.hasImageContents,
+			click: () => webContents.copyImageAt(params.x, params.y),
+		},
+	];
+	const source = URL.parse(params.srcURL);
+	if (source?.protocol === "hubble-asset:") {
+		const filePath = assetPathFromUrl(source);
+		items.push({
+			label: "Copy Image Path",
+			click: () => clipboard.writeText(filePath),
+		});
+	} else if (source?.protocol === "http:" || source?.protocol === "https:") {
+		items.push({
+			label: "Copy Image Address",
+			click: () => clipboard.writeText(params.srcURL),
+		});
+	}
+	return Menu.buildFromTemplate(items);
+}
+
+function registerContextMenu(window: BrowserWindow) {
 	window.webContents.on("context-menu", (_event, params) => {
+		if (params.mediaType === "image") {
+			buildImageContextMenu(window.webContents, params).popup({ window });
+			return;
+		}
 		if (!params.isEditable) return;
 		buildTextContextMenu(window.webContents, params).popup({
 			window,
@@ -1280,7 +1312,7 @@ async function createWindow() {
 		}
 	});
 	window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-	registerTextContextMenu(window);
+	registerContextMenu(window);
 	if (windowState.isFullScreen) {
 		window.setFullScreen(true);
 	} else if (windowState.isMaximized) {
