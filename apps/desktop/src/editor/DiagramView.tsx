@@ -9,6 +9,7 @@ import {
 	react,
 	type TLStore,
 	type TLUiComponents,
+	type TLUiOverrides,
 	Tldraw,
 } from "tldraw";
 import "tldraw/tldraw.css";
@@ -35,6 +36,20 @@ const components: TLUiComponents = {
 	MenuPanel: null,
 	PageMenu: null,
 	NavigationPanel: null,
+};
+
+// Zoom follows Sketch: Cmd-1 fits, Cmd-2 zooms to the selection, and Cmd-0
+// is the View menu's reset. tldraw's Shift-number keys fire when "!" or "@"
+// is typed with the canvas focused. Copy as PNG gives Cmd-Shift-C back to
+// Copy File Path.
+const overrides: TLUiOverrides = {
+	actions(_editor, actions) {
+		actions["zoom-to-fit"].kbd = "cmd+1,ctrl+1";
+		actions["zoom-to-selection"].kbd = "cmd+2,ctrl+2";
+		delete actions["zoom-to-100"].kbd;
+		delete actions["copy-as-png"].kbd;
+		return actions;
+	},
 };
 
 const licenseKey = import.meta.env.VITE_TLDRAW_LICENSE_KEY;
@@ -186,6 +201,7 @@ export function DiagramView({
 				licenseKey={licenseKey}
 				assetUrls={diagramAssetUrls}
 				components={components}
+				overrides={overrides}
 				onMount={handleMount}
 			/>
 		</div>
