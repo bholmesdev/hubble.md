@@ -98,12 +98,14 @@ import {
 	setTelemetryConsent,
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
+	toggleSidebarView,
 	toggleTerminal,
 	undoDelete,
 	updateEditorContent,
 } from "./store/actions";
 import { canGoBack, canGoForward } from "./store/history";
 import { useHistoryNav } from "./store/hooks";
+import type { SidebarView } from "./store/persistence";
 import {
 	lastSeenVersionStore,
 	shortcutBindingsStore,
@@ -147,6 +149,10 @@ function folderForSidebarFocus(
 
 function focusSidebarNav() {
 	document.querySelector<HTMLElement>(SIDEBAR_NAV_SELECTOR)?.focus();
+}
+
+function showSidebarView(view: SidebarView) {
+	if (toggleSidebarView(view)) requestAnimationFrame(() => focusSidebarNav());
 }
 
 async function copyFilePath(path: string | null) {
@@ -503,6 +509,8 @@ function App() {
 					setSidebarOpen(opening);
 					if (opening) requestAnimationFrame(() => focusSidebarNav());
 				},
+				"app.show-folders": () => showSidebarView("folders"),
+				"app.show-inbox": () => showSidebarView("inbox"),
 			};
 			for (const [id, handler] of Object.entries(handlers) as [
 				AppCommandId,

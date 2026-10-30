@@ -15,6 +15,37 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+## [0.3.2] - 2026-10-29
+
+### Added
+
+- Right-click an image in a note to copy it, or to copy its file path (or web address for linked images). [#321](https://github.com/bholmesdev/hubble.md/pull/321)
+
+### Fixed
+
+- When cmd+K fills in a link from your clipboard, the link is now selected, so pasting replaces it instead of adding a duplicate. [#319](https://github.com/bholmesdev/hubble.md/pull/319)
+- The tab bar border no longer has a 1px gap where it meets the sidebar. [#323](https://github.com/bholmesdev/hubble.md/pull/323)
+
+## [0.3.1] - 2026-10-20
+
+### Changed
+
+- Holding Option in the inbox view no longer swaps each note's folder for its full path. Hover a note's folder to see its full path. [#310](https://github.com/bholmesdev/hubble.md/pull/310)
+
+## [0.3.0] - 2026-10-19
+
+### Added
+
+- An inbox view beside the folder tree lists every note newest first, grouped by date, with each note's title, first line, and folder. Switch views from the title bar, or with cmd+shift+E for folders and cmd+shift+I for the inbox. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
+
+### Changed
+
+- Change the default keybinding for toggling the sidebar from cmd+shift+E to cmd+\. You can change this binding back from Settings > Keybindings. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
+
+### Fixed
+
+- The folder tree now highlights the open note however you opened it, not just when you click it in the tree. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
+
 ## [0.2.1] - 2026-09-28
 
 ### Added

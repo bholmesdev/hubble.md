@@ -41,6 +41,8 @@ const desktopApi = {
 		}),
 	readFileText: (path) =>
 		ipcRenderer.invoke("desktop:read-file-text", { path }),
+	readNotePreviews: (paths) =>
+		ipcRenderer.invoke("desktop:read-note-previews", { paths }),
 	searchFileContents: (input) =>
 		ipcRenderer.invoke("desktop:search-file-contents", input),
 	detectHubbleSkills: (workspacePath) =>

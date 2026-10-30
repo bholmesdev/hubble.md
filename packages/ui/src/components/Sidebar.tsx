@@ -414,6 +414,8 @@ export function Sidebar({
 	sortMode,
 	storageScope,
 	header,
+	viewToggle,
+	children,
 	footer,
 	emptyState,
 	getDisplayPath = defaultGetDisplayPath,
@@ -447,6 +449,10 @@ export function Sidebar({
 	/** Stable key used to persist folder expansion for one workspace/open folder. */
 	storageScope?: string | null;
 	header?: ReactNode;
+	/** Switches between views of the files, shown before the file actions. */
+	viewToggle?: ReactNode;
+	/** Replaces the file tree, e.g. with another view over the same files. */
+	children?: ReactNode;
 	footer?: ReactNode;
 	emptyState?: ReactNode;
 	getDisplayPath?: (path: string) => string;
@@ -492,6 +498,10 @@ export function Sidebar({
 	const [renamingItem, setRenamingItem] = useState<RenameItem | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 	const [showFooterBorder, setShowFooterBorder] = useState(false);
+	// Which list (the tree or a replacement view) has scrolled away from its top.
+	const [scrolledList, setScrolledList] = useState<"tree" | "children" | null>(
+		null,
+	);
 	const [deleteOnCancel, setDeleteOnCancel] = useState<{
 		kind: RenameItem["kind"];
 		path: string;
@@ -505,6 +515,8 @@ export function Sidebar({
 	const [activeDragKeys, setActiveDragKeys] = useState<Set<string>>(new Set());
 	const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
 	const highlightPath = pendingPath ?? currentPath;
+	// Whether the file tree or a replacement view (`children`) is showing.
+	const list = children ? "children" : "tree";
 	const uncompactFolderId =
 		deleteOnCancel?.kind === "folder" ? deleteOnCancel.path : null;
 	const { collapseFolder, expandFolder, rows, toggleFolder } = useSidebarTree({
@@ -759,6 +771,9 @@ export function Sidebar({
 		setSelection((current) => pruneSidebarSelection(current, rows));
 	}, [rows]);
 
+	// The selection follows the open file, so a bold row is always highlighted
+	// too, however the file was opened. Returning to the editor also snaps a
+	// selection that keyboard navigation moved back to the open file.
 	useEffect(() => {
 		const selectOpenFile = () => {
 			focusItem(selectionCountRef.current > 1 ? null : activeItemRef.current);
@@ -769,10 +784,22 @@ export function Sidebar({
 		const onFocusIn = (event: FocusEvent) => {
 			if (isEditorTarget(event.target)) selectOpenFile();
 		};
-		if (isEditorTarget(document.activeElement)) selectOpenFile();
+		selectOpenFile();
 		document.addEventListener("focusin", onFocusIn);
 		return () => document.removeEventListener("focusin", onFocusIn);
 	}, [focusItem, highlightPath]);
+
+	// Each list remounts at its top when shown. Reveal the open file when the
+	// tree comes back, since it may have changed while another view showed.
+	useEffect(() => {
+		setScrolledList(null);
+		if (list !== "tree") return;
+		const nav = navRef.current;
+		nav
+			?.querySelector('[aria-current="page"]')
+			?.scrollIntoView({ block: "nearest" });
+		if (nav && nav.scrollTop > 0) setScrolledList("tree");
+	}, [list]);
 
 	const handleDragStart = (event: DragStartEvent) => {
 		const data = event.active.data.current as DragItemData | undefined;
@@ -1322,13 +1349,22 @@ export function Sidebar({
 
 	return (
 		<SidebarFrame onCollapse={onCollapse} storageScope={storageScope}>
-			<div className="flex items-center justify-between border-b border-sidebar-border px-2.5 py-1.5">
+			<div
+				className={cn(
+					// Dashed divider only once the list scrolls beneath the header.
+					"relative flex items-center justify-between px-2.5 py-1.5 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed",
+					scrolledList === list
+						? "after:border-sidebar-border"
+						: "after:border-transparent",
+				)}
+			>
 				{header ?? (
 					<span className="text-[11px] font-medium uppercase text-muted-foreground">
 						Files
 					</span>
 				)}
 				<div className="flex items-center gap-1">
+					{viewToggle}
 					{onCreateFile && (
 						<NewFileMenu
 							onCreateFile={() => void createFile(creationFolderId)}
@@ -1339,56 +1375,68 @@ export function Sidebar({
 							}
 						/>
 					)}
-					{onCreateFolder && (
-						<Button
-							variant="ghost"
-							size="icon-xs"
-							aria-label="New folder"
-							title="New folder"
-							onClick={() => void createFolder(null)}
-						>
-							<MingcuteNewFolderLine className="size-3.5" />
-						</Button>
-					)}
-					<Select.Root
-						value={sortMode}
-						onValueChange={(mode) => {
-							if (mode) onSortModeChange(mode);
-						}}
-					>
-						<Select.Trigger
-							render={
+					{children ? null : (
+						<>
+							{onCreateFolder && (
 								<Button
 									variant="ghost"
 									size="icon-xs"
-									aria-label={`Sort files: ${sortLabel}`}
-									title={`Sort files: ${sortLabel}`}
-								/>
-							}
-						>
-							{sortMode === "alpha" ? (
-								<MingcuteAzSortAscendingLettersLine className="size-3.5" />
-							) : (
-								<MingcuteSortDescendingLine className="size-3.5" />
+									aria-label="New folder"
+									title="New folder"
+									onClick={() => void createFolder(null)}
+								>
+									<MingcuteNewFolderLine className="size-3.5" />
+								</Button>
 							)}
-						</Select.Trigger>
-						<Select.Portal>
-							<Select.Positioner
-								align="end"
-								side="bottom"
-								sideOffset={4}
-								className="isolate z-50"
+							<Select.Root
+								value={sortMode}
+								onValueChange={(mode) => {
+									if (mode) onSortModeChange(mode);
+								}}
 							>
-								<Select.Popup className="z-50 w-36 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-									<SortOption value="recent" label="Recent" />
-									<SortOption value="alpha" label="Name" />
-								</Select.Popup>
-							</Select.Positioner>
-						</Select.Portal>
-					</Select.Root>
+								<Select.Trigger
+									render={
+										<Button
+											variant="ghost"
+											size="icon-xs"
+											aria-label={`Sort files: ${sortLabel}`}
+											title={`Sort files: ${sortLabel}`}
+										/>
+									}
+								>
+									{sortMode === "alpha" ? (
+										<MingcuteAzSortAscendingLettersLine className="size-3.5" />
+									) : (
+										<MingcuteSortDescendingLine className="size-3.5" />
+									)}
+								</Select.Trigger>
+								<Select.Portal>
+									<Select.Positioner
+										align="end"
+										side="bottom"
+										sideOffset={4}
+										className="isolate z-50"
+									>
+										<Select.Popup className="z-50 w-36 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+											<SortOption value="recent" label="Recent" />
+											<SortOption value="alpha" label="Name" />
+										</Select.Popup>
+									</Select.Positioner>
+								</Select.Portal>
+							</Select.Root>
+						</>
+					)}
 				</div>
 			</div>
-			{tree}
+			<div
+				className="contents"
+				onScrollCapture={(event) => {
+					const scrolled = (event.target as HTMLElement).scrollTop > 0;
+					setScrolledList(scrolled ? list : null);
+				}}
+			>
+				{children ?? tree}
+			</div>
 			{footer ? (
 				<div
 					className={cn(
@@ -1525,7 +1573,7 @@ function DroppableRowButton({
 			style={style}
 			onClick={onClick}
 			onDoubleClick={onDoubleClick}
-			{...dragAttributes}
+			{...(enabled ? dragAttributes : {})}
 			{...dragListeners}
 		>
 			{children}
@@ -1601,7 +1649,7 @@ function FolderSegment({
 					"min-w-0 truncate rounded-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
 					active && "bg-sidebar-accent/70",
 				)}
-				{...attributes}
+				{...(enabled ? attributes : {})}
 				{...listeners}
 			>
 				{segment.name}
@@ -2125,9 +2173,6 @@ function FileActionsMenu({
 	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	getDisplayPath: (path: string) => string;
 }) {
-	const revealShortcut = useCommandShortcut("app.reveal");
-	const copyPathShortcut = useCommandShortcut("app.copy-path");
-	const deleteShortcut = useCommandShortcut("app.delete");
 	if (selection.count > 1) {
 		return (
 			<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
@@ -2147,6 +2192,57 @@ function FileActionsMenu({
 	}
 	return (
 		<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
+			<FileActionItems
+				file={file}
+				label={label}
+				onRevealFile={onRevealFile}
+				onOpenFileInNewTab={onOpenFileInNewTab}
+				onOpenFileInDefaultApp={onOpenFileInDefaultApp}
+				onCopyFilePath={onCopyFilePath}
+				revealLabel={revealLabel}
+				onRenameFile={onRenameFile}
+				onTogglePinnedFile={onTogglePinnedFile}
+				onDeleteFile={onDeleteFile}
+				onDeleteSelection={onDeleteSelection}
+			/>
+		</ActionsMenu>
+	);
+}
+
+type FileActionHandlers = {
+	onRevealFile?: (path: string) => void;
+	onOpenFileInNewTab?: (
+		path: string,
+		options?: { background: boolean },
+	) => void;
+	onOpenFileInDefaultApp?: (path: string) => void;
+	onCopyFilePath?: (path: string) => void;
+	revealLabel?: string;
+	onRenameFile?: (file: SidebarFile, label: string) => void;
+	onTogglePinnedFile?: (path: string) => void;
+	onDeleteFile?: (path: string) => void;
+	onDeleteSelection?: (selection: SidebarActionSelection) => void;
+};
+
+/** One file's actions; each appears only when its handler is given. */
+function FileActionItems({
+	file,
+	label,
+	onRevealFile,
+	onOpenFileInNewTab,
+	onOpenFileInDefaultApp,
+	onCopyFilePath,
+	revealLabel,
+	onRenameFile,
+	onTogglePinnedFile,
+	onDeleteFile,
+	onDeleteSelection,
+}: FileActionHandlers & { file: SidebarFile; label: string }) {
+	const revealShortcut = useCommandShortcut("app.reveal");
+	const copyPathShortcut = useCommandShortcut("app.copy-path");
+	const deleteShortcut = useCommandShortcut("app.delete");
+	return (
+		<>
 			{onOpenFileInNewTab && (
 				<ActionItem
 					icon={<MingcuteAddLine />}
@@ -2211,7 +2307,43 @@ function FileActionsMenu({
 					Delete
 				</ActionItem>
 			)}
-		</ActionsMenu>
+		</>
+	);
+}
+
+/**
+ * The tree's row actions for a file shown outside the tree (e.g. an inbox
+ * row): an unpin button for pinned files and the "more" menu. Both appear
+ * while a `group/sidebar-row` ancestor is hovered.
+ */
+export function SidebarFileActionsMenu({
+	open,
+	onOpenChange,
+	...items
+}: FileActionHandlers & {
+	file: SidebarFile;
+	label: string;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
+	const { file, onTogglePinnedFile } = items;
+	return (
+		<>
+			{file.pinned && onTogglePinnedFile && (
+				<button
+					type="button"
+					className={sidebarRowActionButtonClass}
+					aria-label="Unpin"
+					title="Unpin"
+					onClick={() => onTogglePinnedFile(file.path)}
+				>
+					<MingcutePinFill className="size-3.5" />
+				</button>
+			)}
+			<ActionsMenu label={items.label} open={open} onOpenChange={onOpenChange}>
+				<FileActionItems {...items} />
+			</ActionsMenu>
+		</>
 	);
 }
 

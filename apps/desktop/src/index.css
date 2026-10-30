@@ -125,15 +125,51 @@
 	}
 }
 
-/* Paint over the title-bar divider on the same pixel, including beneath tabs. */
+/* Paint over the title-bar divider on the same pixel, including beneath tabs.
+ * A docked sidebar flows into the title bar with no divider; the compact
+ * overlay keeps one so it reads as sitting on top of the editor. */
 [data-sidebar-overlay] [data-sidebar-root]::before {
 	content: "";
 	position: absolute;
 	inset-block-start: -1px;
-	inset-inline: 0 -1px;
+	/* Stop short of the docked sidebar's border column, so the divider or the
+	 * first tab's edge can meet it at the corner. */
+	inset-inline: 0;
 	height: 1px;
 	z-index: 40;
 	pointer-events: none;
 	background: var(--sidebar);
-	border-top: 1px solid var(--border);
+}
+@media (width < 40rem) {
+	[data-sidebar-overlay] [data-sidebar-root]::before {
+		inset-inline-end: -1px;
+		border-top: 1px solid var(--border);
+	}
+}
+/* Round the editor's top-left corner where the divider meets the docked
+ * sidebar, unless the selected first tab already runs straight down into it. */
+@media (width >= 40rem) {
+	:root:not(
+			:has(
+					[role="tablist"]:not([aria-hidden])
+						> [data-tab-item]:first-child[data-selected]
+				)
+		)
+		[data-sidebar-overlay]
+		[data-sidebar-root]::after {
+		content: "";
+		position: absolute;
+		inset-block-start: -1px;
+		inset-inline-start: 100%;
+		width: 7px;
+		height: 7px;
+		z-index: 40;
+		pointer-events: none;
+		background: radial-gradient(
+			circle at 100% 100%,
+			transparent 5.75px,
+			var(--border) 6.25px 6.75px,
+			var(--sidebar) 7.25px
+		);
+	}
 }

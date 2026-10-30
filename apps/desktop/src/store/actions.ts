@@ -63,7 +63,11 @@ import {
 	rewriteHistory,
 	setHistory,
 } from "./history";
-import type { CodeFileOpenMode, TerminalPosition } from "./persistence";
+import type {
+	CodeFileOpenMode,
+	SidebarView,
+	TerminalPosition,
+} from "./persistence";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
 import {
 	applyFileAction,
@@ -85,6 +89,7 @@ import {
 	type SortMode,
 	shortcutBindingsStore,
 	sidebarOpenStore,
+	sidebarViewStore,
 	spellcheckStore,
 	switcherOpenStore,
 	telemetryConsentStore,
@@ -551,6 +556,22 @@ export function setWorkspaceSwitcherOpen(isOpen: boolean) {
 
 export function setSidebarOpen(isOpen: boolean) {
 	sidebarOpenStore.set(isOpen);
+}
+
+export function setSidebarView(view: SidebarView) {
+	sidebarViewStore.set(view);
+}
+
+/** Opens the sidebar on a view, or closes it when that view is already showing. Returns whether it opened. */
+export function toggleSidebarView(view: SidebarView) {
+	const { sidebarOpen, sidebarView } = uiStore.get();
+	const opening = !sidebarOpen || sidebarView !== view;
+	uiStore.set((state) => ({
+		...state,
+		sidebarOpen: opening,
+		sidebarView: view,
+	}));
+	return opening;
 }
 
 export function toggleSidebar() {

@@ -31,10 +31,17 @@ vi.mock("@simplestack/store/react", () => ({
 }));
 vi.mock("../store/state", () => ({
 	sidebarOpenStore: "sidebar",
+	sidebarViewStore: "sidebarView",
 }));
 vi.mock("../store/tabStore", () => ({ tabsStore: "tabs" }));
-vi.mock("../store/actions", () => ({ toggleSidebar: state.toggleSidebar }));
+vi.mock("../store/actions", () => ({
+	setSidebarView: vi.fn(),
+	toggleSidebar: state.toggleSidebar,
+}));
 vi.mock("../lib/layout", () => ({ useCompactWindow: () => state.compact }));
+vi.mock("./InboxView", () => ({
+	SidebarViewToggle: () => <div data-view-toggle />,
+}));
 vi.mock("./AllTabsMenu", () => ({
 	AllTabsMenu: ({ triggerRef }: { triggerRef: Ref<HTMLButtonElement> }) => (
 		<button type="button" ref={triggerRef} data-all-tabs>
@@ -121,6 +128,10 @@ describe("WindowTitleBar", () => {
 				.querySelector("[data-tabs-flush-start]")
 				?.getAttribute("data-tabs-flush-start"),
 		).toBe(flush);
+		// The view toggle sits above a docked sidebar; otherwise the sidebar shows it.
+		expect(container.querySelector("[data-view-toggle]") !== null).toBe(
+			flush === "true",
+		);
 	});
 
 	it("moves keyboard focus to the dropdown when tabs collapse", async () => {
