@@ -39,8 +39,10 @@ function iconUrl(svg: string) {
 }
 
 // tldraw otherwise fetches its icons, fonts and translations from its CDN
-// at runtime, which is slow on first load and fails offline.
-const bundled = getAssetUrlsByImport();
+// at runtime, which is slow on first load and fails offline. Vite already
+// resolves each URL, and tldraw's default formatter would prefix the
+// packaged app's `file://` URLs again as if they were relative.
+const bundled = getAssetUrlsByImport((url) => url);
 
 /**
  * Hubble's Mingcute icons for tldraw's generic UI icons: actions, menus and
