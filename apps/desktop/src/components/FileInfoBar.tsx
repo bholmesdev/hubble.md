@@ -62,7 +62,7 @@ import { ClaudeLogo, CodexLogo } from "./AgentLogos";
 import { DiagramMenuItems } from "./DiagramMenuItems";
 
 const menuItemClass =
-	"flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent";
+	"flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent data-disabled:pointer-events-none data-disabled:opacity-50";
 
 export function FileInfoBar({
 	scrollContainer,
