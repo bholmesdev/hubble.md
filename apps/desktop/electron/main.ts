@@ -1060,9 +1060,8 @@ function buildMenu() {
 				{
 					id: "zoom-to-fit",
 					label: "Zoom to Fit",
-					// tldraw handles Shift+1 on the canvas; registering it here would
-					// swallow "!" while typing elsewhere.
-					accelerator: "Shift+1",
+					// The canvas binds Cmd+1 itself, so only show it here.
+					accelerator: "CmdOrCtrl+1",
 					registerAccelerator: false,
 					enabled: menuState.hasDiagramOpen,
 					click: () => sendToRenderer("desktop:menu-zoom", "fit"),
