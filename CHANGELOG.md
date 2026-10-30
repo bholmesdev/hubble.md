@@ -15,6 +15,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Opening a file with Hubble from Finder now points the terminal's `$HUBBLE_NOTE_PATH` at that file, so "Chat about this note" reads the right note. Thanks [@farskid](https://github.com/farskid) for the suggestion! [#316](https://github.com/bholmesdev/hubble.md/pull/316)
+
 ## [0.3.2] - 2026-10-29
 
 ### Added
