@@ -2043,7 +2043,6 @@ function FolderActionsMenu({
 	getDisplayPath: (path: string) => string;
 }) {
 	const revealShortcut = useCommandShortcut("app.reveal");
-	const copyPathShortcut = useCommandShortcut("app.copy-path");
 	const newFileShortcut = useCommandShortcut("app.new-file");
 	const deleteShortcut = useCommandShortcut("app.delete");
 	if (selection.count > 1) {
@@ -2078,7 +2077,6 @@ function FolderActionsMenu({
 				<ActionItem
 					icon={<MingcuteCopy2Line />}
 					onClick={() => onCopyFolderPath(id)}
-					shortcut={copyPathShortcut ?? undefined}
 				>
 					Copy folder path
 				</ActionItem>
