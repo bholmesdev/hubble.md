@@ -17,8 +17,10 @@ import { desktopApi } from "../desktopApi";
 import {
 	basename,
 	dirname,
+	fileStem,
 	hasDocumentExtension,
 	hasMarkdownExtension,
+	isDiagramFile,
 	relativeWorkspacePath,
 } from "../lib/filePath";
 import {
@@ -157,7 +159,9 @@ export function InboxView({
 	// Only list files Hubble can create as notes. Mtimes are stored in seconds.
 	const notes = new Map(
 		files
-			.filter((file) => hasDocumentExtension(file.path))
+			.filter(
+				(file) => hasDocumentExtension(file.path) || isDiagramFile(file.path),
+			)
 			.map((file) => [
 				file.path,
 				{ path: file.path, modifiedAt: file.modified_at * 1000 },
@@ -287,7 +291,10 @@ const InboxRow = memo(function InboxRow({
 	const [hovered, setHovered] = useState(false);
 	const entry = useStoreValue(previewsStore, (all) => all[path]);
 	const preview = entry?.preview;
-	const title = preview?.title ?? basename(path);
+	// Apps and diagrams are labeled by kind, so their names drop the extension.
+	const title =
+		preview?.title ??
+		(hasMarkdownExtension(path) ? basename(path) : fileStem(path));
 	const description = preview
 		? (preview.description ?? "No additional text")
 		: entry
