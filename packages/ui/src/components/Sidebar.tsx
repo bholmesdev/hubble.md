@@ -427,6 +427,7 @@ export function Sidebar({
 	onRevealFile,
 	onCopyFilePath,
 	onRevealFolder,
+	onCopyFolderPath,
 	onFocusedItemChange,
 	revealLabel,
 	onRenameFile,
@@ -466,6 +467,7 @@ export function Sidebar({
 	onRevealFile?: (path: string) => void;
 	onCopyFilePath?: (path: string) => void;
 	onRevealFolder?: (folderId: string) => void;
+	onCopyFolderPath?: (folderId: string) => void;
 	onFocusedItemChange?: (item: SidebarFocusedItem) => void;
 	revealLabel?: string;
 	onRenameFile?: (
@@ -1118,6 +1120,7 @@ export function Sidebar({
 										if (
 											row.kind === "folder" &&
 											!onRevealFolder &&
+											!onCopyFolderPath &&
 											!onCreateFolder &&
 											!onRenameFolder &&
 											!onCreateFile &&
@@ -1225,6 +1228,7 @@ export function Sidebar({
 									<div className="absolute inset-y-0 end-0.5 flex items-center gap-0.5">
 										{row.kind === "folder" &&
 											(onRevealFolder ||
+												onCopyFolderPath ||
 												onCreateFile ||
 												onCreateFolder ||
 												onRenameFolder ||
@@ -1238,6 +1242,7 @@ export function Sidebar({
 														setOpenActionsPath(open ? row.id : null)
 													}
 													onRevealFolder={onRevealFolder}
+													onCopyFolderPath={onCopyFolderPath}
 													revealLabel={revealLabel}
 													onCreateFile={(id) => void createFile(id)}
 													onCreateHtmlFile={
@@ -2007,6 +2012,7 @@ function FolderActionsMenu({
 	onOpenChange,
 	selection,
 	onRevealFolder,
+	onCopyFolderPath,
 	revealLabel,
 	onCreateFile,
 	onCreateHtmlFile,
@@ -2024,6 +2030,7 @@ function FolderActionsMenu({
 	onOpenChange: (open: boolean) => void;
 	selection: SidebarActionSelection;
 	onRevealFolder?: (id: string) => void;
+	onCopyFolderPath?: (id: string) => void;
 	revealLabel?: string;
 	onCreateFile?: (id: string) => void;
 	onCreateHtmlFile?: (id: string) => void;
@@ -2064,6 +2071,14 @@ function FolderActionsMenu({
 					shortcut={revealShortcut ?? undefined}
 				>
 					{revealLabel ?? "Reveal in File Manager"}
+				</ActionItem>
+			)}
+			{onCopyFolderPath && (
+				<ActionItem
+					icon={<MingcuteCopy2Line />}
+					onClick={() => onCopyFolderPath(id)}
+				>
+					Copy folder path
 				</ActionItem>
 			)}
 			{onCreateFile && (
