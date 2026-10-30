@@ -7,6 +7,7 @@ import {
 	loadSnapshot,
 	parseTldrawJsonFile,
 	react,
+	type Signal,
 	type TLStore,
 	type TLUiComponents,
 	type TLUiOverrides,
@@ -22,6 +23,7 @@ import {
 } from "../store/actions";
 import { diagramGridStore } from "../store/state";
 import { isDarkTheme, subscribeTheme } from "../theme";
+import { DiagramLicenseNotice } from "./DiagramLicenseNotice";
 import { clearActiveDiagram, setActiveDiagram } from "./diagramCommands";
 import { diagramAssetUrls } from "./diagramIcons";
 
@@ -53,6 +55,21 @@ const overrides: TLUiOverrides = {
 };
 
 const licenseKey = import.meta.env.VITE_TLDRAW_LICENSE_KEY;
+
+// tldraw validates the key per editor and keeps the result off its public
+// types. Without it (a tldraw upgrade), Hubble falls back to tldraw's own
+// blank editor.
+type LicensedEditor = Editor & { licenseManager?: { state: Signal<string> } };
+
+/** The states in which tldraw hides the editor after a few seconds. */
+function isLicenseRejected(editor: Editor) {
+	const state = (editor as LicensedEditor).licenseManager?.state.get();
+	return state === "expired" || state === "unlicensed-production";
+}
+
+// One key serves every diagram, so once it fails, later diagrams skip
+// straight to the notice.
+let licenseRejected = false;
 
 type ParsedDiagram = { store: TLStore } | { error: string };
 
@@ -126,10 +143,17 @@ export function DiagramView({
 		saveTimer: null,
 	});
 	const isDark = useSyncExternalStore(subscribeTheme, isDarkTheme);
+	const [rejected, setRejected] = useState(licenseRejected);
 
 	const handleMount = (editor: Editor) => {
 		const session = sessionRef.current;
 		session.editor = editor;
+		const stopLicenseWatch = react("diagram license", () => {
+			if (!isLicenseRejected(editor)) return;
+			licenseRejected = true;
+			flushDiagramSave(session);
+			setRejected(true);
+		});
 		setActiveDiagram(editor);
 		editor.user.updateUserPreferences({
 			colorScheme: isDarkTheme() ? "dark" : "light",
@@ -156,6 +180,7 @@ export function DiagramView({
 			{ source: "user", scope: "document" },
 		);
 		return () => {
+			stopLicenseWatch();
 			stopListening();
 			stopGridSync();
 			stopCameraMemory();
@@ -193,6 +218,7 @@ export function DiagramView({
 	if ("error" in parsed) {
 		return <p className="m-0 p-4 text-sm text-destructive">{parsed.error}</p>;
 	}
+	if (rejected) return <DiagramLicenseNotice path={path} />;
 
 	return (
 		<div className="relative min-h-0 flex-1" data-hubble-diagram>
