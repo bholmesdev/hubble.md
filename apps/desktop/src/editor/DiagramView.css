@@ -66,6 +66,17 @@
 	font-size: 11px;
 }
 
+/* A button whose popover or submenu is open keeps a flat hover fill, not
+ * tldraw's fade toward the popover. Covers submenu triggers, the toolbar's
+ * overflow, the style panel's pickers, and the zoom and page menus. */
+[data-hubble-diagram]
+	.tlui-button[aria-expanded="true"][data-direction="left"] {
+	background: none;
+}
+
+[data-hubble-diagram] .tlui-button[data-state="open"]::after,
+[data-hubble-diagram]
+	.tlui-button[aria-expanded="true"][data-direction="left"]:not(:hover)::after,
 [data-hubble-diagram]
 	.tlui-menu__submenu__trigger:is(:hover, [data-state="open"])::after {
 	background: var(--tl-color-muted-2);
