@@ -164,9 +164,6 @@ if (process.platform !== "darwin") {
 		}
 	});
 }
-let pendingOpenPath: string | null = firstExistingFileArg(
-	process.argv.slice(1),
-);
 const launchWorkspacePath =
 	isDev && process.env.HUBBLE_DESKTOP_DEV_WORKSPACE
 		? resolvePath(process.env.HUBBLE_DESKTOP_DEV_WORKSPACE)
@@ -204,6 +201,9 @@ let workspaceWatcherGeneration = 0;
 let workspaceWatcherStart = Promise.resolve();
 const grantedFiles = new Set<string>();
 const grantedRoots = new Set<string>();
+let pendingOpenPath: string | null = firstExistingFileArg(
+	process.argv.slice(1),
+);
 let grantsLoaded = false;
 let deleteUndoAvailable = false;
 const deleteUndo = new DeleteUndo();
