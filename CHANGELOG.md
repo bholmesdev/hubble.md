@@ -13,7 +13,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
-- Hover and selection highlights, and buttons that show on hover like the sidebar's ⋯ menu, now appear instantly instead of fading. Thanks [@n00ki](https://github.com/n00ki)! [#273](https://github.com/bholmesdev/hubble.md/pull/273)
+- Hover and selection highlights, and buttons that show on hover like the sidebar's ⋯ menu, now appear instantly instead of fading. Thanks [@n00ki](https://github.com/n00ki)! [#327](https://github.com/bholmesdev/hubble.md/pull/327)
 
 ### Fixed
 
