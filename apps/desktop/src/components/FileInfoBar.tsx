@@ -56,6 +56,7 @@ import {
 	isInWorkspace,
 	reviewThreadsStore,
 	titleGenerationPreviewStore,
+	titleRenameRequestStore,
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
@@ -80,6 +81,7 @@ export function FileInfoBar({
 	const titlePreview = useStoreValue(titleGenerationPreviewStore);
 	const titlePath = filePathForTitlePreview(currentPath, titlePreview);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
+	const renameRequest = useStoreValue(titleRenameRequestStore);
 	const compact = useCompactWindow();
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
 	const [showBorder, setShowBorder] = useState(false);
@@ -159,6 +161,10 @@ export function FileInfoBar({
 							? undefined
 							: (nextName) => void renameCurrentMarkdownFile(nextName)
 					}
+					editRequested={
+						renameRequest !== null && renameRequest === currentPath
+					}
+					onEditStart={() => titleRenameRequestStore.set(null)}
 				/>
 			</div>
 			<div
