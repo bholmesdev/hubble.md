@@ -164,6 +164,9 @@ export const titleGenerationPreviewStore = store<{
 	previewPath: string;
 } | null>(null);
 
+// A just-created file whose name the title bar should open for editing.
+export const titleRenameRequestStore = store<string | null>(null);
+
 export const spellcheckStore = store<SpellcheckState | null>(null);
 export const telemetryConsentStore = store<TelemetryConsent | null>(null);
 
