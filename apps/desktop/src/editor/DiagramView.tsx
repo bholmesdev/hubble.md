@@ -40,6 +40,10 @@ const components: TLUiComponents = {
 	NavigationPanel: null,
 };
 
+// Narrow windows would move undo, delete and duplicate from the removed menu
+// into the toolbar. Pointing them at that menu keeps them gone.
+const options = { actionShortcutsLocation: "menu" } as const;
+
 // Zoom follows Sketch: Cmd-1 fits, Cmd-2 zooms to the selection, and Cmd-0
 // is the View menu's reset. tldraw's Shift-number keys fire when "!" or "@"
 // is typed with the canvas focused. Copy as PNG gives Cmd-Shift-C back to
@@ -227,6 +231,7 @@ export function DiagramView({
 				licenseKey={licenseKey}
 				assetUrls={diagramAssetUrls}
 				components={components}
+				options={options}
 				overrides={overrides}
 				onMount={handleMount}
 			/>
