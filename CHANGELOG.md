@@ -9,11 +9,32 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Copy a folder path from its sidebar menu. Thanks [@nisan1101](https://github.com/nisan1101) for the suggestion! [#304](https://github.com/bholmesdev/hubble.md/pull/304)
+
 ### Changed
 
 ### Fixed
 
-- Reference-style links and images no longer disappear from a note when you edit it. [#309](https://github.com/bholmesdev/hubble.md/pull/309)
+- Reference-style links and images no longer disappear from a note when you edit it. Thanks [@mohsensc](https://github.com/mohsensc)! [#309](https://github.com/bholmesdev/hubble.md/pull/309)
+- Opening a file with Hubble from Finder now points the terminal's `$HUBBLE_NOTE_PATH` at that file, so "Chat about this note" reads the right note. Thanks [@farskid](https://github.com/farskid) for the suggestion! [#316](https://github.com/bholmesdev/hubble.md/pull/316)
+- On Windows and Linux, opening a Markdown file while Hubble is closed now opens that file instead of your last session. [#326](https://github.com/bholmesdev/hubble.md/pull/326)
+
+## [0.3.2] - 2026-10-29
+
+### Added
+
+- Right-click an image in a note to copy it, or to copy its file path (or web address for linked images). [#321](https://github.com/bholmesdev/hubble.md/pull/321)
+
+### Fixed
+
+- When cmd+K fills in a link from your clipboard, the link is now selected, so pasting replaces it instead of adding a duplicate. [#319](https://github.com/bholmesdev/hubble.md/pull/319)
+- The tab bar border no longer has a 1px gap where it meets the sidebar. [#323](https://github.com/bholmesdev/hubble.md/pull/323)
+
+## [0.3.1] - 2026-10-20
+
+### Changed
+
+- Holding Option in the inbox view no longer swaps each note's folder for its full path. Hover a note's folder to see its full path. [#310](https://github.com/bholmesdev/hubble.md/pull/310)
 
 ## [0.3.0] - 2026-10-19
 
