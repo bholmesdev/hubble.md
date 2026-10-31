@@ -57,8 +57,8 @@ test("binds the first terminal to the file Hubble was launched with", async () =
 		.click();
 	await expect(page.locator(".ProseMirror")).toContainText("Restored");
 	await app?.evaluate(({ BrowserWindow, Menu }) => {
-		const item = Menu.getApplicationMenu()?.items
-			.flatMap((menu) => menu.submenu?.items ?? [])
+		const item = Menu.getApplicationMenu()
+			?.items.flatMap((menu) => menu.submenu?.items ?? [])
 			.find((entry) => entry.label === "Toggle Terminal");
 		item?.click(undefined, BrowserWindow.getAllWindows()[0], undefined);
 	});
