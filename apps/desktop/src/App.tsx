@@ -41,12 +41,12 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { WindowTitleBar } from "./components/WindowTitleBar";
 import { desktopApi } from "./desktopApi";
 import type { DesktopUpdateState } from "./desktopApi/types";
-import { DiagramView } from "./editor/DiagramView";
 import { runEditCommand, runZoomCommand } from "./editor/diagramCommands";
 import { createEmbedExtension } from "./editor/EmbedExtension";
 import { handleImageDrop, handleImagePaste } from "./editor/handleImagePaste";
 import { IframeView, toAssetUrl } from "./editor/IframeView";
 import { createImageExtension } from "./editor/ImageExtension";
+import { DiagramView } from "./editor/lazyDiagram";
 import {
 	createDiagramFile,
 	createHtmlFile,
