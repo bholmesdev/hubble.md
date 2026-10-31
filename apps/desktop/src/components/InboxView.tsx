@@ -17,8 +17,10 @@ import { desktopApi } from "../desktopApi";
 import {
 	basename,
 	dirname,
+	fileStem,
 	hasHtmlExtension,
 	hasMarkdownExtension,
+	isDiagramFile,
 	relativeWorkspacePath,
 } from "../lib/filePath";
 import {
@@ -287,7 +289,10 @@ const InboxRow = memo(function InboxRow({
 	const [hovered, setHovered] = useState(false);
 	const entry = useStoreValue(previewsStore, (all) => all[path]);
 	const preview = entry?.preview;
-	const title = preview?.title ?? basename(path);
+	// Apps and diagrams are labeled by kind, so their names drop the extension.
+	const title =
+		preview?.title ??
+		(hasMarkdownExtension(path) ? basename(path) : fileStem(path));
 	const description = preview
 		? (preview.description ?? "No additional text")
 		: entry
@@ -478,7 +483,9 @@ function LiveText({
 }
 
 function isCreatableNote(path: string) {
-	return hasMarkdownExtension(path) || hasHtmlExtension(path);
+	return (
+		hasMarkdownExtension(path) || hasHtmlExtension(path) || isDiagramFile(path)
+	);
 }
 
 function focusRow(nav: HTMLElement, path: string) {

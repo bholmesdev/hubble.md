@@ -124,3 +124,41 @@ test("reopens the workspace and note after relaunch", async ({ hubble }) => {
 	await expect(sidebarFile(page, "existing.md")).toBeVisible();
 	await expect(editor(page)).toContainText("Hello");
 });
+
+test("draws a shape in a diagram and saves it", async ({ hubble }) => {
+	const file = path.join(hubble.workspace, "flow.tldr");
+	await fs.writeFile(file, "");
+	const page = await hubble.launch();
+
+	// Builds without a tldraw license key leave diagrams out, and opening a
+	// .tldr file there hands it to another app.
+	await page.getByRole("button", { name: "New file" }).click();
+	const diagramsEnabled = await page
+		.getByRole("menuitem", { name: "New Diagram" })
+		.isVisible();
+	await page.keyboard.press("Escape");
+	test.skip(!diagramsEnabled, "This build has no tldraw license key.");
+
+	await sidebarFile(page, "flow.tldr").click();
+	const canvas = page.locator("[data-hubble-diagram] .tl-canvas");
+	await expect(canvas).toBeVisible();
+	const box = await canvas.boundingBox();
+	if (!box) throw new Error("Diagram canvas has no size");
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	await page.keyboard.press("r");
+	await page.mouse.move(box.x + 200, box.y + 150);
+	await page.mouse.down();
+	await page.mouse.move(box.x + 400, box.y + 300, { steps: 5 });
+	await page.mouse.up();
+
+	await expect(page.locator(".tl-shape")).toHaveCount(1);
+	await expect
+		.poll(async () => {
+			const saved = JSON.parse((await readDisk(file)) || "{}");
+			return (saved.records ?? []).filter(
+				(record: { typeName: string; type?: string }) =>
+					record.typeName === "shape" && record.type === "geo",
+			).length;
+		})
+		.toBe(1);
+});

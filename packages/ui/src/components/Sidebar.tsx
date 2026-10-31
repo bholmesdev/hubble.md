@@ -33,6 +33,7 @@ import MingcuteCheckLine from "~icons/mingcute/check-line";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDeleteLine from "~icons/mingcute/delete-line";
+import MingcuteDrawingBoardLine from "~icons/mingcute/drawing-board-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
@@ -88,7 +89,7 @@ type RenameItem =
 	| {
 			kind: "file";
 			path: string;
-			origin?: "new-note" | "new-html";
+			origin?: "new-note";
 	  }
 	| {
 			kind: "folder";
@@ -437,6 +438,7 @@ export function Sidebar({
 	onTogglePinnedFile,
 	onCreateFile,
 	onCreateHtmlFile,
+	onCreateDiagramFile,
 	onCreateFolder,
 	onDeleteFolder,
 	onMoveItem,
@@ -474,7 +476,7 @@ export function Sidebar({
 		path: string,
 		nextName: string,
 		options: {
-			origin: "new-note" | "new-html" | "rename";
+			origin: "new-note" | "rename";
 			commit: "enter" | "blur";
 		},
 	) => void;
@@ -487,7 +489,9 @@ export function Sidebar({
 	onDeleteItems?: (items: SidebarDeleteItem[]) => void;
 	onTogglePinnedFile?: (path: string) => void;
 	onCreateFile?: (folderId: string | null) => Promise<string | null>;
-	onCreateHtmlFile?: (folderId: string | null) => Promise<string | null>;
+	/** HTML apps and diagrams: the app names them, not the sidebar. */
+	onCreateHtmlFile?: (folderId: string | null) => void;
+	onCreateDiagramFile?: (folderId: string | null) => void;
 	onCreateFolder?: (folderId: string | null) => Promise<string | null>;
 	onDeleteFolder?: (folderId: string) => void;
 	onMoveItem?: (input: SidebarMoveItemInput) => Promise<void> | void;
@@ -570,19 +574,14 @@ export function Sidebar({
 			},
 		);
 	};
-	const createHtmlFile = async (folderId: string | null) => {
-		if (!onCreateHtmlFile) return;
+	const createTypedFile = (
+		create: ((folderId: string | null) => void) | undefined,
+		folderId: string | null,
+	) => {
+		if (!create) return;
 		setOpenActionsPath(null);
 		if (folderId) expandFolder(folderId);
-		const path = await onCreateHtmlFile(folderId);
-		if (!path) return;
-		beginRename(
-			{ kind: "file", path, origin: "new-html" },
-			fileNameFromPath(getDisplayPath(path)),
-			{
-				deleteOnUnchangedCancel: true,
-			},
-		);
+		create(folderId);
 	};
 	const createFolder = async (folderId: string | null) => {
 		if (!onCreateFolder) return;
@@ -1247,7 +1246,12 @@ export function Sidebar({
 													onCreateFile={(id) => void createFile(id)}
 													onCreateHtmlFile={
 														onCreateHtmlFile
-															? (id) => void createHtmlFile(id)
+															? (id) => createTypedFile(onCreateHtmlFile, id)
+															: undefined
+													}
+													onCreateDiagramFile={
+														onCreateDiagramFile
+															? (id) => createTypedFile(onCreateDiagramFile, id)
 															: undefined
 													}
 													onCreateFolder={(id) => void createFolder(id)}
@@ -1370,7 +1374,12 @@ export function Sidebar({
 							onCreateFile={() => void createFile(creationFolderId)}
 							onCreateHtmlFile={
 								onCreateHtmlFile
-									? () => void createHtmlFile(creationFolderId)
+									? () => createTypedFile(onCreateHtmlFile, creationFolderId)
+									: undefined
+							}
+							onCreateDiagramFile={
+								onCreateDiagramFile
+									? () => createTypedFile(onCreateDiagramFile, creationFolderId)
 									: undefined
 							}
 						/>
@@ -1954,9 +1963,11 @@ export function SidebarFrame({
 function NewFileMenu({
 	onCreateFile,
 	onCreateHtmlFile,
+	onCreateDiagramFile,
 }: {
 	onCreateFile: () => void;
 	onCreateHtmlFile?: () => void;
+	onCreateDiagramFile?: () => void;
 }) {
 	const newFileShortcut = useCommandShortcut("app.new-file");
 	const [open, setOpen] = useState(false);
@@ -1998,6 +2009,14 @@ function NewFileMenu({
 								New HTML App
 							</ActionItem>
 						)}
+						{onCreateDiagramFile && (
+							<ActionItem
+								icon={<MingcuteDrawingBoardLine />}
+								onClick={onCreateDiagramFile}
+							>
+								New Diagram
+							</ActionItem>
+						)}
 					</Menu.Popup>
 				</Menu.Positioner>
 			</Menu.Portal>
@@ -2016,6 +2035,7 @@ function FolderActionsMenu({
 	revealLabel,
 	onCreateFile,
 	onCreateHtmlFile,
+	onCreateDiagramFile,
 	onCreateFolder,
 	onRenameFolder,
 	onDeleteFolder,
@@ -2034,6 +2054,7 @@ function FolderActionsMenu({
 	revealLabel?: string;
 	onCreateFile?: (id: string) => void;
 	onCreateHtmlFile?: (id: string) => void;
+	onCreateDiagramFile?: (id: string) => void;
 	onCreateFolder?: (id: string) => void;
 	onRenameFolder?: (id: string, label: string) => void;
 	onDeleteFolder?: (id: string) => void;
@@ -2096,6 +2117,14 @@ function FolderActionsMenu({
 					onClick={() => onCreateHtmlFile(id)}
 				>
 					New HTML App
+				</ActionItem>
+			)}
+			{onCreateDiagramFile && (
+				<ActionItem
+					icon={<MingcuteDrawingBoardLine />}
+					onClick={() => onCreateDiagramFile(id)}
+				>
+					New Diagram
 				</ActionItem>
 			)}
 			{onCreateFolder && (

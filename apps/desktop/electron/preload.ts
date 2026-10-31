@@ -66,7 +66,8 @@ const desktopApi = {
 		ipcRenderer.invoke("desktop:delete-file", { path, options }),
 	stageDelete: (workspacePath, paths) =>
 		ipcRenderer.invoke("desktop:stage-delete", { workspacePath, paths }),
-	undoText: () => ipcRenderer.invoke("desktop:undo-text"),
+	runNativeEdit: (command) =>
+		ipcRenderer.invoke("desktop:run-native-edit", command),
 	restoreDelete: (token) =>
 		ipcRenderer.invoke("desktop:restore-delete", { token }),
 	finalizeDelete: (token) =>
@@ -151,6 +152,8 @@ const desktopApi = {
 		subscribe("desktop:menu-create-markdown-file", callback),
 	onMenuCreateHtmlFile: (callback) =>
 		subscribe("desktop:menu-create-html-file", callback),
+	onMenuCreateDiagramFile: (callback) =>
+		subscribe("desktop:menu-create-diagram-file", callback),
 	onMenuOpenFile: (callback) => subscribe("desktop:menu-open-file", callback),
 	onMenuOpenFolder: (callback) =>
 		subscribe("desktop:menu-open-folder", callback),
@@ -181,6 +184,8 @@ const desktopApi = {
 	onMenuToggleSourceMode: (callback) =>
 		subscribe("desktop:menu-toggle-source-mode", callback),
 	onUndoDelete: (callback) => subscribe("desktop:undo-delete", callback),
+	onMenuEdit: (callback) => subscribe("desktop:menu-edit", callback),
+	onMenuZoom: (callback) => subscribe("desktop:menu-zoom", callback),
 	onWindowFocus: (callback) => subscribe("desktop:window-focus", callback),
 	onFullScreenChange: (callback) =>
 		subscribe("desktop:fullscreen-change", (isFullScreen: boolean) =>

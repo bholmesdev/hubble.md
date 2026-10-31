@@ -49,6 +49,10 @@ export default defineConfig({
 				"@": fileURLToPath(new URL("./src", import.meta.url)),
 			},
 		},
+		// Pre-bundling drops the `?url` imports tldraw's bundled assets rely on.
+		optimizeDeps: {
+			exclude: ["@tldraw/assets"],
+		},
 		server: {
 			port: devPort,
 			strictPort: false,

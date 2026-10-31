@@ -164,6 +164,9 @@ export const titleGenerationPreviewStore = store<{
 	previewPath: string;
 } | null>(null);
 
+// A just-created file whose name the title bar should open for editing.
+export const titleRenameRequestStore = store<string | null>(null);
+
 export const spellcheckStore = store<SpellcheckState | null>(null);
 export const telemetryConsentStore = store<TelemetryConsent | null>(null);
 // Flips once the file Hubble was launched with has loaded, so the first
@@ -198,3 +201,6 @@ export const shortcutBindingsStore = appStore
 	.select("settings")
 	.select("shortcutBindings");
 export const themePreferenceStore = appStore.select("settings").select("theme");
+export const diagramGridStore = appStore
+	.select("settings")
+	.select("diagramGrid");

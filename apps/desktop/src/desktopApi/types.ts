@@ -104,7 +104,12 @@ export type MenuState = {
 	canGoForward: boolean;
 	tabCount: number;
 	hasClosedTabs: boolean;
+	hasDiagramOpen: boolean;
 };
+
+/** Edit menu commands the app reroutes to the open diagram. */
+export type EditCommand = "undo" | "redo" | "selectAll";
+export type ZoomCommand = "in" | "out" | "reset" | "fit";
 
 export type DesktopUpdateStatus =
 	| "idle"
@@ -177,7 +182,8 @@ export type DesktopApi = {
 	): Promise<PersistPastedImageOutput>;
 	deleteFile(path: string, options?: { recursive?: boolean }): Promise<void>;
 	stageDelete(workspacePath: string, paths: string[]): Promise<string>;
-	undoText(): Promise<void>;
+	/** Runs the browser's built-in editing command in the focused element. */
+	runNativeEdit(command: EditCommand): Promise<void>;
 	restoreDelete(token: string): Promise<void>;
 	finalizeDelete(token: string): Promise<void>;
 	setDeleteUndoAvailable(available: boolean): Promise<void>;
@@ -232,6 +238,7 @@ export type DesktopApi = {
 	): Unsubscribe;
 	onMenuCreateMarkdownFile(callback: () => void): Unsubscribe;
 	onMenuCreateHtmlFile(callback: () => void): Unsubscribe;
+	onMenuCreateDiagramFile(callback: () => void): Unsubscribe;
 	onMenuOpenFile(callback: () => void): Unsubscribe;
 	onMenuOpenFolder(callback: () => void): Unsubscribe;
 	onMenuOpenSettings(callback: () => void): Unsubscribe;
@@ -253,6 +260,8 @@ export type DesktopApi = {
 	onMenuPreviousTab(callback: () => void): Unsubscribe;
 	onMenuToggleSourceMode(callback: () => void): Unsubscribe;
 	onUndoDelete(callback: () => void): Unsubscribe;
+	onMenuEdit(callback: (command: EditCommand) => void): Unsubscribe;
+	onMenuZoom(callback: (command: ZoomCommand) => void): Unsubscribe;
 	onWindowFocus(callback: () => void): Unsubscribe;
 	onFullScreenChange(callback: (isFullScreen: boolean) => void): Unsubscribe;
 
