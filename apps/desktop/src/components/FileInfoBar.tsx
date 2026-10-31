@@ -24,6 +24,7 @@ import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { desktopApi } from "../desktopApi";
 import type { AgentClient } from "../desktopApi/types";
+import { DiagramMenuItems } from "../editor/lazyDiagram";
 import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
@@ -61,7 +62,6 @@ import {
 	workspacePathStore,
 } from "../store/state";
 import { ClaudeLogo, CodexLogo } from "./AgentLogos";
-import { DiagramMenuItems } from "./DiagramMenuItems";
 
 const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
 
