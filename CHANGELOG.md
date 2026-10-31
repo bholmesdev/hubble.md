@@ -15,6 +15,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Reference-style links and images no longer disappear from a note when you edit it. Thanks [@mohsensc](https://github.com/mohsensc)! [#309](https://github.com/bholmesdev/hubble.md/pull/309)
 - Opening a file with Hubble from Finder now points the terminal's `$HUBBLE_NOTE_PATH` at that file, so "Chat about this note" reads the right note. Thanks [@farskid](https://github.com/farskid) for the suggestion! [#316](https://github.com/bholmesdev/hubble.md/pull/316)
 - On Windows and Linux, opening a Markdown file while Hubble is closed now opens that file instead of your last session. [#326](https://github.com/bholmesdev/hubble.md/pull/326)
 
