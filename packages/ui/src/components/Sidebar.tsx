@@ -89,7 +89,7 @@ type RenameItem =
 	| {
 			kind: "file";
 			path: string;
-			origin?: "new-note" | "new-html" | "new-diagram";
+			origin?: "new-note";
 	  }
 	| {
 			kind: "folder";
@@ -474,7 +474,7 @@ export function Sidebar({
 		path: string,
 		nextName: string,
 		options: {
-			origin: "new-note" | "new-html" | "new-diagram" | "rename";
+			origin: "new-note" | "rename";
 			commit: "enter" | "blur";
 		},
 	) => void;
@@ -487,8 +487,9 @@ export function Sidebar({
 	onDeleteItems?: (items: SidebarDeleteItem[]) => void;
 	onTogglePinnedFile?: (path: string) => void;
 	onCreateFile?: (folderId: string | null) => Promise<string | null>;
-	onCreateHtmlFile?: (folderId: string | null) => Promise<string | null>;
-	onCreateDiagramFile?: (folderId: string | null) => Promise<string | null>;
+	/** HTML apps and diagrams: the app names them, not the sidebar. */
+	onCreateHtmlFile?: (folderId: string | null) => void;
+	onCreateDiagramFile?: (folderId: string | null) => void;
 	onCreateFolder?: (folderId: string | null) => Promise<string | null>;
 	onDeleteFolder?: (folderId: string) => void;
 	onMoveItem?: (input: SidebarMoveItemInput) => Promise<void> | void;
@@ -571,29 +572,15 @@ export function Sidebar({
 			},
 		);
 	};
-	/** HTML apps and diagrams: created empty, then renamed in place. */
-	const createTypedFile = async (
-		create: ((folderId: string | null) => Promise<string | null>) | undefined,
-		origin: "new-html" | "new-diagram",
+	const createTypedFile = (
+		create: ((folderId: string | null) => void) | undefined,
 		folderId: string | null,
 	) => {
 		if (!create) return;
 		setOpenActionsPath(null);
 		if (folderId) expandFolder(folderId);
-		const path = await create(folderId);
-		if (!path) return;
-		beginRename(
-			{ kind: "file", path, origin },
-			fileNameFromPath(getDisplayPath(path)),
-			{
-				deleteOnUnchangedCancel: true,
-			},
-		);
+		create(folderId);
 	};
-	const createHtmlFile = (folderId: string | null) =>
-		createTypedFile(onCreateHtmlFile, "new-html", folderId);
-	const createDiagramFile = (folderId: string | null) =>
-		createTypedFile(onCreateDiagramFile, "new-diagram", folderId);
 	const createFolder = async (folderId: string | null) => {
 		if (!onCreateFolder) return;
 		setOpenActionsPath(null);
@@ -1254,12 +1241,12 @@ export function Sidebar({
 													onCreateFile={(id) => void createFile(id)}
 													onCreateHtmlFile={
 														onCreateHtmlFile
-															? (id) => void createHtmlFile(id)
+															? (id) => createTypedFile(onCreateHtmlFile, id)
 															: undefined
 													}
 													onCreateDiagramFile={
 														onCreateDiagramFile
-															? (id) => void createDiagramFile(id)
+															? (id) => createTypedFile(onCreateDiagramFile, id)
 															: undefined
 													}
 													onCreateFolder={(id) => void createFolder(id)}
@@ -1382,12 +1369,12 @@ export function Sidebar({
 							onCreateFile={() => void createFile(creationFolderId)}
 							onCreateHtmlFile={
 								onCreateHtmlFile
-									? () => void createHtmlFile(creationFolderId)
+									? () => createTypedFile(onCreateHtmlFile, creationFolderId)
 									: undefined
 							}
 							onCreateDiagramFile={
 								onCreateDiagramFile
-									? () => void createDiagramFile(creationFolderId)
+									? () => createTypedFile(onCreateDiagramFile, creationFolderId)
 									: undefined
 							}
 						/>

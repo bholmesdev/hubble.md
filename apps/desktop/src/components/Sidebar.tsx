@@ -7,15 +7,17 @@ import {
 import { useStoreValue } from "@simplestack/store/react";
 import type { ReactNode } from "react";
 import { desktopApi } from "../desktopApi";
-import { focusMarkdownEditorAfterRender } from "../fileActions";
+import {
+	createDiagramFile,
+	createHtmlFile,
+	focusMarkdownEditorAfterRender,
+} from "../fileActions";
 import { copyText } from "../lib/clipboard";
 import { DIAGRAMS_ENABLED } from "../lib/filePath";
 import { isCompactWindow, useCompactWindow } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
-	createDiagramFileInFolder,
 	createFolderInFolder,
-	createHtmlFileInFolder,
 	createMarkdownFileInFolder,
 	deleteFolder,
 	deleteMarkdownFile,
@@ -207,11 +209,11 @@ export function Sidebar({
 				createMarkdownFileInFolder(absolutePath(folderId))
 			}
 			onCreateHtmlFile={(folderId) =>
-				createHtmlFileInFolder(absolutePath(folderId))
+				void createHtmlFile(absolutePath(folderId))
 			}
 			onCreateDiagramFile={
 				DIAGRAMS_ENABLED
-					? (folderId) => createDiagramFileInFolder(absolutePath(folderId))
+					? (folderId) => void createDiagramFile(absolutePath(folderId))
 					: undefined
 			}
 			onCreateFolder={(folderId) =>
