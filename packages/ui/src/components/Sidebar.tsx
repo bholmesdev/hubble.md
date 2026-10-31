@@ -364,7 +364,7 @@ const sidebarActionIconClass =
 const sidebarRowContentClass =
 	"flex min-w-0 flex-1 items-center gap-1 [padding-block:var(--row-pad-block)] [padding-inline-end:1.25rem] text-start text-[length:var(--font-size-sidebar)]";
 const sidebarRowActionButtonClass =
-	"inline-flex size-5 shrink-0 items-center justify-center rounded-sm border border-transparent bg-transparent text-current opacity-0 outline-hidden transition-opacity group-hover/sidebar-row:opacity-100 aria-expanded:opacity-100 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40";
+	"inline-flex size-5 shrink-0 items-center justify-center rounded-sm border border-transparent bg-transparent text-current opacity-0 outline-hidden group-hover/sidebar-row:opacity-100 aria-expanded:opacity-100 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40";
 const DEFAULT_SIDEBAR_WIDTH = 220;
 const MIN_SIDEBAR_WIDTH = 180;
 const MAX_SIDEBAR_WIDTH = 360;
@@ -1070,7 +1070,7 @@ export function Sidebar({
 									data-selected={isSelected ? "true" : undefined}
 									className={cn(
 										"group/sidebar-row relative flex w-full items-center text-sidebar-foreground",
-										"transition-[background-color,opacity,filter] duration-150 ease-out motion-reduce:transition-none",
+										"transition-[opacity,filter] duration-150 ease-out motion-reduce:transition-none",
 										isSelected &&
 											"bg-sidebar-accent text-sidebar-accent-foreground",
 										isOpen && "font-medium",
@@ -1218,7 +1218,7 @@ export function Sidebar({
 									{canTogglePinnedFile && (
 										<span
 											className={cn(
-												"pointer-events-none absolute inset-y-0 end-0 w-16 rounded-e-[var(--radius-row)] opacity-0 transition-opacity group-hover/sidebar-row:opacity-100",
+												"pointer-events-none absolute inset-y-0 end-0 w-16 rounded-e-[var(--radius-row)] opacity-0 group-hover/sidebar-row:opacity-100",
 												isSelected
 													? "bg-linear-to-r from-transparent from-0% via-sidebar-accent via-25% to-sidebar-accent"
 													: "bg-linear-to-r from-transparent from-0% via-accent via-25% to-accent",
@@ -1646,7 +1646,7 @@ function FolderSegment({
 			<span
 				ref={setRefs}
 				className={cn(
-					"min-w-0 truncate rounded-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
+					"min-w-0 truncate rounded-sm",
 					active && "bg-sidebar-accent/70",
 				)}
 				{...(enabled ? attributes : {})}

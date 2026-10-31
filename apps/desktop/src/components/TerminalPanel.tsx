@@ -406,7 +406,7 @@ export function TerminalPanel() {
 						<div
 							key={session.id}
 							className={cn(
-								"group relative flex min-w-20 max-w-48 items-center rounded-md text-xs transition-colors",
+								"group relative flex min-w-20 max-w-48 items-center rounded-md text-xs",
 								activeSessionId === session.id
 									? "bg-background text-foreground border border-border"
 									: "text-muted-foreground hover:bg-muted",
@@ -451,7 +451,7 @@ export function TerminalPanel() {
 									type="button"
 									aria-label={`Close terminal session ${session.title}`}
 									className={cn(
-										"pointer-events-none absolute end-1 z-10 -translate-y-1/2 rounded-sm p-0.5 opacity-0 transition-opacity [inset-block-start:50%] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-ring",
+										"pointer-events-none absolute end-1 z-10 -translate-y-1/2 rounded-sm p-0.5 opacity-0 [inset-block-start:50%] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-ring",
 										activeSessionId === session.id
 											? "bg-background"
 											: "bg-muted",

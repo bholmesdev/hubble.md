@@ -622,7 +622,7 @@ function NavButton({
 		<button
 			ref={buttonRef}
 			type="button"
-			className={`flex h-8 items-center rounded-sm px-2 text-left text-[11px] font-medium transition-colors ${
+			className={`flex h-8 items-center rounded-sm px-2 text-left text-[11px] font-medium ${
 				active
 					? "bg-sidebar-accent text-sidebar-accent-foreground"
 					: "text-muted-foreground hover:bg-accent hover:text-foreground"

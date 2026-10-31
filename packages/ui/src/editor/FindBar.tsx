@@ -325,7 +325,7 @@ function FindButton({
 			onMouseDown={(event) => event.preventDefault()}
 			onClick={onClick}
 			className={cn(
-				"inline-flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-inner)] text-muted-foreground outline-hidden transition-[background-color,color,box-shadow] duration-[var(--default-transition-duration)] ease-snappy hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/40",
+				"inline-flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-inner)] text-muted-foreground outline-hidden transition-[box-shadow] duration-[var(--default-transition-duration)] ease-snappy hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/40",
 				"disabled:pointer-events-none disabled:opacity-40",
 			)}
 		>
