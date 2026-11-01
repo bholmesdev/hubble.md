@@ -80,8 +80,6 @@ export function FileInfoBar({
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const compact = useCompactWindow();
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
-	// Equal side widths keep the title centered.
-	const sideWidth = onNewTab ? "flex-[0_100_152px]" : "flex-[0_100_114px]";
 	const [showBorder, setShowBorder] = useState(false);
 
 	useEffect(() => {
@@ -114,20 +112,25 @@ export function FileInfoBar({
 				}
 			: null;
 
+	// Equal side columns center the title; each side still fits its controls,
+	// including the window controls it clears in the title bar.
 	return (
 		<div
 			key={currentPath ?? "empty"}
 			data-file-info-bar
-			className={`relative flex h-9 min-w-0 shrink-0 items-center overflow-hidden select-none ${onNewTab ? "px-2" : "px-3"} after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
+			className={`relative grid h-9 min-w-0 shrink-0 grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center overflow-hidden select-none ${onNewTab ? "px-2" : "px-3"} after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
 		>
-			<div className={`flex items-center pe-4 ${sideWidth}`}>
+			<div
+				className="flex items-center pe-4"
+				style={{ paddingInlineStart: "var(--title-bar-start, 0px)" }}
+			>
 				{compact ? null : (
 					<div style={noDragStyle}>
 						<NavigationControls />
 					</div>
 				)}
 			</div>
-			<div className="flex min-w-0 flex-auto items-center justify-center gap-1 [&>button]:px-0 [&>button]:[-webkit-app-region:no-drag] [&>input]:px-0 [&>input]:[-webkit-app-region:no-drag]">
+			<div className="flex min-w-0 items-center justify-center gap-1 [&>button]:px-0 [&>button]:[-webkit-app-region:no-drag] [&>input]:px-0 [&>input]:[-webkit-app-region:no-drag]">
 				{folder ? (
 					<>
 						<span
@@ -153,7 +156,10 @@ export function FileInfoBar({
 					}
 				/>
 			</div>
-			<div className={`flex items-center justify-end ps-2 ${sideWidth}`}>
+			<div
+				className="flex items-center justify-end ps-2"
+				style={{ paddingInlineEnd: "var(--title-bar-end, 0px)" }}
+			>
 				<div className="flex items-center gap-1" style={noDragStyle}>
 					{comments ? <ReviewCommentSummary {...comments} /> : null}
 					<ActionsMenu

@@ -61,6 +61,11 @@ export function WindowTitleBar({
 		"app.toggle-sidebar",
 	);
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
+	const startInset = isFullScreen ? "0px" : START_INSET;
+	const endInset = isFullScreen ? "0px" : END_INSET;
+	// A lone tab's row spans the whole bar so its title centers on the window;
+	// the sidebar toggle floats over its start unless the sidebar header holds it.
+	const overlayToggle = singleTab && !spansSidebar;
 
 	function handleTabsCollapsedChange(collapsed: boolean) {
 		if (
@@ -79,17 +84,25 @@ export function WindowTitleBar({
 			data-window-title-bar
 			data-single-tab={singleTab ? "" : undefined}
 			className={`relative flex h-9 min-w-0 shrink-0 select-none items-center overflow-hidden ${singleTab ? "bg-background" : "bg-sidebar after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border"}`}
-			style={dragRegionStyle}
+			style={{
+				...dragRegionStyle,
+				...(singleTab && {
+					"--title-bar-start": overlayToggle
+						? `calc(${startInset} + 28px)`
+						: "0px",
+					"--title-bar-end": endInset,
+				}),
+			}}
 		>
 			<div
-				className={`flex min-w-0 items-center self-stretch ${spansSidebar ? "gap-2 pe-2.5" : hasTabs && !singleTab ? "pe-4" : ""} ${singleTab && spansSidebar ? "border-e border-sidebar-border bg-sidebar" : ""}`}
+				className={`flex min-w-0 items-center self-stretch ${overlayToggle ? "absolute inset-y-0 start-0 z-10" : ""} ${spansSidebar ? "gap-2 pe-2.5" : hasTabs && !singleTab ? "pe-4" : ""} ${singleTab && spansSidebar ? "border-e border-sidebar-border bg-sidebar" : ""}`}
 				style={{
 					flex: spansSidebar
 						? "0 0 var(--sidebar-width, 220px)"
 						: singleTab
 							? "0 0 auto"
 							: `0 100 ${hasTabs ? 114 : 98}px`,
-					paddingInlineStart: isFullScreen ? 0 : START_INSET,
+					paddingInlineStart: startInset,
 				}}
 			>
 				<Button
@@ -140,10 +153,9 @@ export function WindowTitleBar({
 					/>
 				</>
 			)}
-			<div
-				className="shrink-0"
-				style={{ inlineSize: isFullScreen ? 0 : END_INSET }}
-			/>
+			{singleTab ? null : (
+				<div className="shrink-0" style={{ inlineSize: endInset }} />
+			)}
 		</div>
 	);
 }
