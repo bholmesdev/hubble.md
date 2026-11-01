@@ -2,6 +2,7 @@ import { desktopApi } from "../desktopApi";
 import { CHANGELOG_PATH, isChangelogPath } from "../lib/changelogNote";
 import { sequential } from "../lib/concurrency";
 import { pathEquals } from "../lib/filePath";
+import { isVirtualPath, newTabPath } from "../lib/newTabPage";
 import type { loadPath as loadDocument } from "./actions";
 import { dropHistory, seedHistory } from "./history";
 import { appStore, emptyDoc, viewerStore, workspaceStore } from "./state";
@@ -33,7 +34,7 @@ export function createTabActions({
 		const workspacePath = workspaceStore.get().workspacePath;
 		const missing = await Promise.all(
 			tabs.order.map(async (id) => {
-				if (isChangelogPath(tabs.byId[id].path)) return null;
+				if (isVirtualPath(tabs.byId[id].path)) return null;
 				try {
 					return (await desktopApi.pathExists(tabs.byId[id].path)) ? null : id;
 				} catch {
@@ -89,6 +90,11 @@ export function createTabActions({
 			tabs: next,
 		}));
 		if (mintedId) seedHistory(mintedId, path);
+	}
+
+	/** Open a blank new tab page beside the active tab. */
+	async function openNewTabPage() {
+		await loadPath(newTabPath(), { tab: "new", launchExternal: false });
 	}
 
 	/** Read the tab's file without adding history or opening an external app. */
@@ -158,7 +164,7 @@ export function createTabActions({
 			const stack = tabsStore.get().closed;
 			const closed = stack[stack.length - 1];
 			if (!closed) return;
-			if (!isChangelogPath(closed.path)) {
+			if (!isVirtualPath(closed.path)) {
 				let exists: boolean;
 				try {
 					exists = await desktopApi.pathExists(closed.path);
@@ -260,6 +266,7 @@ export function createTabActions({
 		restoreTabs,
 		openTabForPath,
 		openBackgroundTab,
+		openNewTabPage,
 		activateTab,
 		reorderTab,
 		closeTab,

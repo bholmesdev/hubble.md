@@ -17,7 +17,7 @@ import { desktopApi } from "../desktopApi";
 import {
 	basename,
 	dirname,
-	hasHtmlExtension,
+	hasDocumentExtension,
 	hasMarkdownExtension,
 	relativeWorkspacePath,
 } from "../lib/filePath";
@@ -157,7 +157,7 @@ export function InboxView({
 	// Only list files Hubble can create as notes. Mtimes are stored in seconds.
 	const notes = new Map(
 		files
-			.filter((file) => isCreatableNote(file.path))
+			.filter((file) => hasDocumentExtension(file.path))
 			.map((file) => [
 				file.path,
 				{ path: file.path, modifiedAt: file.modified_at * 1000 },
@@ -475,10 +475,6 @@ function LiveText({
 	});
 	if (live === undefined) return saved;
 	return live ?? empty;
-}
-
-function isCreatableNote(path: string) {
-	return hasMarkdownExtension(path) || hasHtmlExtension(path);
 }
 
 function focusRow(nav: HTMLElement, path: string) {

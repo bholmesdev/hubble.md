@@ -12,7 +12,6 @@ import {
 } from "@hubble.md/ui";
 import { toast } from "sonner";
 import { desktopApi } from "../desktopApi";
-import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
 	basename,
@@ -20,6 +19,7 @@ import {
 	isEditableFile,
 	supportsSourceToggle,
 } from "../lib/filePath";
+import { isVirtualPath } from "../lib/newTabPage";
 import {
 	activateAdjacentTab,
 	closeActiveTab,
@@ -69,7 +69,7 @@ export type AppCommandActions = {
 
 function toRegistryContext(context: AppCommandContext): RegistryContext {
 	const path = context.currentPath;
-	const isRealFile = path !== null && !isChangelogPath(path);
+	const isRealFile = path !== null && !isVirtualPath(path);
 	return {
 		hasCurrentFile: isRealFile,
 		hasEditableFile: isRealFile && isEditableFile(path),
@@ -87,7 +87,7 @@ function hasRichTextEditor(context: AppCommandContext) {
 	const path = context.currentPath;
 	return (
 		path !== null &&
-		!isChangelogPath(path) &&
+		!isVirtualPath(path) &&
 		hasMarkdownExtension(path) &&
 		!context.isSourceMode
 	);

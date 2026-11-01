@@ -1,5 +1,6 @@
 import { isChangelogPath } from "../lib/changelogNote";
 import { fileStem, pathEquals } from "../lib/filePath";
+import { isNewTabPath } from "../lib/newTabPage";
 
 /** Tabs hold paths; DocumentState holds the active document's contents. */
 export type Tab = { path: string };
@@ -181,7 +182,14 @@ export function tabLabels(tabs: TabsState): Record<TabId, string> {
 	return Object.fromEntries(
 		tabs.order.map((id) => {
 			const path = tabs.byId[id]?.path ?? "";
-			return [id, isChangelogPath(path) ? "What's new" : fileStem(path)];
+			return [
+				id,
+				isChangelogPath(path)
+					? "What's new"
+					: isNewTabPath(path)
+						? "New tab"
+						: fileStem(path),
+			];
 		}),
 	);
 }

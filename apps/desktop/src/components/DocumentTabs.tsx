@@ -1,8 +1,8 @@
 import { TabStrip, type TabStripItem } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import type { RefObject } from "react";
-import { isChangelogPath } from "../lib/changelogNote";
 import { fileStem, relativeWorkspacePath } from "../lib/filePath";
+import { isVirtualPath } from "../lib/newTabPage";
 import {
 	activateTab,
 	closeOtherTabs,
@@ -39,8 +39,8 @@ export function DocumentTabs({
 		return {
 			id,
 			label: labels[id] ?? "",
-			title: isChangelogPath(path)
-				? "What's new"
+			title: isVirtualPath(path)
+				? labels[id]
 				: relativeWorkspacePath(path, workspacePath ?? null),
 			name: fileStem(path),
 		};
@@ -62,7 +62,7 @@ export function DocumentTabs({
 			onNewTab={onNewTab}
 			newTabTitle={newTabTitle}
 			onRename={
-				isChangelogPath(
+				isVirtualPath(
 					tabs.activeTabId ? tabs.byId[tabs.activeTabId]?.path : null,
 				)
 					? undefined
