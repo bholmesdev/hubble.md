@@ -986,6 +986,9 @@ function editMenuItem(
 	};
 }
 
+/** The diagram canvas's own Zoom to Fit key. The menu only displays it. */
+const ZOOM_TO_FIT_BINDING = "Shift+1";
+
 /** With a diagram open, zoom acts on the canvas instead of the window. */
 function zoomClick(command: ZoomCommand, zoomWindow: () => void) {
 	return () =>
@@ -1010,7 +1013,10 @@ function buildMenu() {
 				{
 					id: "new-diagram-file",
 					label: "New Diagram",
+					accelerator: "CmdOrCtrl+Alt+N",
+					// Hidden items keep their shortcut on Windows and Linux.
 					visible: DIAGRAMS_ENABLED,
+					enabled: DIAGRAMS_ENABLED,
 					click: () => sendToRenderer("desktop:menu-create-diagram-file"),
 				},
 				{ type: "separator" },
@@ -1127,8 +1133,8 @@ function buildMenu() {
 				{
 					id: "zoom-to-fit",
 					label: "Zoom to Fit",
-					// The canvas binds Cmd+1 itself, so only show it here.
-					accelerator: "CmdOrCtrl+1",
+					// The canvas binds Shift+1 itself, so text fields can still type "!".
+					accelerator: ZOOM_TO_FIT_BINDING,
 					registerAccelerator: false,
 					enabled: menuState.hasDiagramOpen,
 					click: () => sendToRenderer("desktop:menu-zoom", "fit"),
@@ -1417,23 +1423,24 @@ async function createWindow() {
 	if (process.platform === "darwin") {
 		window.webContents.on("before-input-event", (_event, input) => {
 			const command: CommandDefinition = getCommand("app.go-to-file");
-			const binding = command.allowConflictWith
-				? getCommandBinding("app.go-to-file")
-				: null;
-			// macOS still registers accelerators with registerAccelerator: false.
+			const pageBindings = [
+				ZOOM_TO_FIT_BINDING,
+				command.allowConflictWith ? getCommandBinding("app.go-to-file") : null,
+			];
+			const event = {
+				key: input.key,
+				code: input.code,
+				metaKey: input.meta,
+				ctrlKey: input.control,
+				altKey: input.alt,
+				shiftKey: input.shift,
+			} as KeyboardEvent;
+			// macOS still registers accelerators with registerAccelerator: false,
+			// so the menu would act on these keys, and flash, before the page sees them.
 			window.webContents.setIgnoreMenuShortcuts(
 				input.type === "keyDown" &&
-					binding !== null &&
-					keymatch(
-						{
-							key: input.key,
-							code: input.code,
-							metaKey: input.meta,
-							ctrlKey: input.control,
-							altKey: input.alt,
-							shiftKey: input.shift,
-						} as KeyboardEvent,
-						binding,
+					pageBindings.some(
+						(binding) => binding !== null && keymatch(event, binding),
 					),
 			);
 		});
