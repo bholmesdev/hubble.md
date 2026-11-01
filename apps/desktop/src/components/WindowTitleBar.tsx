@@ -1,6 +1,12 @@
 import { Button, useCommandShortcutLabel } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import {
+	type CSSProperties,
+	type ReactNode,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import MingcuteLayoutLeftLine from "~icons/mingcute/layout-left-line";
 import { desktopApi } from "../desktopApi";
 import { useCompactWindow } from "../lib/layout";
@@ -30,8 +36,11 @@ export function WindowTitleBar({
 	onNewTab,
 	allTabsOpen,
 	onAllTabsOpenChange,
+	fileInfo,
 }: {
 	showSidebarBadge?: boolean;
+	/** Shown in place of the tab strip while only one tab is open. */
+	fileInfo?: ReactNode;
 	onNewTab?: () => void;
 	allTabsOpen: boolean;
 	onAllTabsOpenChange: (open: boolean) => void;
@@ -66,15 +75,18 @@ export function WindowTitleBar({
 	return (
 		<div
 			data-window-title-bar
-			className="relative flex h-9 min-w-0 shrink-0 select-none items-center overflow-hidden bg-sidebar after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border"
+			data-single-tab={fileInfo ? "" : undefined}
+			className={`relative flex h-9 min-w-0 shrink-0 select-none items-center overflow-hidden ${fileInfo ? "bg-background" : "bg-sidebar after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border"}`}
 			style={dragRegionStyle}
 		>
 			<div
-				className={`flex min-w-0 items-center ${spansSidebar ? "gap-2 pe-2.5" : hasTabs ? "pe-4" : ""}`}
+				className={`flex min-w-0 items-center self-stretch ${spansSidebar ? "gap-2 pe-2.5" : hasTabs && !fileInfo ? "pe-4" : ""} ${fileInfo && spansSidebar ? "border-e border-sidebar-border bg-sidebar" : ""}`}
 				style={{
 					flex: spansSidebar
 						? "0 0 var(--sidebar-width, 220px)"
-						: `0 100 ${hasTabs ? 114 : 98}px`,
+						: fileInfo
+							? "0 0 auto"
+							: `0 100 ${hasTabs ? 114 : 98}px`,
 					paddingInlineStart: isFullScreen ? 0 : START_INSET,
 				}}
 			>
@@ -99,22 +111,33 @@ export function WindowTitleBar({
 					</div>
 				) : null}
 			</div>
-			{/* Overlap the sidebar seam; the active tab covers the inset divider. */}
-			<div ref={tabAreaRef} className="-ms-px flex min-w-0 flex-1 self-stretch">
-				<DocumentTabs
-					onNewTab={onNewTab}
-					newTabTitle={newTabTitle}
-					flushStart={sidebarOpen && !compact}
-					showStartDivider={!sidebarOpen}
-					onCollapsedChange={handleTabsCollapsedChange}
-					collapseTargetRef={allTabsButtonRef}
-				/>
-			</div>
-			<AllTabsMenu
-				open={allTabsOpen}
-				onOpenChange={onAllTabsOpenChange}
-				triggerRef={allTabsButtonRef}
-			/>
+			{fileInfo ? (
+				<div className="flex min-w-0 flex-1 flex-col self-stretch">
+					{fileInfo}
+				</div>
+			) : (
+				<>
+					{/* Overlap the sidebar seam; the active tab covers the inset divider. */}
+					<div
+						ref={tabAreaRef}
+						className="-ms-px flex min-w-0 flex-1 self-stretch"
+					>
+						<DocumentTabs
+							onNewTab={onNewTab}
+							newTabTitle={newTabTitle}
+							flushStart={sidebarOpen && !compact}
+							showStartDivider={!sidebarOpen}
+							onCollapsedChange={handleTabsCollapsedChange}
+							collapseTargetRef={allTabsButtonRef}
+						/>
+					</div>
+					<AllTabsMenu
+						open={allTabsOpen}
+						onOpenChange={onAllTabsOpenChange}
+						triggerRef={allTabsButtonRef}
+					/>
+				</>
+			)}
 			<div
 				className="shrink-0"
 				style={{ inlineSize: isFullScreen ? 0 : END_INSET }}

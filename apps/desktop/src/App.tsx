@@ -291,6 +291,11 @@ function App() {
 		setSearchOpensInNewTab(mode === "new-tab");
 		changeSearchOpen(true);
 	};
+	const newTab = hasWorkspace ? () => openSearch("new-tab") : undefined;
+	// A lone tab folds the file info into the title bar to save a row. The
+	// strip returns while picking a file for a new tab.
+	const showTabStrip =
+		tabs.order.length > 1 || (searchOpen && searchOpensInNewTab);
 	const createNewFile = () => {
 		const created = createMarkdownFile(
 			focusedCreationFolder,
@@ -759,6 +764,14 @@ function App() {
 			}}
 		>
 			<WindowTitleBar
+				fileInfo={
+					showTabStrip ? undefined : (
+						<FileInfoBar
+							scrollContainer={scrollContainerEl}
+							onNewTab={newTab}
+						/>
+					)
+				}
 				allTabsOpen={allTabsOpen}
 				onAllTabsOpenChange={setAllTabsOpen}
 				showSidebarBadge={
@@ -767,7 +780,7 @@ function App() {
 						whatsNewVersion !== null ||
 						telemetryConsent === "unset")
 				}
-				onNewTab={hasWorkspace ? () => openSearch("new-tab") : undefined}
+				onNewTab={newTab}
 			/>
 			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
@@ -830,7 +843,9 @@ function App() {
 					onFocusCapture={closeSidebarOverlay}
 				>
 					<div className="flex-1 min-h-0 min-w-0 flex flex-col">
-						<FileInfoBar scrollContainer={scrollContainerEl} />
+						{showTabStrip ? (
+							<FileInfoBar scrollContainer={scrollContainerEl} />
+						) : null}
 						<div className="flex-1 min-h-0 min-w-0 relative">
 							{state.status === "loading" && <p>Loading…</p>}
 							{state.status === "error" && (

@@ -147,12 +147,14 @@
 	}
 }
 /* Round the editor's top-left corner where the divider meets the docked
- * sidebar, unless the selected first tab already runs straight down into it. */
+ * sidebar, unless the selected first tab already runs straight down into it
+ * or a lone tab drops the divider entirely. */
 @media (width >= 40rem) {
 	:root:not(
 			:has(
 					[role="tablist"]:not([aria-hidden])
-						> [data-tab-item]:first-child[data-selected]
+						> [data-tab-item]:first-child[data-selected],
+					[data-window-title-bar][data-single-tab]
 				)
 		)
 		[data-sidebar-overlay]

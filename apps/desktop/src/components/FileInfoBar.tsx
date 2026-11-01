@@ -10,8 +10,9 @@ import {
 	useCommandShortcutLabel,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { toast } from "sonner";
+import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteArrowLeftLine from "~icons/mingcute/arrow-left-line";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
@@ -59,13 +60,18 @@ import {
 } from "../store/state";
 import { ClaudeLogo, CodexLogo } from "./AgentLogos";
 
+const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
+
 const menuItemClass =
 	"flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent";
 
 export function FileInfoBar({
 	scrollContainer,
+	onNewTab,
 }: {
 	scrollContainer: HTMLDivElement | null;
+	/** Set while the tab strip is hidden, so a new tab stays one click away. */
+	onNewTab?: () => void;
 }) {
 	const workspacePath = useStoreValue(workspacePathStore);
 	const currentPath = useStoreValue(currentPathStore);
@@ -73,6 +79,7 @@ export function FileInfoBar({
 	const titlePath = filePathForTitlePreview(currentPath, titlePreview);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const compact = useCompactWindow();
+	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
 	const [showBorder, setShowBorder] = useState(false);
 
 	useEffect(() => {
@@ -109,67 +116,74 @@ export function FileInfoBar({
 		<div
 			key={currentPath ?? "empty"}
 			data-file-info-bar
-			className={`relative flex h-9 min-w-0 shrink-0 items-center overflow-hidden px-3 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
+			className={`relative flex h-9 min-w-0 shrink-0 items-center overflow-hidden ps-3 select-none ${onNewTab ? "pe-2" : "pe-3"} after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
 		>
-			<div className="flex flex-[0_100_114px] items-center pe-4">
-				{compact ? null : <NavigationControls />}
-			</div>
-			<div className="flex min-w-0 flex-auto items-center justify-center gap-1 [&>button]:px-0 [&>input]:px-0">
-				{folder ? (
-					<>
-						<span
-							className="min-w-0 max-w-[50%] truncate text-xs text-muted-foreground"
-							title={folder}
-						>
-							{folder.split(/[\\/]/).join(" / ")}
-						</span>
-						<span
-							aria-hidden="true"
-							className="text-xs text-muted-foreground/60"
-						>
-							/
-						</span>
-					</>
-				) : null}
-				<EditableFileTitle
-					currentPath={isChangelog ? "What's new" : (titlePath ?? null)}
-					onRename={
-						isChangelog
-							? undefined
-							: (nextName) => void renameCurrentMarkdownFile(nextName)
-					}
-				/>
-			</div>
-			<div className="flex flex-[0_100_114px] items-center justify-end ps-2">
-				<div className="flex items-center gap-1">
-					{!compact && (
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label="Toggle terminal"
-							title="Toggle terminal"
-							onClick={toggleTerminal}
-						>
-							<MingcuteTerminalLine className="size-3.5" />
-						</Button>
+			{/* Equal side widths keep the title centered; New tab sits outside them. */}
+			<div className="flex min-w-0 flex-1 items-center">
+				<div className="flex flex-[0_100_114px] items-center pe-4">
+					{compact ? null : (
+						<div style={noDragStyle}>
+							<NavigationControls />
+						</div>
 					)}
-					{comments ? <ReviewCommentSummary {...comments} /> : null}
-					{(compact || actionPath) && (
+				</div>
+				<div className="flex min-w-0 flex-auto items-center justify-center gap-1 [&>button]:px-0 [&>button]:[-webkit-app-region:no-drag] [&>input]:px-0 [&>input]:[-webkit-app-region:no-drag]">
+					{folder ? (
+						<>
+							<span
+								className="min-w-0 max-w-[50%] truncate text-xs text-muted-foreground"
+								title={folder}
+							>
+								{folder.split(/[\\/]/).join(" / ")}
+							</span>
+							<span
+								aria-hidden="true"
+								className="text-xs text-muted-foreground/60"
+							>
+								/
+							</span>
+						</>
+					) : null}
+					<EditableFileTitle
+						currentPath={isChangelog ? "What's new" : (titlePath ?? null)}
+						onRename={
+							isChangelog
+								? undefined
+								: (nextName) => void renameCurrentMarkdownFile(nextName)
+						}
+					/>
+				</div>
+				<div className="flex flex-[0_100_114px] items-center justify-end ps-2">
+					<div className="flex items-center gap-1" style={noDragStyle}>
+						{comments ? <ReviewCommentSummary {...comments} /> : null}
 						<ActionsMenu
 							path={actionPath}
 							canDelete={Boolean(
 								actionPath && isInWorkspace(actionPath, workspacePath ?? null),
 							)}
-							showTerminal={compact}
 							workspacePath={
 								workspacePath && actionPath && isEditableFile(actionPath)
 									? workspacePath
 									: null
 							}
 						/>
-					)}
+					</div>
 				</div>
 			</div>
+			{onNewTab ? (
+				<div className="flex shrink-0 items-center" style={noDragStyle}>
+					<span aria-hidden="true" className="mx-2 h-4 w-px bg-border" />
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label={newTabTitle}
+						title={newTabTitle}
+						onClick={onNewTab}
+					>
+						<MingcuteAddLine className="size-4" />
+					</Button>
+				</div>
+			) : null}
 		</div>
 	);
 }
@@ -208,12 +222,10 @@ function ActionsMenu({
 	path,
 	canDelete,
 	workspacePath,
-	showTerminal,
 }: {
 	path: string | null;
 	canDelete: boolean;
 	workspacePath: string | null;
-	showTerminal: boolean;
 }) {
 	const { viewMode } = useStoreValue(viewerStore);
 	const isSourceMode = viewMode === "source";
@@ -286,16 +298,12 @@ function ActionsMenu({
 					className="isolate z-50"
 				>
 					<Menu.Popup className="z-50 w-52 origin-(--transform-origin) rounded-sm border border-border bg-popover p-1 text-[11px] text-popover-foreground outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-						{showTerminal && (
-							<>
-								<Menu.Item className={menuItemClass} onClick={toggleTerminal}>
-									<MingcuteTerminalLine className="size-3 shrink-0" />
-									<span className="min-w-0 flex-1">Toggle terminal</span>
-									<ShortcutHint commandId="app.toggle-terminal" />
-								</Menu.Item>
-								<Menu.Separator className="my-1 h-px bg-border" />
-							</>
-						)}
+						<Menu.Item className={menuItemClass} onClick={toggleTerminal}>
+							<MingcuteTerminalLine className="size-3 shrink-0" />
+							<span className="min-w-0 flex-1">Toggle terminal</span>
+							<ShortcutHint commandId="app.toggle-terminal" />
+						</Menu.Item>
+						{path ? <Menu.Separator className="my-1 h-px bg-border" /> : null}
 						{path && workspacePath && (
 							<>
 								<Menu.Item
