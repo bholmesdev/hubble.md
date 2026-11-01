@@ -11,6 +11,7 @@ import {
 	type SidebarFile,
 	type SidebarRow,
 	type SidebarSortMode,
+	setAllSidebarFoldersExpanded,
 	useSidebarTree,
 } from "./useSidebarTree";
 
@@ -211,6 +212,43 @@ describe("flattenRows", () => {
 });
 
 describe("useSidebarTree", () => {
+	it("expands and collapses every folder in the sidebar", () => {
+		const harness = renderTree({ files: allFolderFiles });
+
+		act(() => setAllSidebarFoldersExpanded(true));
+
+		expect(filePaths(harness.current.rows)).toEqual([
+			"/workspace/alpha/beta/gamma/deep.md",
+			"/workspace/alpha/beta/one.md",
+			"/workspace/alpha/root.md",
+			"/workspace/other/two.md",
+		]);
+
+		act(() => setAllSidebarFoldersExpanded(false));
+
+		expect(filePaths(harness.current.rows)).toEqual([]);
+	});
+
+	it("keeps a compacted folder chain expanded when its shape changes", () => {
+		const nestedFile = {
+			path: "/workspace/alpha/beta/one.md",
+			modifiedAt: 1,
+		};
+		const harness = renderTree({ files: [nestedFile] });
+
+		act(() => setAllSidebarFoldersExpanded(true));
+		harness.rerender({
+			files: [nestedFile, { path: "/workspace/alpha/root.md", modifiedAt: 2 }],
+		});
+
+		expect(folderRow(harness.current.rows, "alpha/").expanded).toBe(true);
+		expect(folderRow(harness.current.rows, "alpha/beta/").expanded).toBe(true);
+		expect(filePaths(harness.current.rows)).toEqual([
+			"/workspace/alpha/beta/one.md",
+			"/workspace/alpha/root.md",
+		]);
+	});
+
 	it("keeps selected-file ancestors collapsed across unrelated rerenders", () => {
 		const harness = renderTree({
 			files: nestedFiles,
@@ -250,6 +288,13 @@ describe("useSidebarTree", () => {
 		expect(folderRow(harness.current.rows, "gamma/delta/").expanded).toBe(true);
 	});
 });
+
+const allFolderFiles: SidebarFile[] = [
+	{ path: "/workspace/alpha/root.md", modifiedAt: 1 },
+	{ path: "/workspace/alpha/beta/one.md", modifiedAt: 2 },
+	{ path: "/workspace/alpha/beta/gamma/deep.md", modifiedAt: 3 },
+	{ path: "/workspace/other/two.md", modifiedAt: 4 },
+];
 
 const nestedFiles: SidebarFile[] = [
 	{ path: "/workspace/alpha/beta/one.md", modifiedAt: 1 },

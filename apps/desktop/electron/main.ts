@@ -170,6 +170,7 @@ const launchWorkspacePath =
 		: null;
 let menuState: MenuState = {
 	hasWorkspace: false,
+	isFolderViewOpen: false,
 	hasSourceViewOpen: false,
 	isSourceMode: false,
 	canGoBack: false,
@@ -1032,6 +1033,13 @@ function buildMenu() {
 				),
 				commandMenuItem("app.next-tab", () =>
 					sendToRenderer("desktop:menu-next-tab"),
+				),
+				{ type: "separator" },
+				commandMenuItem("app.expand-all-folders", () =>
+					sendToRenderer("desktop:menu-expand-all-folders"),
+				),
+				commandMenuItem("app.collapse-all-folders", () =>
+					sendToRenderer("desktop:menu-collapse-all-folders"),
 				),
 				{ type: "separator" },
 				{
@@ -2060,6 +2068,7 @@ function registerIpc() {
 	ipcMain.handle("desktop:set-menu-state", (_event, state: MenuState) => {
 		menuState = {
 			hasWorkspace: state.hasWorkspace === true,
+			isFolderViewOpen: state.isFolderViewOpen === true,
 			hasSourceViewOpen: state.hasSourceViewOpen === true,
 			isSourceMode: state.isSourceMode === true,
 			canGoBack: state.canGoBack === true,

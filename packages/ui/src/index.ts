@@ -26,6 +26,7 @@ export {
 	type TabStripItem,
 	type TabStripProps,
 } from "./components/tabbar/TabStrip";
+export { setAllSidebarFoldersExpanded } from "./components/useSidebarTree";
 export { WorkspaceSwitcherMenu } from "./components/WorkspaceSwitcherMenu";
 export {
 	clearActiveEditor,

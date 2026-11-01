@@ -98,6 +98,7 @@ export type ZoomDirection = "in" | "out" | "reset";
 
 export type MenuState = {
 	hasWorkspace: boolean;
+	isFolderViewOpen: boolean;
 	hasSourceViewOpen: boolean;
 	isSourceMode: boolean;
 	canGoBack: boolean;
@@ -251,6 +252,8 @@ export type DesktopApi = {
 	onMenuReopenClosedTab(callback: () => void): Unsubscribe;
 	onMenuNextTab(callback: () => void): Unsubscribe;
 	onMenuPreviousTab(callback: () => void): Unsubscribe;
+	onMenuExpandAllFolders(callback: () => void): Unsubscribe;
+	onMenuCollapseAllFolders(callback: () => void): Unsubscribe;
 	onMenuToggleSourceMode(callback: () => void): Unsubscribe;
 	onUndoDelete(callback: () => void): Unsubscribe;
 	onWindowFocus(callback: () => void): Unsubscribe;

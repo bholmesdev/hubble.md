@@ -5,8 +5,12 @@ import { describe, expect, it } from "vitest";
 
 Object.defineProperty(window, "desktopApi", { value: {} });
 
-const { filterShortcutGroups, isShortcutCustomized, validateShortcutBinding } =
-	await import("./shortcutSettingsModel");
+const {
+	filterShortcutGroups,
+	isShortcutCustomized,
+	shortcutBindingFromEvent,
+	validateShortcutBinding,
+} = await import("./shortcutSettingsModel");
 
 describe("filterShortcutGroups", () => {
 	it("omits groups with no search matches", () => {
@@ -47,6 +51,13 @@ describe("filterShortcutGroups", () => {
 });
 
 describe("validateShortcutBinding", () => {
+	it("rejects keys Electron cannot use as accelerators", () => {
+		expect(validateShortcutBinding("CmdOrCtrl+Alt+Æ", true)).toBe(
+			"That key cannot be used in a Hubble shortcut.",
+		);
+		expect(validateShortcutBinding("CmdOrCtrl+Alt+[", true)).toBeUndefined();
+	});
+
 	it("keeps application and terminal bindings fixed", () => {
 		expect(validateShortcutBinding("CmdOrCtrl+Q", true)).toContain(
 			"stays fixed",
@@ -80,5 +91,19 @@ describe("validateShortcutBinding", () => {
 		expect(validateShortcutBinding("K", false)).toBe(
 			"Add a modifier (Ctrl, Alt) to create a shortcut.",
 		);
+	});
+});
+
+describe("shortcutBindingFromEvent", () => {
+	it("records punctuation by physical key when Option changes the character", () => {
+		// macOS types “ for Option+[.
+		const event = new KeyboardEvent("keydown", {
+			key: "“",
+			code: "BracketLeft",
+			metaKey: true,
+			altKey: true,
+		});
+
+		expect(shortcutBindingFromEvent(event, true)).toBe("CmdOrCtrl+Alt+[");
 	});
 });
