@@ -1070,7 +1070,6 @@ export function Sidebar({
 									data-selected={isSelected ? "true" : undefined}
 									className={cn(
 										"group/sidebar-row relative flex w-full items-center text-sidebar-foreground",
-										"transition-[opacity,filter] duration-150 ease-out motion-reduce:transition-none",
 										isSelected &&
 											"bg-sidebar-accent text-sidebar-accent-foreground",
 										isOpen && "font-medium",
@@ -1520,7 +1519,7 @@ const DroppableSidebarNav = forwardRef<
 			role="tree"
 			className={cn(
 				"flex-1 overflow-y-auto overscroll-contain px-1.5 py-1 outline-none",
-				"rounded-[var(--radius-row)] inset-ring-1 inset-ring-transparent transition-[box-shadow] duration-150 ease-out motion-reduce:transition-none",
+				"rounded-[var(--radius-row)] inset-ring-1 inset-ring-transparent",
 				active && "inset-ring-sidebar-accent/70",
 			)}
 			tabIndex={0}
