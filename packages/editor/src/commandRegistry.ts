@@ -11,7 +11,8 @@ export type CommandContext = {
 };
 
 export type CommandDefinition = {
-	defaultBinding: string;
+	/** Null leaves the command unbound until the user assigns a shortcut. */
+	defaultBinding: string | null;
 	label: string;
 	isEnabled: (context: CommandContext) => boolean;
 	/** This command may share its binding with the named command. */
@@ -148,6 +149,16 @@ export const commandRegistry = {
 	"app.show-inbox": {
 		defaultBinding: "CmdOrCtrl+Shift+I",
 		label: "Show Inbox",
+		isEnabled: hasWorkspace,
+	},
+	"app.expand-all-folders": {
+		defaultBinding: null,
+		label: "Expand All Folders",
+		isEnabled: hasWorkspace,
+	},
+	"app.collapse-all-folders": {
+		defaultBinding: null,
+		label: "Collapse All Folders",
 		isEnabled: hasWorkspace,
 	},
 	"app.delete": {
@@ -318,11 +329,11 @@ export function sortCommandBinding(binding: string) {
 }
 
 export function isDefaultCommandBinding(id: CommandId, binding: string | null) {
-	return (
-		binding !== null &&
-		sortCommandBinding(binding) ===
-			sortCommandBinding(getCommand(id).defaultBinding)
-	);
+	const defaultBinding: string | null = getCommand(id).defaultBinding;
+	if (binding === null || defaultBinding === null) {
+		return binding === defaultBinding;
+	}
+	return sortCommandBinding(binding) === sortCommandBinding(defaultBinding);
 }
 
 export function setCommandBindings(bindings: CommandBindings) {

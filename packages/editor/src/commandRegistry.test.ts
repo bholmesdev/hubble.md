@@ -17,6 +17,18 @@ import {
 afterEach(() => setCommandBindings({}));
 
 describe("commandRegistry", () => {
+	it("leaves commands without a default unbound until the user binds them", () => {
+		expect(getCommandBinding("app.expand-all-folders")).toBeNull();
+		expect(isDefaultCommandBinding("app.expand-all-folders", null)).toBe(true);
+		expect(cleanCommandBindings({ "app.expand-all-folders": null })).toEqual(
+			{},
+		);
+
+		setCommandBindings({ "app.expand-all-folders": "CmdOrCtrl+Alt+]" });
+
+		expect(getCommandBinding("app.expand-all-folders")).toBe("CmdOrCtrl+Alt+]");
+	});
+
 	it("allows duplicate defaults only for mutually paired commands", () => {
 		const commands: Record<string, CommandDefinition> = commandRegistry;
 		const bindings = new Map<string, string>();
@@ -24,6 +36,7 @@ describe("commandRegistry", () => {
 			if (command.allowConflictWith) {
 				expect(commands[command.allowConflictWith]?.allowConflictWith).toBe(id);
 			}
+			if (command.defaultBinding === null) continue;
 			const earlierId = bindings.get(command.defaultBinding);
 			if (earlierId) {
 				expect(command.allowConflictWith).toBe(earlierId);

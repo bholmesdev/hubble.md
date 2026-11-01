@@ -1034,6 +1034,13 @@ function buildMenu() {
 					sendToRenderer("desktop:menu-next-tab"),
 				),
 				{ type: "separator" },
+				commandMenuItem("app.expand-all-folders", () =>
+					sendToRenderer("desktop:menu-expand-all-folders"),
+				),
+				commandMenuItem("app.collapse-all-folders", () =>
+					sendToRenderer("desktop:menu-collapse-all-folders"),
+				),
+				{ type: "separator" },
 				{
 					id: "zoom-in",
 					label: "Zoom In",

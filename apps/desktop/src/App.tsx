@@ -19,6 +19,7 @@ import {
 	type PaletteFile,
 	PlainTextEditor,
 	type SpellcheckStatus,
+	setAllSidebarFoldersExpanded,
 	type WikiTarget,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
@@ -623,6 +624,12 @@ function App() {
 			desktopApi.onMenuReopenClosedTab(() => void reopenClosedTab()),
 			desktopApi.onMenuNextTab(() => void activateAdjacentTab(1)),
 			desktopApi.onMenuPreviousTab(() => void activateAdjacentTab(-1)),
+			desktopApi.onMenuExpandAllFolders(() =>
+				setAllSidebarFoldersExpanded(true),
+			),
+			desktopApi.onMenuCollapseAllFolders(() =>
+				setAllSidebarFoldersExpanded(false),
+			),
 			desktopApi.onMenuToggleSourceMode(() => {
 				const current = viewerStore.get();
 				if (

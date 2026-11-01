@@ -35,6 +35,7 @@ import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDeleteLine from "~icons/mingcute/delete-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
+import MingcuteFoldVerticalLine from "~icons/mingcute/fold-vertical-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteNewFolderLine from "~icons/mingcute/new-folder-line";
@@ -42,6 +43,7 @@ import MingcutePinFill from "~icons/mingcute/pin-fill";
 import MingcutePinLine from "~icons/mingcute/pin-line";
 import MingcuteRightLine from "~icons/mingcute/right-line";
 import MingcuteSortDescendingLine from "~icons/mingcute/sort-descending-line";
+import MingcuteUnfoldVerticalLine from "~icons/mingcute/unfold-vertical-line";
 import { useResizeSeparator } from "../hooks/useResizeSeparator";
 import { isEditableEventTarget } from "../lib/dom";
 import {
@@ -519,7 +521,14 @@ export function Sidebar({
 	const list = children ? "children" : "tree";
 	const uncompactFolderId =
 		deleteOnCancel?.kind === "folder" ? deleteOnCancel.path : null;
-	const { collapseFolder, expandFolder, rows, toggleFolder } = useSidebarTree({
+	const {
+		collapseFolder,
+		expandFolder,
+		hasSubfolders,
+		rows,
+		setSubfoldersExpanded,
+		toggleFolder,
+	} = useSidebarTree({
 		files,
 		folders,
 		getDisplayPath,
@@ -1228,6 +1237,7 @@ export function Sidebar({
 										{row.kind === "folder" &&
 											(onRevealFolder ||
 												onCopyFolderPath ||
+												hasSubfolders(row.id) ||
 												onCreateFile ||
 												onCreateFolder ||
 												onRenameFolder ||
@@ -1242,6 +1252,12 @@ export function Sidebar({
 													}
 													onRevealFolder={onRevealFolder}
 													onCopyFolderPath={onCopyFolderPath}
+													onSetSubfoldersExpanded={
+														hasSubfolders(row.id)
+															? (expanded) =>
+																	setSubfoldersExpanded(row.id, expanded)
+															: undefined
+													}
 													revealLabel={revealLabel}
 													onCreateFile={(id) => void createFile(id)}
 													onCreateHtmlFile={
@@ -2012,6 +2028,7 @@ function FolderActionsMenu({
 	selection,
 	onRevealFolder,
 	onCopyFolderPath,
+	onSetSubfoldersExpanded,
 	revealLabel,
 	onCreateFile,
 	onCreateHtmlFile,
@@ -2030,6 +2047,7 @@ function FolderActionsMenu({
 	selection: SidebarActionSelection;
 	onRevealFolder?: (id: string) => void;
 	onCopyFolderPath?: (id: string) => void;
+	onSetSubfoldersExpanded?: (expanded: boolean) => void;
 	revealLabel?: string;
 	onCreateFile?: (id: string) => void;
 	onCreateHtmlFile?: (id: string) => void;
@@ -2104,6 +2122,22 @@ function FolderActionsMenu({
 				>
 					New folder
 				</ActionItem>
+			)}
+			{onSetSubfoldersExpanded && (
+				<>
+					<ActionItem
+						icon={<MingcuteUnfoldVerticalLine />}
+						onClick={() => onSetSubfoldersExpanded(true)}
+					>
+						Expand subfolders
+					</ActionItem>
+					<ActionItem
+						icon={<MingcuteFoldVerticalLine />}
+						onClick={() => onSetSubfoldersExpanded(false)}
+					>
+						Collapse subfolders
+					</ActionItem>
+				</>
 			)}
 			{onRenameFolder && (
 				<ActionItem

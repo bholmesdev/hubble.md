@@ -9,6 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Expand or collapse a folder's subfolders from its menu, or every folder from the View menu. Both can be given a shortcut in Settings. Thanks [@n00ki](https://github.com/n00ki)! [#271](https://github.com/bholmesdev/hubble.md/pull/271)
 - Copy a folder path from its sidebar menu. Thanks [@nisan1101](https://github.com/nisan1101) for the suggestion! [#304](https://github.com/bholmesdev/hubble.md/pull/304)
 
 ### Changed

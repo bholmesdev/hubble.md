@@ -43,6 +43,8 @@ const descriptions: Record<CommandId, string> = {
 		"Show the folder view, or hide the sidebar if it is already showing.",
 	"app.show-inbox":
 		"Show recent notes, or hide the sidebar if they are already showing.",
+	"app.expand-all-folders": "Expand every folder in the sidebar.",
+	"app.collapse-all-folders": "Collapse every folder in the sidebar.",
 	"app.delete": "Delete the selected file or folder.",
 	"app.find": "Find text in the current file.",
 	"app.format-menu": "Open the editor formatting menu.",

@@ -11,6 +11,7 @@ import {
 	type SidebarFile,
 	type SidebarRow,
 	type SidebarSortMode,
+	setAllSidebarFoldersExpanded,
 	useSidebarTree,
 } from "./useSidebarTree";
 
@@ -211,41 +212,54 @@ describe("flattenRows", () => {
 });
 
 describe("useSidebarTree", () => {
-	it("expands and collapses every folder", () => {
-		const harness = renderTree({
-			files: [
-				{ path: "/workspace/alpha/root.md", modifiedAt: 1 },
-				{ path: "/workspace/alpha/beta/one.md", modifiedAt: 2 },
-				{ path: "/workspace/gamma/delta/two.md", modifiedAt: 3 },
-			],
-		});
+	it("expands a folder and every folder nested in it", () => {
+		const harness = renderTree({ files: subfolderFiles });
 
-		expect(harness.current.hasFolders).toBe(true);
-		expect(harness.current.hasExpandedFolders).toBe(false);
-		expect(filePaths(harness.current.rows)).toEqual([]);
+		act(() => harness.current.setSubfoldersExpanded("alpha/", true));
 
-		act(() => harness.current.toggleAllFolders());
-
-		expect(harness.current.hasExpandedFolders).toBe(true);
 		expect(filePaths(harness.current.rows)).toEqual([
+			"/workspace/alpha/beta/gamma/deep.md",
 			"/workspace/alpha/beta/one.md",
 			"/workspace/alpha/root.md",
-			"/workspace/gamma/delta/two.md",
 		]);
-
-		act(() => harness.current.toggleAllFolders());
-
-		expect(harness.current.hasExpandedFolders).toBe(false);
-		expect(filePaths(harness.current.rows)).toEqual([]);
+		expect(folderRow(harness.current.rows, "other/").expanded).toBe(false);
 	});
 
-	it("reports when there are no folders to toggle", () => {
-		const harness = renderTree({
-			files: [{ path: "/workspace/one.md", modifiedAt: 1 }],
-		});
+	it("collapses nested folders and leaves the folder itself open", () => {
+		const harness = renderTree({ files: subfolderFiles });
+		act(() => harness.current.setSubfoldersExpanded("alpha/", true));
 
-		expect(harness.current.hasFolders).toBe(false);
-		expect(harness.current.hasExpandedFolders).toBe(false);
+		act(() => harness.current.setSubfoldersExpanded("alpha/", false));
+
+		expect(folderRow(harness.current.rows, "alpha/").expanded).toBe(true);
+		expect(folderRow(harness.current.rows, "alpha/beta/").expanded).toBe(false);
+		expect(filePaths(harness.current.rows)).toEqual([
+			"/workspace/alpha/root.md",
+		]);
+	});
+
+	it("reports which folders have nested folders", () => {
+		const harness = renderTree({ files: subfolderFiles });
+
+		expect(harness.current.hasSubfolders("alpha/")).toBe(true);
+		expect(harness.current.hasSubfolders("other/")).toBe(false);
+	});
+
+	it("expands and collapses every folder in the sidebar", () => {
+		const harness = renderTree({ files: subfolderFiles });
+
+		act(() => setAllSidebarFoldersExpanded(true));
+
+		expect(filePaths(harness.current.rows)).toEqual([
+			"/workspace/alpha/beta/gamma/deep.md",
+			"/workspace/alpha/beta/one.md",
+			"/workspace/alpha/root.md",
+			"/workspace/other/two.md",
+		]);
+
+		act(() => setAllSidebarFoldersExpanded(false));
+
+		expect(filePaths(harness.current.rows)).toEqual([]);
 	});
 
 	it("keeps a compacted folder chain expanded when its shape changes", () => {
@@ -255,7 +269,7 @@ describe("useSidebarTree", () => {
 		};
 		const harness = renderTree({ files: [nestedFile] });
 
-		act(() => harness.current.toggleAllFolders());
+		act(() => setAllSidebarFoldersExpanded(true));
 		harness.rerender({
 			files: [nestedFile, { path: "/workspace/alpha/root.md", modifiedAt: 2 }],
 		});
@@ -307,6 +321,13 @@ describe("useSidebarTree", () => {
 		expect(folderRow(harness.current.rows, "gamma/delta/").expanded).toBe(true);
 	});
 });
+
+const subfolderFiles: SidebarFile[] = [
+	{ path: "/workspace/alpha/root.md", modifiedAt: 1 },
+	{ path: "/workspace/alpha/beta/one.md", modifiedAt: 2 },
+	{ path: "/workspace/alpha/beta/gamma/deep.md", modifiedAt: 3 },
+	{ path: "/workspace/other/two.md", modifiedAt: 4 },
+];
 
 const nestedFiles: SidebarFile[] = [
 	{ path: "/workspace/alpha/beta/one.md", modifiedAt: 1 },

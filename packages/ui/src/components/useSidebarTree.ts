@@ -1,4 +1,10 @@
-import { startTransition, useEffect, useRef, useState } from "react";
+import {
+	startTransition,
+	useEffect,
+	useEffectEvent,
+	useRef,
+	useState,
+} from "react";
 import { z } from "zod/v4";
 import { fileNameFromPath, normalizeDisplayPath } from "../lib/filePath";
 
@@ -54,6 +60,13 @@ type ExpandedState = {
 
 const expandedFoldersSchema = z.array(z.string());
 
+const allFoldersListeners = new Set<(expanded: boolean) => void>();
+
+/** Expand or collapse every folder in each mounted sidebar. */
+export function setAllSidebarFoldersExpanded(expanded: boolean) {
+	for (const listener of allFoldersListeners) listener(expanded);
+}
+
 export function useSidebarTree({
 	files,
 	folders = [],
@@ -107,9 +120,6 @@ export function useSidebarTree({
 		uncompactFolderId,
 	});
 	const folderIds = getFolderIds(tree, uncompactFolderId);
-	const hasExpandedFolders = rows.some(
-		(row) => row.kind === "folder" && row.expanded,
-	);
 
 	useEffect(() => {
 		if (!highlightPath || revealedPathRef.current === highlightPath) return;
@@ -151,22 +161,48 @@ export function useSidebarTree({
 	const collapseFolder = (id: string) => setExpanded(id, false);
 	const toggleFolder = (id: string) =>
 		setExpanded(id, !expandedFolders.has(id));
-	const toggleAllFolders = () => {
+	// A null id means the workspace root. Ids are display paths, so nested
+	// folders share their parent's id as a prefix.
+	const subfolderIds = (id: string | null) =>
+		folderIds.filter((folderId) => id === null || isSubfolder(folderId, id));
+	const hasSubfolders = (id: string) => subfolderIds(id).length > 0;
+	const setSubfoldersExpanded = (id: string | null, expanded: boolean) => {
+		const subfolders = subfolderIds(id);
 		startTransition(() => {
-			setExpandedState({
-				key: storageKey,
-				folders: hasExpandedFolders ? new Set() : new Set(folderIds),
+			setExpandedState((current) => {
+				const next = new Set(
+					current.key === storageKey
+						? current.folders
+						: readExpandedFolders(storageKey),
+				);
+				// Expanding a folder's subfolders only shows them if it is open too.
+				if (expanded && id !== null) next.add(id);
+				for (const folderId of subfolders) {
+					if (expanded) next.add(folderId);
+					else next.delete(folderId);
+				}
+				return { key: storageKey, folders: next };
 			});
 		});
 	};
 
+	const onAllFoldersExpanded = useEffectEvent((expanded: boolean) =>
+		setSubfoldersExpanded(null, expanded),
+	);
+	useEffect(() => {
+		const listener = (expanded: boolean) => onAllFoldersExpanded(expanded);
+		allFoldersListeners.add(listener);
+		return () => {
+			allFoldersListeners.delete(listener);
+		};
+	}, []);
+
 	return {
 		collapseFolder,
 		expandFolder,
-		hasExpandedFolders,
-		hasFolders: folderIds.length > 0,
+		hasSubfolders,
 		rows,
-		toggleAllFolders,
+		setSubfoldersExpanded,
 		toggleFolder,
 	};
 }
@@ -230,6 +266,10 @@ function ensureFolder(parent: FolderNode, name: string): FolderNode {
 		parent.folders.set(name, folder);
 	}
 	return folder;
+}
+
+function isSubfolder(folderId: string, parentId: string) {
+	return folderId !== parentId && folderId.startsWith(parentId);
 }
 
 function getFolderIds(tree: FolderNode, uncompactFolderId: string | null) {
