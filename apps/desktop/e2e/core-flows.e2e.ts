@@ -124,3 +124,29 @@ test("reopens the workspace and note after relaunch", async ({ hubble }) => {
 	await expect(sidebarFile(page, "existing.md")).toBeVisible();
 	await expect(editor(page)).toContainText("Hello");
 });
+
+test("shows the tab strip only while a second tab is open", async ({
+	hubble,
+}) => {
+	await fs.writeFile(path.join(hubble.workspace, "other.md"), "# Other\n");
+	const page = await hubble.launch();
+	// The search dialog hides the strip from the a11y tree, so match the DOM.
+	const tabs = page.locator('[role="tablist"]:not([aria-hidden])');
+	await sidebarFile(page, "existing.md").click();
+	await expect(editor(page)).toContainText("Hello");
+	await expect(tabs).toBeHidden();
+
+	await page.getByRole("button", { name: /^New tab/ }).click();
+	await expect(tabs).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(tabs).toBeHidden();
+
+	await page.getByRole("button", { name: /^New tab/ }).click();
+	await page.keyboard.type("other");
+	await page.getByRole("option", { name: "other.md" }).click();
+	await expect(tabs.getByRole("tab")).toHaveCount(2);
+
+	await tabs.getByRole("button", { name: "Close other" }).click();
+	await expect(tabs).toBeHidden();
+	await expect(editor(page)).toContainText("Hello");
+});
