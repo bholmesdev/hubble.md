@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- New tabs open a new tab page with search, New file, New HTML app, and recent notes, instead of the command palette. Files you pick open in that tab, and every open folder keeps at least one tab. [#329](https://github.com/bholmesdev/hubble.md/pull/329)
+
 ### Fixed
 
 - Opening a file with Hubble from Finder now points the terminal's `$HUBBLE_NOTE_PATH` at that file, so "Chat about this note" reads the right note. Thanks [@farskid](https://github.com/farskid) for the suggestion! [#316](https://github.com/bholmesdev/hubble.md/pull/316)
