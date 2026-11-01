@@ -13,7 +13,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
-- With a single tab open, the tab bar folds away and the note's title row moves to the top of the window, freeing up vertical space. A + button past the note menu opens a new tab, and the tab bar returns once a second tab opens. Toggle terminal now lives in the note menu. Thanks [@sebastiansandqvist](https://github.com/sebastiansandqvist) for the suggestion!
+- With a single tab open, the tab bar folds away and the note's title row moves to the top of the window, freeing up vertical space. A + button past the note menu opens a new tab, and the tab bar returns once a second tab opens. Toggle terminal now lives in the note menu. Thanks [@sebastiansandqvist](https://github.com/sebastiansandqvist) for the suggestion! [#330](https://github.com/bholmesdev/hubble.md/pull/330)
 
 ### Fixed
 
