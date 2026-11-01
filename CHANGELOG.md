@@ -9,6 +9,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.3.3] - 2026-10-31
+
+### Added
+
 - Expand or collapse every sidebar folder from the View menu, and give either a shortcut in Settings. Thanks [@n00ki](https://github.com/n00ki)! [#271](https://github.com/bholmesdev/hubble.md/pull/271)
 - Copy a folder path from its sidebar menu. Thanks [@nisan1101](https://github.com/nisan1101) for the suggestion! [#304](https://github.com/bholmesdev/hubble.md/pull/304)
 
