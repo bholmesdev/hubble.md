@@ -80,6 +80,8 @@ export function FileInfoBar({
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const compact = useCompactWindow();
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
+	// Equal side widths keep the title centered.
+	const sideWidth = onNewTab ? "flex-[0_100_152px]" : "flex-[0_100_114px]";
 	const [showBorder, setShowBorder] = useState(false);
 
 	useEffect(() => {
@@ -116,74 +118,71 @@ export function FileInfoBar({
 		<div
 			key={currentPath ?? "empty"}
 			data-file-info-bar
-			className={`relative flex h-9 min-w-0 shrink-0 items-center overflow-hidden ps-3 select-none ${onNewTab ? "pe-2" : "pe-3"} after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
+			className={`relative flex h-9 min-w-0 shrink-0 items-center overflow-hidden select-none ${onNewTab ? "px-2" : "px-3"} after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
 		>
-			{/* Equal side widths keep the title centered; New tab sits outside them. */}
-			<div className="flex min-w-0 flex-1 items-center">
-				<div className="flex flex-[0_100_114px] items-center pe-4">
-					{compact ? null : (
-						<div style={noDragStyle}>
-							<NavigationControls />
-						</div>
-					)}
-				</div>
-				<div className="flex min-w-0 flex-auto items-center justify-center gap-1 [&>button]:px-0 [&>button]:[-webkit-app-region:no-drag] [&>input]:px-0 [&>input]:[-webkit-app-region:no-drag]">
-					{folder ? (
-						<>
-							<span
-								className="min-w-0 max-w-[50%] truncate text-xs text-muted-foreground"
-								title={folder}
-							>
-								{folder.split(/[\\/]/).join(" / ")}
-							</span>
-							<span
-								aria-hidden="true"
-								className="text-xs text-muted-foreground/60"
-							>
-								/
-							</span>
-						</>
-					) : null}
-					<EditableFileTitle
-						currentPath={isChangelog ? "What's new" : (titlePath ?? null)}
-						onRename={
-							isChangelog
-								? undefined
-								: (nextName) => void renameCurrentMarkdownFile(nextName)
+			<div className={`flex items-center pe-4 ${sideWidth}`}>
+				{compact ? null : (
+					<div style={noDragStyle}>
+						<NavigationControls />
+					</div>
+				)}
+			</div>
+			<div className="flex min-w-0 flex-auto items-center justify-center gap-1 [&>button]:px-0 [&>button]:[-webkit-app-region:no-drag] [&>input]:px-0 [&>input]:[-webkit-app-region:no-drag]">
+				{folder ? (
+					<>
+						<span
+							className="min-w-0 max-w-[50%] truncate text-xs text-muted-foreground"
+							title={folder}
+						>
+							{folder.split(/[\\/]/).join(" / ")}
+						</span>
+						<span
+							aria-hidden="true"
+							className="text-xs text-muted-foreground/60"
+						>
+							/
+						</span>
+					</>
+				) : null}
+				<EditableFileTitle
+					currentPath={isChangelog ? "What's new" : (titlePath ?? null)}
+					onRename={
+						isChangelog
+							? undefined
+							: (nextName) => void renameCurrentMarkdownFile(nextName)
+					}
+				/>
+			</div>
+			<div className={`flex items-center justify-end ps-2 ${sideWidth}`}>
+				<div className="flex items-center gap-1" style={noDragStyle}>
+					{comments ? <ReviewCommentSummary {...comments} /> : null}
+					<ActionsMenu
+						path={actionPath}
+						canDelete={Boolean(
+							actionPath && isInWorkspace(actionPath, workspacePath ?? null),
+						)}
+						workspacePath={
+							workspacePath && actionPath && isEditableFile(actionPath)
+								? workspacePath
+								: null
 						}
 					/>
-				</div>
-				<div className="flex flex-[0_100_114px] items-center justify-end ps-2">
-					<div className="flex items-center gap-1" style={noDragStyle}>
-						{comments ? <ReviewCommentSummary {...comments} /> : null}
-						<ActionsMenu
-							path={actionPath}
-							canDelete={Boolean(
-								actionPath && isInWorkspace(actionPath, workspacePath ?? null),
-							)}
-							workspacePath={
-								workspacePath && actionPath && isEditableFile(actionPath)
-									? workspacePath
-									: null
-							}
-						/>
-					</div>
+					{onNewTab ? (
+						<>
+							<span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={newTabTitle}
+								title={newTabTitle}
+								onClick={onNewTab}
+							>
+								<MingcuteAddLine className="size-4" />
+							</Button>
+						</>
+					) : null}
 				</div>
 			</div>
-			{onNewTab ? (
-				<div className="flex shrink-0 items-center" style={noDragStyle}>
-					<span aria-hidden="true" className="mx-2 h-4 w-px bg-border" />
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						aria-label={newTabTitle}
-						title={newTabTitle}
-						onClick={onNewTab}
-					>
-						<MingcuteAddLine className="size-4" />
-					</Button>
-				</div>
-			) : null}
 		</div>
 	);
 }
