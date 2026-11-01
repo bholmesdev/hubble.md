@@ -66,7 +66,7 @@ A note the user has open in the desktop editor, shown as one entry in the tab st
 
 A Tab records **where** a note is, not what it holds: its path and its own back/forward trail. The open document itself stays singular — one [[Markdown File]] is loaded at a time, in one editor, with one file watcher. Activating a Tab saves the current note and loads the Tab's note from disk, the same thing clicking a sidebar row already does. Background Tabs therefore hold no unsaved text, no dirty state, and no conflict state; there is nothing in a Tab to go stale.
 
-Each workspace’s ordered Tab paths and Active Tab are saved in local storage. Reloading the app or returning to a workspace restores that set, skipping files that no longer exist. An empty set stays empty. Each workspace also saves up to 40 recently closed Tabs, recording their paths and former positions. Reopening restores the most recently closed Tab and focuses it. Back/forward trails remain in memory; document contents stay on disk.
+Each workspace’s ordered Tab paths and Active Tab are saved in local storage. Reloading the app or returning to a workspace restores that set, skipping files that no longer exist. An open workspace always has at least one Tab: when the last one closes, a [[Blank Tab]] takes its place. Each workspace also saves up to 40 recently closed Tabs, recording their paths and former positions. Reopening restores the most recently closed Tab and focuses it. Back/forward trails remain in memory; document contents stay on disk.
 _Avoid_: buffer, pane, window.
 
 ### Active Tab
@@ -74,6 +74,11 @@ _Avoid_: buffer, pane, window.
 The Tab whose note is currently in the editor. Back and forward act on the Active Tab's trail, so each Tab navigates independently.
 
 The editor shows the Active Tab's content. The app changelog opens in its own read-only Tab, using bundled content instead of a file on disk.
+
+### Blank Tab
+
+A Tab with no note yet, showing the new tab page: file search, create actions, and recent notes. New-tab opens one beside the Active Tab, and any number can be open at once. Picking a note from it, or from file search while it is active, opens the note in that same Tab, and Back returns to the blank page.
+_Avoid_: empty tab, start page.
 
 ### Asset
 
