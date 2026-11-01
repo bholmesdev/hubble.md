@@ -66,7 +66,7 @@ async function readDisk(file: string) {
 
 test("creates a note and saves typed content to disk", async ({ hubble }) => {
 	const page = await hubble.launch();
-	await page.getByRole("button", { name: "New file" }).click();
+	await page.getByRole("button", { name: "New file", exact: true }).click();
 	await page.getByRole("menuitem", { name: "New Note" }).click();
 	await editor(page).click();
 	await page.keyboard.type("Groceries");
