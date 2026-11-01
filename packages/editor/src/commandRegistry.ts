@@ -3,6 +3,7 @@ export type CommandContext = {
 	hasEditableFile?: boolean;
 	hasSourceViewOpen?: boolean;
 	hasWorkspace?: boolean;
+	isFolderViewOpen?: boolean;
 	isSourceMode?: boolean;
 	canGoBack?: boolean;
 	canGoForward?: boolean;
@@ -11,7 +12,8 @@ export type CommandContext = {
 };
 
 export type CommandDefinition = {
-	defaultBinding: string;
+	/** Null leaves the command unbound until the user assigns a shortcut. */
+	defaultBinding: string | null;
 	label: string;
 	isEnabled: (context: CommandContext) => boolean;
 	/** This command may share its binding with the named command. */
@@ -26,6 +28,8 @@ const hasEditableFile = (context: CommandContext) =>
 const hasSourceViewOpen = (context: CommandContext) =>
 	context.hasSourceViewOpen === true;
 const hasWorkspace = (context: CommandContext) => context.hasWorkspace === true;
+const isFolderViewOpen = (context: CommandContext) =>
+	context.isFolderViewOpen === true;
 
 // Context-sensitive structural keys (Enter, Tab, Mod-a, Escape, and
 // ProseMirror handleKeyDown plugins), OS zoom conventions, and Electron roles
@@ -149,6 +153,16 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+Shift+I",
 		label: "Show Inbox",
 		isEnabled: hasWorkspace,
+	},
+	"app.expand-all-folders": {
+		defaultBinding: null,
+		label: "Expand All Folders",
+		isEnabled: isFolderViewOpen,
+	},
+	"app.collapse-all-folders": {
+		defaultBinding: null,
+		label: "Collapse All Folders",
+		isEnabled: isFolderViewOpen,
 	},
 	"app.delete": {
 		defaultBinding: "CmdOrCtrl+Backspace",
@@ -318,11 +332,11 @@ export function sortCommandBinding(binding: string) {
 }
 
 export function isDefaultCommandBinding(id: CommandId, binding: string | null) {
-	return (
-		binding !== null &&
-		sortCommandBinding(binding) ===
-			sortCommandBinding(getCommand(id).defaultBinding)
-	);
+	const defaultBinding: string | null = getCommand(id).defaultBinding;
+	if (binding === null || defaultBinding === null) {
+		return binding === defaultBinding;
+	}
+	return sortCommandBinding(binding) === sortCommandBinding(defaultBinding);
 }
 
 export function setCommandBindings(bindings: CommandBindings) {

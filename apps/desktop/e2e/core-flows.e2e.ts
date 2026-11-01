@@ -66,7 +66,7 @@ async function readDisk(file: string) {
 
 test("creates a note and saves typed content to disk", async ({ hubble }) => {
 	const page = await hubble.launch();
-	await page.getByRole("button", { name: "New file" }).click();
+	await page.getByRole("button", { name: "New file", exact: true }).click();
 	await page.getByRole("menuitem", { name: "New Note" }).click();
 	await editor(page).click();
 	await page.keyboard.type("Groceries");
@@ -128,25 +128,19 @@ test("reopens the workspace and note after relaunch", async ({ hubble }) => {
 test("shows the tab strip only while a second tab is open", async ({
 	hubble,
 }) => {
-	await fs.writeFile(path.join(hubble.workspace, "other.md"), "# Other\n");
 	const page = await hubble.launch();
-	// The search dialog hides the strip from the a11y tree, so match the DOM.
-	const tabs = page.locator('[role="tablist"]:not([aria-hidden])');
+	const tabs = page.getByRole("tablist");
+	// A blank new tab keeps the strip.
+	await expect(tabs).toBeVisible();
+
 	await sidebarFile(page, "existing.md").click();
 	await expect(editor(page)).toContainText("Hello");
 	await expect(tabs).toBeHidden();
 
 	await page.getByRole("button", { name: /^New tab/ }).click();
-	await expect(tabs).toBeVisible();
-	await page.keyboard.press("Escape");
-	await expect(tabs).toBeHidden();
-
-	await page.getByRole("button", { name: /^New tab/ }).click();
-	await page.keyboard.type("other");
-	await page.getByRole("option", { name: "other.md" }).click();
 	await expect(tabs.getByRole("tab")).toHaveCount(2);
 
-	await tabs.getByRole("button", { name: "Close other" }).click();
+	await tabs.getByRole("button", { name: "Close New tab" }).click();
 	await expect(tabs).toBeHidden();
 	await expect(editor(page)).toContainText("Hello");
 });

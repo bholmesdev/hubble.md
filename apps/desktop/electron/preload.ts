@@ -178,6 +178,10 @@ const desktopApi = {
 	onMenuNextTab: (callback) => subscribe("desktop:menu-next-tab", callback),
 	onMenuPreviousTab: (callback) =>
 		subscribe("desktop:menu-previous-tab", callback),
+	onMenuExpandAllFolders: (callback) =>
+		subscribe("desktop:menu-expand-all-folders", callback),
+	onMenuCollapseAllFolders: (callback) =>
+		subscribe("desktop:menu-collapse-all-folders", callback),
 	onMenuToggleSourceMode: (callback) =>
 		subscribe("desktop:menu-toggle-source-mode", callback),
 	onUndoDelete: (callback) => subscribe("desktop:undo-delete", callback),

@@ -22,6 +22,30 @@ describe("desktop tabs", () => {
 		expect(canGoBack()).toBe(true);
 	});
 
+	it("opens blank tabs that a picked file replaces in place", async () => {
+		const api = createDesktopApi();
+		api.pathExists.mockResolvedValue(true);
+		api.readFileText.mockResolvedValue("content");
+		const { appStore, goBack, loadPath, openNewTabPage, viewerStore } =
+			await loadStoreActions(api);
+
+		await openNewTabPage();
+		await openNewTabPage();
+		const tabs = appStore.get().tabs;
+		const blankId = tabs.activeTabId;
+		const blankPath = blankId ? tabs.byId[blankId].path : null;
+		expect(tabs.order).toHaveLength(2);
+		expect(api.readFileText).not.toHaveBeenCalled();
+
+		await loadPath("/workspace/a.md");
+		expect(appStore.get().tabs.order).toHaveLength(2);
+		expect(appStore.get().tabs.activeTabId).toBe(blankId);
+		expect(viewerStore.get().currentPath).toBe("/workspace/a.md");
+
+		await goBack();
+		expect(viewerStore.get().currentPath).toBe(blankPath);
+	});
+
 	it("blocks closing a tab while its note has a disk conflict", async () => {
 		const api = createDesktopApi();
 		api.pathExists.mockResolvedValue(true);

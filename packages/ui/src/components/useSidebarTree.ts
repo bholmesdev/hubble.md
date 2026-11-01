@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+	startTransition,
+	useEffect,
+	useEffectEvent,
+	useRef,
+	useState,
+} from "react";
 import { z } from "zod/v4";
 import { fileNameFromPath, normalizeDisplayPath } from "../lib/filePath";
 
@@ -54,6 +60,13 @@ type ExpandedState = {
 
 const expandedFoldersSchema = z.array(z.string());
 
+const allFoldersListeners = new Set<(expanded: boolean) => void>();
+
+/** Expand or collapse every folder in each mounted sidebar. */
+export function setAllSidebarFoldersExpanded(expanded: boolean) {
+	for (const listener of allFoldersListeners) listener(expanded);
+}
+
 export function useSidebarTree({
 	files,
 	folders = [],
@@ -106,6 +119,7 @@ export function useSidebarTree({
 		expandedFolders,
 		uncompactFolderId,
 	});
+	const folderIds = getFolderIds(tree, uncompactFolderId);
 
 	useEffect(() => {
 		if (!highlightPath || revealedPathRef.current === highlightPath) return;
@@ -147,8 +161,30 @@ export function useSidebarTree({
 	const collapseFolder = (id: string) => setExpanded(id, false);
 	const toggleFolder = (id: string) =>
 		setExpanded(id, !expandedFolders.has(id));
+	const setAllFoldersExpanded = (expanded: boolean) => {
+		startTransition(() => {
+			setExpandedState({
+				key: storageKey,
+				folders: expanded ? new Set(folderIds) : new Set(),
+			});
+		});
+	};
 
-	return { collapseFolder, expandFolder, rows, toggleFolder };
+	const onAllFoldersExpanded = useEffectEvent(setAllFoldersExpanded);
+	useEffect(() => {
+		const listener = (expanded: boolean) => onAllFoldersExpanded(expanded);
+		allFoldersListeners.add(listener);
+		return () => {
+			allFoldersListeners.delete(listener);
+		};
+	}, []);
+
+	return {
+		collapseFolder,
+		expandFolder,
+		rows,
+		toggleFolder,
+	};
 }
 
 function makeFolder(id: string, name: string): FolderNode {
@@ -210,6 +246,19 @@ function ensureFolder(parent: FolderNode, name: string): FolderNode {
 		parent.folders.set(name, folder);
 	}
 	return folder;
+}
+
+function getFolderIds(tree: FolderNode, uncompactFolderId: string | null) {
+	const ids: string[] = [];
+	const walk = (folder: FolderNode) => {
+		for (const child of folder.folders.values()) {
+			const compacted = compactFolder(child, uncompactFolderId);
+			for (const segment of compacted.segments) ids.push(segment.id);
+			walk(compacted.folder);
+		}
+	};
+	walk(tree);
+	return ids;
 }
 
 export function flattenRows({

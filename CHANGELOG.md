@@ -9,15 +9,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Expand or collapse every sidebar folder from the View menu, and give either a shortcut in Settings. Thanks [@n00ki](https://github.com/n00ki)! [#271](https://github.com/bholmesdev/hubble.md/pull/271)
 - Copy a folder path from its sidebar menu. Thanks [@nisan1101](https://github.com/nisan1101) for the suggestion! [#304](https://github.com/bholmesdev/hubble.md/pull/304)
 
 ### Changed
 
 - With a single tab open, the tab bar folds away and the note's title row moves to the top of the window, freeing up vertical space. A + button past the note menu opens a new tab, and the tab bar returns once a second tab opens. Toggle terminal now lives in the note menu. Thanks [@sebastiansandqvist](https://github.com/sebastiansandqvist) for the suggestion! [#330](https://github.com/bholmesdev/hubble.md/pull/330)
+- New tabs now open a new tab menu to easily create files, find recent notes, and search. [#329](https://github.com/bholmesdev/hubble.md/pull/329)
 - Hover and selection highlights, and buttons that show on hover like the sidebar's ⋯ menu, now appear instantly instead of fading. Thanks [@n00ki](https://github.com/n00ki)! [#327](https://github.com/bholmesdev/hubble.md/pull/327)
 
 ### Fixed
 
+- Recording a shortcut that uses ⌥ with a punctuation key, such as ⌘⌥[, now saves that key instead of the character ⌥ types. [#271](https://github.com/bholmesdev/hubble.md/pull/271)
 - Reference-style links and images no longer disappear from a note when you edit it. Thanks [@mohsensc](https://github.com/mohsensc)! [#309](https://github.com/bholmesdev/hubble.md/pull/309)
 - Opening a file with Hubble from Finder now points the terminal's `$HUBBLE_NOTE_PATH` at that file, so "Chat about this note" reads the right note. Thanks [@farskid](https://github.com/farskid) for the suggestion! [#316](https://github.com/bholmesdev/hubble.md/pull/316)
 - On Windows and Linux, opening a Markdown file while Hubble is closed now opens that file instead of your last session. [#326](https://github.com/bholmesdev/hubble.md/pull/326)
