@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Hover and selection highlights, and buttons that show on hover like the sidebar's ⋯ menu, now appear instantly instead of fading. Thanks [@n00ki](https://github.com/n00ki)! [#327](https://github.com/bholmesdev/hubble.md/pull/327)
+
 ### Fixed
 
 - Reference-style links and images no longer disappear from a note when you edit it. Thanks [@mohsensc](https://github.com/mohsensc)! [#309](https://github.com/bholmesdev/hubble.md/pull/309)
