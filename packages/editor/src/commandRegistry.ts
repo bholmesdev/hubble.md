@@ -3,6 +3,7 @@ export type CommandContext = {
 	hasEditableFile?: boolean;
 	hasSourceViewOpen?: boolean;
 	hasWorkspace?: boolean;
+	isFolderViewOpen?: boolean;
 	isSourceMode?: boolean;
 	canGoBack?: boolean;
 	canGoForward?: boolean;
@@ -27,6 +28,8 @@ const hasEditableFile = (context: CommandContext) =>
 const hasSourceViewOpen = (context: CommandContext) =>
 	context.hasSourceViewOpen === true;
 const hasWorkspace = (context: CommandContext) => context.hasWorkspace === true;
+const isFolderViewOpen = (context: CommandContext) =>
+	context.isFolderViewOpen === true;
 
 // Context-sensitive structural keys (Enter, Tab, Mod-a, Escape, and
 // ProseMirror handleKeyDown plugins), OS zoom conventions, and Electron roles
@@ -154,12 +157,12 @@ export const commandRegistry = {
 	"app.expand-all-folders": {
 		defaultBinding: null,
 		label: "Expand All Folders",
-		isEnabled: hasWorkspace,
+		isEnabled: isFolderViewOpen,
 	},
 	"app.collapse-all-folders": {
 		defaultBinding: null,
 		label: "Collapse All Folders",
-		isEnabled: hasWorkspace,
+		isEnabled: isFolderViewOpen,
 	},
 	"app.delete": {
 		defaultBinding: "CmdOrCtrl+Backspace",

@@ -112,6 +112,7 @@ import {
 	launchFileSettledStore,
 	shortcutBindingsStore,
 	sidebarOpenStore,
+	sidebarViewStore,
 	spellcheckStore,
 	telemetryConsentStore,
 	terminalPositionStore,
@@ -217,6 +218,7 @@ function App() {
 	const compact = useCompactWindow();
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
+	const sidebarView = useStoreValue(sidebarViewStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
 	const shortcutBindings = useStoreValue(shortcutBindingsStore);
 	const tabs = useStoreValue(tabsStore);
@@ -439,6 +441,8 @@ function App() {
 		const currentPath = state.currentPath;
 		void desktopApi.setMenuState({
 			hasWorkspace,
+			isFolderViewOpen:
+				hasWorkspace && sidebarOpen && sidebarView === "folders",
 			hasSourceViewOpen:
 				typeof currentPath === "string" && supportsSourceToggle(currentPath),
 			isSourceMode: state.viewMode === "source",
@@ -449,6 +453,8 @@ function App() {
 		});
 	}, [
 		hasWorkspace,
+		sidebarOpen,
+		sidebarView,
 		menuCanGoBack,
 		menuCanGoForward,
 		state.currentPath,

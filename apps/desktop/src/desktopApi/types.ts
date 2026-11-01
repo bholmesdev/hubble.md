@@ -98,6 +98,7 @@ export type ZoomDirection = "in" | "out" | "reset";
 
 export type MenuState = {
 	hasWorkspace: boolean;
+	isFolderViewOpen: boolean;
 	hasSourceViewOpen: boolean;
 	isSourceMode: boolean;
 	canGoBack: boolean;

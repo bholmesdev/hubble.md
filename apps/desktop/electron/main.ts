@@ -170,6 +170,7 @@ const launchWorkspacePath =
 		: null;
 let menuState: MenuState = {
 	hasWorkspace: false,
+	isFolderViewOpen: false,
 	hasSourceViewOpen: false,
 	isSourceMode: false,
 	canGoBack: false,
@@ -2067,6 +2068,7 @@ function registerIpc() {
 	ipcMain.handle("desktop:set-menu-state", (_event, state: MenuState) => {
 		menuState = {
 			hasWorkspace: state.hasWorkspace === true,
+			isFolderViewOpen: state.isFolderViewOpen === true,
 			hasSourceViewOpen: state.hasSourceViewOpen === true,
 			isSourceMode: state.isSourceMode === true,
 			canGoBack: state.canGoBack === true,
