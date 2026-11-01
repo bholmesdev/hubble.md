@@ -41,6 +41,7 @@ import {
 	pathAfterMove,
 	rewriteMovedLinks,
 } from "../lib/markdownLinkRewrite";
+import { isNewTabPath, isVirtualPath } from "../lib/newTabPage";
 import {
 	captureScroll,
 	forgetScrollPositions,
@@ -175,7 +176,7 @@ async function refreshFilesNow(
 		!options.reloadActive ||
 		workspaceStore.get().workspacePath !== path ||
 		!currentPath ||
-		isChangelogPath(currentPath) ||
+		isVirtualPath(currentPath) ||
 		!isEditableFile(currentPath) ||
 		!isInWorkspace(currentPath, path)
 	) {
@@ -704,7 +705,7 @@ function syncNativeTheme(preference: ThemePreference) {
 }
 
 export function requestChatAboutNote() {
-	if (isChangelogPath(viewerStore.get().currentPath)) return;
+	if (isVirtualPath(viewerStore.get().currentPath)) return;
 	const command = chatCommandStore.get().trim() || DEFAULT_CHAT_COMMAND;
 	// Set the command before opening so the panel's open effect can see it
 	// and defer to the chat launch instead of starting a plain session.
@@ -768,6 +769,7 @@ let workspaceRequest = 0;
 export const {
 	restoreTabs,
 	openTabForPath,
+	openNewTabPage,
 	openBackgroundTab,
 	activateTab,
 	reorderTab,
@@ -877,7 +879,7 @@ async function savePathContentNow(
 	options?: { force?: boolean; throwOnError?: boolean; allowBlocked?: boolean },
 ) {
 	// Binary viewers, external files, and the virtual changelog never enter text saves.
-	if (isChangelogPath(path) || !isEditableFile(path)) return;
+	if (isVirtualPath(path) || !isEditableFile(path)) return;
 	// A save already queued by the editor must not recreate a staged deletion.
 	if (!options?.allowBlocked && deletionActions.isSaveBlocked(path)) return;
 	const current = viewerStore.get();
@@ -1109,7 +1111,7 @@ function renameStem(name: string, currentExt: string) {
 
 export async function renameCurrentMarkdownFile(nextName: string) {
 	const current = viewerStore.get();
-	if (!current.currentPath || isChangelogPath(current.currentPath)) return;
+	if (!current.currentPath || isVirtualPath(current.currentPath)) return;
 	await renameMarkdownFile(current.currentPath, nextName);
 }
 
@@ -1448,7 +1450,9 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 
 		try {
 			let content = "";
-			if (isChangelogPath(path)) {
+			if (isNewTabPath(path)) {
+				content = "";
+			} else if (isChangelogPath(path)) {
 				content = prepareChangelogMarkdown(changelogRaw);
 			} else if (fileKind === "viewer") {
 				if (!(await desktopApi.pathExists(path))) throw new Error("ENOENT");
@@ -1509,7 +1513,7 @@ const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 );
 
 export async function loadPath(path: string, options?: LoadPathOptions) {
-	if (isChangelogPath(path)) {
+	if (isVirtualPath(path)) {
 		await loadInternalPath(path, options);
 		return;
 	}
@@ -1552,7 +1556,7 @@ async function navigateHistory(delta: -1 | 1) {
 		let nextIndex = working.index + delta;
 		while (nextIndex >= 0 && nextIndex < working.entries.length) {
 			const target = working.entries[nextIndex];
-			if (isChangelogPath(target) || (await desktopApi.pathExists(target))) {
+			if (isVirtualPath(target) || (await desktopApi.pathExists(target))) {
 				setHistory({ entries: working.entries, index: nextIndex });
 				await loadPath(target, {
 					history: "none",

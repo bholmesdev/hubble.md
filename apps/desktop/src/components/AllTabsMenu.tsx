@@ -6,6 +6,7 @@ import MingcuteCheckLine from "~icons/mingcute/check-line";
 import MingcuteDownLine from "~icons/mingcute/down-line";
 import { isChangelogPath } from "../lib/changelogNote";
 import { basename, dirname, relativeWorkspacePath } from "../lib/filePath";
+import { isVirtualPath } from "../lib/newTabPage";
 import { activateTab } from "../store/actions";
 import { workspacePathStore } from "../store/state";
 import { tabsStore } from "../store/tabStore";
@@ -73,9 +74,13 @@ export function AllTabsMenu({
 							>
 								{tabs.order.map((id) => {
 									const path = tabs.byId[id].path;
-									const isChangelog = isChangelogPath(path);
-									const name = isChangelog ? "What's new" : basename(path);
-									const folder = isChangelog
+									const isVirtual = isVirtualPath(path);
+									const name = isChangelogPath(path)
+										? "What's new"
+										: isVirtual
+											? "New tab"
+											: basename(path);
+									const folder = isVirtual
 										? null
 										: dirname(
 												relativeWorkspacePath(path, workspacePath ?? null),
@@ -85,7 +90,7 @@ export function AllTabsMenu({
 											key={id}
 											value={id}
 											closeOnClick
-											title={isChangelog ? name : path}
+											title={isVirtual ? name : path}
 											className="flex h-11 cursor-pointer items-center gap-2 rounded-sm px-2 outline-hidden select-none data-highlighted:bg-accent"
 										>
 											<span className="size-4 shrink-0">

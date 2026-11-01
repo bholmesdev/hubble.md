@@ -33,6 +33,7 @@ import {
 import { buildAppCommands } from "./commands/useAppCommands";
 import { FileInfoBar } from "./components/FileInfoBar";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
+import { NewTabPage } from "./components/NewTabPage";
 import { Settings, type SettingsTarget } from "./components/Settings";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
 import { TelemetryConsentCallout } from "./components/TelemetrySection";
@@ -63,6 +64,7 @@ import {
 	supportsSourceToggle,
 } from "./lib/filePath";
 import { isCompactWindow, useCompactWindow } from "./lib/layout";
+import { isNewTabPath, isVirtualPath } from "./lib/newTabPage";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { isDefaultLanguage, languageName } from "./lib/spellcheckLanguages";
 import { useScrollMemory } from "./lib/useScrollMemory";
@@ -81,7 +83,7 @@ import {
 	loadPath,
 	loadSettingsState,
 	openChangelog,
-	openTabForPath,
+	openNewTabPage,
 	openWorkspace,
 	openWorkspaceWithSidebar,
 	reconcileWorkspacePath,
@@ -176,7 +178,7 @@ async function revealPath(path: string | null) {
 async function openFilePicker() {
 	const currentPath = viewerStore.get().currentPath;
 	const defaultPath =
-		(isChangelogPath(currentPath) ? null : currentPath) ??
+		(isVirtualPath(currentPath) ? null : currentPath) ??
 		workspaceStore.get().workspacePath ??
 		undefined;
 	const selected = await desktopApi.openFilePicker({ defaultPath });
@@ -251,7 +253,6 @@ function App() {
 	};
 	const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
-	const [searchOpensInNewTab, setSearchOpensInNewTab] = useState(false);
 	const [searchFolderParent, setSearchFolderParent] = useState<string | null>(
 		null,
 	);
@@ -285,20 +286,21 @@ function App() {
 	useEffect(() => {
 		if (compact) setSidebarOpen(false);
 	}, [compact]);
+
+	// An open folder always keeps at least one tab, so closing the last one
+	// (or deleting its file) lands on a blank new tab page.
+	const needsBlankTab =
+		hasWorkspace && tabs.order.length === 0 && state.status !== "loading";
+	useEffect(() => {
+		if (needsBlankTab) void openNewTabPage();
+	}, [needsBlankTab]);
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
-		else setSearchOpensInNewTab(false);
 		setSearchOpen(open);
 	};
-	const openSearch = (mode: "current" | "new-tab") => {
-		setSearchOpensInNewTab(mode === "new-tab");
-		changeSearchOpen(true);
-	};
+	const openSearch = () => changeSearchOpen(true);
 	const createNewFile = () => {
-		const created = createMarkdownFile(
-			focusedCreationFolder,
-			searchOpen && searchOpensInNewTab ? "new" : undefined,
-		);
+		const created = createMarkdownFile(focusedCreationFolder);
 		if (searchOpen) changeSearchOpen(false);
 		return created;
 	};
@@ -309,7 +311,7 @@ function App() {
 			requestCopyAsMarkdown: () =>
 				setCopyAsMarkdownRequest((request) => request + 1),
 			focusSidebar: focusSidebarNav,
-			openNewTab: () => openSearch("new-tab"),
+			openNewTab: () => openNewTabPage(),
 			toggleAllTabs: () => setAllTabsOpen((open) => !open),
 		},
 		{
@@ -396,7 +398,7 @@ function App() {
 		// Only editable text files participate in external-change conflict handling.
 		if (
 			!currentPath ||
-			isChangelogPath(currentPath) ||
+			isVirtualPath(currentPath) ||
 			!isEditableFile(currentPath)
 		)
 			return;
@@ -486,10 +488,10 @@ function App() {
 			// Chat targets the note open in the viewer, not the sidebar focus.
 			const viewerPath = viewerStore.get().currentPath;
 			const context = {
-				hasCurrentFile: Boolean(currentPath && !isChangelogPath(currentPath)),
+				hasCurrentFile: Boolean(currentPath && !isVirtualPath(currentPath)),
 				hasEditableFile: Boolean(
 					viewerPath &&
-						!isChangelogPath(viewerPath) &&
+						!isVirtualPath(viewerPath) &&
 						isEditableFile(viewerPath),
 				),
 				hasWorkspace: Boolean(workspaceStore.get().workspacePath),
@@ -504,8 +506,8 @@ function App() {
 				"app.new-file": createNewFile,
 				"app.settings": () => setSettingsOpen(true),
 				"app.open-recent": () => setWorkspaceSwitcherOpen(true),
-				"app.go-to-file": () => openSearch("current"),
-				"app.new-tab": () => openSearch("new-tab"),
+				"app.go-to-file": () => openSearch(),
+				"app.new-tab": () => openNewTabPage(),
 				"app.all-tabs": () => setAllTabsOpen((open) => !open),
 				"app.open-folder": openWorkspaceWithSidebar,
 				"app.open-file": openFilePicker,
@@ -620,8 +622,8 @@ function App() {
 			desktopApi.onMenuShowWorkspaceSwitcher(() =>
 				setWorkspaceSwitcherOpen(true),
 			),
-			desktopApi.onMenuGoToFile(() => openSearch("current")),
-			desktopApi.onMenuNewTab(() => openSearch("new-tab")),
+			desktopApi.onMenuGoToFile(() => openSearch()),
+			desktopApi.onMenuNewTab(() => openNewTabPage()),
 			desktopApi.onMenuSyncWorkspace(() => void refreshFiles()),
 			desktopApi.onMenuToggleTerminal(() => toggleTerminal()),
 			desktopApi.onMenuGoBack(() => void goBack()),
@@ -780,7 +782,7 @@ function App() {
 						whatsNewVersion !== null ||
 						telemetryConsent === "unset")
 				}
-				onNewTab={hasWorkspace ? () => openSearch("new-tab") : undefined}
+				onNewTab={hasWorkspace ? () => openNewTabPage() : undefined}
 			/>
 			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
@@ -843,7 +845,9 @@ function App() {
 					onFocusCapture={closeSidebarOverlay}
 				>
 					<div className="flex-1 min-h-0 min-w-0 flex flex-col">
-						<FileInfoBar scrollContainer={scrollContainerEl} />
+						{state.currentPath && !isNewTabPath(state.currentPath) && (
+							<FileInfoBar scrollContainer={scrollContainerEl} />
+						)}
 						<div className="flex-1 min-h-0 min-w-0 relative">
 							{state.status === "loading" && <p>Loading…</p>}
 							{state.status === "error" && (
@@ -851,38 +855,45 @@ function App() {
 							)}
 							{state.status !== "loading" &&
 								state.status !== "error" &&
-								!state.currentPath && (
+								!state.currentPath &&
+								!hasWorkspace && (
 									<div className="flex h-full items-center justify-center p-6">
-										{hasWorkspace ? (
-											<Button onClick={() => void openFilePicker()}>
-												Open file
-											</Button>
-										) : (
-											<WelcomeScreen
-												onCreateFolder={() => void createWorkspaceWithSidebar()}
-												onOpenFolder={() => void openWorkspaceWithSidebar()}
-											/>
-										)}
+										<WelcomeScreen
+											onCreateFolder={() => void createWorkspaceWithSidebar()}
+											onOpenFolder={() => void openWorkspaceWithSidebar()}
+										/>
 									</div>
 								)}
-							{state.status === "ready" && state.currentPath && (
-								<div className="flex h-full min-h-0 flex-col">
-									{state.externalChange.kind === "conflict" && (
-										<ExternalChangeBanner
-											onKeepMyEdits={() => void forceKeepLocalEdits()}
-											onReloadFromDisk={reloadFromDiskConflict}
-										/>
-									)}
-									<DocumentViewer
-										path={state.currentPath}
-										content={state.content}
-										copyAsMarkdownRequest={copyAsMarkdownRequest}
-										viewMode={state.viewMode}
-										spellcheckStatus={spellcheckStatus}
-										onScrollContainerChange={setScrollContainerEl}
+							{/* With no tabs open, the blank page doubles as the empty state. */}
+							{state.status !== "loading" &&
+								state.status !== "error" &&
+								(isNewTabPath(state.currentPath) ||
+									(!state.currentPath && hasWorkspace)) && (
+									<NewTabPage
+										folder={focusedCreationFolder}
+										onSearch={openSearch}
 									/>
-								</div>
-							)}
+								)}
+							{state.status === "ready" &&
+								state.currentPath &&
+								!isNewTabPath(state.currentPath) && (
+									<div className="flex h-full min-h-0 flex-col">
+										{state.externalChange.kind === "conflict" && (
+											<ExternalChangeBanner
+												onKeepMyEdits={() => void forceKeepLocalEdits()}
+												onReloadFromDisk={reloadFromDiskConflict}
+											/>
+										)}
+										<DocumentViewer
+											path={state.currentPath}
+											content={state.content}
+											copyAsMarkdownRequest={copyAsMarkdownRequest}
+											viewMode={state.viewMode}
+											spellcheckStatus={spellcheckStatus}
+											onScrollContainerChange={setScrollContainerEl}
+										/>
+									</div>
+								)}
 						</div>
 					</div>
 					<TerminalPanel />
@@ -892,10 +903,7 @@ function App() {
 				open={searchOpen}
 				onOpenChange={changeSearchOpen}
 				files={paletteFiles}
-				pinnedCommandIds={searchOpensInNewTab ? ["app.new-file"] : undefined}
-				onSelectFile={(path) =>
-					void (searchOpensInNewTab ? openTabForPath(path) : loadPath(path))
-				}
+				onSelectFile={(path) => void loadPath(path)}
 				searchContents={searchFileContents}
 				commands={paletteCommands}
 				recentCommandIds={recentCommandIds}
