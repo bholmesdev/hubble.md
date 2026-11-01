@@ -44,14 +44,12 @@ const components: TLUiComponents = {
 // into the toolbar. Pointing them at that menu keeps them gone.
 const options = { actionShortcutsLocation: "menu" } as const;
 
-// Zoom follows Sketch: Cmd-1 fits, Cmd-2 zooms to the selection, and Cmd-0
-// is the View menu's reset. tldraw's Shift-number keys fire when "!" or "@"
-// is typed with the canvas focused. Copy as PNG gives Cmd-Shift-C back to
+// Zoom keeps tldraw's Shift-1 (fit) and Shift-2 (selection), as in Figma and
+// Excalidraw. tldraw skips them while text is being edited. Cmd-0 is the View
+// menu's reset. Copy as PNG gives Cmd-Shift-C back to
 // Copy File Path.
 const overrides: TLUiOverrides = {
 	actions(_editor, actions) {
-		actions["zoom-to-fit"].kbd = "cmd+1,ctrl+1";
-		actions["zoom-to-selection"].kbd = "cmd+2,ctrl+2";
 		delete actions["zoom-to-100"].kbd;
 		delete actions["copy-as-png"].kbd;
 		return actions;
