@@ -1364,7 +1364,7 @@ export function LinkPopover({
 							<PreviewLabel key={previewText} text={previewText} />
 							<span
 								aria-hidden="true"
-								className="pointer-events-none absolute inset-block-0 end-0 z-20 flex w-8 items-center justify-center bg-linear-to-l from-card via-card/95 to-transparent text-muted-foreground opacity-0 transition-opacity duration-[var(--default-transition-duration)] ease-snappy group-hover/preview-label:from-muted group-hover/preview-label:via-muted/95 group-hover/preview-label:opacity-100"
+								className="pointer-events-none absolute inset-block-0 end-0 z-20 flex w-8 items-center justify-center bg-linear-to-l from-card via-card/95 to-transparent text-muted-foreground opacity-0 group-hover/preview-label:from-muted group-hover/preview-label:via-muted/95 group-hover/preview-label:opacity-100"
 							>
 								<MingcutePencilFill
 									aria-hidden="true"
@@ -1378,7 +1378,7 @@ export function LinkPopover({
 							size="sm"
 							aria-label="Copy link"
 							title="Copy link"
-							className="relative z-20 flex h-full w-7 shrink-0 items-center justify-center border-0 bg-card p-0 text-muted-foreground transition-colors duration-[var(--default-transition-duration)] ease-snappy hover:bg-muted hover:text-foreground"
+							className="relative z-20 flex h-full w-7 shrink-0 items-center justify-center border-0 bg-card p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
 							onClick={() => {
 								if (!activeLink) return;
 								void copyLinkToClipboard(

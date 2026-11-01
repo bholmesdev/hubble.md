@@ -166,7 +166,7 @@ function Row({
 			tabIndex={-1}
 			aria-rowindex={index + 1}
 			className={cn(
-				"group/row relative rounded-sm transition-colors hover:bg-accent focus-within:bg-accent",
+				"group/row relative rounded-sm hover:bg-accent focus-within:bg-accent",
 				resolved && "opacity-50",
 			)}
 		>
@@ -192,7 +192,7 @@ function Row({
 			</GridCell>
 			<span
 				role="presentation"
-				className="absolute end-1 top-1.5 flex h-[1.375em] items-center gap-0.5 rounded-sm bg-accent text-[11px] opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100"
+				className="absolute end-1 top-1.5 flex h-[1.375em] items-center gap-0.5 rounded-sm bg-accent text-[11px] opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100"
 			>
 				<GridCell>
 					<Button

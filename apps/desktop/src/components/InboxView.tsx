@@ -113,7 +113,7 @@ export function SidebarViewToggle({
 					onClick={() => onChange(value)}
 					className={cn(
 						// Full-height and flush, so the selected button is the container's edge.
-						"inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-sm border transition-colors",
+						"inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-sm border",
 						view === value
 							? "border-border bg-background text-foreground"
 							: "border-transparent text-muted-foreground hover:text-foreground",
