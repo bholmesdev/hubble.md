@@ -5,7 +5,18 @@ import type {
 	RootContent,
 } from "hast";
 import { fromHtml } from "hast-util-from-html";
-import type { Content, Image, List, ListItem, Paragraph, Root } from "mdast";
+import type {
+	Content,
+	Definition,
+	Image,
+	ImageReference,
+	LinkReference,
+	List,
+	ListItem,
+	Paragraph,
+	Parent,
+	Root,
+} from "mdast";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { type Plugin, unified } from "unified";
@@ -20,6 +31,7 @@ export function markdownToTiptapDoc(markdown: string): JSONContent {
 	const processor = unified()
 		.use(remarkParse)
 		.use(remarkGfm)
+		.use(remarkInlineReferences)
 		.use(remarkRemoveEmptyMarkers);
 	const parsed = processor.parse(input);
 	const tree = processor.runSync(parsed) as Root;
@@ -883,6 +895,50 @@ function extractImagesFromHast(hastTree: HastRoot): JSONContent[] {
 	visitHastNode(hastTree);
 	return images;
 }
+
+const remarkInlineReferences: Plugin<[]> = () => {
+	return (tree) => {
+		const definitions = new Map<string, Definition>();
+		visit(tree, "definition", (node: Definition) => {
+			if (!definitions.has(node.identifier)) {
+				definitions.set(node.identifier, node);
+			}
+		});
+		if (definitions.size === 0) return;
+
+		const inlineReference = (
+			node: LinkReference | ImageReference,
+			index: number | undefined,
+			parent: Parent | undefined,
+		) => {
+			if (!parent || index === undefined) return;
+			const definition = definitions.get(node.identifier);
+			if (!definition) return;
+			parent.children[index] =
+				node.type === "linkReference"
+					? {
+							type: "link",
+							url: definition.url,
+							title: definition.title,
+							children: node.children,
+						}
+					: {
+							type: "image",
+							url: definition.url,
+							title: definition.title,
+							alt: node.alt,
+						};
+		};
+		visit(tree, "linkReference", inlineReference);
+		visit(tree, "imageReference", inlineReference);
+
+		visit(tree, "definition", (_node, index, parent: Parent | undefined) => {
+			if (!parent || index === undefined) return;
+			parent.children.splice(index, 1);
+			return index;
+		});
+	};
+};
 
 const remarkRemoveEmptyMarkers: Plugin<[]> = () => {
 	return (tree) => {

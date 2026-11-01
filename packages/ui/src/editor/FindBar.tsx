@@ -1,6 +1,6 @@
 import {
 	type FindState,
-	getCommand,
+	getCommandBinding,
 	getFindState,
 	selectFindMatch,
 } from "@hubble.md/editor";
@@ -108,7 +108,8 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 					}
 					return;
 				}
-				if (!keymatch(event, getCommand("app.find").defaultBinding)) return;
+				const binding = getCommandBinding("app.find");
+				if (!binding || !keymatch(event, binding)) return;
 				if (!editor?.isFocused && !open) return;
 				event.preventDefault();
 				openFind();
@@ -324,7 +325,7 @@ function FindButton({
 			onMouseDown={(event) => event.preventDefault()}
 			onClick={onClick}
 			className={cn(
-				"inline-flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-inner)] text-muted-foreground outline-hidden transition-[background-color,color,box-shadow] duration-[var(--default-transition-duration)] ease-snappy hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/40",
+				"inline-flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-inner)] text-muted-foreground outline-hidden hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/40",
 				"disabled:pointer-events-none disabled:opacity-40",
 			)}
 		>

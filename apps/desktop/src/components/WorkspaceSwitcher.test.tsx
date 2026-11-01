@@ -58,9 +58,6 @@ describe("WorkspaceSwitcher", () => {
 				...state.workspace,
 				workspacePath: "/workspace-a",
 				recentWorkspaces: ["/workspace-a", "/workspace-b", "/workspace-c"],
-				lastOpenedPaths: {
-					"/workspace-b": "/workspace-b/remembered.md",
-				},
 			},
 			ui: {
 				...state.ui,
@@ -96,9 +93,6 @@ describe("WorkspaceSwitcher", () => {
 		expect(workspaceStore.get()).toMatchObject({
 			workspacePath: "/workspace-a",
 			recentWorkspaces: ["/workspace-a", "/workspace-c"],
-			lastOpenedPaths: {
-				"/workspace-b": "/workspace-b/remembered.md",
-			},
 		});
 		expect(document.body.querySelector('[role="menu"]')).not.toBeNull();
 		expect(

@@ -1,28 +1,14 @@
-import { isChangelogPath } from "../lib/changelogNote";
 import { pathInFolder, replacePathPrefix } from "../lib/filePath";
 import {
-	currentPathStore,
 	type HistoryStack,
 	type HistoryState,
 	historyStore,
 	MAX_HISTORY,
-	workspaceStore,
 } from "./state";
+import { activeTabIdStore, tabsStore } from "./tabStore";
+import type { TabId } from "./tabs";
 
-/**
- * Per-workspace back/forward stacks over opened file paths.
- *
- * This module owns reads and writes of `historyStore`. Navigation itself
- * (save current doc, load target) lives in actions.ts to avoid an import
- * cycle with `loadPath`.
- */
-
-/** Stack key for files opened with no workspace. */
-const LOOSE_HISTORY_KEY = "__none__";
-
-function historyKey(workspacePath = workspaceStore.get().workspacePath) {
-	return workspacePath ?? LOOSE_HISTORY_KEY;
-}
+// This module owns per-tab history; actions.ts saves and loads documents to avoid an import cycle.
 
 /** Clamps a persisted or edited stack so `index` always points at an entry. */
 export function normalizeStack(stack?: HistoryStack): HistoryStack {
@@ -35,22 +21,50 @@ export function normalizeStack(stack?: HistoryStack): HistoryStack {
 	};
 }
 
-function stackFor(history: HistoryState, workspacePath: string | null) {
-	return normalizeStack(history.byWorkspace[historyKey(workspacePath)]);
-}
-
-/** The current workspace's stack. */
 export function activeHistory() {
-	return stackFor(historyStore.get(), workspaceStore.get().workspacePath);
+	return stackFor(historyStore.get(), activeTabIdStore.get());
 }
 
-/** Replaces the current workspace's stack. */
+/** Drop closed tabs' stacks on each write so every removal path gets cleaned up. */
 export function setHistory(stack: HistoryStack) {
-	const key = historyKey();
+	const tabId = activeTabIdStore.get();
+	if (!tabId) return;
+	const open = new Set(tabsStore.get().order);
 	historyStore.set((state) => ({
 		...state,
-		byWorkspace: { ...state.byWorkspace, [key]: stack },
+		byTab: {
+			...Object.fromEntries(
+				Object.entries(state.byTab).filter(([id]) => open.has(id)),
+			),
+			[tabId]: stack,
+		},
 	}));
+}
+
+/** Save a new tab's starting path so Back can return to it. */
+export function seedHistory(tabId: TabId, path: string) {
+	historyStore.set((state) => {
+		if (state.byTab[tabId]?.entries.length) return state;
+		return {
+			...state,
+			byTab: {
+				...state.byTab,
+				[tabId]: { entries: [path], index: 0 },
+			},
+		};
+	});
+}
+
+export function dropHistory(tabId: TabId) {
+	historyStore.set((state) => {
+		if (!(tabId in state.byTab)) return state;
+		const { [tabId]: _dropped, ...byTab } = state.byTab;
+		return { ...state, byTab };
+	});
+}
+
+export function resetHistory() {
+	historyStore.set((state) => ({ ...state, byTab: {} }));
 }
 
 /**
@@ -66,30 +80,11 @@ export function pushHistory(path: string) {
 	setHistory({ entries, index: entries.length - 1 });
 }
 
-/** Empties the current workspace's stack. */
 export function clearHistory() {
 	setHistory({ entries: [], index: -1 });
 }
 
-/** Applies `update` to every workspace's stack, normalizing around it. */
-function mapHistory(update: (stack: HistoryStack) => HistoryStack) {
-	historyStore.set((state) => ({
-		...state,
-		byWorkspace: Object.fromEntries(
-			Object.entries(state.byWorkspace).map(([key, stack]) => [
-				key,
-				normalizeStack(update(normalizeStack(stack))),
-			]),
-		),
-	}));
-}
-
-/**
- * Points history at a file's new location after a rename or move so back and
- * forward keep working. With `isFolder`, rewrites the path prefix of every
- * entry inside the folder. Runs across all workspaces because a rename can
- * touch paths recorded under another workspace's stack.
- */
+/** A renamed path can appear in any tab's history, so update every stack. */
 export function rewriteHistory(
 	fromPath: string,
 	toPath: string,
@@ -129,22 +124,33 @@ export function pruneHistory(path: string, isFolder = false) {
 
 export function canGoBack(
 	history = historyStore.get(),
-	workspacePath = workspaceStore.get().workspacePath,
-	onChangelog = isChangelogPath(currentPathStore.get()),
+	tabId = activeTabIdStore.get(),
 ) {
-	const stack = stackFor(history, workspacePath);
-	// The changelog note is never pushed, so back means "return to the current
-	// entry" and stays enabled whenever one exists.
-	if (onChangelog) return stack.index >= 0;
+	const stack = stackFor(history, tabId);
 	return stack.index > 0;
 }
 
 export function canGoForward(
 	history = historyStore.get(),
-	workspacePath = workspaceStore.get().workspacePath,
-	onChangelog = isChangelogPath(currentPathStore.get()),
+	tabId = activeTabIdStore.get(),
 ) {
-	if (onChangelog) return false;
-	const { index, entries } = stackFor(history, workspacePath);
+	const { index, entries } = stackFor(history, tabId);
 	return index >= 0 && index < entries.length - 1;
+}
+
+function stackFor(history: HistoryState, tabId: TabId | null | undefined) {
+	return normalizeStack(tabId ? history.byTab[tabId] : undefined);
+}
+
+/** Applies `update` to every tab's stack, normalizing around it. */
+function mapHistory(update: (stack: HistoryStack) => HistoryStack) {
+	historyStore.set((state) => ({
+		...state,
+		byTab: Object.fromEntries(
+			Object.entries(state.byTab).map(([key, stack]) => [
+				key,
+				normalizeStack(update(normalizeStack(stack))),
+			]),
+		),
+	}));
 }

@@ -21,6 +21,7 @@ import {
 } from "../store/actions";
 import type { TerminalPosition } from "../store/persistence";
 import {
+	launchFileSettledStore,
 	pendingTerminalCommandStore,
 	terminalOpenStore,
 	terminalPositionStore,
@@ -213,6 +214,7 @@ export function TerminalPanel() {
 	const isOpen = useStoreValue(terminalOpenStore);
 	const workspacePath = useStoreValue(workspacePathStore);
 	const pendingTerminalCommand = useStoreValue(pendingTerminalCommandStore);
+	const launchFileSettled = useStoreValue(launchFileSettledStore);
 	const [{ sessions, activeSessionId }, dispatch] = useReducer(
 		terminalStateReducer,
 		EMPTY_TERMINAL_STATE,
@@ -313,6 +315,9 @@ export function TerminalPanel() {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: startSession is render-local
 	useEffect(() => {
 		if (!isOpen || !workspacePath || isInitializingRef.current) return;
+		// A cold launch from Finder restores the last workspace before the
+		// opened file loads; booting now would bind the shell to the old note.
+		if (!launchFileSettled) return;
 		if (!pendingTerminalCommand && sessions.length > 0) return;
 
 		isInitializingRef.current = true;
@@ -330,7 +335,13 @@ export function TerminalPanel() {
 				isInitializingRef.current = false;
 			},
 		);
-	}, [isOpen, pendingTerminalCommand, workspacePath, sessions.length]);
+	}, [
+		isOpen,
+		pendingTerminalCommand,
+		workspacePath,
+		sessions.length,
+		launchFileSettled,
+	]);
 
 	const handleCloseSession = async (sessionId: string) => {
 		await desktopApi.terminalStop(sessionId);
@@ -395,7 +406,7 @@ export function TerminalPanel() {
 						<div
 							key={session.id}
 							className={cn(
-								"group relative flex min-w-20 max-w-48 items-center rounded-md text-xs transition-colors",
+								"group relative flex min-w-20 max-w-48 items-center rounded-md text-xs",
 								activeSessionId === session.id
 									? "bg-background text-foreground border border-border"
 									: "text-muted-foreground hover:bg-muted",
@@ -440,7 +451,7 @@ export function TerminalPanel() {
 									type="button"
 									aria-label={`Close terminal session ${session.title}`}
 									className={cn(
-										"pointer-events-none absolute end-1 z-10 -translate-y-1/2 rounded-sm p-0.5 opacity-0 transition-opacity [inset-block-start:50%] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-ring",
+										"pointer-events-none absolute end-1 z-10 -translate-y-1/2 rounded-sm p-0.5 opacity-0 [inset-block-start:50%] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus:pointer-events-auto focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-ring",
 										activeSessionId === session.id
 											? "bg-background"
 											: "bg-muted",
@@ -457,6 +468,7 @@ export function TerminalPanel() {
 						size="icon-sm"
 						className="ml-1"
 						onClick={() => void startSession("bash")}
+						disabled={!launchFileSettled}
 						aria-label="New Terminal"
 						title="New Terminal"
 					>

@@ -1,6 +1,17 @@
 import os from "node:os";
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type { DesktopApi } from "../src/desktopApi/types";
+
+// Reserve toolbar space for the macOS traffic lights before the first paint.
+// Runtime zoom changes override this stylesheet with an inline style.
+const insetFlag = "--hubble-traffic-light-inset=";
+const insetArg = process.argv.find((arg) => arg.startsWith(insetFlag));
+if (insetArg) {
+	const inset = Number(insetArg.slice(insetFlag.length));
+	if (Number.isFinite(inset)) {
+		webFrame.insertCSS(`:root { --hubble-traffic-light-inset: ${inset}px }`);
+	}
+}
 
 function subscribe<T extends unknown[]>(
 	channel: string,
@@ -30,6 +41,8 @@ const desktopApi = {
 		}),
 	readFileText: (path) =>
 		ipcRenderer.invoke("desktop:read-file-text", { path }),
+	readNotePreviews: (paths) =>
+		ipcRenderer.invoke("desktop:read-note-previews", { paths }),
 	searchFileContents: (input) =>
 		ipcRenderer.invoke("desktop:search-file-contents", input),
 	detectHubbleSkills: (workspacePath) =>
@@ -115,6 +128,8 @@ const desktopApi = {
 	setSpellcheckLanguages: (languages) =>
 		ipcRenderer.invoke("desktop:set-spellcheck-languages", { languages }),
 	setMenuState: (state) => ipcRenderer.invoke("desktop:set-menu-state", state),
+	setShortcutBindings: (bindings) =>
+		ipcRenderer.invoke("desktop:set-shortcut-bindings", bindings),
 	getUpdateState: () => ipcRenderer.invoke("desktop:get-update-state"),
 	getTelemetryConsent: () =>
 		ipcRenderer.invoke("desktop:get-telemetry-consent"),
@@ -148,6 +163,7 @@ const desktopApi = {
 	onMenuShowWorkspaceSwitcher: (callback) =>
 		subscribe("desktop:menu-show-workspace-switcher", callback),
 	onMenuGoToFile: (callback) => subscribe("desktop:menu-go-to-file", callback),
+	onMenuNewTab: (callback) => subscribe("desktop:menu-new-tab", callback),
 	onMenuSyncWorkspace: (callback) =>
 		subscribe("desktop:menu-sync-workspace", callback),
 	onWorkspaceChanged: (callback) =>
@@ -156,6 +172,12 @@ const desktopApi = {
 		subscribe("desktop:menu-toggle-terminal", callback),
 	onMenuGoBack: (callback) => subscribe("desktop:menu-go-back", callback),
 	onMenuGoForward: (callback) => subscribe("desktop:menu-go-forward", callback),
+	onMenuCloseTab: (callback) => subscribe("desktop:menu-close-tab", callback),
+	onMenuReopenClosedTab: (callback) =>
+		subscribe("desktop:menu-reopen-closed-tab", callback),
+	onMenuNextTab: (callback) => subscribe("desktop:menu-next-tab", callback),
+	onMenuPreviousTab: (callback) =>
+		subscribe("desktop:menu-previous-tab", callback),
 	onMenuToggleSourceMode: (callback) =>
 		subscribe("desktop:menu-toggle-source-mode", callback),
 	onUndoDelete: (callback) => subscribe("desktop:undo-delete", callback),

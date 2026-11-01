@@ -174,7 +174,7 @@ export function ReviewCommentGutter({
 					data-review-comment-anchor
 					title={badge.resolved ? "Resolved comment" : "Open comments"}
 					className={cn(
-						"pointer-events-auto absolute flex h-5 items-center gap-1 rounded-md px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+						"pointer-events-auto absolute flex h-5 items-center gap-1 rounded-md px-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
 						badge.resolved && "opacity-50",
 					)}
 					style={
@@ -197,7 +197,7 @@ export function ReviewCommentGutter({
 					data-review-comment-anchor
 					title="Add comment"
 					className={cn(
-						"absolute flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity duration-150 hover:bg-muted hover:text-foreground",
+						"absolute flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground",
 						layout.hoverTop !== null
 							? "pointer-events-auto opacity-100"
 							: "pointer-events-none",

@@ -6,6 +6,7 @@ import {
 	type MovedFile,
 	rewriteMovedLinks,
 } from "../lib/markdownLinkRewrite";
+import { rewriteScrollMemory } from "../lib/scrollMemory";
 import { generatedTitleStem } from "../lib/titleGeneration";
 import { rewriteHistory } from "./history";
 import {
@@ -15,6 +16,7 @@ import {
 	viewerStore,
 	workspaceStore,
 } from "./state";
+import { withRewrittenTabPaths } from "./tabs";
 
 const TITLE_RENAME_DELAY_MS = 500;
 const existingPathErrorPattern = /\bEEXIST\b|\balready exists\b/i;
@@ -278,6 +280,9 @@ export function createTitleManager(deps: TitleManagerDeps) {
 			previewPath: nextPath,
 		});
 		rewriteHistory(previousPath, nextPath);
+		rewriteScrollMemory((scrolled) =>
+			pathEquals(scrolled, previousPath) ? nextPath : scrolled,
+		);
 		appStore.set((state) => ({
 			...state,
 			workspace: {
@@ -290,26 +295,15 @@ export function createTitleManager(deps: TitleManagerDeps) {
 				pinnedNotes: state.workspace.pinnedNotes.map((path) =>
 					pathEquals(path, previousPath) ? nextPath : path,
 				),
-				lastOpenedPaths: Object.fromEntries(
-					Object.entries(state.workspace.lastOpenedPaths).map(
-						([workspacePath, openedPath]) => [
-							workspacePath,
-							pathEquals(openedPath, previousPath) ? nextPath : openedPath,
-						],
-					),
-				),
 			},
+			tabs: withRewrittenTabPaths(state.tabs, (tabPath) =>
+				pathEquals(tabPath, previousPath) ? nextPath : tabPath,
+			),
 			document: {
 				...state.document,
 				currentPath: pathEquals(state.document.currentPath ?? "", previousPath)
 					? nextPath
 					: state.document.currentPath,
-				lastOpenedPath: pathEquals(
-					state.document.lastOpenedPath ?? "",
-					previousPath,
-				)
-					? nextPath
-					: state.document.lastOpenedPath,
 			},
 		}));
 	}

@@ -9,6 +9,8 @@ lerna-debug.log*
 
 node_modules
 .dev-electron
+test-results
+test-results-web
 dist
 dist-ssr
 *.local

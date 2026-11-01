@@ -7,6 +7,7 @@ import {
 } from "@floating-ui/dom";
 import {
 	getActiveLinkRange,
+	getCommandBinding,
 	wikiDisplayNameForTarget,
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
@@ -50,7 +51,6 @@ type MachineState = {
 type MachineEvent =
 	| { type: "LINK_SESSION_CHANGED"; activeKey: string | null }
 	| { type: "EXPAND_REQUESTED" }
-	| { type: "TOGGLE_ACTIONS_REQUESTED" }
 	| { type: "ESCAPE_REQUESTED" }
 	| { type: "CREATION_REQUESTED" }
 	| { type: "CREATION_CONFIRMED" }
@@ -102,12 +102,6 @@ function machineReducer(
 			if (state.mode === "creating") return state;
 			if (!state.activeKey) return state;
 			return { ...state, mode: "actions" };
-		}
-		case "TOGGLE_ACTIONS_REQUESTED": {
-			if (!state.activeKey) return state;
-			if (state.mode === "preview") return { ...state, mode: "actions" };
-			if (state.mode === "actions") return { ...state, mode: "preview" };
-			return state;
 		}
 		case "ESCAPE_REQUESTED": {
 			if (state.mode === "creating") return INITIAL_MACHINE_STATE;
@@ -665,6 +659,7 @@ export function LinkPopover({
 	const anchorRef = useRef(INITIAL_LINK_ANCHOR_STATE);
 	const lastSelectionActiveKeyRef = useRef<string | null>(null);
 	const expandNextLinkSessionRef = useRef(false);
+	const selectHrefAfterAutofillRef = useRef(false);
 	const originalWikiTargetRef = useRef<{
 		activeKey: string;
 		target: string;
@@ -951,6 +946,7 @@ export function LinkPopover({
 							const href = clipboardValue.trim();
 							if (!canAutofillLinkFromClipboard(href)) return;
 							updateLinkMark(editor, link, href);
+							selectHrefAfterAutofillRef.current = true;
 							setHrefValue(href);
 							setActiveLink({ ...link, ...linkAttrsForHref(href) });
 							dispatchMachineEvent({ type: "EXPAND_REQUESTED" });
@@ -973,7 +969,7 @@ export function LinkPopover({
 		[editor, dispatchMachineEvent],
 	);
 
-	// ── Listen for LINK_CREATION_REQUESTED_EVENT (empty-selection Cmd+K) ──
+	// ── Listen for link creation from [[ ──
 	useEffect(
 		() => {
 			const onCreationRequested = (event: Event) => {
@@ -1007,6 +1003,15 @@ export function LinkPopover({
 			inputRef.current?.select();
 		});
 	}, [machineState.mode]);
+
+	// Clipboard autofill lands after the input was selected empty; reselect so a paste replaces it.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the href change is the selection signal.
+	useLayoutEffect(() => {
+		if (!selectHrefAfterAutofillRef.current) return;
+		selectHrefAfterAutofillRef.current = false;
+		inputRef.current?.focus();
+		inputRef.current?.select();
+	}, [hrefValue]);
 
 	// ── Ghost text decoration management ────────────────────────────
 	useEffect(() => {
@@ -1071,6 +1076,20 @@ export function LinkPopover({
 		dispatchMachineEvent,
 	]);
 
+	useEffect(() => {
+		if (machineState.mode !== "creating" && machineState.mode !== "actions")
+			return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (document.activeElement !== inputRef.current) return;
+			const binding = getCommandBinding("app.go-to-file");
+			if (!binding || !keymatch(event, binding)) return;
+			event.preventDefault();
+			event.stopPropagation();
+		};
+		window.addEventListener("keydown", onKeyDown, true);
+		return () => window.removeEventListener("keydown", onKeyDown, true);
+	}, [machineState.mode]);
+
 	// ── Keyboard: creating mode ─────────────────────────────────────
 	useEffect(() => {
 		if (!editor || machineState.mode !== "creating") return;
@@ -1119,11 +1138,6 @@ export function LinkPopover({
 				dispatchMachineEvent({ type: "ESCAPE_REQUESTED" });
 				editor.commands.focus(undefined, { scrollIntoView: false });
 				return;
-			}
-
-			if (keymatch(event, "CmdOrCtrl+K")) {
-				event.preventDefault();
-				event.stopPropagation();
 			}
 		};
 		window.addEventListener("keydown", onKeyDown, true);
@@ -1212,14 +1226,6 @@ export function LinkPopover({
 						});
 					}
 				});
-				return;
-			}
-
-			if (keymatch(event, "CmdOrCtrl+K")) {
-				if (!isVisible) return;
-				event.preventDefault();
-				event.stopPropagation();
-				dispatchMachineEvent({ type: "TOGGLE_ACTIONS_REQUESTED" });
 				return;
 			}
 		};
@@ -1358,7 +1364,7 @@ export function LinkPopover({
 							<PreviewLabel key={previewText} text={previewText} />
 							<span
 								aria-hidden="true"
-								className="pointer-events-none absolute inset-block-0 end-0 z-20 flex w-8 items-center justify-center bg-linear-to-l from-card via-card/95 to-transparent text-muted-foreground opacity-0 transition-opacity duration-[var(--default-transition-duration)] ease-snappy group-hover/preview-label:from-muted group-hover/preview-label:via-muted/95 group-hover/preview-label:opacity-100"
+								className="pointer-events-none absolute inset-block-0 end-0 z-20 flex w-8 items-center justify-center bg-linear-to-l from-card via-card/95 to-transparent text-muted-foreground opacity-0 group-hover/preview-label:from-muted group-hover/preview-label:via-muted/95 group-hover/preview-label:opacity-100"
 							>
 								<MingcutePencilFill
 									aria-hidden="true"
@@ -1372,7 +1378,7 @@ export function LinkPopover({
 							size="sm"
 							aria-label="Copy link"
 							title="Copy link"
-							className="relative z-20 flex h-full w-7 shrink-0 items-center justify-center border-0 bg-card p-0 text-muted-foreground transition-colors duration-[var(--default-transition-duration)] ease-snappy hover:bg-muted hover:text-foreground"
+							className="relative z-20 flex h-full w-7 shrink-0 items-center justify-center border-0 bg-card p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
 							onClick={() => {
 								if (!activeLink) return;
 								void copyLinkToClipboard(

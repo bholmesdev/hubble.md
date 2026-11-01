@@ -1,6 +1,11 @@
 // @vitest-environment happy-dom
 
-import { InlineCodeExtension, listExtensions } from "@hubble.md/editor";
+import {
+	InlineCodeExtension,
+	LinkExtension,
+	listExtensions,
+	setCommandBindings,
+} from "@hubble.md/editor";
 import { Editor } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list";
 import { afterEach, describe, expect, it } from "vitest";
@@ -8,12 +13,14 @@ import {
 	EditorCommandShortcuts,
 	starterKitWithRegistryShortcuts,
 } from "./EditorCommandShortcuts";
+import { SmartLinkExtension } from "./SmartLinkExtension";
 
 const editors: Editor[] = [];
 
 afterEach(() => {
 	for (const editor of editors) editor.destroy();
 	editors.length = 0;
+	setCommandBindings({});
 });
 
 describe("EditorCommandShortcuts", () => {
@@ -64,6 +71,56 @@ describe("EditorCommandShortcuts", () => {
 		expect(editor.commands.keyboardShortcut("Mod-Shift-9")).toBe(true);
 		expect(editor.isActive("bulletList")).toBe(true);
 	});
+
+	it("applies a remap to an editor that is already open", () => {
+		const editor = createEditor();
+		editor.commands.selectAll();
+		setCommandBindings({ "editor.bold": "CmdOrCtrl+Alt+B" });
+
+		editor.commands.keyboardShortcut("Mod-b");
+		expect(editor.isActive("bold")).toBe(false);
+
+		editor.commands.keyboardShortcut("Mod-Alt-b");
+		expect(editor.isActive("bold")).toBe(true);
+	});
+
+	it("does not run a disabled shortcut", () => {
+		const editor = createEditor();
+		editor.commands.selectAll();
+		setCommandBindings({ "editor.italic": null });
+
+		editor.commands.keyboardShortcut("Mod-i");
+		expect(editor.isActive("italic")).toBe(false);
+	});
+
+	it("handles the link shortcut only with selected text", () => {
+		const editor = createEditor();
+
+		editor.commands.keyboardShortcut("Mod-k");
+		expect(editor.getJSON().content?.[0]?.content?.[0]?.marks).toBeUndefined();
+
+		editor.commands.setTextSelection({ from: 1, to: 6 });
+		editor.commands.keyboardShortcut("Mod-k");
+		expect(editor.getJSON().content?.[0]?.content?.[0]).toEqual({
+			type: "text",
+			text: "hello",
+			marks: [{ type: "link", attrs: { href: "", kind: "url", target: null } }],
+		});
+	});
+
+	it("runs only the first command when shortcuts conflict", () => {
+		const editor = createEditor();
+		editor.commands.selectAll();
+		setCommandBindings({
+			"editor.bold": "CmdOrCtrl+Alt+M",
+			"editor.italic": "CmdOrCtrl+Alt+M",
+		});
+
+		editor.commands.keyboardShortcut("Mod-Alt-m");
+
+		expect(editor.isActive("bold")).toBe(true);
+		expect(editor.isActive("italic")).toBe(false);
+	});
 });
 
 // Mirrors the EditorView setup: registry-owned StarterKit shortcuts plus
@@ -72,10 +129,16 @@ function createEditor() {
 	const editor = new Editor({
 		element: document.createElement("div"),
 		extensions: [
-			...starterKitWithRegistryShortcuts({ code: false, listItem: false }),
+			...starterKitWithRegistryShortcuts({
+				code: false,
+				link: false,
+				listItem: false,
+			}),
 			InlineCodeExtension,
 			...listExtensions,
 			TaskItem.configure({ nested: true }),
+			LinkExtension,
+			SmartLinkExtension,
 			EditorCommandShortcuts,
 		],
 		content: "<p>hello</p>",

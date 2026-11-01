@@ -102,9 +102,7 @@ export function applyFormatCommand(editor: Editor, kind: FormatCommandKind) {
 			return;
 		case "link":
 			editor.commands.focus(undefined, { scrollIntoView: false });
-			// Selections touching a link remove it. Otherwise reuse the Cmd+K
-			// flow so the link popover opens instead of silently creating an
-			// empty link.
+			// Selections touching a link remove it. Otherwise open the link popover.
 			if (removeLinksInSelection(editor)) return;
 			editor.commands.toggleLinkAtSelection();
 			return;

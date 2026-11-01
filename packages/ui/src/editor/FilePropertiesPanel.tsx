@@ -96,7 +96,7 @@ export function FilePropertiesPanel({
 				<button
 					ref={addButtonRef}
 					type="button"
-					className="grid h-7 grid-cols-[minmax(7rem,0.75fr)_2fr] items-center gap-2 text-muted-foreground text-xs transition-colors hover:text-foreground"
+					className="grid h-7 grid-cols-[minmax(7rem,0.75fr)_2fr] items-center gap-2 text-muted-foreground text-xs hover:text-foreground"
 					onClick={() => {
 						const draftId = crypto.randomUUID();
 						setFocusDraftId(draftId);
@@ -266,7 +266,7 @@ function PropertyRow({
 				type="button"
 				aria-label={`Delete ${property.key || "property"}`}
 				title="Delete property"
-				className="inline-flex size-7 items-center justify-center rounded-sm bg-muted/0 text-muted-foreground/45 opacity-0 outline-none transition-[background-color,color,opacity] duration-150 ease-out hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground focus-visible:opacity-100 group-focus-within/property:opacity-100 group-hover/property:opacity-100"
+				className="inline-flex size-7 items-center justify-center rounded-sm bg-muted/0 text-muted-foreground/45 opacity-0 outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground focus-visible:opacity-100 group-focus-within/property:opacity-100 group-hover/property:opacity-100"
 				onClick={() => onDelete()}
 			>
 				<MingcuteCloseLine className="size-3.5" />

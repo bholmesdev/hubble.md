@@ -22,15 +22,7 @@ function toggleLinkAtSelection() {
 
 			const { selection } = state;
 
-			// Empty selection: enter creation flow (no mark inserted yet)
-			if (selection.empty) {
-				window.dispatchEvent(
-					new CustomEvent(LINK_CREATION_REQUESTED_EVENT, {
-						detail: { pos: selection.from },
-					}),
-				);
-				return true;
-			}
+			if (selection.empty) return false;
 
 			// Non-empty selection: apply link mark to selection
 			const range = { from: selection.from, to: selection.to };

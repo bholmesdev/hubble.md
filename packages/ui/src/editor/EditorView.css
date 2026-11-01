@@ -107,6 +107,57 @@
 	margin-inline-start: 1.3rem;
 }
 
+/* Match each text block's direction on its structural parent so markers,
+ * checkboxes, and quote borders use the same side. Empty blocks carry their
+ * temporary direction in a decoration. */
+[data-hubble-editor]
+	.ProseMirror
+	:is(
+		blockquote:has(
+				> :first-child:is(
+						:dir(ltr):not([data-empty-direction]),
+						[data-empty-direction="ltr"]
+					)
+			),
+		li:has(
+				> div
+					> :first-child:is(
+						:dir(ltr):not([data-empty-direction]),
+						[data-empty-direction="ltr"]
+					)
+			)
+	) {
+	direction: ltr;
+}
+
+[data-hubble-editor]
+	.ProseMirror
+	:is(
+		blockquote:has(
+				> :first-child:is(
+						:dir(rtl):not([data-empty-direction]),
+						[data-empty-direction="rtl"]
+					)
+			),
+		li:has(
+				> div
+					> :first-child:is(
+						:dir(rtl):not([data-empty-direction]),
+						[data-empty-direction="rtl"]
+					)
+			)
+	) {
+	direction: rtl;
+}
+
+[data-hubble-editor] .ProseMirror [data-empty-direction="ltr"] {
+	direction: ltr;
+}
+
+[data-hubble-editor] .ProseMirror [data-empty-direction="rtl"] {
+	direction: rtl;
+}
+
 [data-hubble-editor] .ProseMirror :is(ul, ol) li::marker {
 	color: var(--muted-foreground);
 }

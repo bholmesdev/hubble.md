@@ -1,15 +1,19 @@
 import {
 	type AppCommandId,
+	commandRegistry,
 	getCommand,
+	getCommandBinding,
+	getCommandBindings,
+	resolveCommandBinding,
 	wikiDisplayNameForTarget,
 } from "@hubble.md/editor";
 import {
 	Button,
 	classifyHref,
 	EditorView,
+	formatShortcut,
 	GlobalSearchPalette,
 	getActiveEditor,
-	Input,
 	MarkdownSourceEditor,
 	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
@@ -19,33 +23,24 @@ import {
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import {
 	recentCommandIdsStore,
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
+import { FileInfoBar } from "./components/FileInfoBar";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
-import { SettingsDialog, SettingsSection } from "./components/SettingsDialog";
+import { Settings, type SettingsTarget } from "./components/Settings";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
-import { SpellcheckSettingsSection } from "./components/SpellcheckSection";
-import {
-	TelemetryConsentCallout,
-	TelemetrySettingsSection,
-} from "./components/TelemetrySection";
+import { TelemetryConsentCallout } from "./components/TelemetrySection";
 import { TerminalPanel } from "./components/TerminalPanel";
-import { Toolbar } from "./components/Toolbar";
-import { SidebarCallout, UpdatesSection } from "./components/UpdatesSection";
+import { SidebarCallout } from "./components/UpdatesSection";
 import { WelcomeScreen } from "./components/WelcomeScreen";
+import { WindowTitleBar } from "./components/WindowTitleBar";
 import { desktopApi } from "./desktopApi";
-import type {
-	DesktopUpdateState,
-	SpellcheckState,
-	TelemetryChoice,
-	TelemetryConsent,
-} from "./desktopApi/types";
+import type { DesktopUpdateState } from "./desktopApi/types";
 import { createEmbedExtension } from "./editor/EmbedExtension";
 import { handleImageDrop, handleImagePaste } from "./editor/handleImagePaste";
 import { IframeView, toAssetUrl } from "./editor/IframeView";
@@ -69,9 +64,12 @@ import {
 import { isCompactWindow, useCompactWindow } from "./lib/layout";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { isDefaultLanguage, languageName } from "./lib/spellcheckLanguages";
+import { useScrollMemory } from "./lib/useScrollMemory";
 import { resolveWikiPath } from "./lib/wikiPath";
 import { SIDEBAR_NAV_SELECTOR } from "./selectors";
 import {
+	activateAdjacentTab,
+	closeActiveTab,
 	createWorkspaceWithSidebar,
 	editorDocumentId,
 	forceKeepLocalEdits,
@@ -80,7 +78,9 @@ import {
 	goForward,
 	handleExternalFileChange,
 	loadPath,
+	loadSettingsState,
 	openChangelog,
+	openTabForPath,
 	openWorkspace,
 	openWorkspaceWithSidebar,
 	reconcileWorkspacePath,
@@ -88,35 +88,39 @@ import {
 	refreshFiles,
 	refreshFilesDebounced,
 	reloadFromDiskConflict,
+	reopenClosedTab,
 	requestChatAboutNote,
+	restoreTabs,
 	savePathContent,
-	setChatCommand,
-	setCodeFileOpenMode,
 	setLastSeenVersion,
 	setReviewThreads,
 	setSidebarOpen,
-	setThemePreference,
+	setTelemetryConsent,
 	setViewerMode,
 	setWorkspaceSwitcherOpen,
+	toggleSidebarView,
 	toggleTerminal,
 	undoDelete,
 	updateEditorContent,
 } from "./store/actions";
 import { canGoBack, canGoForward } from "./store/history";
 import { useHistoryNav } from "./store/hooks";
+import type { SidebarView } from "./store/persistence";
 import {
-	chatCommandStore,
-	codeFileOpenModeStore,
 	lastSeenVersionStore,
+	launchFileSettledStore,
+	shortcutBindingsStore,
 	sidebarOpenStore,
+	spellcheckStore,
+	telemetryConsentStore,
 	terminalPositionStore,
-	themePreferenceStore,
 	uiStore,
 	type ViewMode,
 	viewerStore,
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
+import { tabsStore } from "./store/tabStore";
 import { isDarkTheme, subscribeTheme } from "./theme";
 
 // Forces editor refresh when underlying TipTap extensions change
@@ -148,6 +152,10 @@ function focusSidebarNav() {
 	document.querySelector<HTMLElement>(SIDEBAR_NAV_SELECTOR)?.focus();
 }
 
+function showSidebarView(view: SidebarView) {
+	if (toggleSidebarView(view)) requestAnimationFrame(() => focusSidebarNav());
+}
+
 async function copyFilePath(path: string | null) {
 	if (!path) return;
 	await copyText(path, "File path");
@@ -176,7 +184,7 @@ async function openFilePicker() {
 }
 
 const SIDEBAR_OVERLAY =
-	"max-sm:absolute max-sm:inset-y-0 max-sm:start-0 max-sm:z-30 max-sm:flex max-sm:shadow-overlay max-sm:transition-transform max-sm:motion-reduce:transition-none";
+	"max-sm:absolute max-sm:top-px max-sm:bottom-0 max-sm:start-0 max-sm:z-30 max-sm:flex max-sm:shadow-overlay max-sm:transition-transform max-sm:motion-reduce:transition-none";
 const SIDEBAR_OVERLAY_SHOWN =
 	"contents max-sm:translate-x-0 max-sm:duration-[180ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
 const SIDEBAR_OVERLAY_HIDDEN =
@@ -209,19 +217,28 @@ function App() {
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const terminalPosition = useStoreValue(terminalPositionStore);
+	const shortcutBindings = useStoreValue(shortcutBindingsStore);
+	const tabs = useStoreValue(tabsStore);
 	const hasWorkspace = workspacePath !== null;
 	const { canGoBack: menuCanGoBack, canGoForward: menuCanGoForward } =
 		useHistoryNav();
 	const [scrollContainerEl, setScrollContainerEl] =
 		useState<HTMLDivElement | null>(null);
+	useScrollMemory(state.currentPath, scrollContainerEl);
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [settingsTarget, setSettingsTarget] = useState<SettingsTarget>();
+	const settingsRequestId = useRef(0);
+	const changeSettingsOpen = (open: boolean) => {
+		setSettingsOpen(open);
+		if (!open) setSettingsTarget(undefined);
+	};
+	const [allTabsOpen, setAllTabsOpen] = useState(false);
 	const [copyAsMarkdownRequest, setCopyAsMarkdownRequest] = useState(0);
 	const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(
 		null,
 	);
-	const [telemetryConsent, setTelemetryConsent] =
-		useState<TelemetryConsent | null>(null);
-	const [spellcheck, setSpellcheck] = useState<SpellcheckState | null>(null);
+	const telemetryConsent = useStoreValue(telemetryConsentStore);
+	const spellcheck = useStoreValue(spellcheckStore);
 	const [focusedSidebarItem, setFocusedSidebarItem] =
 		useState<DesktopSidebarFocus>(null);
 	const updateFocusedSidebarItem = (next: DesktopSidebarFocus) => {
@@ -231,6 +248,7 @@ function App() {
 	};
 	const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
+	const [searchOpensInNewTab, setSearchOpensInNewTab] = useState(false);
 	const [searchFolderParent, setSearchFolderParent] = useState<string | null>(
 		null,
 	);
@@ -266,18 +284,33 @@ function App() {
 	}, [compact]);
 	const changeSearchOpen = (open: boolean) => {
 		if (open) setSearchFolderParent(focusedFolderParent ?? null);
+		else setSearchOpensInNewTab(false);
 		setSearchOpen(open);
+	};
+	const openSearch = (mode: "current" | "new-tab") => {
+		setSearchOpensInNewTab(mode === "new-tab");
+		changeSearchOpen(true);
+	};
+	const createNewFile = () => {
+		const created = createMarkdownFile(
+			focusedCreationFolder,
+			searchOpen && searchOpensInNewTab ? "new" : undefined,
+		);
+		if (searchOpen) changeSearchOpen(false);
+		return created;
 	};
 	const paletteCommands = buildAppCommands(
 		{
+			createNewFile,
 			openSettings: () => setSettingsOpen(true),
 			requestCopyAsMarkdown: () =>
 				setCopyAsMarkdownRequest((request) => request + 1),
 			focusSidebar: focusSidebarNav,
+			openNewTab: () => openSearch("new-tab"),
+			toggleAllTabs: () => setAllTabsOpen((open) => !open),
 		},
 		{
 			currentPath: state.currentPath ?? null,
-			newFileParent: focusedCreationFolder,
 			newFolderParent: searchOpen
 				? searchFolderParent
 				: (focusedFolderParent ?? null),
@@ -311,30 +344,7 @@ function App() {
 		if (currentVersion) setLastSeenVersion(currentVersion);
 	};
 
-	useEffect(() => {
-		void desktopApi.getTelemetryConsent().then(setTelemetryConsent);
-	}, []);
-
-	useEffect(() => {
-		void desktopApi.getSpellcheckState().then(setSpellcheck);
-	}, []);
-
-	const updateSpellcheck = async (request: Promise<void>) => {
-		try {
-			await request;
-			setSpellcheck(await desktopApi.getSpellcheckState());
-		} catch {
-			toast.error("Failed to update spellcheck");
-		}
-	};
-
-	const changeSpellcheckEnabled = (enabled: boolean) => {
-		void updateSpellcheck(desktopApi.setSpellcheckEnabled(enabled));
-	};
-
-	const changeSpellcheckLanguages = (languages: string[]) => {
-		void updateSpellcheck(desktopApi.setSpellcheckLanguages(languages));
-	};
+	useEffect(loadSettingsState, []);
 
 	const spellcheckStatus: SpellcheckStatus | null =
 		spellcheck?.enabled &&
@@ -347,20 +357,6 @@ function App() {
 				}
 			: null;
 
-	const chooseTelemetry = async (choice: TelemetryChoice) => {
-		setTelemetryConsent(await desktopApi.setTelemetryConsent(choice));
-		if (choice !== "enabled") return;
-		// Declining wiped today's record, so re-enabling must record the current
-		// session again; an open HTML file counts as HTML App use.
-		const viewer = viewerStore.get();
-		void desktopApi.recordTelemetryActivity({
-			usedHtmlApp:
-				viewer.status === "ready" &&
-				!!viewer.currentPath &&
-				hasHtmlExtension(viewer.currentPath),
-		});
-	};
-
 	useEffect(() => {
 		// First install has no update to announce; just record the version.
 		if (currentVersion && lastSeenVersion === null) {
@@ -369,7 +365,7 @@ function App() {
 	}, [currentVersion, lastSeenVersion]);
 
 	const openWhatsNew = () => {
-		setSettingsOpen(false);
+		changeSettingsOpen(false);
 		void openChangelog();
 	};
 
@@ -447,6 +443,8 @@ function App() {
 			isSourceMode: state.viewMode === "source",
 			canGoBack: menuCanGoBack,
 			canGoForward: menuCanGoForward,
+			tabCount: tabs.order.length,
+			hasClosedTabs: tabs.closed.length > 0,
 		});
 	}, [
 		hasWorkspace,
@@ -454,7 +452,13 @@ function App() {
 		menuCanGoForward,
 		state.currentPath,
 		state.viewMode,
+		tabs.order.length,
+		tabs.closed.length,
 	]);
+
+	useEffect(() => {
+		void desktopApi.setShortcutBindings(shortcutBindings);
+	}, [shortcutBindings]);
 
 	useEffect(() => {
 		if (!sidebarOpen) setFocusedSidebarItem(null);
@@ -463,7 +467,8 @@ function App() {
 	useEffect(() => {
 		const onKeyDown = async (event: KeyboardEvent) => {
 			if (event.defaultPrevented) return;
-			if (keymatch(event, getCommand("app.format-menu").defaultBinding)) {
+			const formatBinding = getCommandBinding("app.format-menu");
+			if (formatBinding && keymatch(event, formatBinding)) {
 				const editor = getActiveEditor();
 				if (editor?.isFocused && !editor.state.selection.empty) return;
 				event.preventDefault();
@@ -489,11 +494,12 @@ function App() {
 			> = {
 				"app.go-back": goBack,
 				"app.go-forward": goForward,
-				"app.new-file": () => createMarkdownFile(focusedCreationFolder),
+				"app.new-file": createNewFile,
 				"app.settings": () => setSettingsOpen(true),
 				"app.open-recent": () => setWorkspaceSwitcherOpen(true),
-				// The File menu accelerator fires too, but opening is idempotent.
-				"app.go-to-file": () => changeSearchOpen(true),
+				"app.go-to-file": () => openSearch("current"),
+				"app.new-tab": () => openSearch("new-tab"),
+				"app.all-tabs": () => setAllTabsOpen((open) => !open),
 				"app.open-folder": openWorkspaceWithSidebar,
 				"app.open-file": openFilePicker,
 				"app.copy-path": () => copyFilePath(currentPath),
@@ -504,26 +510,61 @@ function App() {
 					setSidebarOpen(opening);
 					if (opening) requestAnimationFrame(() => focusSidebarNav());
 				},
+				"app.show-folders": () => showSidebarView("folders"),
+				"app.show-inbox": () => showSidebarView("inbox"),
 			};
 			for (const [id, handler] of Object.entries(handlers) as [
 				AppCommandId,
 				() => void | Promise<void>,
 			][]) {
 				const command = getCommand(id);
-				if (
-					keymatch(event, command.defaultBinding) &&
-					command.isEnabled(context)
-				) {
+				const binding = getCommandBinding(id);
+				if (binding && keymatch(event, binding) && command.isEnabled(context)) {
 					event.preventDefault();
 					await handler();
 					return;
 				}
 			}
+			// The palette's binding can claim Cmd-P even when unavailable here; editor commands can too.
+			if (
+				!event.repeat &&
+				keymatch(event, "CmdOrCtrl+P") &&
+				!Object.keys(commandRegistry).some((id) => {
+					const binding = resolveCommandBinding(
+						id as keyof typeof commandRegistry,
+						getCommandBindings(),
+					);
+					return binding && keymatch(event, binding);
+				})
+			) {
+				event.preventDefault();
+				const binding = getCommandBinding("app.go-to-file");
+				toast(
+					binding
+						? `Command palette can now be opened with ${formatShortcut(binding)}`
+						: "Command palette has no shortcut",
+					{
+						id: "command-p-shortcut-hint",
+						action: {
+							label: "Modify in settings",
+							onClick: () => {
+								settingsRequestId.current += 1;
+								setSettingsTarget({
+									page: "shortcuts",
+									shortcutId: "app.go-to-file",
+									requestId: settingsRequestId.current,
+								});
+								setSettingsOpen(true);
+							},
+						},
+					},
+				);
+			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen, focusedCreationFolder, focusedSidebarPath]);
+	}, [openSearch, createNewFile, focusedSidebarPath]);
 
 	useEffect(() => {
 		let active = true;
@@ -555,9 +596,7 @@ function App() {
 					if (!undone) void desktopApi.undoText();
 				});
 			}),
-			desktopApi.onMenuCreateMarkdownFile(
-				() => void createMarkdownFile(focusedCreationFolder),
-			),
+			desktopApi.onMenuCreateMarkdownFile(() => void createNewFile()),
 			desktopApi.onMenuCreateHtmlFile(
 				() => void createHtmlFile(focusedCreationFolder),
 			),
@@ -565,7 +604,7 @@ function App() {
 			desktopApi.onMenuOpenFolder(() => void openWorkspaceWithSidebar()),
 			desktopApi.onMenuOpenSettings(() => setSettingsOpen(true)),
 			desktopApi.onMenuOpenChangelog(() => {
-				setSettingsOpen(false);
+				changeSettingsOpen(false);
 				void openChangelog();
 			}),
 			desktopApi.onMenuCopyAsMarkdown(() =>
@@ -574,11 +613,16 @@ function App() {
 			desktopApi.onMenuShowWorkspaceSwitcher(() =>
 				setWorkspaceSwitcherOpen(true),
 			),
-			desktopApi.onMenuGoToFile(() => changeSearchOpen(true)),
+			desktopApi.onMenuGoToFile(() => openSearch("current")),
+			desktopApi.onMenuNewTab(() => openSearch("new-tab")),
 			desktopApi.onMenuSyncWorkspace(() => void refreshFiles()),
 			desktopApi.onMenuToggleTerminal(() => toggleTerminal()),
 			desktopApi.onMenuGoBack(() => void goBack()),
 			desktopApi.onMenuGoForward(() => void goForward()),
+			desktopApi.onMenuCloseTab(() => void closeActiveTab()),
+			desktopApi.onMenuReopenClosedTab(() => void reopenClosedTab()),
+			desktopApi.onMenuNextTab(() => void activateAdjacentTab(1)),
+			desktopApi.onMenuPreviousTab(() => void activateAdjacentTab(-1)),
 			desktopApi.onMenuToggleSourceMode(() => {
 				const current = viewerStore.get();
 				if (
@@ -594,7 +638,7 @@ function App() {
 			for (const dispose of disposers) dispose();
 		};
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	}, [changeSearchOpen, focusedCreationFolder]);
+	}, [openSearch, createNewFile, focusedCreationFolder, changeSettingsOpen]);
 
 	useEffect(() => {
 		// Window focus can fire in bursts when switching apps, so debounce the
@@ -661,9 +705,13 @@ function App() {
 			if (!active) return;
 
 			if (typeof launchPath === "string" && launchPath.length > 0) {
-				await loadPath(launchPath);
+				// A failed load must not leave the terminal unable to start.
+				await loadPath(launchPath).finally(() =>
+					launchFileSettledStore.set(true),
+				);
 				return;
 			}
+			launchFileSettledStore.set(true);
 			const launchWorkspacePath = await desktopApi.getLaunchWorkspacePath();
 			if (!active) return;
 
@@ -677,21 +725,7 @@ function App() {
 				}
 				return;
 			}
-			const nextState = viewerStore.get();
-			const workspace = workspaceStore.get();
-			const lastPath =
-				nextState.lastOpenedPath ??
-				(workspace.workspacePath
-					? workspace.lastOpenedPaths[workspace.workspacePath]
-					: undefined);
-			if (lastPath) {
-				// Restore must stay in Hubble: missing files stay quiet, and a code-file
-				// preference must not launch another app during startup.
-				await loadPath(lastPath, {
-					missing: "silent",
-					launchExternal: false,
-				});
-			}
+			await restoreTabs();
 		};
 		void init();
 		return () => {
@@ -724,16 +758,18 @@ function App() {
 				}
 			}}
 		>
-			<Toolbar
-				scrollContainer={scrollContainerEl}
+			<WindowTitleBar
+				allTabsOpen={allTabsOpen}
+				onAllTabsOpenChange={setAllTabsOpen}
 				showSidebarBadge={
 					!sidebarOpen &&
 					(showReadyCallout ||
 						whatsNewVersion !== null ||
 						telemetryConsent === "unset")
 				}
+				onNewTab={hasWorkspace ? () => openSearch("new-tab") : undefined}
 			/>
-			<div className="relative flex min-h-0 flex-1 overflow-hidden">
+			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
 				<div
 					data-sidebar-overlay
@@ -778,7 +814,7 @@ function App() {
 								/>
 							) : telemetryConsent === "unset" ? (
 								<TelemetryConsentCallout
-									onChoose={(choice) => void chooseTelemetry(choice)}
+									onChoose={(choice) => void setTelemetryConsent(choice)}
 								/>
 							) : undefined
 						}
@@ -793,45 +829,48 @@ function App() {
 					aria-live="polite"
 					onFocusCapture={closeSidebarOverlay}
 				>
-					<div className="flex-1 min-h-0 min-w-0 relative">
-						{state.status === "loading" && <p>Loading…</p>}
-						{state.status === "error" && (
-							<p>{state.error ?? "Failed to open file."}</p>
-						)}
-						{state.status !== "loading" &&
-							state.status !== "error" &&
-							!state.currentPath && (
-								<div className="flex h-full items-center justify-center p-6">
-									{hasWorkspace ? (
-										<Button onClick={() => void openFilePicker()}>
-											Open file
-										</Button>
-									) : (
-										<WelcomeScreen
-											onCreateFolder={() => void createWorkspaceWithSidebar()}
-											onOpenFolder={() => void openWorkspaceWithSidebar()}
+					<div className="flex-1 min-h-0 min-w-0 flex flex-col">
+						<FileInfoBar scrollContainer={scrollContainerEl} />
+						<div className="flex-1 min-h-0 min-w-0 relative">
+							{state.status === "loading" && <p>Loading…</p>}
+							{state.status === "error" && (
+								<p>{state.error ?? "Failed to open file."}</p>
+							)}
+							{state.status !== "loading" &&
+								state.status !== "error" &&
+								!state.currentPath && (
+									<div className="flex h-full items-center justify-center p-6">
+										{hasWorkspace ? (
+											<Button onClick={() => void openFilePicker()}>
+												Open file
+											</Button>
+										) : (
+											<WelcomeScreen
+												onCreateFolder={() => void createWorkspaceWithSidebar()}
+												onOpenFolder={() => void openWorkspaceWithSidebar()}
+											/>
+										)}
+									</div>
+								)}
+							{state.status === "ready" && state.currentPath && (
+								<div className="flex h-full min-h-0 flex-col">
+									{state.externalChange.kind === "conflict" && (
+										<ExternalChangeBanner
+											onKeepMyEdits={() => void forceKeepLocalEdits()}
+											onReloadFromDisk={reloadFromDiskConflict}
 										/>
 									)}
+									<DocumentViewer
+										path={state.currentPath}
+										content={state.content}
+										copyAsMarkdownRequest={copyAsMarkdownRequest}
+										viewMode={state.viewMode}
+										spellcheckStatus={spellcheckStatus}
+										onScrollContainerChange={setScrollContainerEl}
+									/>
 								</div>
 							)}
-						{state.status === "ready" && state.currentPath && (
-							<div className="flex h-full min-h-0 flex-col">
-								{state.externalChange.kind === "conflict" && (
-									<ExternalChangeBanner
-										onKeepMyEdits={() => void forceKeepLocalEdits()}
-										onReloadFromDisk={reloadFromDiskConflict}
-									/>
-								)}
-								<DocumentViewer
-									path={state.currentPath}
-									content={state.content}
-									copyAsMarkdownRequest={copyAsMarkdownRequest}
-									viewMode={state.viewMode}
-									spellcheckStatus={spellcheckStatus}
-									onScrollContainerChange={setScrollContainerEl}
-								/>
-							</div>
-						)}
+						</div>
 					</div>
 					<TerminalPanel />
 				</section>
@@ -840,114 +879,24 @@ function App() {
 				open={searchOpen}
 				onOpenChange={changeSearchOpen}
 				files={paletteFiles}
-				onSelectFile={(path) => void loadPath(path)}
+				pinnedCommandIds={searchOpensInNewTab ? ["app.new-file"] : undefined}
+				onSelectFile={(path) =>
+					void (searchOpensInNewTab ? openTabForPath(path) : loadPath(path))
+				}
 				searchContents={searchFileContents}
 				commands={paletteCommands}
 				recentCommandIds={recentCommandIds}
 				onRunCommand={recordRecentCommand}
 			/>
-			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-				{updateState ? (
-					<UpdatesSection
-						state={updateState}
-						onPrimaryAction={() => void triggerPrimaryUpdateAction()}
-						onViewChangelog={openWhatsNew}
-					/>
-				) : null}
-				<GeneralSettingsSection />
-				{spellcheck ? (
-					<SpellcheckSettingsSection
-						state={spellcheck}
-						onEnabledChange={changeSpellcheckEnabled}
-						onLanguagesChange={changeSpellcheckLanguages}
-					/>
-				) : null}
-				<CodeFilesSettingsSection />
-				<ChatAboutNoteSettingsSection />
-				{telemetryConsent ? (
-					<TelemetrySettingsSection
-						consent={telemetryConsent}
-						onChoose={(choice) => void chooseTelemetry(choice)}
-					/>
-				) : null}
-			</SettingsDialog>
+			<Settings
+				open={settingsOpen}
+				target={settingsTarget}
+				onOpenChange={changeSettingsOpen}
+				updateState={updateState}
+				onUpdateAction={() => void triggerPrimaryUpdateAction()}
+				onViewChangelog={openWhatsNew}
+			/>
 		</main>
-	);
-}
-
-function GeneralSettingsSection() {
-	const theme = useStoreValue(themePreferenceStore);
-	return (
-		<SettingsSection title="General" description="Choose the app appearance.">
-			<div className="flex items-center gap-2">
-				{(["light", "dark", "system"] as const).map((preference) => (
-					<Button
-						key={preference}
-						size="sm"
-						variant={theme === preference ? "secondary" : "outline"}
-						aria-pressed={theme === preference}
-						onClick={() => setThemePreference(preference)}
-					>
-						{preference === "system"
-							? "System default"
-							: `${preference[0].toUpperCase()}${preference.slice(1)}`}
-					</Button>
-				))}
-			</div>
-		</SettingsSection>
-	);
-}
-
-function CodeFilesSettingsSection() {
-	const mode = useStoreValue(codeFileOpenModeStore);
-	return (
-		<SettingsSection
-			title="Code files"
-			description="Choose where code files (JavaScript, Python, etc) are opened."
-		>
-			<div className="flex items-center gap-2">
-				<Button
-					size="sm"
-					variant={mode === "hubble" ? "secondary" : "outline"}
-					aria-pressed={mode === "hubble"}
-					onClick={() => setCodeFileOpenMode("hubble")}
-				>
-					Hubble
-				</Button>
-				<Button
-					size="sm"
-					variant={mode === "default-app" ? "secondary" : "outline"}
-					aria-pressed={mode === "default-app"}
-					onClick={() => setCodeFileOpenMode("default-app")}
-				>
-					Default app
-				</Button>
-			</div>
-		</SettingsSection>
-	);
-}
-
-function ChatAboutNoteSettingsSection() {
-	const [draft, setDraft] = useState(() => chatCommandStore.get());
-
-	return (
-		<SettingsSection
-			title="Chat about this note"
-			description={`This command runs in a new terminal when you pick "Chat about this note" from a note's ⋯ menu. The shell replaces $HUBBLE_NOTE_PATH with the current note's file path.`}
-		>
-			<div className="relative">
-				<Input
-					className="font-mono pe-8"
-					spellCheck={false}
-					value={draft}
-					onChange={(event) => {
-						setDraft(event.currentTarget.value);
-						setChatCommand(event.currentTarget.value);
-					}}
-				/>
-				<MingcutePencilLine className="pointer-events-none absolute end-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/60" />
-			</div>
-		</SettingsSection>
 	);
 }
 

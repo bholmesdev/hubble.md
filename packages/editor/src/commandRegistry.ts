@@ -6,12 +6,16 @@ export type CommandContext = {
 	isSourceMode?: boolean;
 	canGoBack?: boolean;
 	canGoForward?: boolean;
+	tabCount?: number;
+	hasClosedTabs?: boolean;
 };
 
 export type CommandDefinition = {
 	defaultBinding: string;
 	label: string;
 	isEnabled: (context: CommandContext) => boolean;
+	/** This command may share its binding with the named command. */
+	allowConflictWith?: string;
 };
 
 const always = () => true;
@@ -48,8 +52,19 @@ export const commandRegistry = {
 		isEnabled: always,
 	},
 	"app.go-to-file": {
-		defaultBinding: "CmdOrCtrl+P",
+		defaultBinding: "CmdOrCtrl+K",
 		label: "Go to File...",
+		isEnabled: hasWorkspace,
+		allowConflictWith: "editor.link",
+	},
+	"app.all-tabs": {
+		defaultBinding: "CmdOrCtrl+Shift+A",
+		label: "Show All Tabs",
+		isEnabled: always,
+	},
+	"app.new-tab": {
+		defaultBinding: "CmdOrCtrl+T",
+		label: "New Tab",
 		isEnabled: hasWorkspace,
 	},
 	"app.settings": {
@@ -66,6 +81,28 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+]",
 		label: "Go Forward",
 		isEnabled: (context) => context.canGoForward === true,
+	},
+	// `CmdOrCtrl+W` also carries Electron's window-close role. The menu item
+	// closes a Tab when there is one and falls back to closing the window.
+	"app.close-tab": {
+		defaultBinding: "CmdOrCtrl+W",
+		label: "Close Tab",
+		isEnabled: (context) => (context.tabCount ?? 0) > 0,
+	},
+	"app.reopen-closed-tab": {
+		defaultBinding: "CmdOrCtrl+Shift+T",
+		label: "Reopen Closed Tab",
+		isEnabled: (context) => context.hasClosedTabs === true,
+	},
+	"app.next-tab": {
+		defaultBinding: "Ctrl+Tab",
+		label: "Next Tab",
+		isEnabled: (context) => (context.tabCount ?? 0) > 1,
+	},
+	"app.previous-tab": {
+		defaultBinding: "Ctrl+Shift+Tab",
+		label: "Previous Tab",
+		isEnabled: (context) => (context.tabCount ?? 0) > 1,
 	},
 	"app.toggle-terminal": {
 		defaultBinding: "CmdOrCtrl+J",
@@ -99,9 +136,19 @@ export const commandRegistry = {
 			context.hasEditableFile === true && context.hasWorkspace === true,
 	},
 	"app.toggle-sidebar": {
-		defaultBinding: "CmdOrCtrl+Shift+E",
+		defaultBinding: "CmdOrCtrl+\\",
 		label: "Toggle Sidebar",
 		isEnabled: always,
+	},
+	"app.show-folders": {
+		defaultBinding: "CmdOrCtrl+Shift+E",
+		label: "Show Folders",
+		isEnabled: hasWorkspace,
+	},
+	"app.show-inbox": {
+		defaultBinding: "CmdOrCtrl+Shift+I",
+		label: "Show Inbox",
+		isEnabled: hasWorkspace,
 	},
 	"app.delete": {
 		defaultBinding: "CmdOrCtrl+Backspace",
@@ -122,6 +169,7 @@ export const commandRegistry = {
 		defaultBinding: "CmdOrCtrl+K",
 		label: "Link",
 		isEnabled: always,
+		allowConflictWith: "app.go-to-file",
 	},
 	"editor.strike": {
 		defaultBinding: "CmdOrCtrl+Shift+X",
@@ -198,14 +246,124 @@ export const commandRegistry = {
 export type CommandId = keyof typeof commandRegistry;
 export type AppCommandId = Extract<CommandId, `app.${string}`>;
 export type EditorCommandId = Extract<CommandId, `editor.${string}`>;
+export type CommandBindings = Partial<Record<CommandId, string | null>>;
+
+let commandBindings: CommandBindings = {};
+const bindingListeners = new Set<() => void>();
+const commandIds = Object.keys(commandRegistry) as CommandId[];
+const bindingPartOrder = ["CmdOrCtrl", "Ctrl", "Alt", "Shift", "Super"];
+const bindingParts = new Set(bindingPartOrder);
 
 export function getCommand<Id extends CommandId>(id: Id) {
 	return commandRegistry[id];
 }
 
+/**
+ * Return the shortcut a command can use, or null if disabled or claimed by an
+ * earlier command. Commands that name each other in allowConflictWith may share
+ * a shortcut. Use resolveCommandBinding to read the assigned shortcut without
+ * this conflict check.
+ */
+export function getCommandBinding(id: CommandId) {
+	const binding = resolveCommandBinding(id, commandBindings);
+	if (!binding) return binding;
+	const bindingKey = sortCommandBinding(binding);
+	const command: CommandDefinition = commandRegistry[id];
+	for (const commandId of commandIds) {
+		if (commandId === id) return binding;
+		const otherBinding = resolveCommandBinding(commandId, commandBindings);
+		if (otherBinding && sortCommandBinding(otherBinding) === bindingKey) {
+			const otherCommand: CommandDefinition = commandRegistry[commandId];
+			if (
+				command.allowConflictWith === commandId &&
+				otherCommand.allowConflictWith === id
+			)
+				continue;
+			return null;
+		}
+	}
+	return binding;
+}
+
+export function resolveCommandBinding(
+	id: CommandId,
+	bindings: CommandBindings,
+) {
+	return bindings[id] === undefined
+		? getCommand(id).defaultBinding
+		: bindings[id];
+}
+
+export function findCommandBindingConflicts(
+	id: CommandId,
+	bindings: CommandBindings,
+) {
+	const binding = resolveCommandBinding(id, bindings);
+	if (!binding) return [];
+	const bindingKey = sortCommandBinding(binding);
+	return commandIds.filter((commandId) => {
+		if (commandId === id) return false;
+		const otherBinding = resolveCommandBinding(commandId, bindings);
+		return (
+			otherBinding !== null && sortCommandBinding(otherBinding) === bindingKey
+		);
+	});
+}
+
+export function sortCommandBinding(binding: string) {
+	const parts = binding.split("+");
+	const modifiers = bindingPartOrder.filter((part) => parts.includes(part));
+	const keys = parts.filter((part) => !bindingParts.has(part));
+	return [...modifiers, ...keys].join("+");
+}
+
+export function isDefaultCommandBinding(id: CommandId, binding: string | null) {
+	return (
+		binding !== null &&
+		sortCommandBinding(binding) ===
+			sortCommandBinding(getCommand(id).defaultBinding)
+	);
+}
+
+export function setCommandBindings(bindings: CommandBindings) {
+	commandBindings = cleanCommandBindings(bindings);
+	for (const listener of bindingListeners) listener();
+}
+
+export function getCommandBindings() {
+	return commandBindings;
+}
+
+export function subscribeCommandBindings(listener: () => void) {
+	bindingListeners.add(listener);
+	return () => {
+		bindingListeners.delete(listener);
+	};
+}
+
+export function cleanCommandBindings(value: unknown): CommandBindings {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+	const bindings: CommandBindings = {};
+	for (const [id, binding] of Object.entries(value)) {
+		if (!(id in commandRegistry)) continue;
+		if (binding !== null && (typeof binding !== "string" || !binding)) continue;
+		const commandId = id as CommandId;
+		if (!isDefaultCommandBinding(commandId, binding)) {
+			bindings[commandId] = binding;
+		}
+	}
+	return bindings;
+}
+
 export function tiptapBinding(id: EditorCommandId) {
-	return getCommand(id)
-		.defaultBinding.replace("CmdOrCtrl", "Mod")
+	const binding = getCommandBinding(id);
+	return binding ? toTiptapBinding(binding) : null;
+}
+
+export function toTiptapBinding(binding: string) {
+	return binding
+		.replace("CmdOrCtrl", "Mod")
 		.split("+")
 		.map((part) => (/^[A-Z]$/.test(part) ? part.toLowerCase() : part))
 		.join("-");

@@ -109,7 +109,7 @@ export function ReviewCommentSummary({
 											<Tabs.Tab
 												key={value}
 												value={value}
-												className="cursor-pointer rounded-sm px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors select-none hover:text-foreground data-active:bg-secondary data-active:text-foreground"
+												className="cursor-pointer rounded-sm px-2 py-1 text-[11px] font-medium text-muted-foreground select-none hover:text-foreground data-active:bg-secondary data-active:text-foreground"
 											>
 												{label}
 											</Tabs.Tab>

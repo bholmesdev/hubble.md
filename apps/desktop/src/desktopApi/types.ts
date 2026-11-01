@@ -1,4 +1,6 @@
+import type { CommandBindings } from "@hubble.md/editor";
 import type { FileKind } from "../lib/filePath";
+import type { NotePreview } from "../lib/titleGeneration";
 import type { ThemePreference } from "../theme";
 
 export type FileEntry = {
@@ -100,6 +102,8 @@ export type MenuState = {
 	isSourceMode: boolean;
 	canGoBack: boolean;
 	canGoForward: boolean;
+	tabCount: number;
+	hasClosedTabs: boolean;
 };
 
 export type DesktopUpdateStatus =
@@ -156,6 +160,10 @@ export type DesktopApi = {
 		config: WorkspaceConfig,
 	): Promise<void>;
 	readFileText(path: string): Promise<string>;
+	/** Titles and first lines for many notes, reading only the start of each. */
+	readNotePreviews(
+		paths: string[],
+	): Promise<Record<string, NotePreview | null>>;
 	searchFileContents(
 		input: SearchFileContentsInput,
 	): Promise<SearchFileContentsOutput>;
@@ -207,6 +215,7 @@ export type DesktopApi = {
 	setSpellcheckEnabled(enabled: boolean): Promise<void>;
 	setSpellcheckLanguages(languages: string[]): Promise<void>;
 	setMenuState(state: MenuState): Promise<void>;
+	setShortcutBindings(bindings: CommandBindings): Promise<void>;
 	getUpdateState(): Promise<DesktopUpdateState>;
 	getTelemetryConsent(): Promise<TelemetryConsent>;
 	setTelemetryConsent(consent: TelemetryChoice): Promise<TelemetryConsent>;
@@ -230,6 +239,7 @@ export type DesktopApi = {
 	onMenuCopyAsMarkdown(callback: () => void): Unsubscribe;
 	onMenuShowWorkspaceSwitcher(callback: () => void): Unsubscribe;
 	onMenuGoToFile(callback: () => void): Unsubscribe;
+	onMenuNewTab(callback: () => void): Unsubscribe;
 	onMenuSyncWorkspace(callback: () => void): Unsubscribe;
 	onWorkspaceChanged(
 		callback: (event: WorkspaceWatchEvent) => void,
@@ -237,6 +247,10 @@ export type DesktopApi = {
 	onMenuToggleTerminal(callback: () => void): Unsubscribe;
 	onMenuGoBack(callback: () => void): Unsubscribe;
 	onMenuGoForward(callback: () => void): Unsubscribe;
+	onMenuCloseTab(callback: () => void): Unsubscribe;
+	onMenuReopenClosedTab(callback: () => void): Unsubscribe;
+	onMenuNextTab(callback: () => void): Unsubscribe;
+	onMenuPreviousTab(callback: () => void): Unsubscribe;
 	onMenuToggleSourceMode(callback: () => void): Unsubscribe;
 	onUndoDelete(callback: () => void): Unsubscribe;
 	onWindowFocus(callback: () => void): Unsubscribe;

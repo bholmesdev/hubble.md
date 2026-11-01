@@ -1,5 +1,7 @@
+import { setCommandBindings } from "@hubble.md/editor";
 import type { ReviewThread } from "@hubble.md/ui";
 import { store } from "@simplestack/store";
+import type { SpellcheckState, TelemetryConsent } from "../desktopApi/types";
 import type { FileAction } from "../externalFileChange";
 import type { FileKind } from "../lib/filePath";
 import { localStoragePersist } from "../lib/localStoragePersist";
@@ -9,6 +11,7 @@ import {
 	STORAGE_KEY,
 	serialize,
 } from "./persistence";
+import { type TabId, type TabTarget, withOpenedTab } from "./tabs";
 
 export type SortMode = "alpha" | "recent";
 
@@ -31,7 +34,6 @@ type ExternalChange =
 
 type DocumentState = {
 	currentPath: string | null;
-	lastOpenedPath: string | null;
 	content: string;
 	diskContent: string;
 	externalChange: ExternalChange;
@@ -52,15 +54,12 @@ export type HistoryStack = {
 };
 
 export type HistoryState = {
-	byWorkspace: Record<string, HistoryStack>;
+	byTab: Record<TabId, HistoryStack>;
 	isNavigating: boolean;
 };
 
-export const emptyDoc = (
-	lastOpenedPath: string | null = null,
-): DocumentState => ({
+export const emptyDoc = (): DocumentState => ({
 	currentPath: null,
-	lastOpenedPath,
 	content: "",
 	diskContent: "",
 	externalChange: NO_CONFLICT,
@@ -128,26 +127,14 @@ export function withOpenedDoc(
 	state: DesktopState,
 	path: string,
 	content: string,
+	tab?: TabTarget,
 ): DesktopState {
-	const workspacePath = state.workspace.workspacePath;
-	const workspace =
-		workspacePath && isInWorkspace(path, workspacePath)
-			? {
-					...state.workspace,
-					lastOpenedPaths: {
-						...state.workspace.lastOpenedPaths,
-						[workspacePath]: path,
-					},
-				}
-			: state.workspace;
-
 	return {
 		...state,
-		workspace,
+		tabs: withOpenedTab(state.tabs, path, tab),
 		document: {
 			...state.document,
 			currentPath: path,
-			lastOpenedPath: path,
 			...cleanFileState(content),
 			viewMode: "rich",
 		},
@@ -156,12 +143,15 @@ export function withOpenedDoc(
 
 // ── Stores ──────────────────────────────────────────────────────────
 
-export const appStore = store<DesktopState>(getInitialState(), {
+const initialState = getInitialState();
+setCommandBindings(initialState.settings.shortcutBindings);
+
+export const appStore = store<DesktopState>(initialState, {
 	middleware: [localStoragePersist(STORAGE_KEY, serialize)],
 });
 
 export const historyStore = store<HistoryState>({
-	byWorkspace: {},
+	byTab: {},
 	isNavigating: false,
 });
 
@@ -174,6 +164,12 @@ export const titleGenerationPreviewStore = store<{
 	previewPath: string;
 } | null>(null);
 
+export const spellcheckStore = store<SpellcheckState | null>(null);
+export const telemetryConsentStore = store<TelemetryConsent | null>(null);
+// Flips once the file Hubble was launched with has loaded, so the first
+// terminal session sees it as $HUBBLE_NOTE_PATH instead of a restored note.
+export const launchFileSettledStore = store(false);
+
 export const workspaceStore = appStore.select("workspace");
 export const viewerStore = appStore.select("document");
 export const uiStore = appStore.select("ui");
@@ -182,6 +178,7 @@ export const workspacePathStore = workspaceStore.select("workspacePath");
 export const recentWorkspacesStore = workspaceStore.select("recentWorkspaces");
 export const currentPathStore = viewerStore.select("currentPath");
 export const sidebarOpenStore = uiStore.select("sidebarOpen");
+export const sidebarViewStore = uiStore.select("sidebarView");
 export const switcherOpenStore = uiStore.select("isSwitcherOpen");
 export const terminalOpenStore = uiStore.select("isTerminalOpen");
 export const terminalPositionStore = uiStore.select("terminalPosition");
@@ -197,4 +194,7 @@ export const codeFileOpenModeStore = appStore
 export const lastSeenVersionStore = appStore
 	.select("settings")
 	.select("lastSeenVersion");
+export const shortcutBindingsStore = appStore
+	.select("settings")
+	.select("shortcutBindings");
 export const themePreferenceStore = appStore.select("settings").select("theme");

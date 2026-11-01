@@ -9,11 +9,90 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Expand or collapse all sidebar folders at once. Thanks [@n00ki](https://github.com/n00ki)! [#271](https://github.com/bholmesdev/hubble.md/pull/271)
+- Copy a folder path from its sidebar menu. Thanks [@nisan1101](https://github.com/nisan1101) for the suggestion! [#304](https://github.com/bholmesdev/hubble.md/pull/304)
 
 ### Changed
 
+- Hover and selection highlights, and buttons that show on hover like the sidebar's ⋯ menu, now appear instantly instead of fading. Thanks [@n00ki](https://github.com/n00ki)! [#327](https://github.com/bholmesdev/hubble.md/pull/327)
+
 ### Fixed
+
+- Reference-style links and images no longer disappear from a note when you edit it. Thanks [@mohsensc](https://github.com/mohsensc)! [#309](https://github.com/bholmesdev/hubble.md/pull/309)
+- Opening a file with Hubble from Finder now points the terminal's `$HUBBLE_NOTE_PATH` at that file, so "Chat about this note" reads the right note. Thanks [@farskid](https://github.com/farskid) for the suggestion! [#316](https://github.com/bholmesdev/hubble.md/pull/316)
+- On Windows and Linux, opening a Markdown file while Hubble is closed now opens that file instead of your last session. [#326](https://github.com/bholmesdev/hubble.md/pull/326)
+
+## [0.3.2] - 2026-10-29
+
+### Added
+
+- Right-click an image in a note to copy it, or to copy its file path (or web address for linked images). [#321](https://github.com/bholmesdev/hubble.md/pull/321)
+
+### Fixed
+
+- When cmd+K fills in a link from your clipboard, the link is now selected, so pasting replaces it instead of adding a duplicate. [#319](https://github.com/bholmesdev/hubble.md/pull/319)
+- The tab bar border no longer has a 1px gap where it meets the sidebar. [#323](https://github.com/bholmesdev/hubble.md/pull/323)
+
+## [0.3.1] - 2026-10-20
+
+### Changed
+
+- Holding Option in the inbox view no longer swaps each note's folder for its full path. Hover a note's folder to see its full path. [#310](https://github.com/bholmesdev/hubble.md/pull/310)
+
+## [0.3.0] - 2026-10-19
+
+### Added
+
+- An inbox view beside the folder tree lists every note newest first, grouped by date, with each note's title, first line, and folder. Switch views from the title bar, or with cmd+shift+E for folders and cmd+shift+I for the inbox. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
+
+### Changed
+
+- Change the default keybinding for toggling the sidebar from cmd+shift+E to cmd+\. You can change this binding back from Settings > Keybindings. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
+
+### Fixed
+
+- The folder tree now highlights the open note however you opened it, not just when you click it in the tree. [#307](https://github.com/bholmesdev/hubble.md/pull/307)
+
+## [0.2.1] - 2026-09-28
+
+### Added
+
+- Tabs now have right-click actions to close other tabs or tabs to the left, and open files can be deleted from the file bar overflow menu. [#294](https://github.com/bholmesdev/hubble.md/pull/294)
+
+### Changed
+
+- Change the default keybinding for search from cmd+P to cmd+K. You can change this binding back to cmd+P from Settings > Keybindings. [#296](https://github.com/bholmesdev/hubble.md/pull/296)
+
+### Fixed
+
+- Creating a new note now focuses the editor automatically. Thanks [@n00ki](https://github.com/n00ki)! [#278](https://github.com/bholmesdev/hubble.md/pull/278)
+
+## [0.2.0] - 2026-09-14
+
+### Added
+
+- [#282](https://github.com/bholmesdev/hubble.md/pull/282) Hubble now supports tabs! Works how you'd expect from Obsidian, Notion, or Google Chrome, with a horizontal tabbar and a set of familiar commands:
+  - `cmd+t` opens the file palette to search for files or create a new note
+  - `ctrl+t` and `ctrl+shift+t` walk through opened tabs
+  - `cmd+shift+A` opens the "All Tabs" menu to see all tabs at a glance. Especially useful on narrow screens
+- HTML Apps can open web links in the system browser and email links in the default email app, from plain `<a>` links or the new `hubble.links.open(url)` API. Thanks [@marcodlk](https://github.com/marcodlk)! [#274](https://github.com/bholmesdev/hubble.md/pull/274)
+- Notes automatically lay out each block from right to left or left to right based on its text. Thanks [@n00ki](https://github.com/n00ki)! [#277](https://github.com/bholmesdev/hubble.md/pull/277)
+
+### Changed
+
+- The app window now appears about 200ms sooner on launch, already in the right theme, instead of staying hidden behind a bouncing dock icon until the whole app had loaded. Thanks [@zcuric](https://github.com/zcuric)! [#281](https://github.com/bholmesdev/hubble.md/pull/281)
+- The desktop download is smaller: the app bundle dropped from 131 MB to 56 MB and the app code itself is half the size, so updates download faster. Thanks [@zcuric](https://github.com/zcuric)! [#281](https://github.com/bholmesdev/hubble.md/pull/281)
+
+### Fixed
+
+- Comment thread author headings and actions stay visible while long discussions scroll. Thanks [@LarrySequino](https://github.com/LarrySequino) for the suggestion! [#286](https://github.com/bholmesdev/hubble.md/pull/286)
+- Typing and immediately opening another note no longer loses the last few characters. The open note is now saved before navigating rather than as the editor closes. [#282](https://github.com/bholmesdev/hubble.md/pull/282)
+- Opening a Markdown file from Finder now brings Hubble to the front, and opens a window when the app is running with none open. Thanks [@HDPark95](https://github.com/HDPark95)! [#289](https://github.com/bholmesdev/hubble.md/pull/289)
+
+## [0.1.28] - 2026-08-19
+
+### Added
+
+- Customize keyboard shortcuts from Settings. Thanks [@Mamdouh66](https://github.com/Mamdouh66)! [#204](https://github.com/bholmesdev/hubble.md/pull/204)
 
 ## [0.1.27] - 2026-08-16
 

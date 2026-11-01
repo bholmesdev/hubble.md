@@ -64,6 +64,7 @@ export function MarkdownSourceEditor({
 	};
 
 	const editor = useEditor({
+		textDirection: "ltr",
 		extensions: [
 			SourceDocument,
 			StarterKit.configure({ codeBlock: false, document: false }),

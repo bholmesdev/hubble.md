@@ -1,4 +1,5 @@
 export { AppShellFrame } from "./components/AppShellFrame";
+export { EditableFileTitle } from "./components/EditableFileTitle";
 export {
 	GlobalSearchPalette,
 	type GlobalSearchPaletteProps,
@@ -7,10 +8,12 @@ export {
 	type PaletteFile,
 	type PaletteFileMatches,
 } from "./components/GlobalSearchPalette";
+export { NewNoteButton } from "./components/NewNoteButton";
 export {
 	Sidebar,
 	type SidebarDeleteItem,
 	type SidebarFile,
+	SidebarFileActionsMenu,
 	type SidebarFocusedItem,
 	type SidebarFolder,
 	SidebarFrame,
@@ -18,7 +21,11 @@ export {
 	type SidebarMoveItemInput,
 	type SidebarSortMode,
 } from "./components/Sidebar";
-export { NewNoteButton, Toolbar } from "./components/Toolbar";
+export {
+	TabStrip,
+	type TabStripItem,
+	type TabStripProps,
+} from "./components/tabbar/TabStrip";
 export { WorkspaceSwitcherMenu } from "./components/WorkspaceSwitcherMenu";
 export {
 	clearActiveEditor,
@@ -73,7 +80,13 @@ export {
 	scoreCommand,
 	stripCommandPrefix,
 } from "./lib/paletteCommand";
-export { formatCommandShortcut, formatShortcut } from "./lib/shortcut";
+export {
+	formatCommandShortcut,
+	formatShortcut,
+	useCommandBindings,
+	useCommandShortcut,
+	useCommandShortcutLabel,
+} from "./lib/shortcut";
 export { Button, buttonVariants } from "./primitives/button";
 export { Input } from "./primitives/input";
 export { Modal } from "./primitives/modal";

@@ -15,7 +15,7 @@ import {
 	useSensor,
 	useSensors,
 } from "@dnd-kit/core";
-import { getCommand } from "@hubble.md/editor";
+import { getCommandBinding } from "@hubble.md/editor";
 import { keymatch } from "keymatch";
 import {
 	type CSSProperties,
@@ -27,6 +27,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteAzSortAscendingLettersLine from "~icons/mingcute/az-sort-ascending-letters-line";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
@@ -34,7 +35,6 @@ import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDeleteLine from "~icons/mingcute/delete-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
-import MingcuteFoldVerticalLine from "~icons/mingcute/fold-vertical-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteNewFolderLine from "~icons/mingcute/new-folder-line";
@@ -42,7 +42,6 @@ import MingcutePinFill from "~icons/mingcute/pin-fill";
 import MingcutePinLine from "~icons/mingcute/pin-line";
 import MingcuteRightLine from "~icons/mingcute/right-line";
 import MingcuteSortDescendingLine from "~icons/mingcute/sort-descending-line";
-import MingcuteUnfoldVerticalLine from "~icons/mingcute/unfold-vertical-line";
 import { useResizeSeparator } from "../hooks/useResizeSeparator";
 import { isEditableEventTarget } from "../lib/dom";
 import {
@@ -52,7 +51,7 @@ import {
 	splitFileName,
 } from "../lib/filePath";
 import { shouldShowFooterDivider } from "../lib/scrollOverflow";
-import { formatCommandShortcut } from "../lib/shortcut";
+import { useCommandShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 import {
@@ -86,7 +85,11 @@ export type SidebarFocusedItem =
 	| null;
 
 type RenameItem =
-	| { kind: "file"; path: string }
+	| {
+			kind: "file";
+			path: string;
+			origin?: "new-note" | "new-html";
+	  }
 	| {
 			kind: "folder";
 			path: string;
@@ -109,10 +112,22 @@ export type SidebarSelectionState = {
 export type SidebarSelectionMode =
 	// plain click: select only this row
 	| "replace"
-	// cmd/ctrl click: add or remove this row from the selection
+	// add or remove one row without a click gesture
 	| "toggle"
 	// shift click: select every row between the anchor and this row
 	| "range";
+
+export type SidebarRowClickMode = "range" | "new-tab" | "replace";
+
+/** Shift range-selects. Cmd/Ctrl-click opens a file in a new tab. */
+export function sidebarRowClickMode(
+	event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean },
+	kind: "file" | "folder",
+): SidebarRowClickMode {
+	if (event.shiftKey) return "range";
+	if ((event.metaKey || event.ctrlKey) && kind === "file") return "new-tab";
+	return "replace";
+}
 
 export type SidebarMoveCandidate =
 	| {
@@ -349,7 +364,7 @@ const sidebarActionIconClass =
 const sidebarRowContentClass =
 	"flex min-w-0 flex-1 items-center gap-1 [padding-block:var(--row-pad-block)] [padding-inline-end:1.25rem] text-start text-[length:var(--font-size-sidebar)]";
 const sidebarRowActionButtonClass =
-	"inline-flex size-5 shrink-0 items-center justify-center rounded-sm border border-transparent bg-transparent text-current opacity-0 outline-hidden transition-opacity group-hover/sidebar-row:opacity-100 aria-expanded:opacity-100 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40";
+	"inline-flex size-5 shrink-0 items-center justify-center rounded-sm border border-transparent bg-transparent text-current opacity-0 outline-hidden group-hover/sidebar-row:opacity-100 aria-expanded:opacity-100 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40";
 const DEFAULT_SIDEBAR_WIDTH = 220;
 const MIN_SIDEBAR_WIDTH = 180;
 const MAX_SIDEBAR_WIDTH = 360;
@@ -399,16 +414,20 @@ export function Sidebar({
 	sortMode,
 	storageScope,
 	header,
+	viewToggle,
+	children,
 	footer,
 	emptyState,
 	getDisplayPath = defaultGetDisplayPath,
 	onCollapse,
 	onSortModeChange,
 	onSelectFile,
+	onOpenFileInNewTab,
 	onOpenFileInDefaultApp,
 	onRevealFile,
 	onCopyFilePath,
 	onRevealFolder,
+	onCopyFolderPath,
 	onFocusedItemChange,
 	revealLabel,
 	onRenameFile,
@@ -430,19 +449,35 @@ export function Sidebar({
 	/** Stable key used to persist folder expansion for one workspace/open folder. */
 	storageScope?: string | null;
 	header?: ReactNode;
+	/** Switches between views of the files, shown before the file actions. */
+	viewToggle?: ReactNode;
+	/** Replaces the file tree, e.g. with another view over the same files. */
+	children?: ReactNode;
 	footer?: ReactNode;
 	emptyState?: ReactNode;
 	getDisplayPath?: (path: string) => string;
 	onCollapse?: () => void;
 	onSortModeChange: (mode: SidebarSortMode) => void;
 	onSelectFile: (path: string) => void;
+	onOpenFileInNewTab?: (
+		path: string,
+		options?: { background: boolean },
+	) => void;
 	onOpenFileInDefaultApp?: (path: string) => void;
 	onRevealFile?: (path: string) => void;
 	onCopyFilePath?: (path: string) => void;
 	onRevealFolder?: (folderId: string) => void;
+	onCopyFolderPath?: (folderId: string) => void;
 	onFocusedItemChange?: (item: SidebarFocusedItem) => void;
 	revealLabel?: string;
-	onRenameFile?: (path: string, nextName: string) => void;
+	onRenameFile?: (
+		path: string,
+		nextName: string,
+		options: {
+			origin: "new-note" | "new-html" | "rename";
+			commit: "enter" | "blur";
+		},
+	) => void;
 	onRenameFolder?: (
 		folderId: string,
 		nextName: string,
@@ -463,6 +498,10 @@ export function Sidebar({
 	const [renamingItem, setRenamingItem] = useState<RenameItem | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 	const [showFooterBorder, setShowFooterBorder] = useState(false);
+	// Which list (the tree or a replacement view) has scrolled away from its top.
+	const [scrolledList, setScrolledList] = useState<"tree" | "children" | null>(
+		null,
+	);
 	const [deleteOnCancel, setDeleteOnCancel] = useState<{
 		kind: RenameItem["kind"];
 		path: string;
@@ -476,17 +515,11 @@ export function Sidebar({
 	const [activeDragKeys, setActiveDragKeys] = useState<Set<string>>(new Set());
 	const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
 	const highlightPath = pendingPath ?? currentPath;
+	// Whether the file tree or a replacement view (`children`) is showing.
+	const list = children ? "children" : "tree";
 	const uncompactFolderId =
 		deleteOnCancel?.kind === "folder" ? deleteOnCancel.path : null;
-	const {
-		collapseFolder,
-		expandFolder,
-		hasExpandedFolders,
-		hasFolders,
-		rows,
-		toggleAllFolders,
-		toggleFolder,
-	} = useSidebarTree({
+	const { collapseFolder, expandFolder, rows, toggleFolder } = useSidebarTree({
 		files,
 		folders,
 		getDisplayPath,
@@ -495,9 +528,6 @@ export function Sidebar({
 		storageScope,
 		uncompactFolderId,
 	});
-	const allFoldersActionLabel = hasExpandedFolders
-		? "Collapse all folders"
-		: "Expand all folders";
 	const [selection, setSelection] = useState<SidebarSelectionState>({
 		selectedKeys: new Set(),
 		anchorKey: null,
@@ -533,7 +563,7 @@ export function Sidebar({
 		const path = await onCreateFile(folderId);
 		if (!path) return;
 		beginRename(
-			{ kind: "file", path },
+			{ kind: "file", path, origin: "new-note" },
 			fileNameFromPath(getDisplayPath(path)),
 			{
 				deleteOnUnchangedCancel: true,
@@ -547,7 +577,7 @@ export function Sidebar({
 		const path = await onCreateHtmlFile(folderId);
 		if (!path) return;
 		beginRename(
-			{ kind: "file", path },
+			{ kind: "file", path, origin: "new-html" },
 			fileNameFromPath(getDisplayPath(path)),
 			{
 				deleteOnUnchangedCancel: true,
@@ -598,16 +628,18 @@ export function Sidebar({
 		row: SidebarSelectableRow,
 		event: React.MouseEvent<HTMLButtonElement>,
 	) => {
-		const mode: SidebarSelectionMode = event.shiftKey
-			? "range"
-			: event.metaKey || event.ctrlKey
-				? "toggle"
-				: "replace";
-		updateSelection(row, mode);
-		if (mode !== "replace") {
+		const clickMode = sidebarRowClickMode(event, row.kind);
+		if (clickMode === "range") {
+			updateSelection(row, "range");
 			event.preventDefault();
 			return;
 		}
+		if (clickMode === "new-tab" && onOpenFileInNewTab && row.kind === "file") {
+			event.preventDefault();
+			onOpenFileInNewTab(row.file.path, { background: true });
+			return;
+		}
+		updateSelection(row, "replace");
 		if (row.kind === "file" && event.detail > 1) return;
 		activateRow(row);
 		requestAnimationFrame(() => navRef.current?.focus());
@@ -690,9 +722,11 @@ export function Sidebar({
 		for (const folderId of actionable.folders) onDeleteFolder?.(folderId);
 	};
 	const handleTreeKeyDown = (event: React.KeyboardEvent) => {
+		const deleteBinding = getCommandBinding("app.delete");
 		if (
 			!isEditableEventTarget(event.target) &&
-			keymatch(event.nativeEvent, getCommand("app.delete").defaultBinding)
+			deleteBinding &&
+			keymatch(event.nativeEvent, deleteBinding)
 		) {
 			const focusedRow = focusedIndex === null ? null : rows[focusedIndex];
 			const focusedKey = focusedRow ? sidebarRowKey(focusedRow) : null;
@@ -737,6 +771,9 @@ export function Sidebar({
 		setSelection((current) => pruneSidebarSelection(current, rows));
 	}, [rows]);
 
+	// The selection follows the open file, so a bold row is always highlighted
+	// too, however the file was opened. Returning to the editor also snaps a
+	// selection that keyboard navigation moved back to the open file.
 	useEffect(() => {
 		const selectOpenFile = () => {
 			focusItem(selectionCountRef.current > 1 ? null : activeItemRef.current);
@@ -747,10 +784,22 @@ export function Sidebar({
 		const onFocusIn = (event: FocusEvent) => {
 			if (isEditorTarget(event.target)) selectOpenFile();
 		};
-		if (isEditorTarget(document.activeElement)) selectOpenFile();
+		selectOpenFile();
 		document.addEventListener("focusin", onFocusIn);
 		return () => document.removeEventListener("focusin", onFocusIn);
 	}, [focusItem, highlightPath]);
+
+	// Each list remounts at its top when shown. Reveal the open file when the
+	// tree comes back, since it may have changed while another view showed.
+	useEffect(() => {
+		setScrolledList(null);
+		if (list !== "tree") return;
+		const nav = navRef.current;
+		nav
+			?.querySelector('[aria-current="page"]')
+			?.scrollIntoView({ block: "nearest" });
+		if (nav && nav.scrollTop > 0) setScrolledList("tree");
+	}, [list]);
 
 	const handleDragStart = (event: DragStartEvent) => {
 		const data = event.active.data.current as DragItemData | undefined;
@@ -874,13 +923,14 @@ export function Sidebar({
 		return `A ${item.kind} ${targetName} already exists at this location.`;
 	};
 
-	const commitRename = (focusTree = false) => {
+	const commitRename = (commit: "enter" | "blur") => {
 		const item = renamingItem;
 		if (!item) return;
 		const nextName = renameDraft.trim();
 		if (!nextName) {
 			resetRename();
-			if (focusTree) requestAnimationFrame(() => navRef.current?.focus());
+			if (commit === "enter")
+				requestAnimationFrame(() => navRef.current?.focus());
 			return;
 		}
 		const error = getRenameError(item, nextName);
@@ -889,14 +939,20 @@ export function Sidebar({
 			requestAnimationFrame(() => renameInputRef.current?.focus());
 			return;
 		}
-		if (focusTree) {
+		const origin = item.kind === "file" ? (item.origin ?? "rename") : "rename";
+		const handsOffFocus = origin === "new-note" && commit === "enter";
+		if (commit === "enter" && !handsOffFocus) {
 			setPendingFocusDisplayPath(
 				renameTargetDisplayPath(item, nextName, getDisplayPath),
 			);
 			requestAnimationFrame(() => navRef.current?.focus());
 		}
 		resetRename();
-		if (item.kind === "file") onRenameFile?.(item.path, nextName);
+		if (item.kind === "file")
+			onRenameFile?.(item.path, nextName, {
+				origin,
+				commit,
+			});
 		else
 			onRenameFolder?.(
 				item.path,
@@ -1014,7 +1070,6 @@ export function Sidebar({
 									data-selected={isSelected ? "true" : undefined}
 									className={cn(
 										"group/sidebar-row relative flex w-full items-center text-sidebar-foreground",
-										"transition-[background-color,opacity,filter] duration-150 ease-out motion-reduce:transition-none",
 										isSelected &&
 											"bg-sidebar-accent text-sidebar-accent-foreground",
 										isOpen && "font-medium",
@@ -1053,6 +1108,7 @@ export function Sidebar({
 										if (
 											row.kind === "file" &&
 											!onRevealFile &&
+											!onOpenFileInNewTab &&
 											!onOpenFileInDefaultApp &&
 											!onCopyFilePath &&
 											!onRenameFile &&
@@ -1063,6 +1119,7 @@ export function Sidebar({
 										if (
 											row.kind === "folder" &&
 											!onRevealFolder &&
+											!onCopyFolderPath &&
 											!onCreateFolder &&
 											!onRenameFolder &&
 											!onCreateFile &&
@@ -1160,7 +1217,7 @@ export function Sidebar({
 									{canTogglePinnedFile && (
 										<span
 											className={cn(
-												"pointer-events-none absolute inset-y-0 end-0 w-16 rounded-e-[var(--radius-row)] opacity-0 transition-opacity group-hover/sidebar-row:opacity-100",
+												"pointer-events-none absolute inset-y-0 end-0 w-16 rounded-e-[var(--radius-row)] opacity-0 group-hover/sidebar-row:opacity-100",
 												isSelected
 													? "bg-linear-to-r from-transparent from-0% via-sidebar-accent via-25% to-sidebar-accent"
 													: "bg-linear-to-r from-transparent from-0% via-accent via-25% to-accent",
@@ -1170,6 +1227,7 @@ export function Sidebar({
 									<div className="absolute inset-y-0 end-0.5 flex items-center gap-0.5">
 										{row.kind === "folder" &&
 											(onRevealFolder ||
+												onCopyFolderPath ||
 												onCreateFile ||
 												onCreateFolder ||
 												onRenameFolder ||
@@ -1183,6 +1241,7 @@ export function Sidebar({
 														setOpenActionsPath(open ? row.id : null)
 													}
 													onRevealFolder={onRevealFolder}
+													onCopyFolderPath={onCopyFolderPath}
 													revealLabel={revealLabel}
 													onCreateFile={(id) => void createFile(id)}
 													onCreateHtmlFile={
@@ -1229,7 +1288,8 @@ export function Sidebar({
 											</button>
 										)}
 										{row.kind === "file" &&
-											(onRevealFile ||
+											(onOpenFileInNewTab ||
+												onRevealFile ||
 												onOpenFileInDefaultApp ||
 												onCopyFilePath ||
 												onRenameFile ||
@@ -1244,6 +1304,7 @@ export function Sidebar({
 														setOpenActionsPath(open ? row.file.path : null)
 													}
 													onRevealFile={onRevealFile}
+													onOpenFileInNewTab={onOpenFileInNewTab}
 													onOpenFileInDefaultApp={onOpenFileInDefaultApp}
 													onCopyFilePath={onCopyFilePath}
 													revealLabel={revealLabel}
@@ -1287,13 +1348,22 @@ export function Sidebar({
 
 	return (
 		<SidebarFrame onCollapse={onCollapse} storageScope={storageScope}>
-			<div className="flex items-center justify-between border-b border-sidebar-border px-2.5 py-1.5">
+			<div
+				className={cn(
+					// Dashed divider only once the list scrolls beneath the header.
+					"relative flex items-center justify-between px-2.5 py-1.5 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed",
+					scrolledList === list
+						? "after:border-sidebar-border"
+						: "after:border-transparent",
+				)}
+			>
 				{header ?? (
 					<span className="text-[11px] font-medium uppercase text-muted-foreground">
 						Files
 					</span>
 				)}
-				<div className="flex shrink-0 items-center gap-1">
+				<div className="flex items-center gap-1">
+					{viewToggle}
 					{onCreateFile && (
 						<NewFileMenu
 							onCreateFile={() => void createFile(creationFolderId)}
@@ -1304,71 +1374,68 @@ export function Sidebar({
 							}
 						/>
 					)}
-					{onCreateFolder && (
-						<Button
-							variant="ghost"
-							size="icon-xs"
-							aria-label="New folder"
-							title="New folder"
-							onClick={() => void createFolder(null)}
-						>
-							<MingcuteNewFolderLine className="size-3.5" />
-						</Button>
-					)}
-					<Select.Root
-						value={sortMode}
-						onValueChange={(mode) => {
-							if (mode) onSortModeChange(mode);
-						}}
-					>
-						<Select.Trigger
-							render={
+					{children ? null : (
+						<>
+							{onCreateFolder && (
 								<Button
 									variant="ghost"
 									size="icon-xs"
-									aria-label={`Sort files: ${sortLabel}`}
-									title={`Sort files: ${sortLabel}`}
-								/>
-							}
-						>
-							{sortMode === "alpha" ? (
-								<MingcuteAzSortAscendingLettersLine className="size-3.5" />
-							) : (
-								<MingcuteSortDescendingLine className="size-3.5" />
+									aria-label="New folder"
+									title="New folder"
+									onClick={() => void createFolder(null)}
+								>
+									<MingcuteNewFolderLine className="size-3.5" />
+								</Button>
 							)}
-						</Select.Trigger>
-						<Select.Portal>
-							<Select.Positioner
-								align="end"
-								side="bottom"
-								sideOffset={4}
-								className="isolate z-50"
+							<Select.Root
+								value={sortMode}
+								onValueChange={(mode) => {
+									if (mode) onSortModeChange(mode);
+								}}
 							>
-								<Select.Popup className="z-50 w-36 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-									<SortOption value="recent" label="Recent" />
-									<SortOption value="alpha" label="Name" />
-								</Select.Popup>
-							</Select.Positioner>
-						</Select.Portal>
-					</Select.Root>
-					{hasFolders ? (
-						<Button
-							variant="ghost"
-							size="icon-xs"
-							aria-label={allFoldersActionLabel}
-							title={allFoldersActionLabel}
-							onClick={toggleAllFolders}
-						>
-							{hasExpandedFolders ? (
-								<MingcuteFoldVerticalLine className="size-3.5" />
-							) : (
-								<MingcuteUnfoldVerticalLine className="size-3.5" />
-							)}
-						</Button>
-					) : null}
+								<Select.Trigger
+									render={
+										<Button
+											variant="ghost"
+											size="icon-xs"
+											aria-label={`Sort files: ${sortLabel}`}
+											title={`Sort files: ${sortLabel}`}
+										/>
+									}
+								>
+									{sortMode === "alpha" ? (
+										<MingcuteAzSortAscendingLettersLine className="size-3.5" />
+									) : (
+										<MingcuteSortDescendingLine className="size-3.5" />
+									)}
+								</Select.Trigger>
+								<Select.Portal>
+									<Select.Positioner
+										align="end"
+										side="bottom"
+										sideOffset={4}
+										className="isolate z-50"
+									>
+										<Select.Popup className="z-50 w-36 origin-(--transform-origin) rounded-[var(--radius-popover)] border border-border bg-popover p-1 text-[11px] text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+											<SortOption value="recent" label="Recent" />
+											<SortOption value="alpha" label="Name" />
+										</Select.Popup>
+									</Select.Positioner>
+								</Select.Portal>
+							</Select.Root>
+						</>
+					)}
 				</div>
 			</div>
-			{tree}
+			<div
+				className="contents"
+				onScrollCapture={(event) => {
+					const scrolled = (event.target as HTMLElement).scrollTop > 0;
+					setScrolledList(scrolled ? list : null);
+				}}
+			>
+				{children ?? tree}
+			</div>
 			{footer ? (
 				<div
 					className={cn(
@@ -1452,7 +1519,7 @@ const DroppableSidebarNav = forwardRef<
 			role="tree"
 			className={cn(
 				"flex-1 overflow-y-auto overscroll-contain px-1.5 py-1 outline-none",
-				"rounded-[var(--radius-row)] inset-ring-1 inset-ring-transparent transition-[box-shadow] duration-150 ease-out motion-reduce:transition-none",
+				"rounded-[var(--radius-row)] inset-ring-1 inset-ring-transparent",
 				active && "inset-ring-sidebar-accent/70",
 			)}
 			tabIndex={0}
@@ -1505,7 +1572,7 @@ function DroppableRowButton({
 			style={style}
 			onClick={onClick}
 			onDoubleClick={onDoubleClick}
-			{...dragAttributes}
+			{...(enabled ? dragAttributes : {})}
 			{...dragListeners}
 		>
 			{children}
@@ -1578,10 +1645,10 @@ function FolderSegment({
 			<span
 				ref={setRefs}
 				className={cn(
-					"min-w-0 truncate rounded-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
+					"min-w-0 truncate rounded-sm",
 					active && "bg-sidebar-accent/70",
 				)}
-				{...attributes}
+				{...(enabled ? attributes : {})}
 				{...listeners}
 			>
 				{segment.name}
@@ -1890,6 +1957,7 @@ function NewFileMenu({
 	onCreateFile: () => void;
 	onCreateHtmlFile?: () => void;
 }) {
+	const newFileShortcut = useCommandShortcut("app.new-file");
 	const [open, setOpen] = useState(false);
 	return (
 		<Menu.Root open={open} onOpenChange={setOpen}>
@@ -1917,7 +1985,7 @@ function NewFileMenu({
 						<ActionItem
 							icon={<MingcuteEditLine />}
 							onClick={onCreateFile}
-							shortcut={formatCommandShortcut("app.new-file")}
+							shortcut={newFileShortcut ?? undefined}
 						>
 							New Note
 						</ActionItem>
@@ -1943,6 +2011,7 @@ function FolderActionsMenu({
 	onOpenChange,
 	selection,
 	onRevealFolder,
+	onCopyFolderPath,
 	revealLabel,
 	onCreateFile,
 	onCreateHtmlFile,
@@ -1960,6 +2029,7 @@ function FolderActionsMenu({
 	onOpenChange: (open: boolean) => void;
 	selection: SidebarActionSelection;
 	onRevealFolder?: (id: string) => void;
+	onCopyFolderPath?: (id: string) => void;
 	revealLabel?: string;
 	onCreateFile?: (id: string) => void;
 	onCreateHtmlFile?: (id: string) => void;
@@ -1971,6 +2041,9 @@ function FolderActionsMenu({
 	onTogglePinnedFile?: (path: string) => void;
 	getDisplayPath: (path: string) => string;
 }) {
+	const revealShortcut = useCommandShortcut("app.reveal");
+	const newFileShortcut = useCommandShortcut("app.new-file");
+	const deleteShortcut = useCommandShortcut("app.delete");
 	if (selection.count > 1) {
 		return (
 			<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
@@ -1994,16 +2067,24 @@ function FolderActionsMenu({
 				<ActionItem
 					icon={<MingcuteFolderOpenLine />}
 					onClick={() => onRevealFolder(id)}
-					shortcut={formatCommandShortcut("app.reveal")}
+					shortcut={revealShortcut ?? undefined}
 				>
 					{revealLabel ?? "Reveal in File Manager"}
+				</ActionItem>
+			)}
+			{onCopyFolderPath && (
+				<ActionItem
+					icon={<MingcuteCopy2Line />}
+					onClick={() => onCopyFolderPath(id)}
+				>
+					Copy folder path
 				</ActionItem>
 			)}
 			{onCreateFile && (
 				<ActionItem
 					icon={<MingcuteEditLine />}
 					onClick={() => onCreateFile(id)}
-					shortcut={formatCommandShortcut("app.new-file")}
+					shortcut={newFileShortcut ?? undefined}
 				>
 					New file
 				</ActionItem>
@@ -2036,7 +2117,7 @@ function FolderActionsMenu({
 				<ActionItem
 					destructive
 					icon={<MingcuteDeleteLine />}
-					shortcut={formatCommandShortcut("app.delete")}
+					shortcut={deleteShortcut ?? undefined}
 					onClick={() =>
 						onDeleteSelection
 							? onDeleteSelection({ files: [], folders: [id], count: 1 })
@@ -2058,6 +2139,7 @@ function FileActionsMenu({
 	onOpenChange,
 	selection,
 	onRevealFile,
+	onOpenFileInNewTab,
 	onOpenFileInDefaultApp,
 	onCopyFilePath,
 	revealLabel,
@@ -2074,6 +2156,10 @@ function FileActionsMenu({
 	onOpenChange: (open: boolean) => void;
 	selection: SidebarActionSelection;
 	onRevealFile?: (path: string) => void;
+	onOpenFileInNewTab?: (
+		path: string,
+		options?: { background: boolean },
+	) => void;
 	onOpenFileInDefaultApp?: (path: string) => void;
 	onCopyFilePath?: (path: string) => void;
 	revealLabel?: string;
@@ -2103,6 +2189,65 @@ function FileActionsMenu({
 	}
 	return (
 		<ActionsMenu label={label} open={open} onOpenChange={onOpenChange}>
+			<FileActionItems
+				file={file}
+				label={label}
+				onRevealFile={onRevealFile}
+				onOpenFileInNewTab={onOpenFileInNewTab}
+				onOpenFileInDefaultApp={onOpenFileInDefaultApp}
+				onCopyFilePath={onCopyFilePath}
+				revealLabel={revealLabel}
+				onRenameFile={onRenameFile}
+				onTogglePinnedFile={onTogglePinnedFile}
+				onDeleteFile={onDeleteFile}
+				onDeleteSelection={onDeleteSelection}
+			/>
+		</ActionsMenu>
+	);
+}
+
+type FileActionHandlers = {
+	onRevealFile?: (path: string) => void;
+	onOpenFileInNewTab?: (
+		path: string,
+		options?: { background: boolean },
+	) => void;
+	onOpenFileInDefaultApp?: (path: string) => void;
+	onCopyFilePath?: (path: string) => void;
+	revealLabel?: string;
+	onRenameFile?: (file: SidebarFile, label: string) => void;
+	onTogglePinnedFile?: (path: string) => void;
+	onDeleteFile?: (path: string) => void;
+	onDeleteSelection?: (selection: SidebarActionSelection) => void;
+};
+
+/** One file's actions; each appears only when its handler is given. */
+function FileActionItems({
+	file,
+	label,
+	onRevealFile,
+	onOpenFileInNewTab,
+	onOpenFileInDefaultApp,
+	onCopyFilePath,
+	revealLabel,
+	onRenameFile,
+	onTogglePinnedFile,
+	onDeleteFile,
+	onDeleteSelection,
+}: FileActionHandlers & { file: SidebarFile; label: string }) {
+	const revealShortcut = useCommandShortcut("app.reveal");
+	const copyPathShortcut = useCommandShortcut("app.copy-path");
+	const deleteShortcut = useCommandShortcut("app.delete");
+	return (
+		<>
+			{onOpenFileInNewTab && (
+				<ActionItem
+					icon={<MingcuteAddLine />}
+					onClick={() => onOpenFileInNewTab(file.path)}
+				>
+					Open in new tab
+				</ActionItem>
+			)}
 			{onOpenFileInDefaultApp && (
 				<ActionItem
 					icon={<MingcuteExternalLinkLine />}
@@ -2115,7 +2260,7 @@ function FileActionsMenu({
 				<ActionItem
 					icon={<MingcuteFolderOpenLine />}
 					onClick={() => onRevealFile(file.path)}
-					shortcut={formatCommandShortcut("app.reveal")}
+					shortcut={revealShortcut ?? undefined}
 				>
 					{revealLabel ?? "Reveal in File Manager"}
 				</ActionItem>
@@ -2124,7 +2269,7 @@ function FileActionsMenu({
 				<ActionItem
 					icon={<MingcuteCopy2Line />}
 					onClick={() => onCopyFilePath(file.path)}
-					shortcut={formatCommandShortcut("app.copy-path")}
+					shortcut={copyPathShortcut ?? undefined}
 				>
 					Copy file path
 				</ActionItem>
@@ -2149,7 +2294,7 @@ function FileActionsMenu({
 				<ActionItem
 					destructive
 					icon={<MingcuteDeleteLine />}
-					shortcut={formatCommandShortcut("app.delete")}
+					shortcut={deleteShortcut ?? undefined}
 					onClick={() =>
 						onDeleteSelection
 							? onDeleteSelection({ files: [file], folders: [], count: 1 })
@@ -2159,7 +2304,43 @@ function FileActionsMenu({
 					Delete
 				</ActionItem>
 			)}
-		</ActionsMenu>
+		</>
+	);
+}
+
+/**
+ * The tree's row actions for a file shown outside the tree (e.g. an inbox
+ * row): an unpin button for pinned files and the "more" menu. Both appear
+ * while a `group/sidebar-row` ancestor is hovered.
+ */
+export function SidebarFileActionsMenu({
+	open,
+	onOpenChange,
+	...items
+}: FileActionHandlers & {
+	file: SidebarFile;
+	label: string;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
+	const { file, onTogglePinnedFile } = items;
+	return (
+		<>
+			{file.pinned && onTogglePinnedFile && (
+				<button
+					type="button"
+					className={sidebarRowActionButtonClass}
+					aria-label="Unpin"
+					title="Unpin"
+					onClick={() => onTogglePinnedFile(file.path)}
+				>
+					<MingcutePinFill className="size-3.5" />
+				</button>
+			)}
+			<ActionsMenu label={items.label} open={open} onOpenChange={onOpenChange}>
+				<FileActionItems {...items} />
+			</ActionsMenu>
+		</>
 	);
 }
 
@@ -2201,6 +2382,7 @@ function BulkDeleteAction({
 	onDeleteSelection?: (selection: SidebarActionSelection) => void;
 	getDisplayPath: (path: string) => string;
 }) {
+	const deleteShortcut = useCommandShortcut("app.delete");
 	const actionable = sidebarDeleteSelection(
 		selection,
 		getDisplayPath,
@@ -2212,7 +2394,7 @@ function BulkDeleteAction({
 		<ActionItem
 			destructive
 			icon={<MingcuteDeleteLine />}
-			shortcut={formatCommandShortcut("app.delete")}
+			shortcut={deleteShortcut ?? undefined}
 			onClick={() => {
 				if (onDeleteSelection) {
 					onDeleteSelection(actionable);
@@ -2332,7 +2514,7 @@ function FileRenameInput({
 	error: string | null;
 	onChange: (value: string) => void;
 	onCancel: () => void;
-	onCommit: (focusTree?: boolean) => void;
+	onCommit: (commit: "enter" | "blur") => void;
 }) {
 	return (
 		<span className="relative flex min-w-0 flex-1 items-center">
@@ -2341,12 +2523,12 @@ function FileRenameInput({
 				aria-invalid={error ? true : undefined}
 				className="min-w-0 flex-1 rounded-none border-0 bg-muted/70 p-0 text-[13px] text-sidebar-foreground outline-none selection:bg-selected/70 selection:text-sidebar-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
 				value={value}
-				onBlur={() => onCommit()}
+				onBlur={() => onCommit("blur")}
 				onChange={(event) => onChange(event.target.value)}
 				onKeyDown={(event) => {
 					if (event.key === "Enter") {
 						event.preventDefault();
-						onCommit(true);
+						onCommit("enter");
 					} else if (event.key === "Escape") {
 						event.preventDefault();
 						onCancel();

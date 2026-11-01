@@ -18,6 +18,7 @@
 		"check:fix": "biome check . --write",
 		"release:desktop": "node scripts/release-desktop.mjs",
 		"test": "pnpm -r --if-present test",
+		"test:e2e": "pnpm build:desktop && pnpm --filter @hubble.md/desktop test:e2e",
 		"typecheck": "pnpm -r --if-present typecheck",
 		"build": "pnpm check && pnpm -r --if-present build && pnpm typecheck",
 		"build:desktop": "pnpm --filter @hubble.md/desktop... --if-present build && pnpm --filter @hubble.md/desktop... --if-present typecheck",
