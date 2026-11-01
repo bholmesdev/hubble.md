@@ -302,9 +302,9 @@ function App() {
 	const newTab = hasWorkspace ? () => openNewTabPage() : undefined;
 	const isFileOpen =
 		Boolean(state.currentPath) && !isNewTabPath(state.currentPath);
-	// A lone note folds its file info into the title bar to save a row. A blank
-	// new tab keeps the strip, so it still reads as a tab.
-	const showTabStrip = tabs.order.length > 1 || !isFileOpen;
+	// A lone tab folds the strip away to save a row: a note moves its file info
+	// into the title bar, and a blank new tab leaves just the empty state.
+	const showTabStrip = tabs.order.length > 1 || !hasWorkspace;
 	const createNewFile = () => {
 		const created = createMarkdownFile(focusedCreationFolder);
 		if (searchOpen) changeSearchOpen(false);
@@ -780,14 +780,7 @@ function App() {
 			}}
 		>
 			<WindowTitleBar
-				fileInfo={
-					showTabStrip ? undefined : (
-						<FileInfoBar
-							scrollContainer={scrollContainerEl}
-							onNewTab={newTab}
-						/>
-					)
-				}
+				singleTab={!showTabStrip}
 				allTabsOpen={allTabsOpen}
 				onAllTabsOpenChange={setAllTabsOpen}
 				showSidebarBadge={
@@ -797,7 +790,11 @@ function App() {
 						telemetryConsent === "unset")
 				}
 				onNewTab={newTab}
-			/>
+			>
+				{isFileOpen ? (
+					<FileInfoBar scrollContainer={scrollContainerEl} onNewTab={newTab} />
+				) : null}
+			</WindowTitleBar>
 			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
 				<div

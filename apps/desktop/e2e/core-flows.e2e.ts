@@ -130,14 +130,17 @@ test("shows the tab strip only while a second tab is open", async ({
 }) => {
 	const page = await hubble.launch();
 	const tabs = page.getByRole("tablist");
-	// A blank new tab keeps the strip.
-	await expect(tabs).toBeVisible();
+	const newTabButton = page.getByRole("button", { name: /^New tab/ });
+	// A lone blank new tab shows only the empty state.
+	await expect(page.getByRole("button", { name: "New HTML app" })).toBeVisible();
+	await expect(tabs).toBeHidden();
+	await expect(newTabButton).toBeHidden();
 
 	await sidebarFile(page, "existing.md").click();
 	await expect(editor(page)).toContainText("Hello");
 	await expect(tabs).toBeHidden();
 
-	await page.getByRole("button", { name: /^New tab/ }).click();
+	await newTabButton.click();
 	await expect(tabs.getByRole("tab")).toHaveCount(2);
 
 	await tabs.getByRole("button", { name: "Close New tab" }).click();

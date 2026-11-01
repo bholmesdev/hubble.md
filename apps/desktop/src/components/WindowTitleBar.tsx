@@ -36,11 +36,13 @@ export function WindowTitleBar({
 	onNewTab,
 	allTabsOpen,
 	onAllTabsOpenChange,
-	fileInfo,
+	singleTab = false,
+	children,
 }: {
 	showSidebarBadge?: boolean;
-	/** Shown in place of the tab strip while only one tab is open. */
-	fileInfo?: ReactNode;
+	/** Hides the tab strip while one tab is open; children take its place. */
+	singleTab?: boolean;
+	children?: ReactNode;
 	onNewTab?: () => void;
 	allTabsOpen: boolean;
 	onAllTabsOpenChange: (open: boolean) => void;
@@ -75,16 +77,16 @@ export function WindowTitleBar({
 	return (
 		<div
 			data-window-title-bar
-			data-single-tab={fileInfo ? "" : undefined}
-			className={`relative flex h-9 min-w-0 shrink-0 select-none items-center overflow-hidden ${fileInfo ? "bg-background" : "bg-sidebar after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border"}`}
+			data-single-tab={singleTab ? "" : undefined}
+			className={`relative flex h-9 min-w-0 shrink-0 select-none items-center overflow-hidden ${singleTab ? "bg-background" : "bg-sidebar after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border"}`}
 			style={dragRegionStyle}
 		>
 			<div
-				className={`flex min-w-0 items-center self-stretch ${spansSidebar ? "gap-2 pe-2.5" : hasTabs && !fileInfo ? "pe-4" : ""} ${fileInfo && spansSidebar ? "border-e border-sidebar-border bg-sidebar" : ""}`}
+				className={`flex min-w-0 items-center self-stretch ${spansSidebar ? "gap-2 pe-2.5" : hasTabs && !singleTab ? "pe-4" : ""} ${singleTab && spansSidebar ? "border-e border-sidebar-border bg-sidebar" : ""}`}
 				style={{
 					flex: spansSidebar
 						? "0 0 var(--sidebar-width, 220px)"
-						: fileInfo
+						: singleTab
 							? "0 0 auto"
 							: `0 100 ${hasTabs ? 114 : 98}px`,
 					paddingInlineStart: isFullScreen ? 0 : START_INSET,
@@ -111,9 +113,9 @@ export function WindowTitleBar({
 					</div>
 				) : null}
 			</div>
-			{fileInfo ? (
+			{singleTab ? (
 				<div className="flex min-w-0 flex-1 flex-col self-stretch">
-					{fileInfo}
+					{children}
 				</div>
 			) : (
 				<>
