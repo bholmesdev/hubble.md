@@ -161,34 +161,16 @@ export function useSidebarTree({
 	const collapseFolder = (id: string) => setExpanded(id, false);
 	const toggleFolder = (id: string) =>
 		setExpanded(id, !expandedFolders.has(id));
-	// A null id means the workspace root. Ids are display paths, so nested
-	// folders share their parent's id as a prefix.
-	const subfolderIds = (id: string | null) =>
-		folderIds.filter((folderId) => id === null || isSubfolder(folderId, id));
-	const hasSubfolders = (id: string) => subfolderIds(id).length > 0;
-	const setSubfoldersExpanded = (id: string | null, expanded: boolean) => {
-		const subfolders = subfolderIds(id);
+	const setAllFoldersExpanded = (expanded: boolean) => {
 		startTransition(() => {
-			setExpandedState((current) => {
-				const next = new Set(
-					current.key === storageKey
-						? current.folders
-						: readExpandedFolders(storageKey),
-				);
-				// Expanding a folder's subfolders only shows them if it is open too.
-				if (expanded && id !== null) next.add(id);
-				for (const folderId of subfolders) {
-					if (expanded) next.add(folderId);
-					else next.delete(folderId);
-				}
-				return { key: storageKey, folders: next };
+			setExpandedState({
+				key: storageKey,
+				folders: expanded ? new Set(folderIds) : new Set(),
 			});
 		});
 	};
 
-	const onAllFoldersExpanded = useEffectEvent((expanded: boolean) =>
-		setSubfoldersExpanded(null, expanded),
-	);
+	const onAllFoldersExpanded = useEffectEvent(setAllFoldersExpanded);
 	useEffect(() => {
 		const listener = (expanded: boolean) => onAllFoldersExpanded(expanded);
 		allFoldersListeners.add(listener);
@@ -200,9 +182,7 @@ export function useSidebarTree({
 	return {
 		collapseFolder,
 		expandFolder,
-		hasSubfolders,
 		rows,
-		setSubfoldersExpanded,
 		toggleFolder,
 	};
 }
@@ -266,10 +246,6 @@ function ensureFolder(parent: FolderNode, name: string): FolderNode {
 		parent.folders.set(name, folder);
 	}
 	return folder;
-}
-
-function isSubfolder(folderId: string, parentId: string) {
-	return folderId !== parentId && folderId.startsWith(parentId);
 }
 
 function getFolderIds(tree: FolderNode, uncompactFolderId: string | null) {
