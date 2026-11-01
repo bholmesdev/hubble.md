@@ -145,7 +145,8 @@ const otherUnavailableBindings = bindingSet([
 export function validateShortcutBinding(binding: string, mac = isMac()) {
 	const sortedBinding = sortCommandBinding(binding);
 	const parts = sortedBinding.split("+");
-	if (parts.some((part) => part.length === 0)) {
+	// Electron rejects accelerators with non-ASCII keys, such as Æ from Option+'.
+	if (parts.some((part) => part.length === 0 || /[^\x20-\x7e]/.test(part))) {
 		return "That key cannot be used in a Hubble shortcut.";
 	}
 	if (parts.includes("Super")) {
@@ -187,11 +188,26 @@ export function shortcutBindingFromEvent(
 		ArrowRight: "Right",
 		ArrowUp: "Up",
 	};
+	// Read punctuation by physical key: Option and Shift change event.key
+	// (Option+[ types “), which Electron can't use as an accelerator.
+	const punctuationKeys: Record<string, string> = {
+		Backquote: "`",
+		Backslash: "\\",
+		BracketLeft: "[",
+		BracketRight: "]",
+		Comma: ",",
+		Equal: "=",
+		Minus: "-",
+		Period: ".",
+		Quote: "'",
+		Semicolon: ";",
+		Slash: "/",
+	};
 	const key = /^Key[A-Z]$/.test(event.code)
 		? event.code.slice(3)
 		: /^Digit[0-9]$/.test(event.code)
 			? event.code.slice(5)
-			: (keyAliases[event.key] ?? event.key);
+			: (punctuationKeys[event.code] ?? keyAliases[event.key] ?? event.key);
 	if (["Alt", "Control", "Meta", "Shift"].includes(key)) return null;
 
 	const parts: string[] = [];
