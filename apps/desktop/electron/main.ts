@@ -101,6 +101,11 @@ const { autoUpdater } = electronUpdater;
 const devAppName = isDev ? process.env.HUBBLE_DESKTOP_DEV_APP_NAME : undefined;
 const appName = devAppName ?? "Hubble";
 const debugPort = process.env.HUBBLE_DESKTOP_DEBUG_PORT ?? "9222";
+// Agents and e2e runs set this so the app runs without ever showing a window
+// or taking focus from whatever the user is working in. They drive the
+// renderer over CDP, which works on a hidden window.
+const launchInBackground =
+	isDev && process.env.HUBBLE_DESKTOP_BACKGROUND === "1";
 const updateFeedUrl = process.env.HUBBLE_DESKTOP_UPDATE_URL;
 const supportsAutoUpdates = !isDev && process.platform === "darwin";
 const updateCheckErrorMessage =
@@ -150,6 +155,11 @@ const telemetry = new TelemetryManager({
 if (isDev && process.env.HUBBLE_DESKTOP_ENABLE_CDP === "1") {
 	app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
 	app.commandLine.appendSwitch("remote-debugging-port", debugPort);
+}
+
+// No Dock icon or app switcher entry, so macOS never brings the app forward.
+if (launchInBackground && process.platform === "darwin") {
+	app.setActivationPolicy("accessory");
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -1295,6 +1305,8 @@ async function createWindow() {
 			// either one from main after load would need a round-trip the window
 			// then has to wait on.
 			zoomFactor,
+			// A hidden window is otherwise throttled like a background tab.
+			backgroundThrottling: !launchInBackground,
 			additionalArguments: [
 				`--hubble-traffic-light-inset=${trafficLightInsetForZoom(zoomFactor)}`,
 			],
@@ -1321,13 +1333,15 @@ async function createWindow() {
 	});
 	window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 	registerContextMenu(window);
-	if (windowState.isFullScreen) {
-		window.setFullScreen(true);
-	} else if (windowState.isMaximized) {
-		window.maximize();
+	if (!launchInBackground) {
+		if (windowState.isFullScreen) {
+			window.setFullScreen(true);
+		} else if (windowState.isMaximized) {
+			window.maximize();
+		}
+		// Show the themed window while the renderer loads.
+		window.show();
 	}
-	// Show the themed window while the renderer loads.
-	window.show();
 
 	window.on("focus", () => sendToRenderer("desktop:window-focus"));
 	if (process.platform === "darwin") {
@@ -2127,11 +2141,13 @@ function openFile(openPath: string) {
 		if (appBootstrapped) void ensureMainWindow();
 		return;
 	}
-	if (mainWindow.isMinimized()) mainWindow.restore();
-	mainWindow.show();
-	// Window focus alone cannot take keyboard focus from another app on macOS.
-	app.focus({ steal: true });
-	mainWindow.focus();
+	if (!launchInBackground) {
+		if (mainWindow.isMinimized()) mainWindow.restore();
+		mainWindow.show();
+		// Window focus alone cannot take keyboard focus from another app on macOS.
+		app.focus({ steal: true });
+		mainWindow.focus();
+	}
 	sendToRenderer("desktop:open-file", toRendererPath(openPath));
 }
 
