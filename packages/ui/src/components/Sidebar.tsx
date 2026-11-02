@@ -414,7 +414,6 @@ export function Sidebar({
 	sortMode,
 	storageScope,
 	header,
-	viewToggle,
 	children,
 	footer,
 	emptyState,
@@ -449,8 +448,6 @@ export function Sidebar({
 	/** Stable key used to persist folder expansion for one workspace/open folder. */
 	storageScope?: string | null;
 	header?: ReactNode;
-	/** Switches between views of the files, shown before the file actions. */
-	viewToggle?: ReactNode;
 	/** Replaces the file tree, e.g. with another view over the same files. */
 	children?: ReactNode;
 	footer?: ReactNode;
@@ -1363,7 +1360,6 @@ export function Sidebar({
 					</span>
 				)}
 				<div className="flex items-center gap-1">
-					{viewToggle}
 					{onCreateFile && (
 						<NewFileMenu
 							onCreateFile={() => void createFile(creationFolderId)}

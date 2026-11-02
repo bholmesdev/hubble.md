@@ -11,6 +11,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- In narrow windows, the sidebar now slides in over the whole window, keeping the Folders and Inbox buttons in the title bar where they sit in wide windows. [#331](https://github.com/bholmesdev/hubble.md/pull/331)
+
 ### Fixed
 
 ## [0.3.3] - 2026-10-31

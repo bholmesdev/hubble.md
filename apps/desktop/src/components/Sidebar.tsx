@@ -27,7 +27,6 @@ import {
 	renameFolder,
 	renameMarkdownFile,
 	setSidebarOpen,
-	setSidebarView,
 	setSortMode,
 	togglePinnedNote,
 } from "../store/actions";
@@ -37,7 +36,7 @@ import {
 	sidebarViewStore,
 	workspaceStore,
 } from "../store/state";
-import { InboxView, SidebarViewToggle } from "./InboxView";
+import { InboxView } from "./InboxView";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export type DesktopSidebarFocus = {
@@ -141,12 +140,6 @@ export function Sidebar({
 			sortMode={sortMode}
 			storageScope={workspacePath}
 			header={<WorkspaceSwitcher />}
-			// Wide windows show the view toggle in the title bar above the sidebar.
-			viewToggle={
-				compact ? (
-					<SidebarViewToggle view={sidebarView} onChange={setSidebarView} />
-				) : undefined
-			}
 			footer={footer}
 			getDisplayPath={relativePath}
 			onCollapse={collapseSidebar}

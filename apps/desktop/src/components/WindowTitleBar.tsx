@@ -82,7 +82,8 @@ export function WindowTitleBar({
 					data-sidebar-toggle
 					variant="ghost"
 					size="icon-sm"
-					className="relative"
+					// Stays above the compact sidebar overlay, which covers the title bar.
+					className="relative z-40"
 					style={noDragStyle}
 					onClick={toggleSidebar}
 					aria-label="Toggle sidebar"
@@ -119,6 +120,32 @@ export function WindowTitleBar({
 				className="shrink-0"
 				style={{ inlineSize: isFullScreen ? 0 : END_INSET }}
 			/>
+		</div>
+	);
+}
+
+/**
+ * Title row for the compact sidebar overlay, which covers the title bar. It
+ * mirrors the title bar's start inset so the view toggle sits where the docked
+ * sidebar shows it.
+ */
+export function SidebarOverlayTitleRow() {
+	const sidebarView = useStoreValue(sidebarViewStore);
+	const isFullScreen = useIsFullScreen();
+	return (
+		<div
+			className="flex h-9 shrink-0 items-center gap-2 border-e border-sidebar-border pe-2.5"
+			style={{
+				...dragRegionStyle,
+				paddingInlineStart: isFullScreen ? 0 : START_INSET,
+			}}
+		>
+			{/* Electron applies app regions in DOM order, so this row's drag region
+			 * would swallow clicks on the sidebar toggle beneath without a hole. */}
+			<div className="size-7 shrink-0" style={noDragStyle} />
+			<div className="ms-auto flex min-w-0" style={noDragStyle}>
+				<SidebarViewToggle view={sidebarView} onChange={setSidebarView} />
+			</div>
 		</div>
 	);
 }
