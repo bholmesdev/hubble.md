@@ -2,11 +2,17 @@ import { useCommandShortcut } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { type ReactNode, useEffect, useRef } from "react";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
+import MingcuteDrawingBoardLine from "~icons/mingcute/drawing-board-line";
 import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteFileNewLine from "~icons/mingcute/file-new-line";
 import MingcuteSearchLine from "~icons/mingcute/search-line";
-import { createHtmlFile, createMarkdownFile } from "../fileActions";
 import {
+	createDiagramFile,
+	createHtmlFile,
+	createMarkdownFile,
+} from "../fileActions";
+import {
+	DIAGRAMS_ENABLED,
 	dirname,
 	fileStem,
 	hasDocumentExtension,
@@ -96,6 +102,13 @@ export function NewTabPage({
 						label="New HTML app"
 						onClick={() => void createHtmlFile(folder)}
 					/>
+					{DIAGRAMS_ENABLED && (
+						<NewTabAction
+							icon={<MingcuteDrawingBoardLine className="size-4" />}
+							label="New diagram"
+							onClick={() => void createDiagramFile(folder)}
+						/>
+					)}
 				</section>
 				{recent.length > 0 && (
 					<section className="flex flex-col gap-1">

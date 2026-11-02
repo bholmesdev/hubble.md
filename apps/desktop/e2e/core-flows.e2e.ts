@@ -157,11 +157,12 @@ test("draws a shape in a diagram and saves it", async ({ hubble }) => {
 
 	// Builds without a tldraw license key leave diagrams out, and opening a
 	// .tldr file there hands it to another app.
-	await page.getByRole("button", { name: "New file" }).click();
+	await expect(
+		page.getByRole("button", { name: "New HTML app" }),
+	).toBeVisible();
 	const diagramsEnabled = await page
-		.getByRole("menuitem", { name: "New Diagram" })
+		.getByRole("button", { name: "New diagram" })
 		.isVisible();
-	await page.keyboard.press("Escape");
 	test.skip(!diagramsEnabled, "This build has no tldraw license key.");
 
 	await sidebarFile(page, "flow.tldr").click();
