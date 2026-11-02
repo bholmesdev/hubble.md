@@ -132,7 +132,9 @@ test("shows the tab strip only while a second tab is open", async ({
 	const tabs = page.getByRole("tablist");
 	const newTabButton = page.getByRole("button", { name: /^New tab/ });
 	// A lone blank new tab shows only the empty state.
-	await expect(page.getByRole("button", { name: "New HTML app" })).toBeVisible();
+	await expect(
+		page.getByRole("button", { name: "New HTML app" }),
+	).toBeVisible();
 	await expect(tabs).toBeHidden();
 	await expect(newTabButton).toBeHidden();
 
