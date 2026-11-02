@@ -24,7 +24,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
-- With a single tab open, the tab bar folds away and the note's title row moves to the top of the window, freeing up vertical space. A + button past the note menu opens a new tab, and the tab bar slides back in once a second tab opens. A lone blank tab shows just the new tab menu. Toggle terminal now lives in the note menu. Thanks [@sebastiansandqvist](https://github.com/sebastiansandqvist) for the suggestion! [#330](https://github.com/bholmesdev/hubble.md/pull/330)
+- With a single tab open, the tab bar folds away and the note's title row moves to the top of the window, freeing up vertical space. Thanks [@sebastiansandqvist](https://github.com/sebastiansandqvist) for the suggestion! [#330](https://github.com/bholmesdev/hubble.md/pull/330)
 - New tabs now open a new tab menu to easily create files, find recent notes, and search. [#329](https://github.com/bholmesdev/hubble.md/pull/329)
 - Hover and selection highlights, and buttons that show on hover like the sidebar's ⋯ menu, now appear instantly instead of fading. Thanks [@n00ki](https://github.com/n00ki)! [#327](https://github.com/bholmesdev/hubble.md/pull/327)
 
