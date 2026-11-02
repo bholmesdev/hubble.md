@@ -1,6 +1,6 @@
 import { TabStrip, type TabStripItem } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import type { RefObject } from "react";
+import { type RefObject, useState } from "react";
 import { fileStem, relativeWorkspacePath } from "../lib/filePath";
 import { isVirtualPath } from "../lib/newTabPage";
 import {
@@ -23,6 +23,7 @@ export function DocumentTabs({
 	showStartDivider,
 	onCollapsedChange,
 	collapseTargetRef,
+	leaving = false,
 }: {
 	onNewTab?: () => void;
 	newTabTitle?: string;
@@ -30,8 +31,13 @@ export function DocumentTabs({
 	showStartDivider: boolean;
 	onCollapsedChange: (collapsed: boolean) => void;
 	collapseTargetRef: RefObject<HTMLButtonElement | null>;
+	/** The strip is sliding away; keep the tabs it showed, closed one included. */
+	leaving?: boolean;
 }) {
-	const tabs = useStoreValue(tabsStore);
+	const currentTabs = useStoreValue(tabsStore);
+	const [shownTabs, setShownTabs] = useState(currentTabs);
+	if (!leaving && shownTabs !== currentTabs) setShownTabs(currentTabs);
+	const tabs = leaving ? shownTabs : currentTabs;
 	const workspacePath = useStoreValue(workspacePathStore);
 	const labels = tabLabels(tabs);
 	const items: TabStripItem[] = tabs.order.map((id) => {

@@ -1,6 +1,12 @@
 import { Button, useCommandShortcutLabel } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import {
+	type CSSProperties,
+	type ReactNode,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import MingcuteLayoutLeftLine from "~icons/mingcute/layout-left-line";
 import { desktopApi } from "../desktopApi";
 import { useCompactWindow } from "../lib/layout";
@@ -30,8 +36,16 @@ export function WindowTitleBar({
 	onNewTab,
 	allTabsOpen,
 	onAllTabsOpenChange,
+	singleTab = false,
+	tabStripLeaving = false,
+	children,
 }: {
 	showSidebarBadge?: boolean;
+	/** Hides the tab strip while one tab is open; children take its place. */
+	singleTab?: boolean;
+	/** The strip is sliding out; its tabs hold still until it's gone. */
+	tabStripLeaving?: boolean;
+	children?: ReactNode;
 	onNewTab?: () => void;
 	allTabsOpen: boolean;
 	onAllTabsOpenChange: (open: boolean) => void;
@@ -50,6 +64,11 @@ export function WindowTitleBar({
 		"app.toggle-sidebar",
 	);
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
+	const startInset = isFullScreen ? "0px" : START_INSET;
+	const endInset = isFullScreen ? "0px" : END_INSET;
+	// A lone tab's row spans the whole bar so its title centers on the window;
+	// the sidebar toggle floats over its start unless the sidebar header holds it.
+	const overlayToggle = singleTab && !spansSidebar;
 
 	function handleTabsCollapsedChange(collapsed: boolean) {
 		if (
@@ -66,16 +85,29 @@ export function WindowTitleBar({
 	return (
 		<div
 			data-window-title-bar
-			className="relative flex h-9 min-w-0 shrink-0 select-none items-center overflow-hidden bg-sidebar after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border"
-			style={dragRegionStyle}
+			data-single-tab={singleTab ? "" : undefined}
+			data-tab-strip={singleTab ? undefined : ""}
+			className={`relative flex h-9 min-w-0 shrink-0 select-none items-center overflow-hidden ${singleTab ? "bg-background" : "bg-sidebar after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border"}`}
+			style={{
+				...dragRegionStyle,
+				...(singleTab && {
+					"--title-bar-start": overlayToggle
+						? `calc(${startInset} + 28px)`
+						: "0px",
+					"--title-bar-end": endInset,
+				}),
+			}}
 		>
 			<div
-				className={`flex min-w-0 items-center ${spansSidebar ? "gap-2 pe-2.5" : hasTabs ? "pe-4" : ""}`}
+				data-title-bar-start
+				className={`flex min-w-0 items-center self-stretch ${overlayToggle ? "absolute inset-y-0 start-0 z-40" : ""} ${spansSidebar ? `relative z-10 gap-2 bg-sidebar pe-2.5 ${singleTab ? "border-e border-sidebar-border" : ""}` : hasTabs && !singleTab ? "pe-4" : ""}`}
 				style={{
 					flex: spansSidebar
 						? "0 0 var(--sidebar-width, 220px)"
-						: `0 100 ${hasTabs ? 114 : 98}px`,
-					paddingInlineStart: isFullScreen ? 0 : START_INSET,
+						: singleTab
+							? "0 0 auto"
+							: `0 100 ${hasTabs ? 114 : 98}px`,
+					paddingInlineStart: startInset,
 				}}
 			>
 				<Button
@@ -100,26 +132,37 @@ export function WindowTitleBar({
 					</div>
 				) : null}
 			</div>
-			{/* Overlap the sidebar seam; the active tab covers the inset divider. */}
-			<div ref={tabAreaRef} className="-ms-px flex min-w-0 flex-1 self-stretch">
-				<DocumentTabs
-					onNewTab={onNewTab}
-					newTabTitle={newTabTitle}
-					flushStart={sidebarOpen && !compact}
-					showStartDivider={!sidebarOpen}
-					onCollapsedChange={handleTabsCollapsedChange}
-					collapseTargetRef={allTabsButtonRef}
-				/>
-			</div>
-			<AllTabsMenu
-				open={allTabsOpen}
-				onOpenChange={onAllTabsOpenChange}
-				triggerRef={allTabsButtonRef}
-			/>
-			<div
-				className="shrink-0"
-				style={{ inlineSize: isFullScreen ? 0 : END_INSET }}
-			/>
+			{singleTab ? (
+				<div className="flex min-w-0 flex-1 flex-col self-stretch">
+					{children}
+				</div>
+			) : (
+				<>
+					{/* Overlap the sidebar seam; the active tab covers the inset divider. */}
+					<div
+						ref={tabAreaRef}
+						className="-ms-px flex min-w-0 flex-1 self-stretch"
+					>
+						<DocumentTabs
+							onNewTab={onNewTab}
+							newTabTitle={newTabTitle}
+							flushStart={sidebarOpen && !compact}
+							showStartDivider={!sidebarOpen}
+							onCollapsedChange={handleTabsCollapsedChange}
+							collapseTargetRef={allTabsButtonRef}
+							leaving={tabStripLeaving}
+						/>
+					</div>
+					<AllTabsMenu
+						open={allTabsOpen}
+						onOpenChange={onAllTabsOpenChange}
+						triggerRef={allTabsButtonRef}
+					/>
+				</>
+			)}
+			{singleTab ? null : (
+				<div className="shrink-0" style={{ inlineSize: endInset }} />
+			)}
 		</div>
 	);
 }

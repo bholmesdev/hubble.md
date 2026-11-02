@@ -124,3 +124,28 @@ test("reopens the workspace and note after relaunch", async ({ hubble }) => {
 	await expect(sidebarFile(page, "existing.md")).toBeVisible();
 	await expect(editor(page)).toContainText("Hello");
 });
+
+test("shows the tab strip only while a second tab is open", async ({
+	hubble,
+}) => {
+	const page = await hubble.launch();
+	const tabs = page.getByRole("tablist");
+	const newTabButton = page.getByRole("button", { name: /^New tab/ });
+	// A lone blank new tab shows only the empty state.
+	await expect(
+		page.getByRole("button", { name: "New HTML app" }),
+	).toBeVisible();
+	await expect(tabs).toBeHidden();
+	await expect(newTabButton).toBeHidden();
+
+	await sidebarFile(page, "existing.md").click();
+	await expect(editor(page)).toContainText("Hello");
+	await expect(tabs).toBeHidden();
+
+	await newTabButton.click();
+	await expect(tabs.getByRole("tab")).toHaveCount(2);
+
+	await tabs.getByRole("button", { name: "Close New tab" }).click();
+	await expect(tabs).toBeHidden();
+	await expect(editor(page)).toContainText("Hello");
+});

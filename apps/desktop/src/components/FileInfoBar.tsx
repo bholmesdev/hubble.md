@@ -10,8 +10,9 @@ import {
 	useCommandShortcutLabel,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { toast } from "sonner";
+import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteArrowLeftLine from "~icons/mingcute/arrow-left-line";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
@@ -59,13 +60,18 @@ import {
 } from "../store/state";
 import { ClaudeLogo, CodexLogo } from "./AgentLogos";
 
+const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
+
 const menuItemClass =
 	"flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent";
 
 export function FileInfoBar({
 	scrollContainer,
+	onNewTab,
 }: {
 	scrollContainer: HTMLDivElement | null;
+	/** Set while the tab strip is hidden, so a new tab stays one click away. */
+	onNewTab?: () => void;
 }) {
 	const workspacePath = useStoreValue(workspacePathStore);
 	const currentPath = useStoreValue(currentPathStore);
@@ -73,6 +79,7 @@ export function FileInfoBar({
 	const titlePath = filePathForTitlePreview(currentPath, titlePreview);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const compact = useCompactWindow();
+	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
 	const [showBorder, setShowBorder] = useState(false);
 
 	useEffect(() => {
@@ -105,16 +112,28 @@ export function FileInfoBar({
 				}
 			: null;
 
+	// Equal side columns center the title; each side still fits its controls,
+	// including the window controls it clears in the title bar.
 	return (
 		<div
 			key={currentPath ?? "empty"}
 			data-file-info-bar
-			className={`relative flex h-9 min-w-0 shrink-0 items-center overflow-hidden px-3 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
+			className={`relative grid h-9 min-w-0 shrink-0 grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center overflow-hidden select-none ${onNewTab ? "px-2" : "px-3"} after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
 		>
-			<div className="flex flex-[0_100_114px] items-center pe-4">
-				{compact ? null : <NavigationControls />}
+			<div
+				className="flex items-center pe-4"
+				style={{ paddingInlineStart: "var(--title-bar-start, 0px)" }}
+			>
+				{compact ? null : (
+					<div data-file-info-nav style={noDragStyle}>
+						<NavigationControls />
+					</div>
+				)}
 			</div>
-			<div className="flex min-w-0 flex-auto items-center justify-center gap-1 [&>button]:px-0 [&>input]:px-0">
+			<div
+				data-file-info-title
+				className="flex min-w-0 items-center justify-center gap-1 [&>button]:px-0 [&>button]:[-webkit-app-region:no-drag] [&>input]:px-0 [&>input]:[-webkit-app-region:no-drag]"
+			>
 				{folder ? (
 					<>
 						<span
@@ -140,34 +159,39 @@ export function FileInfoBar({
 					}
 				/>
 			</div>
-			<div className="flex flex-[0_100_114px] items-center justify-end ps-2">
-				<div className="flex items-center gap-1">
-					{!compact && (
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label="Toggle terminal"
-							title="Toggle terminal"
-							onClick={toggleTerminal}
-						>
-							<MingcuteTerminalLine className="size-3.5" />
-						</Button>
-					)}
-					{comments ? <ReviewCommentSummary {...comments} /> : null}
-					{(compact || actionPath) && (
+			<div
+				className="flex items-center justify-end ps-2"
+				style={{ paddingInlineEnd: "var(--title-bar-end, 0px)" }}
+			>
+				<div className="flex items-center gap-1" style={noDragStyle}>
+					<div data-file-info-actions className="flex items-center gap-1">
+						{comments ? <ReviewCommentSummary {...comments} /> : null}
 						<ActionsMenu
 							path={actionPath}
 							canDelete={Boolean(
 								actionPath && isInWorkspace(actionPath, workspacePath ?? null),
 							)}
-							showTerminal={compact}
 							workspacePath={
 								workspacePath && actionPath && isEditableFile(actionPath)
 									? workspacePath
 									: null
 							}
 						/>
-					)}
+					</div>
+					{onNewTab ? (
+						<>
+							<span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={newTabTitle}
+								title={newTabTitle}
+								onClick={onNewTab}
+							>
+								<MingcuteAddLine className="size-4" />
+							</Button>
+						</>
+					) : null}
 				</div>
 			</div>
 		</div>
@@ -208,12 +232,10 @@ function ActionsMenu({
 	path,
 	canDelete,
 	workspacePath,
-	showTerminal,
 }: {
 	path: string | null;
 	canDelete: boolean;
 	workspacePath: string | null;
-	showTerminal: boolean;
 }) {
 	const { viewMode } = useStoreValue(viewerStore);
 	const isSourceMode = viewMode === "source";
@@ -286,16 +308,12 @@ function ActionsMenu({
 					className="isolate z-50"
 				>
 					<Menu.Popup className="z-50 w-52 origin-(--transform-origin) rounded-sm border border-border bg-popover p-1 text-[11px] text-popover-foreground outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
-						{showTerminal && (
-							<>
-								<Menu.Item className={menuItemClass} onClick={toggleTerminal}>
-									<MingcuteTerminalLine className="size-3 shrink-0" />
-									<span className="min-w-0 flex-1">Toggle terminal</span>
-									<ShortcutHint commandId="app.toggle-terminal" />
-								</Menu.Item>
-								<Menu.Separator className="my-1 h-px bg-border" />
-							</>
-						)}
+						<Menu.Item className={menuItemClass} onClick={toggleTerminal}>
+							<MingcuteTerminalLine className="size-3 shrink-0" />
+							<span className="min-w-0 flex-1">Toggle terminal</span>
+							<ShortcutHint commandId="app.toggle-terminal" />
+						</Menu.Item>
+						{path ? <Menu.Separator className="my-1 h-px bg-border" /> : null}
 						{path && workspacePath && (
 							<>
 								<Menu.Item

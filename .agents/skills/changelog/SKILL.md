@@ -17,9 +17,25 @@ the entry now while the change is fresh.
    - `Fixed` — bug fixes.
 3. Write it for a user reading release notes, not as a commit message:
    - One line, present tense.
+   - Lead with the user value: what they can now do, or what got better.
+     Stop there. Leave out how it works, even when it's user-visible: button
+     placement, animations, edge cases, which menu something moved to. The
+     user finds those details by using the feature.
    - Describe the effect, not the implementation or file paths.
    - Skip internal-only churn (refactors, deps, CI, tests) unless it changes
      what the user experiences.
+
+   Too detailed:
+
+   > With a single tab open, the tab bar folds away and the note's title row
+   > moves to the top of the window, freeing up vertical space. A + button
+   > past the note menu opens a new tab, and the tab bar slides back in once a
+   > second tab opens. Toggle terminal now lives in the note menu.
+
+   Right:
+
+   > With a single tab open, the tab bar folds away and the note's title row
+   > moves to the top of the window, freeing up vertical space.
 4. Link the PR for every entry (not the issue).
 5. Credit the contributor. Every entry from someone other than `bholmesdev`
    gets a thank you, including when you are that contributor writing your own
