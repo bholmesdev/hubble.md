@@ -47,7 +47,10 @@ import { TelemetryConsentCallout } from "./components/TelemetrySection";
 import { TerminalPanel } from "./components/TerminalPanel";
 import { SidebarCallout } from "./components/UpdatesSection";
 import { WelcomeScreen } from "./components/WelcomeScreen";
-import { WindowTitleBar } from "./components/WindowTitleBar";
+import {
+	SidebarOverlayTitleRow,
+	WindowTitleBar,
+} from "./components/WindowTitleBar";
 import { desktopApi } from "./desktopApi";
 import type { DesktopUpdateState } from "./desktopApi/types";
 import { createEmbedExtension } from "./editor/EmbedExtension";
@@ -195,8 +198,9 @@ async function openFilePicker() {
 	}
 }
 
+// Covers the title bar too, so the view toggle sits where the docked sidebar puts it.
 const SIDEBAR_OVERLAY =
-	"max-sm:absolute max-sm:top-px max-sm:bottom-0 max-sm:start-0 max-sm:z-30 max-sm:flex max-sm:shadow-overlay max-sm:transition-transform max-sm:motion-reduce:transition-none";
+	"max-sm:absolute max-sm:inset-y-0 max-sm:start-0 max-sm:z-30 max-sm:flex max-sm:flex-col max-sm:bg-sidebar max-sm:shadow-overlay max-sm:transition-transform max-sm:motion-reduce:transition-none";
 const SIDEBAR_OVERLAY_SHOWN =
 	"contents max-sm:translate-x-0 max-sm:duration-[180ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
 const SIDEBAR_OVERLAY_HIDDEN =
@@ -807,7 +811,7 @@ function App() {
 
 	return (
 		<main
-			className="flex h-dvh flex-col bg-background text-foreground"
+			className="relative flex h-dvh flex-col bg-background text-foreground"
 			onPointerDownCapture={(event) => {
 				if (
 					event.target instanceof Element &&
@@ -847,7 +851,8 @@ function App() {
 					<FileInfoBar scrollContainer={scrollContainerEl} onNewTab={newTab} />
 				) : null}
 			</WindowTitleBar>
-			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px">
+			{/* Compact windows anchor the sidebar overlay to the window instead. */}
+			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px max-sm:static">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
 				<div
 					data-sidebar-overlay
@@ -855,6 +860,7 @@ function App() {
 					inert={!sidebarOpen}
 					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
 				>
+					{compact ? <SidebarOverlayTitleRow /> : null}
 					<Sidebar
 						onFocusedItemChange={updateFocusedSidebarItem}
 						footer={
