@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  keymatch@1.0.5: d054585b53c9070585af527a4f5238d0bd3a70c5cc5c5f77cb685965eed0b882
+
 importers:
 
   .:
@@ -76,7 +79,7 @@ importers:
         version: 7.0.5
       keymatch:
         specifier: ^1.0.5
-        version: 1.0.5
+        version: 1.0.5(patch_hash=d054585b53c9070585af527a4f5238d0bd3a70c5cc5c5f77cb685965eed0b882)
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0
@@ -468,7 +471,7 @@ importers:
         version: 11.11.1
       keymatch:
         specifier: ^1.0.5
-        version: 1.0.5
+        version: 1.0.5(patch_hash=d054585b53c9070585af527a4f5238d0bd3a70c5cc5c5f77cb685965eed0b882)
       lowlight:
         specifier: ^3.3.0
         version: 3.3.0
@@ -9287,7 +9290,7 @@ snapshots:
     optionalDependencies:
       graceful-fs: 4.2.11
 
-  keymatch@1.0.5: {}
+  keymatch@1.0.5(patch_hash=d054585b53c9070585af527a4f5238d0bd3a70c5cc5c5f77cb685965eed0b882): {}
 
   keyv@4.5.4:
     dependencies:

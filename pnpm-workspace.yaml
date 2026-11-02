@@ -21,3 +21,6 @@ allowBuilds:
   msw: true
   sharp: true
   node-pty: true
+
+patchedDependencies:
+  keymatch@1.0.5: patches/keymatch@1.0.5.patch
