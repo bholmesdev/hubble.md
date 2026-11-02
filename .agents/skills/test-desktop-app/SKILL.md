@@ -5,7 +5,7 @@ description: Use when testing the Hubble Electron desktop app, especially when i
 
 # Test Desktop App
 
-1. Run `HUBBLE_DESKTOP_ENABLE_CDP=1 pnpm dev:desktop`.
+1. Run `HUBBLE_DESKTOP_BACKGROUND=1 HUBBLE_DESKTOP_ENABLE_CDP=1 pnpm dev:desktop`. `HUBBLE_DESKTOP_BACKGROUND=1` keeps the window hidden so it never covers or takes focus from the user's screen; drive it over CDP.
 2. Read the terminal output for:
    - `Playground: <path>`
    - `DevTools listening on ws://127.0.0.1:9222/...`
