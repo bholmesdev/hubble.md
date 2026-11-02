@@ -175,3 +175,87 @@
 		);
 	}
 }
+
+/* The tab strip's title bar slides in when a second tab opens and back out
+ * when one tab is left, carrying its divider so the active tab always covers
+ * it. The sidebar toggle stays put. The file info row moves with the strip:
+ * down below it, or up into the title bar, sliding in or out when only one
+ * side of the switch has it. */
+[data-tab-strip-transition] {
+	[data-tab-strip] {
+		view-transition-name: tab-strip;
+	}
+	[data-title-bar-start] {
+		view-transition-name: title-bar-start;
+	}
+	[data-sidebar-toggle] {
+		view-transition-name: sidebar-toggle;
+	}
+	[data-file-info-bar] {
+		view-transition-name: file-info-bar;
+	}
+	/* Its parts sit differently in each spot, so they glide on their own. */
+	[data-file-info-nav] {
+		view-transition-name: file-info-nav;
+	}
+	[data-file-info-title] {
+		view-transition-name: file-info-title;
+	}
+	[data-file-info-actions] {
+		view-transition-name: file-info-actions;
+	}
+	[data-note-body] {
+		view-transition-name: note-body;
+	}
+}
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+	animation-duration: 0.12s;
+	animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1); /* ease-out quart */
+}
+/* Keep the sidebar header unstretched while its box changes width. */
+::view-transition-old(title-bar-start),
+::view-transition-new(title-bar-start) {
+	inline-size: auto;
+}
+/* The strip only exists on one side of the switch, so it would paint last;
+ * keep the sidebar header and toggle above it as it slides past. */
+::view-transition-group(title-bar-start),
+::view-transition-group(sidebar-toggle) {
+	z-index: 1;
+}
+::view-transition-new(tab-strip):only-child {
+	animation-name: tab-strip-in;
+}
+::view-transition-old(tab-strip):only-child {
+	animation-name: tab-strip-out;
+}
+::view-transition-new(file-info-bar):only-child {
+	animation-name: file-info-bar-in;
+}
+::view-transition-old(file-info-bar):only-child {
+	animation-name: file-info-bar-out;
+}
+@keyframes file-info-bar-in {
+	from {
+		transform: translateY(100%);
+	}
+}
+@keyframes file-info-bar-out {
+	to {
+		transform: translateY(100%);
+		opacity: 0;
+	}
+}
+@keyframes tab-strip-in {
+	from {
+		transform: translateY(-100%);
+	}
+}
+@keyframes tab-strip-out {
+	to {
+		transform: translateY(-100%);
+		opacity: 0;
+	}
+}

@@ -37,11 +37,14 @@ export function WindowTitleBar({
 	allTabsOpen,
 	onAllTabsOpenChange,
 	singleTab = false,
+	tabStripLeaving = false,
 	children,
 }: {
 	showSidebarBadge?: boolean;
 	/** Hides the tab strip while one tab is open; children take its place. */
 	singleTab?: boolean;
+	/** The strip is sliding out; its tabs hold still until it's gone. */
+	tabStripLeaving?: boolean;
 	children?: ReactNode;
 	onNewTab?: () => void;
 	allTabsOpen: boolean;
@@ -83,6 +86,7 @@ export function WindowTitleBar({
 		<div
 			data-window-title-bar
 			data-single-tab={singleTab ? "" : undefined}
+			data-tab-strip={singleTab ? undefined : ""}
 			className={`relative flex h-9 min-w-0 shrink-0 select-none items-center overflow-hidden ${singleTab ? "bg-background" : "bg-sidebar after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border"}`}
 			style={{
 				...dragRegionStyle,
@@ -95,7 +99,8 @@ export function WindowTitleBar({
 			}}
 		>
 			<div
-				className={`flex min-w-0 items-center self-stretch ${overlayToggle ? "absolute inset-y-0 start-0 z-10" : ""} ${spansSidebar ? "gap-2 pe-2.5" : hasTabs && !singleTab ? "pe-4" : ""} ${singleTab && spansSidebar ? "border-e border-sidebar-border bg-sidebar" : ""}`}
+				data-title-bar-start
+				className={`flex min-w-0 items-center self-stretch ${overlayToggle ? "absolute inset-y-0 start-0 z-10" : ""} ${spansSidebar ? `relative z-10 gap-2 bg-sidebar pe-2.5 ${singleTab ? "border-e border-sidebar-border" : ""}` : hasTabs && !singleTab ? "pe-4" : ""}`}
 				style={{
 					flex: spansSidebar
 						? "0 0 var(--sidebar-width, 220px)"
@@ -144,6 +149,7 @@ export function WindowTitleBar({
 							showStartDivider={!sidebarOpen}
 							onCollapsedChange={handleTabsCollapsedChange}
 							collapseTargetRef={allTabsButtonRef}
+							leaving={tabStripLeaving}
 						/>
 					</div>
 					<AllTabsMenu

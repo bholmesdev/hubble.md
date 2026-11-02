@@ -125,12 +125,15 @@ export function FileInfoBar({
 				style={{ paddingInlineStart: "var(--title-bar-start, 0px)" }}
 			>
 				{compact ? null : (
-					<div style={noDragStyle}>
+					<div data-file-info-nav style={noDragStyle}>
 						<NavigationControls />
 					</div>
 				)}
 			</div>
-			<div className="flex min-w-0 items-center justify-center gap-1 [&>button]:px-0 [&>button]:[-webkit-app-region:no-drag] [&>input]:px-0 [&>input]:[-webkit-app-region:no-drag]">
+			<div
+				data-file-info-title
+				className="flex min-w-0 items-center justify-center gap-1 [&>button]:px-0 [&>button]:[-webkit-app-region:no-drag] [&>input]:px-0 [&>input]:[-webkit-app-region:no-drag]"
+			>
 				{folder ? (
 					<>
 						<span
@@ -161,18 +164,20 @@ export function FileInfoBar({
 				style={{ paddingInlineEnd: "var(--title-bar-end, 0px)" }}
 			>
 				<div className="flex items-center gap-1" style={noDragStyle}>
-					{comments ? <ReviewCommentSummary {...comments} /> : null}
-					<ActionsMenu
-						path={actionPath}
-						canDelete={Boolean(
-							actionPath && isInWorkspace(actionPath, workspacePath ?? null),
-						)}
-						workspacePath={
-							workspacePath && actionPath && isEditableFile(actionPath)
-								? workspacePath
-								: null
-						}
-					/>
+					<div data-file-info-actions className="flex items-center gap-1">
+						{comments ? <ReviewCommentSummary {...comments} /> : null}
+						<ActionsMenu
+							path={actionPath}
+							canDelete={Boolean(
+								actionPath && isInWorkspace(actionPath, workspacePath ?? null),
+							)}
+							workspacePath={
+								workspacePath && actionPath && isEditableFile(actionPath)
+									? workspacePath
+									: null
+							}
+						/>
+					</div>
 					{onNewTab ? (
 						<>
 							<span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />

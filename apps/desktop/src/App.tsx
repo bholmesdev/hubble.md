@@ -24,7 +24,14 @@ import {
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
+import { flushSync } from "react-dom";
 import { toast } from "sonner";
 import {
 	recentCommandIdsStore,
@@ -59,6 +66,7 @@ import {
 	hasTextExtension,
 	isCodeFile,
 	isEditableFile,
+	pathEquals,
 	relativeWorkspacePath,
 	sourceLanguageForPath,
 	supportsSourceToggle,
@@ -304,7 +312,50 @@ function App() {
 		Boolean(state.currentPath) && !isNewTabPath(state.currentPath);
 	// A lone tab folds the strip away to save a row: a note moves its file info
 	// into the title bar, and a blank new tab leaves just the empty state.
-	const showTabStrip = tabs.order.length > 1 || !hasWorkspace;
+	const wantsTabStrip = tabs.order.length > 1 || !hasWorkspace;
+	// Trails wantsTabStrip by one view transition, so the strip slides.
+	const [showTabStrip, setShowTabStrip] = useState(wantsTabStrip);
+	const tabStripTransitionRef = useRef<ViewTransition | null>(null);
+	const activeTabPath = tabs.activeTabId
+		? tabs.byId[tabs.activeTabId]?.path
+		: undefined;
+	// Closing a tab loads its neighbor; switch once it shows, so the file info
+	// row is there to slide.
+	const activeTabShown =
+		!activeTabPath ||
+		(pathEquals(state.currentPath ?? "", activeTabPath) &&
+			state.status !== "loading");
+	useLayoutEffect(() => {
+		if (wantsTabStrip === showTabStrip) return;
+		function switchTabStrip() {
+			if (
+				!document.startViewTransition ||
+				window.matchMedia("(prefers-reduced-motion: reduce)").matches
+			) {
+				setShowTabStrip(wantsTabStrip);
+				return;
+			}
+			// Names only apply mid-transition; they'd otherwise isolate the strip
+			// and keep the active tab from covering the divider below it.
+			const root = document.documentElement;
+			root.dataset.tabStripTransition = "";
+			const transition = document.startViewTransition(() =>
+				flushSync(() => setShowTabStrip(wantsTabStrip)),
+			);
+			tabStripTransitionRef.current = transition;
+			void transition.finished.finally(() => {
+				if (tabStripTransitionRef.current === transition)
+					delete root.dataset.tabStripTransition;
+			});
+		}
+		if (activeTabShown) {
+			switchTabStrip();
+			return;
+		}
+		// Don't wait on a load that stalls or fails.
+		const timeout = setTimeout(switchTabStrip, 300);
+		return () => clearTimeout(timeout);
+	}, [wantsTabStrip, showTabStrip, activeTabShown]);
 	const createNewFile = () => {
 		const created = createMarkdownFile(focusedCreationFolder);
 		if (searchOpen) changeSearchOpen(false);
@@ -781,6 +832,7 @@ function App() {
 		>
 			<WindowTitleBar
 				singleTab={!showTabStrip}
+				tabStripLeaving={showTabStrip && !wantsTabStrip}
 				allTabsOpen={allTabsOpen}
 				onAllTabsOpenChange={setAllTabsOpen}
 				showSidebarBadge={
@@ -859,7 +911,7 @@ function App() {
 						{showTabStrip && isFileOpen ? (
 							<FileInfoBar scrollContainer={scrollContainerEl} />
 						) : null}
-						<div className="flex-1 min-h-0 min-w-0 relative">
+						<div data-note-body className="flex-1 min-h-0 min-w-0 relative">
 							{state.status === "loading" && <p>Loading…</p>}
 							{state.status === "error" && (
 								<p>{state.error ?? "Failed to open file."}</p>
