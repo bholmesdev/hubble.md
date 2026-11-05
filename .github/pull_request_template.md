@@ -1,24 +1,26 @@
-## Description
-<!-- Provide a clear and concise description of your changes -->
-<!-- Link to any related issues using #issue-number. This is **required** for feature requests! -->
+## Summary
+<!-- One or two sentences, then the smallest visual that makes the change clear: a diff sketch, call tree, component tree, file tree, pseudocode, or Mermaid diagram. -->
+<!-- Link related issues with #issue-number. This is **required** for feature requests! -->
 
 Closes #<issue-number>
 
-## Type of Change
-<!-- Mark the relevant option with an "x" -->
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Documentation update
+## Verification
+<!-- Show that it works. User-visible changes need before/after screenshots or a screen recording. -->
+<!-- Otherwise, show the test or command output that failed before and passes now. List edge cases you tested, and any you didn't. -->
 
-## Testing
-<!-- Describe the tests you ran to verify your changes -->
+**Before:**
 
-- [ ] Existing tests pass
-- [ ] Added new tests for changes
-- [ ] Tested manually (describe below)
+**After:**
 
-**Manual Testing Details:**
-<!-- If applicable, describe how you manually tested these changes. Include screenshots if applicable -->
+## Impact
+<!-- Who and what this touches: screens, flows, platforms (macOS/Windows/Linux), file formats, consumers of shared packages. -->
+<!-- Call out sensitive areas: file system access, auth, data migrations, dependency bumps, build/release config. -->
+
+## Rollback
+<!-- The exact steps to undo this if it causes an incident. Say whether it's a two-way door (revert and ship) or a one-way door (data, file, or config changes a revert won't undo). -->
+
+1. Revert this PR on `main`.
+2. Ship a release.
 
 ## Checklist
 
