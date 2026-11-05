@@ -4,14 +4,25 @@ import { fileNameFromPath } from "../lib/filePath";
 export function EditableFileTitle({
 	currentPath,
 	onRename,
+	editRequested = false,
+	onEditStart,
 }: {
 	currentPath: string | null;
 	onRename?: (nextName: string) => void | Promise<void>;
+	/** Opens the field without a click, such as for a just-created file. */
+	editRequested?: boolean;
+	onEditStart?: () => void;
 }) {
 	const [draft, setDraft] = useState<string | null>(null);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const title = currentPath ? fileNameFromPath(currentPath) : "";
 	const editing = draft !== null;
+
+	useEffect(() => {
+		if (!editRequested || !title || !onRename) return;
+		setDraft(title);
+		onEditStart?.();
+	}, [editRequested, title, onRename, onEditStart]);
 
 	useEffect(() => {
 		if (!editing) return;

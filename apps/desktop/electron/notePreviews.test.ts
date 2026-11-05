@@ -42,13 +42,16 @@ describe("readNotePreviews", () => {
 		});
 	});
 
-	it("labels HTML apps and reports unreadable notes as failed", async () => {
+	it("labels HTML apps and diagrams and reports unreadable notes as failed", async () => {
 		const app = path.join(root, "app.html");
 		await fs.writeFile(app, "<h1>App</h1>");
+		const diagram = path.join(root, "flow.tldr");
+		await fs.writeFile(diagram, "{}");
 		const missing = path.join(root, "missing.md");
 
-		expect(await readNotePreviews([app, missing], resolve)).toEqual({
+		expect(await readNotePreviews([app, diagram, missing], resolve)).toEqual({
 			[app]: { title: null, description: "HTML App" },
+			[diagram]: { title: null, description: "Diagram" },
 			[missing]: null,
 		});
 	});

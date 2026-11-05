@@ -1,18 +1,10 @@
 import { Button } from "@hubble.md/ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
-import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
-import { copyText } from "../lib/clipboard";
 import { dirname } from "../lib/filePath";
-import {
-	hasHubbleSkillsInstalled,
-	installHubbleSkills,
-} from "../lib/hubbleSkills";
+import { INSTALL_COMMAND, useHubbleSkills } from "../lib/hubbleSkills";
 import { tildePath } from "../lib/tildePath";
-
-// No -g, so the skills CLI asks which agents and folder to install into.
-const INSTALL_COMMAND = "npx skills add bholmesdev/hubble.md";
-const SKILLS_POLL_INTERVAL_MS = 2000;
+import { CopyBlock } from "./CopyBlock";
 
 function buildPrompt(filePath: string): string {
 	return `Build a Hubble HTML app at ${filePath} that...`;
@@ -25,43 +17,11 @@ export function HtmlAppEmptyState({
 	path: string;
 	workspacePath: string | null;
 }) {
-	const [skillsInstalled, setSkillsInstalled] = useState(false);
-	const [installing, setInstalling] = useState(false);
 	const [showManualInstall, setShowManualInstall] = useState(false);
 	// Without a workspace, treat the file's folder as the notes folder so the
 	// prompt stays sensible and detection still covers the global skill dirs.
 	const notesPath = workspacePath ?? dirname(path) ?? path;
-
-	// Poll while visible and not yet installed, so installing from a terminal
-	// (e.g. with the skills CLI) reflects here without refocusing the window.
-	// Detection is a handful of readdirs, and polling stops as soon as the
-	// skills are found. Window focus re-checks either way, so skills removed
-	// while Hubble was in the background bring the Install button back.
-	useEffect(() => {
-		let active = true;
-		const check = () => {
-			void hasHubbleSkillsInstalled(notesPath).then((installed) => {
-				if (active) setSkillsInstalled(installed);
-			});
-		};
-		check();
-		window.addEventListener("focus", check);
-		const interval = skillsInstalled
-			? undefined
-			: setInterval(check, SKILLS_POLL_INTERVAL_MS);
-		return () => {
-			active = false;
-			window.removeEventListener("focus", check);
-			clearInterval(interval);
-		};
-	}, [notesPath, skillsInstalled]);
-
-	const installSkills = async () => {
-		setInstalling(true);
-		await installHubbleSkills();
-		setSkillsInstalled(await hasHubbleSkillsInstalled(notesPath));
-		setInstalling(false);
-	};
+	const { installed, installing, install } = useHubbleSkills(notesPath);
 
 	return (
 		<div className="flex h-full items-center justify-center overflow-y-auto p-6">
@@ -81,7 +41,7 @@ export function HtmlAppEmptyState({
 					step="1"
 					title="Install the skills"
 					indicator={
-						skillsInstalled ? (
+						installed ? (
 							<span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
 								<MingcuteCheckCircleFill className="size-3.5" />
 								Skills installed
@@ -99,7 +59,7 @@ export function HtmlAppEmptyState({
 								<Button
 									size="sm"
 									disabled={installing}
-									onClick={() => void installSkills()}
+									onClick={() => void install()}
 								>
 									{installing ? "Installing..." : "Install"}
 								</Button>
@@ -107,7 +67,7 @@ export function HtmlAppEmptyState({
 						)
 					}
 				>
-					{showManualInstall && !skillsInstalled ? (
+					{showManualInstall && !installed ? (
 						<>
 							<p className="text-xs text-muted-foreground">
 								Run this in your terminal:
@@ -155,34 +115,6 @@ function Section({
 				<span className="ms-auto inline-flex items-center">{indicator}</span>
 			</div>
 			{children}
-		</div>
-	);
-}
-
-function CopyBlock({
-	value,
-	display,
-	label,
-	ariaLabel,
-}: {
-	value: string;
-	display?: string;
-	label: string;
-	ariaLabel: string;
-}) {
-	return (
-		<div className="flex items-start gap-2 rounded-sm border border-border bg-muted/40 p-2">
-			<code className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
-				{display ?? value}
-			</code>
-			<Button
-				size="icon-sm"
-				variant="ghost"
-				aria-label={ariaLabel}
-				onClick={() => void copyText(value, label)}
-			>
-				<MingcuteCopy2Line />
-			</Button>
 		</div>
 	);
 }

@@ -1,5 +1,9 @@
 import fs from "node:fs/promises";
-import { hasHtmlExtension, hasMarkdownExtension } from "../src/lib/filePath";
+import {
+	hasHtmlExtension,
+	hasMarkdownExtension,
+	isDiagramFile,
+} from "../src/lib/filePath";
 import { type NotePreview, notePreview } from "../src/lib/titleGeneration";
 
 /** Enough for front matter plus a title and first line in almost every note. */
@@ -40,6 +44,7 @@ export async function readNotePreviews(
 async function readPreview(filePath: string): Promise<NotePreview> {
 	if (hasHtmlExtension(filePath))
 		return { title: null, description: "HTML App" };
+	if (isDiagramFile(filePath)) return { title: null, description: "Diagram" };
 	if (!hasMarkdownExtension(filePath)) return EMPTY;
 	let head = await readHead(filePath, HEAD_BYTES);
 	if (!head.complete && frontMatterUnclosed(head.text)) {

@@ -209,6 +209,35 @@ describe("desktop savePathContent", () => {
 		);
 	});
 
+	it("persists the diagram grid setting", async () => {
+		const api = createDesktopApi();
+		const { diagramGridStore, setDiagramGrid } = await loadStoreActions(api);
+		const { STORAGE_KEY } = await import("./persistence");
+
+		expect(diagramGridStore.get()).toBe(false);
+		setDiagramGrid(true);
+
+		expect(diagramGridStore.get()).toBe(true);
+		expect(localStorage.setItem).toHaveBeenLastCalledWith(
+			STORAGE_KEY,
+			expect.stringContaining('"diagramGrid":true'),
+		);
+	});
+
+	it("persists closing the skill toast", async () => {
+		await loadStoreActions(createDesktopApi());
+		const { skillToastDismissedStore } = await import("./state");
+		const { STORAGE_KEY } = await import("./persistence");
+
+		expect(skillToastDismissedStore.get()).toBe(false);
+		skillToastDismissedStore.set(true);
+
+		expect(localStorage.setItem).toHaveBeenLastCalledWith(
+			STORAGE_KEY,
+			expect.stringContaining('"skillToastDismissed":true'),
+		);
+	});
+
 	it("hydrates the code-file preference", async () => {
 		const api = createDesktopApi();
 		const { codeFileOpenModeStore } = await loadStoreActions(

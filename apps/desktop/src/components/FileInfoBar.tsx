@@ -24,6 +24,7 @@ import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { desktopApi } from "../desktopApi";
 import type { AgentClient } from "../desktopApi/types";
+import { DiagramMenuItems } from "../editor/lazyDiagram";
 import { isChangelogPath } from "../lib/changelogNote";
 import { copyText } from "../lib/clipboard";
 import {
@@ -32,6 +33,7 @@ import {
 	hasHtmlExtension,
 	hasMarkdownExtension,
 	hasTextExtension,
+	isDiagramFile,
 	isEditableFile,
 	pathEquals,
 	relativeWorkspacePath,
@@ -55,6 +57,7 @@ import {
 	isInWorkspace,
 	reviewThreadsStore,
 	titleGenerationPreviewStore,
+	titleRenameRequestStore,
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
@@ -63,7 +66,7 @@ import { ClaudeLogo, CodexLogo } from "./AgentLogos";
 const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
 
 const menuItemClass =
-	"flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent";
+	"flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-start text-[11px] outline-hidden select-none data-highlighted:bg-accent data-disabled:pointer-events-none data-disabled:opacity-50";
 
 export function FileInfoBar({
 	scrollContainer,
@@ -78,6 +81,7 @@ export function FileInfoBar({
 	const titlePreview = useStoreValue(titleGenerationPreviewStore);
 	const titlePath = filePathForTitlePreview(currentPath, titlePreview);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
+	const renameRequest = useStoreValue(titleRenameRequestStore);
 	const compact = useCompactWindow();
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
 	const [showBorder, setShowBorder] = useState(false);
@@ -157,6 +161,10 @@ export function FileInfoBar({
 							? undefined
 							: (nextName) => void renameCurrentMarkdownFile(nextName)
 					}
+					editRequested={
+						renameRequest !== null && renameRequest === currentPath
+					}
+					onEditStart={() => titleRenameRequestStore.set(null)}
 				/>
 			</div>
 			<div
@@ -350,6 +358,12 @@ function ActionsMenu({
 								<span className="min-w-0 flex-1">{sourceModeLabel}</span>
 								<ShortcutHint commandId="app.toggle-source-mode" />
 							</Menu.Item>
+						)}
+						{path && isDiagramFile(path) && (
+							<>
+								<DiagramMenuItems itemClass={menuItemClass} />
+								<Menu.Separator className="my-1 h-px bg-border" />
+							</>
 						)}
 						{path && (
 							<>

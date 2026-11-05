@@ -76,6 +76,7 @@ import {
 	chatCommandStore,
 	cleanFileState,
 	codeFileOpenModeStore,
+	diagramGridStore,
 	emptyDoc,
 	type FileEntry,
 	type FolderEntry,
@@ -597,6 +598,10 @@ export function setChatCommand(command: string) {
 
 export function setCodeFileOpenMode(mode: CodeFileOpenMode) {
 	codeFileOpenModeStore.set(mode);
+}
+
+export function setDiagramGrid(on: boolean) {
+	diagramGridStore.set(on);
 }
 
 export async function openPathInDefaultApp(path: string) {
@@ -1374,6 +1379,10 @@ export function createMarkdownFileInFolder(
 
 export function createHtmlFileInFolder(parentPath: string) {
 	return createEmptyFileInFolder(parentPath, "new-app", ".html");
+}
+
+export function createDiagramFileInFolder(parentPath: string) {
+	return createEmptyFileInFolder(parentPath, "new-diagram", ".tldr");
 }
 
 export async function createFolderInFolder(parentPath: string) {

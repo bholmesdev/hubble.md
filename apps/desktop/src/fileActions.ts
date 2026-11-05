@@ -1,9 +1,14 @@
 import { getActiveEditor } from "@hubble.md/ui";
 import {
+	createDiagramFileInFolder,
 	createHtmlFileInFolder,
 	createMarkdownFileInFolder,
 } from "./store/actions";
-import { viewerStore, workspaceStore } from "./store/state";
+import {
+	titleRenameRequestStore,
+	viewerStore,
+	workspaceStore,
+} from "./store/state";
 import type { TabTarget } from "./store/tabs";
 
 export async function createMarkdownFile(
@@ -27,5 +32,13 @@ export function focusMarkdownEditorAfterRender(path: string) {
 export async function createHtmlFile(parentPath?: string | null) {
 	const targetPath = parentPath ?? workspaceStore.get().workspacePath;
 	if (!targetPath) return;
-	await createHtmlFileInFolder(targetPath);
+	const path = await createHtmlFileInFolder(targetPath);
+	if (path) titleRenameRequestStore.set(path);
+}
+
+export async function createDiagramFile(parentPath?: string | null) {
+	const targetPath = parentPath ?? workspaceStore.get().workspacePath;
+	if (!targetPath) return;
+	const path = await createDiagramFileInFolder(targetPath);
+	if (path) titleRenameRequestStore.set(path);
 }
