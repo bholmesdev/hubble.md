@@ -13,6 +13,8 @@ const markerComment = `<!-- ${INSTALLED_MARKER}. Hubble updates this skill when 
 // the `source` field of its lock file.
 const SKILLS_CLI_SOURCES = ["bholmesdev/hubble-skills", "bholmesdev/hubble.md"];
 
+const STAGING_DIR = ".hubble-staging";
+
 export type AgentSkillsInstallResult = {
 	installed: string[];
 	/** Skill folders already present that Hubble did not install. */
@@ -121,7 +123,12 @@ export class AgentSkills {
 		const result: AgentSkillsInstallResult = { installed: [], skipped: [] };
 		const takenOver = new Set<string>();
 		for (const dir of targetDirs) {
-			await fs.mkdir(dir, { recursive: true });
+			// New copies are built here, then renamed into place, so quitting or
+			// failing mid-copy never leaves a skill missing. It's a dot folder
+			// one level up from SKILL.md files, so agents don't load it as a skill.
+			const staging = path.join(dir, STAGING_DIR);
+			await fs.rm(staging, { recursive: true, force: true });
+			await fs.mkdir(staging, { recursive: true });
 			for (const name of names) {
 				const target = path.join(dir, name);
 				const state = await this.skillFolderState(target, name);
@@ -131,18 +138,24 @@ export class AgentSkills {
 				}
 				if (state === "missing" && existingOnly) continue;
 				if (state === "published") takenOver.add(name);
-				// The skills CLI may have linked this folder to its copy in
-				// ~/.agents/skills. Removing only unlinks it, and the copy below
-				// replaces it with a real folder.
-				if (state !== "missing") await fs.rm(target, { recursive: true });
-				await fs.cp(path.join(this.options.bundleDir, name), target, {
+
+				const next = path.join(staging, name);
+				await fs.cp(path.join(this.options.bundleDir, name), next, {
 					recursive: true,
 				});
-				const skillMdPath = path.join(target, "SKILL.md");
+				const skillMdPath = path.join(next, "SKILL.md");
 				const skillMd = await fs.readFile(skillMdPath, "utf8");
 				await fs.writeFile(skillMdPath, withMarker(skillMd));
+				// The skills CLI may have linked this folder to its copy in
+				// ~/.agents/skills. Renaming moves only the link, and the new
+				// copy takes its place as a real folder.
+				if (state !== "missing") {
+					await fs.rename(target, path.join(staging, `${name}.old`));
+				}
+				await fs.rename(next, target);
 				result.installed.push(target);
 			}
+			await fs.rm(staging, { recursive: true, force: true });
 		}
 		if (takenOver.size > 0) await this.forgetSkillsCliInstalls(takenOver);
 		return result;

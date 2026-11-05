@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	AgentSkills,
 	type AgentSkillsOptions,
@@ -19,6 +19,7 @@ const repoSkillsDir = fileURLToPath(
 const dirs: string[] = [];
 
 afterEach(async () => {
+	vi.restoreAllMocks();
 	await Promise.all(
 		dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true })),
 	);
@@ -129,6 +130,31 @@ describe("AgentSkills", () => {
 		).toBe("v2");
 		expect(await exists(path.join(claudeDir, "old"))).toBe(false);
 		expect(await exists(path.join(claudeDir, "added"))).toBe(false);
+	});
+
+	it("keeps the old skill when updating it fails partway", async () => {
+		const { bundleDir, agentsDir, options } = await setup();
+		await new AgentSkills(options).install();
+		await write(path.join(bundleDir, "draw", "scripts", "draw.mjs"), "v2");
+		vi.spyOn(fs, "cp").mockRejectedValueOnce(new Error("disk full"));
+
+		await expect(
+			new AgentSkills({ ...options, appVersion: "1.1.0" }).sync(),
+		).rejects.toThrow("disk full");
+		expect(
+			await fs.readFile(
+				path.join(agentsDir, "draw", "scripts", "draw.mjs"),
+				"utf8",
+			),
+		).toBe("v1");
+	});
+
+	it("leaves no staging folder behind", async () => {
+		const { claudeDir, agentsDir, options } = await setup();
+		await new AgentSkills(options).install();
+
+		expect(await fs.readdir(claudeDir)).toEqual(["draw"]);
+		expect(await fs.readdir(agentsDir)).toEqual(["draw"]);
 	});
 
 	it("does nothing on launch when the version is unchanged", async () => {
