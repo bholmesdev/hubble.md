@@ -93,10 +93,22 @@ function main() {
 		env,
 	});
 	rmSync(RELEASE_DIR, { recursive: true, force: true });
-	run("pnpm", ["exec", "electron-builder", "--mac", "--dir"], {
-		cwd: "apps/desktop",
-		env: { ...env, CSC_IDENTITY_AUTO_DISCOVERY: "false" },
-	});
+	// Package the Electron that `pnpm install` already fetched, so packaging
+	// doesn't download it again from GitHub.
+	run(
+		"pnpm",
+		[
+			"exec",
+			"electron-builder",
+			"--mac",
+			"--dir",
+			"-c.electronDist=node_modules/electron/dist",
+		],
+		{
+			cwd: "apps/desktop",
+			env: { ...env, CSC_IDENTITY_AUTO_DISCOVERY: "false" },
+		},
+	);
 
 	const app = builtApp();
 	const target = join(dest, "Hubble.app");
