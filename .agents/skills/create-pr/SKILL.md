@@ -18,6 +18,8 @@ Run the `changelog` skill before or right after opening the PR.
 
 Use `.github/pull_request_template.md` for the PR body. Skip preambles and keep prose brief.
 
+Fill each section's **Verdict:** line with the verdict `merge-risk` gave its category after mitigation, emoji included: Verification → Verification, Impact → Impact, Rollback → Rollback cost (e.g. `**Verdict:** low ✅`).
+
 For the Summary, pick the smallest view that makes the key point clear, and place it next to the short text it supports:
 
 - pseudocode for logic or an algorithm
