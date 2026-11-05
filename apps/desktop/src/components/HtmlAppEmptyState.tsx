@@ -1,12 +1,13 @@
 import { Button } from "@hubble.md/ui";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
-import { desktopApi } from "../desktopApi";
 import { copyText } from "../lib/clipboard";
 import { dirname } from "../lib/filePath";
-import { hasHubbleSkillsInstalled } from "../lib/hubbleSkills";
+import {
+	hasHubbleSkillsInstalled,
+	installHubbleSkills,
+} from "../lib/hubbleSkills";
 import { tildePath } from "../lib/tildePath";
 
 // No -g, so the skills CLI asks which agents and folder to install into.
@@ -34,33 +35,31 @@ export function HtmlAppEmptyState({
 	// Poll while visible and not yet installed, so installing from a terminal
 	// (e.g. with the skills CLI) reflects here without refocusing the window.
 	// Detection is a handful of readdirs, and polling stops as soon as the
-	// skills are found.
+	// skills are found. Window focus re-checks either way, so skills removed
+	// while Hubble was in the background bring the Install button back.
 	useEffect(() => {
-		if (skillsInstalled) return;
 		let active = true;
 		const check = () => {
 			void hasHubbleSkillsInstalled(notesPath).then((installed) => {
-				if (active && installed) setSkillsInstalled(true);
+				if (active) setSkillsInstalled(installed);
 			});
 		};
 		check();
-		const interval = setInterval(check, SKILLS_POLL_INTERVAL_MS);
+		window.addEventListener("focus", check);
+		const interval = skillsInstalled
+			? undefined
+			: setInterval(check, SKILLS_POLL_INTERVAL_MS);
 		return () => {
 			active = false;
+			window.removeEventListener("focus", check);
 			clearInterval(interval);
 		};
 	}, [notesPath, skillsInstalled]);
 
 	const installSkills = async () => {
 		setInstalling(true);
-		try {
-			await desktopApi.installAgentSkills();
-			if (await hasHubbleSkillsInstalled(notesPath)) setSkillsInstalled(true);
-		} catch (error) {
-			toast.error("Failed to install skills", {
-				description: error instanceof Error ? error.message : String(error),
-			});
-		}
+		await installHubbleSkills();
+		setSkillsInstalled(await hasHubbleSkillsInstalled(notesPath));
 		setInstalling(false);
 	};
 

@@ -169,8 +169,12 @@ export type DesktopApi = {
 		input: SearchFileContentsInput,
 	): Promise<SearchFileContentsOutput>;
 	detectHubbleSkills(workspacePath: string): Promise<boolean>;
-	/** Copies the skills bundled with Hubble into the user's agent folders. */
-	installAgentSkills(): Promise<void>;
+	/**
+	 * Copies the skills bundled with Hubble into the user's agent folders.
+	 * Resolves to the folders left alone because a skill Hubble didn't install
+	 * already has that name.
+	 */
+	installHubbleSkills(): Promise<string[]>;
 	writeFileText(path: string, content: string): Promise<void>;
 	createFolder(path: string): Promise<void>;
 	renameFile(fromPath: string, toPath: string): Promise<void>;
@@ -239,6 +243,7 @@ export type DesktopApi = {
 	onMenuOpenFolder(callback: () => void): Unsubscribe;
 	onMenuOpenSettings(callback: () => void): Unsubscribe;
 	onMenuOpenChangelog(callback: () => void): Unsubscribe;
+	onMenuInstallHubbleSkills(callback: () => void): Unsubscribe;
 	onMenuCopyAsMarkdown(callback: () => void): Unsubscribe;
 	onMenuShowWorkspaceSwitcher(callback: () => void): Unsubscribe;
 	onMenuGoToFile(callback: () => void): Unsubscribe;

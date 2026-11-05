@@ -712,24 +712,6 @@ async function detectHubbleSkills(workspacePath: unknown): Promise<boolean> {
 	return skillNames.every((name) => present.has(name));
 }
 
-async function installAgentSkills(): Promise<void> {
-	const result = await agentSkills.install();
-	if (result.skipped.length > 0) {
-		await dialog.showMessageBox(mainWindow ?? undefined, {
-			type: "info",
-			message: "Some skills were left as they are",
-			detail: `These folders hold a skill Hubble didn't install, or one you edited, so Hubble won't update them. Delete them and install again to let Hubble manage them.\n\n${result.skipped.map(tildePath).join("\n")}`,
-		});
-	}
-}
-
-function tildePath(filePath: string): string {
-	const home = os.homedir();
-	return filePath.startsWith(`${home}/`)
-		? `~${filePath.slice(home.length)}`
-		: filePath;
-}
-
 function firstExistingFileArg(args: string[]): string | null {
 	for (const arg of args) {
 		if (arg.startsWith("-")) continue;
@@ -1134,7 +1116,9 @@ function buildMenu() {
 				{
 					id: "install-agent-skills",
 					label: "Install Agent Skills",
-					click: () => void installAgentSkills(),
+					// The renderer runs the install, so both this and the empty
+					// state's Install button report skipped skills the same way.
+					click: () => sendToRenderer("desktop:menu-install-hubble-skills"),
 				},
 			],
 		},
@@ -1698,7 +1682,10 @@ function registerIpc() {
 		async (_event, { workspacePath }) => detectHubbleSkills(workspacePath),
 	);
 
-	ipcMain.handle("desktop:install-agent-skills", () => installAgentSkills());
+	ipcMain.handle(
+		"desktop:install-hubble-skills",
+		async () => (await agentSkills.install()).skipped,
+	);
 
 	ipcMain.handle(
 		"desktop:persist-pasted-image",
