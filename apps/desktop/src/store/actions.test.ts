@@ -224,6 +224,20 @@ describe("desktop savePathContent", () => {
 		);
 	});
 
+	it("persists closing the skill toast", async () => {
+		await loadStoreActions(createDesktopApi());
+		const { skillToastDismissedStore } = await import("./state");
+		const { STORAGE_KEY } = await import("./persistence");
+
+		expect(skillToastDismissedStore.get()).toBe(false);
+		skillToastDismissedStore.set(true);
+
+		expect(localStorage.setItem).toHaveBeenLastCalledWith(
+			STORAGE_KEY,
+			expect.stringContaining('"skillToastDismissed":true'),
+		);
+	});
+
 	it("hydrates the code-file preference", async () => {
 		const api = createDesktopApi();
 		const { codeFileOpenModeStore } = await loadStoreActions(

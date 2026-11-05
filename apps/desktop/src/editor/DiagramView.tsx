@@ -15,7 +15,7 @@ import {
 } from "tldraw";
 import "tldraw/tldraw.css";
 import "./DiagramView.css";
-import { DiagramSkillBanner } from "../components/DiagramSkillBanner";
+import { DiagramSkillToast } from "../components/DiagramSkillToast";
 import { recallCamera, rememberCamera } from "../lib/scrollMemory";
 import {
 	savePathContent,
@@ -234,7 +234,7 @@ export function DiagramView({
 				overrides={overrides}
 				onMount={handleMount}
 			/>
-			<DiagramSkillBanner path={path} />
+			<DiagramSkillToast path={path} />
 		</div>
 	);
 }

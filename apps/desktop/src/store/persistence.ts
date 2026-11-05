@@ -47,6 +47,8 @@ type SettingsState = {
 	theme: ThemePreference;
 	/** Grid mode for every diagram, not saved per file. */
 	diagramGrid: boolean;
+	/** The user closed the diagram toast that offers the Hubble skills. */
+	skillToastDismissed: boolean;
 };
 
 export type CodeFileOpenMode = "hubble" | "default-app";
@@ -80,6 +82,7 @@ type Persisted = {
 		shortcutBindings?: unknown;
 		theme?: ThemePreference;
 		diagramGrid?: boolean;
+		skillToastDismissed?: boolean;
 	};
 };
 
@@ -152,6 +155,7 @@ export function getInitialState(): DesktopState {
 					? p.settings.theme
 					: "system",
 			diagramGrid: p?.settings?.diagramGrid === true,
+			skillToastDismissed: p?.settings?.skillToastDismissed === true,
 		},
 	};
 }
@@ -180,6 +184,7 @@ export function serialize(state: DesktopState): Persisted {
 			shortcutBindings: state.settings.shortcutBindings,
 			theme: state.settings.theme,
 			diagramGrid: state.settings.diagramGrid,
+			skillToastDismissed: state.settings.skillToastDismissed,
 		},
 	};
 }
