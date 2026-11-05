@@ -11,6 +11,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 - You can now draw diagrams in Hubble with the dedicated whiteboarding tool. Backed by [tldraw](https://tldraw.com) and works offline like everything else in Hubble. Click the "new file" button next to the folder switcher to try it out. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
 - Install the Hubble agent skills from inside Hubble, and they stay up to date as Hubble updates, including copies you installed with `npx skills`. [#337](https://github.com/bholmesdev/hubble.md/pull/337)
+- Install the agent skills anytime from Settings. [#346](https://github.com/bholmesdev/hubble.md/pull/346)
 
 ### Changed
 
