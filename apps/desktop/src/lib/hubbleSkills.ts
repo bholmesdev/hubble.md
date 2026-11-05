@@ -1,6 +1,11 @@
 import { store } from "@simplestack/store";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { desktopApi } from "../desktopApi";
+
+// No -g, so the skills CLI asks which agents and folder to install into.
+export const INSTALL_COMMAND = "npx skills add bholmesdev/hubble.md";
+const POLL_INTERVAL_MS = 2000;
 
 /** Skill folders the last install skipped, shown by SkippedSkillsDialog. */
 export const skippedSkillsStore = store<string[]>([]);
@@ -35,4 +40,44 @@ export async function hasHubbleSkillsInstalled(
 	} catch {
 		return false;
 	}
+}
+
+/**
+ * Whether every Hubble skill is installed, or null until the first check
+ * returns. Polls until they are, so installing from a terminal (e.g. with the
+ * skills CLI) shows up without refocusing the window. Detection is a handful
+ * of readdirs. Window focus re-checks either way, so skills removed while
+ * Hubble was in the background bring the Install button back.
+ */
+export function useHubbleSkills(workspacePath: string) {
+	const [installed, setInstalled] = useState<boolean | null>(null);
+	const [installing, setInstalling] = useState(false);
+
+	useEffect(() => {
+		let active = true;
+		const check = () => {
+			void hasHubbleSkillsInstalled(workspacePath).then((result) => {
+				if (active) setInstalled(result);
+			});
+		};
+		check();
+		window.addEventListener("focus", check);
+		const interval = installed
+			? undefined
+			: setInterval(check, POLL_INTERVAL_MS);
+		return () => {
+			active = false;
+			window.removeEventListener("focus", check);
+			clearInterval(interval);
+		};
+	}, [workspacePath, installed]);
+
+	const install = async () => {
+		setInstalling(true);
+		await installHubbleSkills();
+		setInstalled(await hasHubbleSkillsInstalled(workspacePath));
+		setInstalling(false);
+	};
+
+	return { installed, installing, install };
 }
