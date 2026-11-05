@@ -2,6 +2,7 @@
 name: "merge-risk"
 description: "Use when assessing the risk of merging a PR"
 metadata:
+  internal: true
   credits:
     skill: pr
     author: Matt Pocock

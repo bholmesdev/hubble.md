@@ -1,6 +1,8 @@
 ---
 name: writing-tests
 description: Use when writing or reviewing tests, or deciding whether a change needs one.
+metadata:
+  internal: true
 ---
 
 # Writing tests

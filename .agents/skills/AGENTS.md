@@ -1,0 +1,1 @@
+Every dev skill here needs `metadata.internal: true` in its frontmatter so the skills CLI and the desktop app don't ship it to Hubble users. Skills without it are user-facing and bundled with the app.

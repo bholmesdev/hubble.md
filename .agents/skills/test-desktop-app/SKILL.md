@@ -1,6 +1,8 @@
 ---
 name: test-desktop-app
 description: Use when testing the Hubble Electron desktop app, especially when inspecting, clicking, screenshotting, or verifying a real note edit in the running app.
+metadata:
+  internal: true
 ---
 
 # Test Desktop App

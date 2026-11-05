@@ -1,6 +1,8 @@
 ---
 name: implementation
 description: Implement a fix or feature from a GitHub, Jira, Linear, or other issue-tracker issue by fetching issue context, inspecting the current codebase, making code changes, validating them, opening a GitHub pull request, and reporting progress back to the original issue.
+metadata:
+  internal: true
 ---
 
 # Implementation

@@ -1,6 +1,8 @@
 ---
 name: write-product-spec
 description: Write a PRODUCT.md spec for a significant Hubble user-facing feature, focused only on user experience and observable behavior. Use when the user asks for a product spec, UX spec, PRD, desired behavior doc, or wants feature behavior clarified before implementation.
+metadata:
+  internal: true
 ---
 
 # write-product-spec

@@ -1,6 +1,8 @@
 ---
 name: release
 description: Prepare Hubble desktop releases using tag-triggered GitHub Releases. Use when cutting, automating, or explaining app releases, version bumps, tags, GitHub Actions publishing, Electron artifacts, or updater release management.
+metadata:
+  internal: true
 ---
 # Release
 

@@ -47,6 +47,8 @@ const desktopApi = {
 		ipcRenderer.invoke("desktop:search-file-contents", input),
 	detectHubbleSkills: (workspacePath) =>
 		ipcRenderer.invoke("desktop:detect-hubble-skills", { workspacePath }),
+	installHubbleSkills: () =>
+		ipcRenderer.invoke("desktop:install-hubble-skills"),
 	writeFileText: (path, content) => {
 		// Encode in the renderer before IPC. Main should write these bytes as-is,
 		// because re-encoding the string there has truncated multibyte characters.
@@ -158,6 +160,8 @@ const desktopApi = {
 		subscribe("desktop:menu-open-settings", callback),
 	onMenuOpenChangelog: (callback) =>
 		subscribe("desktop:menu-open-changelog", callback),
+	onMenuInstallHubbleSkills: (callback) =>
+		subscribe("desktop:menu-install-hubble-skills", callback),
 	onMenuCopyAsMarkdown: (callback) =>
 		subscribe("desktop:menu-copy-as-markdown", callback),
 	onMenuShowWorkspaceSwitcher: (callback) =>

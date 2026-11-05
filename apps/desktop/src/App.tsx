@@ -43,6 +43,7 @@ import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { NewTabPage } from "./components/NewTabPage";
 import { Settings, type SettingsTarget } from "./components/Settings";
 import { type DesktopSidebarFocus, Sidebar } from "./components/Sidebar";
+import { SkippedSkillsDialog } from "./components/SkippedSkillsDialog";
 import { TelemetryConsentCallout } from "./components/TelemetrySection";
 import { TerminalPanel } from "./components/TerminalPanel";
 import { SidebarCallout } from "./components/UpdatesSection";
@@ -74,6 +75,7 @@ import {
 	sourceLanguageForPath,
 	supportsSourceToggle,
 } from "./lib/filePath";
+import { installHubbleSkills } from "./lib/hubbleSkills";
 import { isCompactWindow, useCompactWindow } from "./lib/layout";
 import { isNewTabPath, isVirtualPath } from "./lib/newTabPage";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
@@ -677,6 +679,7 @@ function App() {
 				changeSettingsOpen(false);
 				void openChangelog();
 			}),
+			desktopApi.onMenuInstallHubbleSkills(() => void installHubbleSkills()),
 			desktopApi.onMenuCopyAsMarkdown(() =>
 				setCopyAsMarkdownRequest((request) => request + 1),
 			),
@@ -986,6 +989,7 @@ function App() {
 				onUpdateAction={() => void triggerPrimaryUpdateAction()}
 				onViewChangelog={openWhatsNew}
 			/>
+			<SkippedSkillsDialog />
 		</main>
 	);
 }

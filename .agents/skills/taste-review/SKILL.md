@@ -1,6 +1,8 @@
 ---
 name: taste-review
 description: Ask Claude Code to make a taste-driven call on something ambiguous — UI polish, prose phrasing, naming, formatting. Use when you'd otherwise guess.
+metadata:
+  internal: true
 ---
 
 You hit something fuzzy and need a judgment call. Shell out to the `claude` CLI to get one back, then apply it.

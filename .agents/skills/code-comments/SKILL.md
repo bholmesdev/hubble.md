@@ -1,6 +1,8 @@
 ---
 name: code-comments
 description: Use while implementing or reviewing edge cases, failure paths, or unexpected behavior to document the non-obvious constraints in code. Also use when asked to add or improve code comments.
+metadata:
+  internal: true
 ---
 
 # Code comments

@@ -18,7 +18,7 @@ Hubble is a free, open-source notetaking app for you and your agents.
 
 - **Feels familiar.** The same writing experience you're used to from Notion or Apple Notes, but for Markdown. `/` commands, Markdown shortcuts, and file properties / frontmatter are supported.
 - **Agent ready.** Point your agent at your notes folder to start collaborating. Hubble will live-reloads as your agent edits.
-- **Build any view.** Beyond Markdown, you can build and view HTML-based apps. [Install the skills](https://github.com/bholmesdev/hubble-skills) and tell your coding agent what to build. Turn a folder of notes into a table, a bookshelf, a map... anything you can think of.
+- **Build any view.** Beyond Markdown, you can build and view HTML-based apps. Install the [skills](.agents/skills) from Help → Install Agent Skills and tell your coding agent what to build. Turn a folder of notes into a table, a bookshelf, a map... anything you can think of.
 
 ## Download
 

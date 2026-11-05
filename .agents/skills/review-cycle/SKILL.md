@@ -1,6 +1,8 @@
 ---
 name: review-cycle
 description: Work through code-review feedback on an open PR until checks and review threads settle, after the user says the work is ready for their review. Do not use for a one-off PR review.
+metadata:
+  internal: true
 ---
 
 # Review cycle

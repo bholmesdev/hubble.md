@@ -2,13 +2,16 @@ import { Button } from "@hubble.md/ui";
 import { useEffect, useState } from "react";
 import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
-import MingcuteRightLine from "~icons/mingcute/right-line";
 import { copyText } from "../lib/clipboard";
 import { dirname } from "../lib/filePath";
-import { hasHubbleSkillsInstalled } from "../lib/hubbleSkills";
+import {
+	hasHubbleSkillsInstalled,
+	installHubbleSkills,
+} from "../lib/hubbleSkills";
 import { tildePath } from "../lib/tildePath";
 
-const INSTALL_COMMAND = "npx skills add bholmesdev/hubble-skills -g";
+// No -g, so the skills CLI asks which agents and folder to install into.
+const INSTALL_COMMAND = "npx skills add bholmesdev/hubble.md";
 const SKILLS_POLL_INTERVAL_MS = 2000;
 
 function buildPrompt(filePath: string): string {
@@ -23,40 +26,42 @@ export function HtmlAppEmptyState({
 	workspacePath: string | null;
 }) {
 	const [skillsInstalled, setSkillsInstalled] = useState(false);
-	// Before install the setup section is always expanded with no toggle. Once
-	// the skills are detected it collapses to just the check, with a disclosure
-	// to reveal the command again.
-	const [setupExpandedOverride, setSetupExpandedOverride] = useState<
-		boolean | null
-	>(null);
-	const setupExpanded = skillsInstalled
-		? (setupExpandedOverride ?? false)
-		: true;
+	const [installing, setInstalling] = useState(false);
+	const [showManualInstall, setShowManualInstall] = useState(false);
 	// Without a workspace, treat the file's folder as the notes folder so the
 	// prompt stays sensible and detection still covers the global skill dirs.
 	const notesPath = workspacePath ?? dirname(path) ?? path;
 
-	// Poll while visible and not yet installed, so running the install command
-	// reflects here without refocusing the window (e.g. from the in-app
-	// terminal). Detection is a handful of readdirs, and polling stops as soon
-	// as the skills are found.
+	// Poll while visible and not yet installed, so installing from a terminal
+	// (e.g. with the skills CLI) reflects here without refocusing the window.
+	// Detection is a handful of readdirs, and polling stops as soon as the
+	// skills are found. Window focus re-checks either way, so skills removed
+	// while Hubble was in the background bring the Install button back.
 	useEffect(() => {
-		if (skillsInstalled) return;
 		let active = true;
 		const check = () => {
 			void hasHubbleSkillsInstalled(notesPath).then((installed) => {
-				if (!active || !installed) return;
-				setSkillsInstalled(true);
-				setSetupExpandedOverride(null);
+				if (active) setSkillsInstalled(installed);
 			});
 		};
 		check();
-		const interval = setInterval(check, SKILLS_POLL_INTERVAL_MS);
+		window.addEventListener("focus", check);
+		const interval = skillsInstalled
+			? undefined
+			: setInterval(check, SKILLS_POLL_INTERVAL_MS);
 		return () => {
 			active = false;
+			window.removeEventListener("focus", check);
 			clearInterval(interval);
 		};
 	}, [notesPath, skillsInstalled]);
+
+	const installSkills = async () => {
+		setInstalling(true);
+		await installHubbleSkills();
+		setSkillsInstalled(await hasHubbleSkillsInstalled(notesPath));
+		setInstalling(false);
+	};
 
 	return (
 		<div className="flex h-full items-center justify-center overflow-y-auto p-6">
@@ -81,20 +86,39 @@ export function HtmlAppEmptyState({
 								<MingcuteCheckCircleFill className="size-3.5" />
 								Skills installed
 							</span>
-						) : null
-					}
-					expanded={setupExpanded}
-					onToggle={
-						skillsInstalled
-							? () => setSetupExpandedOverride(!setupExpanded)
-							: undefined
+						) : (
+							<span className="inline-flex items-center gap-1">
+								<Button
+									size="sm"
+									variant="ghost"
+									aria-expanded={showManualInstall}
+									onClick={() => setShowManualInstall(!showManualInstall)}
+								>
+									Install manually
+								</Button>
+								<Button
+									size="sm"
+									disabled={installing}
+									onClick={() => void installSkills()}
+								>
+									{installing ? "Installing..." : "Install"}
+								</Button>
+							</span>
+						)
 					}
 				>
-					<CopyBlock
-						value={INSTALL_COMMAND}
-						label="Command"
-						ariaLabel="Copy install command"
-					/>
+					{showManualInstall && !skillsInstalled ? (
+						<>
+							<p className="text-xs text-muted-foreground">
+								Run this in your terminal:
+							</p>
+							<CopyBlock
+								value={INSTALL_COMMAND}
+								label="Command"
+								ariaLabel="Copy install command"
+							/>
+						</>
+					) : null}
 				</Section>
 
 				<Section step="2" title="Prompt your agent">
@@ -103,7 +127,6 @@ export function HtmlAppEmptyState({
 						display={buildPrompt(tildePath(path))}
 						label="Prompt"
 						ariaLabel="Copy prompt"
-						multiline
 					/>
 				</Section>
 			</div>
@@ -115,49 +138,23 @@ function Section({
 	step,
 	title,
 	indicator,
-	expanded,
-	onToggle,
 	children,
 }: {
 	step: string;
 	title: string;
 	indicator?: React.ReactNode;
-	expanded?: boolean;
-	onToggle?: () => void;
-	children: React.ReactNode;
+	children?: React.ReactNode;
 }) {
-	const header = (
-		<>
-			<span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[11px] font-semibold text-primary">
-				{step}
-			</span>
-			<span className="text-xs font-medium text-foreground">{title}</span>
-			<span className="ms-auto inline-flex items-center gap-2">
-				{indicator}
-				{onToggle ? (
-					<MingcuteRightLine
-						className={`size-3.5 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`}
-					/>
-				) : null}
-			</span>
-		</>
-	);
-
 	return (
 		<div className="flex flex-col gap-2">
-			{onToggle ? (
-				<button
-					type="button"
-					aria-expanded={expanded}
-					onClick={onToggle}
-					className="flex items-center gap-2 text-start"
-				>
-					{header}
-				</button>
-			) : (
-				<div className="flex items-center gap-2">{header}</div>
-			)}
-			{onToggle && !expanded ? null : children}
+			<div className="flex items-center gap-2">
+				<span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[11px] font-semibold text-primary">
+					{step}
+				</span>
+				<span className="text-xs font-medium text-foreground">{title}</span>
+				<span className="ms-auto inline-flex items-center">{indicator}</span>
+			</div>
+			{children}
 		</div>
 	);
 }
@@ -167,23 +164,15 @@ function CopyBlock({
 	display,
 	label,
 	ariaLabel,
-	multiline,
 }: {
 	value: string;
 	display?: string;
 	label: string;
 	ariaLabel: string;
-	multiline?: boolean;
 }) {
 	return (
 		<div className="flex items-start gap-2 rounded-sm border border-border bg-muted/40 p-2">
-			<code
-				className={
-					multiline
-						? "min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground"
-						: "min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-xs text-foreground"
-				}
-			>
+			<code className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
 				{display ?? value}
 			</code>
 			<Button
