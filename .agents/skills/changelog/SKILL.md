@@ -1,6 +1,8 @@
 ---
 name: changelog
 description: Add a user-facing entry to CHANGELOG.md for work that just landed. Use when wrapping up a feature/fix, or when asked to record what changed. Called standalone or from the `done` skill.
+metadata:
+  internal: true
 ---
 
 # Changelog

@@ -89,7 +89,14 @@
 		},
 		"icon": "assets/icon.icns",
 		"files": [
-			"out/**"
+			"out/**",
+			"!out/skills/**"
+		],
+		"extraResources": [
+			{
+				"from": "out/skills",
+				"to": "skills"
+			}
 		],
 		"publish": [
 			{

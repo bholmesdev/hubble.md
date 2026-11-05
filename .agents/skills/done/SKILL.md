@@ -1,6 +1,8 @@
 ---
-title: Done with the current feature
+name: done
 description: Use this skill when the human has decide we're done working on the feature, and we're ready to merge into main.
+metadata:
+  internal: true
 ---
 
 Before committing, record what shipped: follow the `changelog` skill to add a user-facing entry under `## [Unreleased]` in `CHANGELOG.md`. Skip only if the work is internal-only (no user-visible effect).

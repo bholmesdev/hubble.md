@@ -3,6 +3,7 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	type AppCommandId,
 	type CommandBindings,
@@ -55,8 +56,10 @@ import {
 	SEARCH_MIN_QUERY_LENGTH,
 } from "../src/lib/searchContent";
 import type { ThemePreference } from "../src/theme";
+import { AgentSkills } from "./agentSkills";
 import { DeleteUndo } from "./deleteUndo";
 import { readNotePreviews } from "./notePreviews";
+import publishedSkillHashes from "./publishedSkillHashes.json";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
 import {
@@ -150,6 +153,23 @@ const telemetry = new TelemetryManager({
 	canSend: app.isPackaged && process.env.HUBBLE_TELEMETRY_DISABLED !== "1",
 	version: app.getVersion(),
 	userAgent: () => session.defaultSession.getUserAgent(),
+});
+const agentSkills = new AgentSkills({
+	// The build copies the user-facing skills into out/skills (see
+	// bundleUserSkills), which packaging moves to Resources/skills. Dev reads
+	// out/skills directly: its wrapper app counts as packaged but has no
+	// Resources/skills.
+	bundleDir: isDev
+		? fileURLToPath(new URL("../skills", import.meta.url))
+		: path.join(process.resourcesPath, "skills"),
+	targetDirs: [
+		path.join(os.homedir(), ".agents", "skills"),
+		path.join(os.homedir(), ".claude", "skills"),
+	],
+	manifestPath: path.join(app.getPath("userData"), "agent-skills.json"),
+	appVersion: app.getVersion(),
+	publishedHashes: publishedSkillHashes,
+	skillsCliLockPath: path.join(os.homedir(), ".agents", ".skill-lock.json"),
 });
 
 if (isDev && process.env.HUBBLE_DESKTOP_ENABLE_CDP === "1") {
@@ -660,28 +680,21 @@ async function assertGrantedOrConfirmFile(filePath: string): Promise<string> {
 	}
 }
 
-// HUBBLE_SKILL_DIR_NAMES tracks the skill folders in
-// github.com/bholmesdev/hubble-skills and must be updated if those skills are
-// renamed; the /hubble/ substring match is a resilient fallback.
-const HUBBLE_SKILL_DIR_NAMES = ["create-html-app", "embed-html-app"];
-
-async function skillsDirHasHubble(dirPath: string): Promise<boolean> {
+async function readdirOrEmpty(dirPath: string): Promise<string[]> {
 	try {
-		const entries = await fs.readdir(dirPath);
-		return entries.some((name) => {
-			const lower = name.toLocaleLowerCase();
-			return HUBBLE_SKILL_DIR_NAMES.includes(lower) || lower.includes("hubble");
-		});
+		return await fs.readdir(dirPath);
 	} catch {
-		return false;
+		return [];
 	}
 }
 
 /**
- * Detects Hubble skills across the workspace and the user's global agent
- * folders. Runs in the main process because the global paths live outside the
- * renderer's granted file scope. Fast and ENOENT-quiet: every location is probed
- * in parallel and missing paths resolve to false.
+ * Checks that every bundled Hubble skill is in the workspace or the user's
+ * global agent folders. Matches by folder name, so copies from the skills CLI
+ * count too. A partial install reports false, so the Install button can add
+ * the missing skills. Runs in the main process because the global paths live
+ * outside the renderer's granted file scope. Every location is read in
+ * parallel, and missing folders count as empty.
  */
 async function detectHubbleSkills(workspacePath: unknown): Promise<boolean> {
 	const workspace = typeof workspacePath === "string" ? workspacePath : null;
@@ -691,8 +704,30 @@ async function detectHubbleSkills(workspacePath: unknown): Promise<boolean> {
 		path.join(root, ".agents", "skills"),
 	]);
 
-	const results = await Promise.all(skillDirs.map(skillsDirHasHubble));
-	return results.some(Boolean);
+	const [skillNames, entries] = await Promise.all([
+		agentSkills.bundledSkillNames(),
+		Promise.all(skillDirs.map(readdirOrEmpty)),
+	]);
+	const present = new Set(entries.flat());
+	return skillNames.every((name) => present.has(name));
+}
+
+async function installAgentSkills(): Promise<void> {
+	const result = await agentSkills.install();
+	if (result.skipped.length > 0) {
+		await dialog.showMessageBox(mainWindow ?? undefined, {
+			type: "info",
+			message: "Some skills were left as they are",
+			detail: `These folders hold a skill Hubble didn't install, or one you edited, so Hubble won't update them. Delete them and install again to let Hubble manage them.\n\n${result.skipped.map(tildePath).join("\n")}`,
+		});
+	}
+}
+
+function tildePath(filePath: string): string {
+	const home = os.homedir();
+	return filePath.startsWith(`${home}/`)
+		? `~${filePath.slice(home.length)}`
+		: filePath;
 }
 
 function firstExistingFileArg(args: string[]): string | null {
@@ -1095,6 +1130,11 @@ function buildMenu() {
 					id: "whats-new",
 					label: "See what's new",
 					click: () => sendToRenderer("desktop:menu-open-changelog"),
+				},
+				{
+					id: "install-agent-skills",
+					label: "Install Agent Skills",
+					click: () => void installAgentSkills(),
 				},
 			],
 		},
@@ -1658,6 +1698,8 @@ function registerIpc() {
 		async (_event, { workspacePath }) => detectHubbleSkills(workspacePath),
 	);
 
+	ipcMain.handle("desktop:install-agent-skills", () => installAgentSkills());
+
 	ipcMain.handle(
 		"desktop:persist-pasted-image",
 		async (_event, { filePath, bytes, mimeType }) => {
@@ -2190,6 +2232,13 @@ if (!singleInstanceLock) {
 		registerIpc();
 		buildMenu();
 		configureAutoUpdates();
+		// Dev and e2e runs skip this so they never rewrite the user's real agent
+		// folders. Set HUBBLE_DESKTOP_SYNC_AGENT_SKILLS=1 to test it in dev.
+		if (!isDev || process.env.HUBBLE_DESKTOP_SYNC_AGENT_SKILLS === "1") {
+			void agentSkills.sync().catch((error) => {
+				console.error("Failed to sync agent skills", error);
+			});
+		}
 		appBootstrapped = true;
 		await ensureMainWindow();
 	});

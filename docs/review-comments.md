@@ -62,11 +62,11 @@ should:
 5. Preserve CriticMarkup markers, unknown review metadata, and unrelated Markdown.
 
 Install the companion skill to give an agent a reusable workflow for this
-handoff:
+handoff. In Hubble, choose Help → Install Agent Skills, or run:
 
 ```bash
-npx skills add bholmesdev/hubble-skills --skill review-markdown-comments
+npx skills add bholmesdev/hubble.md --skill review-markdown-comments
 ```
 
-[`review-markdown-comments`](https://github.com/bholmesdev/hubble-skills/blob/main/skills/review-markdown-comments/SKILL.md)
+[`review-markdown-comments`](../.agents/skills/review-markdown-comments/SKILL.md)
 handles the file-backed reply and resolve workflow described above.

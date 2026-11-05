@@ -2,6 +2,7 @@
 name: create-pr
 description: Open a pull request for the current branch. Use whenever asked to make/create/open a PR.
 metadata:
+  internal: true
   credits:
     skill: show-me
     author: Dex Horthy

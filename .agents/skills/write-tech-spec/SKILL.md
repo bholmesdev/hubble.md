@@ -1,6 +1,8 @@
 ---
 name: write-tech-spec
 description: Write a TECH.md spec for a significant Hubble feature after researching the monorepo architecture. Use when the user asks for a technical spec, implementation plan, architecture plan, or package/app/module breakdown tied to product behavior.
+metadata:
+  internal: true
 ---
 
 # write-tech-spec

@@ -1,6 +1,8 @@
 ---
 name: triage
 description: Triage an incoming GitHub, Jira, Linear, or other issue-tracker issue against the current codebase and related issues, then return a structured decision with exactly one triage state. Use whenever the user asks to triage, classify, assess, prioritize, or label an issue for implementation readiness, especially when an issue URL, key, or number is supplied in the prompt.
+metadata:
+  internal: true
 ---
 
 # Triage

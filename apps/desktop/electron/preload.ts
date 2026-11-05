@@ -47,6 +47,9 @@ const desktopApi = {
 		ipcRenderer.invoke("desktop:search-file-contents", input),
 	detectHubbleSkills: (workspacePath) =>
 		ipcRenderer.invoke("desktop:detect-hubble-skills", { workspacePath }),
+	installAgentSkills: async () => {
+		await ipcRenderer.invoke("desktop:install-agent-skills");
+	},
 	writeFileText: (path, content) => {
 		// Encode in the renderer before IPC. Main should write these bytes as-is,
 		// because re-encoding the string there has truncated multibyte characters.
