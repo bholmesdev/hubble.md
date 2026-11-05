@@ -1,23 +1,21 @@
 ## Summary
-<!-- One or two sentences, then the smallest visual that makes the change clear: a diff sketch, call tree, component tree, file tree, pseudocode, or Mermaid diagram. -->
+<!-- A sentence or two, then the smallest visual that makes the change clear (diff sketch, tree, or diagram). -->
 <!-- Link related issues with #issue-number. This is **required** for feature requests! -->
 
 Closes #<issue-number>
 
 ## Verification
-<!-- Show that it works. User-visible changes need before/after screenshots or a screen recording. -->
-<!-- Otherwise, show the test or command output that failed before and passes now. List edge cases you tested, and any you didn't. -->
+<!-- Before/after screenshots or a recording for user-visible changes; otherwise test or command output. -->
 
 **Before:**
 
 **After:**
 
 ## Impact
-<!-- Who and what this touches: screens, flows, platforms (macOS/Windows/Linux), file formats, consumers of shared packages. -->
-<!-- Call out sensitive areas: file system access, auth, data migrations, dependency bumps, build/release config. -->
+<!-- What this touches and who would notice if it broke. -->
 
 ## Rollback
-<!-- The exact steps to undo this if it causes an incident. Say whether it's a two-way door (revert and ship) or a one-way door (data, file, or config changes a revert won't undo). -->
+<!-- The exact steps to undo this during an incident, including anything a revert won't undo. -->
 
 1. Revert this PR on `main`.
 2. Ship a release.
