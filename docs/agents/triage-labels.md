@@ -1,6 +1,6 @@
 # Triage Labels
 
-Every open issue should carry **exactly one** triage-state label. Bug/feature templates pre-apply `needs-triage`; the `Triage New Issues` workflow also seeds `needs-triage` on open when no triage-state label is present (blank issues, CLI/API creates, template misses). The triage agent then replaces that with a decision label when it can.
+Every open issue should carry **exactly one** triage-state label. Bug/feature templates pre-apply `needs-triage`. The scheduled `issue-pipeline` skill treats open issues with no triage-state label (blank issues, CLI/API creates, template misses) the same as `needs-triage`, and replaces it with a decision label.
 
 | Label                | Meaning                                                                             |
 | -------------------- | ----------------------------------------------------------------------------------- |
