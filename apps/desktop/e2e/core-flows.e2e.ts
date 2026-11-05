@@ -153,17 +153,14 @@ test("shows the tab strip only while a second tab is open", async ({
 test("draws a shape in a diagram and saves it", async ({ hubble }) => {
 	const file = path.join(hubble.workspace, "flow.tldr");
 	await fs.writeFile(file, "");
+	// test:e2e builds with this environment. Without a tldraw license key the
+	// build leaves diagrams out, and opening a .tldr file hands it to another app.
+	test.skip(
+		!process.env.VITE_TLDRAW_LICENSE_KEY,
+		"This build has no tldraw license key.",
+	);
 	const page = await hubble.launch();
-
-	// Builds without a tldraw license key leave diagrams out, and opening a
-	// .tldr file there hands it to another app.
-	await expect(
-		page.getByRole("button", { name: "New HTML app" }),
-	).toBeVisible();
-	const diagramsEnabled = await page
-		.getByRole("button", { name: "New diagram" })
-		.isVisible();
-	test.skip(!diagramsEnabled, "This build has no tldraw license key.");
+	await expect(page.getByRole("button", { name: "New diagram" })).toBeVisible();
 
 	await sidebarFile(page, "flow.tldr").click();
 	const canvas = page.locator("[data-hubble-diagram] .tl-canvas");
