@@ -1,24 +1,24 @@
-## Description
-<!-- Provide a clear and concise description of your changes -->
-<!-- Link to any related issues using #issue-number. This is **required** for feature requests! -->
+## Summary
+<!-- A sentence or two, then the smallest visual that makes the change clear (diff sketch, tree, or diagram). -->
+<!-- Link related issues with #issue-number. This is **required** for feature requests! -->
 
 Closes #<issue-number>
 
-## Type of Change
-<!-- Mark the relevant option with an "x" -->
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Documentation update
+## Verification
+<!-- Before/after screenshots or a recording for user-visible changes; otherwise test or command output. -->
 
-## Testing
-<!-- Describe the tests you ran to verify your changes -->
+**Before:**
 
-- [ ] Existing tests pass
-- [ ] Added new tests for changes
-- [ ] Tested manually (describe below)
+**After:**
 
-**Manual Testing Details:**
-<!-- If applicable, describe how you manually tested these changes. Include screenshots if applicable -->
+## Impact
+<!-- What this touches and who would notice if it broke. -->
+
+## Rollback
+<!-- The exact steps to undo this during an incident, including anything a revert won't undo. -->
+
+1. Revert this PR on `main`.
+2. Ship a release.
 
 ## Checklist
 
