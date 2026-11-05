@@ -9,7 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Install the Hubble agent skills from inside Hubble, and they stay up to date as Hubble updates, including copies you installed with `npx skills`.
+- Install the Hubble agent skills from inside Hubble, and they stay up to date as Hubble updates, including copies you installed with `npx skills`. [#337](https://github.com/bholmesdev/hubble.md/pull/337)
 
 ### Changed
 
