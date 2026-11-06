@@ -1,0 +1,25 @@
+diff --git a/dist/keymatch.js b/dist/keymatch.js
+index 8f88078a806058e074dd92e289eb2d1983f56bd2..4b81919668cdce7a6383d56ef150e8d82de21c43 100644
+--- a/dist/keymatch.js
++++ b/dist/keymatch.js
+@@ -66,11 +66,16 @@ function normalizeKey(key) {
+     return keyMap[normalized] || normalized;
+ }
+ /**
+- * Derive a normalized base key from a KeyboardEvent, preferring `code` for letters/digits.
+- * This ensures Option/Alt dead-key compositions on macOS (e.g. Option+O => 'ø')
+- * still match the intended base key ('o').
++ * Derive a normalized base key from a KeyboardEvent.
++ * Alt keeps the `code` path, so Option/Alt dead-key compositions on macOS
++ * (e.g. Option+O => 'ø') still match the intended base key ('o').
+  */
+-function normalizedEventKey({ code, key }) {
++function normalizedEventKey({ code, key, altKey }) {
++    // Letters and digits follow the layout's character, unless Alt is held
++    // or the key is not an ASCII letter or digit.
++    if (!altKey && /^[a-zA-Z0-9]$/.test(key)) {
++        return key.toLowerCase();
++    }
+     if (code) {
+         if (/^Key[A-Z]$/.test(code)) {
+             // e.g. KeyO => 'o'

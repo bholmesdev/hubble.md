@@ -188,8 +188,11 @@ export function shortcutBindingFromEvent(
 		ArrowRight: "Right",
 		ArrowUp: "Up",
 	};
-	// Read punctuation by physical key: Option and Shift change event.key
-	// (Option+[ types “), which Electron can't use as an accelerator.
+	// Letters and digits follow the layout (Dvorak types "b" on QWERTY's N),
+	// unless Alt is held. Same rule as keymatch, so a binding fires from the
+	// key that recorded it. Read punctuation by physical key: Option and Shift
+	// change event.key (Option+[ types “), which Electron can't use as an
+	// accelerator.
 	const punctuationKeys: Record<string, string> = {
 		Backquote: "`",
 		Backslash: "\\",
@@ -203,11 +206,14 @@ export function shortcutBindingFromEvent(
 		Semicolon: ";",
 		Slash: "/",
 	};
-	const key = /^Key[A-Z]$/.test(event.code)
-		? event.code.slice(3)
-		: /^Digit[0-9]$/.test(event.code)
-			? event.code.slice(5)
-			: (punctuationKeys[event.code] ?? keyAliases[event.key] ?? event.key);
+	const key =
+		!event.altKey && /^[a-zA-Z0-9]$/.test(event.key)
+			? event.key
+			: /^Key[A-Z]$/.test(event.code)
+				? event.code.slice(3)
+				: /^Digit[0-9]$/.test(event.code)
+					? event.code.slice(5)
+					: (punctuationKeys[event.code] ?? keyAliases[event.key] ?? event.key);
 	if (["Alt", "Control", "Meta", "Shift"].includes(key)) return null;
 
 	const parts: string[] = [];

@@ -15,6 +15,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Keyboard shortcuts follow the active keyboard layout (Dvorak, Colemak, AZERTY, QWERTZ) instead of the QWERTY key position. Thanks [@lenshinanatali-sys](https://github.com/lenshinanatali-sys)! [#333](https://github.com/bholmesdev/hubble.md/pull/333)
+
 ## [0.3.4] - 2026-11-01
 
 ### Changed
