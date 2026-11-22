@@ -91,6 +91,31 @@ test("edits an existing note and saves it", async ({ hubble }) => {
 		.toBe("# Existing\n\nHello world");
 });
 
+test("switches a Markdown note between rich text and source", async ({
+	hubble,
+}) => {
+	const page = await hubble.launch();
+	await sidebarFile(page, "existing.md").click();
+	await expect(editor(page)).toContainText("Hello");
+
+	const sourceButton = page.getByRole("button", {
+		name: "Markdown source",
+		exact: true,
+	});
+	await expect(sourceButton).toHaveAttribute("aria-pressed", "false");
+	await sourceButton.click();
+	await expect(sourceButton).toHaveAttribute("aria-pressed", "true");
+	await expect(
+		page.locator("[data-note-body]").getByLabel("Markdown source", {
+			exact: true,
+		}),
+	).toContainText("# Existing");
+
+	await sourceButton.click();
+	await expect(sourceButton).toHaveAttribute("aria-pressed", "false");
+	await expect(editor(page)).toContainText("Hello");
+});
+
 test("renames a note from the sidebar and keeps it open", async ({
 	hubble,
 }) => {

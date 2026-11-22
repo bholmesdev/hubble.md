@@ -79,6 +79,10 @@ export function FileInfoBar({
 	const titlePath = filePathForTitlePreview(currentPath, titlePreview);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const compact = useCompactWindow();
+	const isSourceMode = useStoreValue(
+		viewerStore,
+		(state) => state.viewMode === "source",
+	);
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
 	const [showBorder, setShowBorder] = useState(false);
 
@@ -165,6 +169,23 @@ export function FileInfoBar({
 			>
 				<div className="flex items-center gap-1" style={noDragStyle}>
 					<div data-file-info-actions className="flex items-center gap-1">
+						{actionPath && hasMarkdownExtension(actionPath) ? (
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label="Markdown source"
+								aria-pressed={isSourceMode}
+								title={isSourceMode ? "Edit rich text" : "Edit source"}
+								className={
+									isSourceMode
+										? "border-border bg-background text-foreground"
+										: undefined
+								}
+								onClick={() => setViewerMode(isSourceMode ? "rich" : "source")}
+							>
+								<MingcuteCodeLine className="size-4" />
+							</Button>
+						) : null}
 						{comments ? <ReviewCommentSummary {...comments} /> : null}
 						<ActionsMenu
 							path={actionPath}
