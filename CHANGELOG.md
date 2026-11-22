@@ -10,7 +10,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Added
 
 - Install the Hubble agent skills from inside Hubble, and they stay up to date as Hubble updates, including copies you installed with `npx skills`. [#337](https://github.com/bholmesdev/hubble.md/pull/337)
-- Switch a Markdown note between rich text and source from the file info bar. Thanks [@hwong103](https://github.com/hwong103)! [#TBD](https://github.com/bholmesdev/hubble.md/pull/TBD)
+- Switch a Markdown note between rich text and source from the file info bar. Thanks [@hwong103](https://github.com/hwong103)! [#345](https://github.com/bholmesdev/hubble.md/pull/345)
 
 ### Changed
 
