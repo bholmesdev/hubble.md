@@ -16,6 +16,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Diagram edits stay saved when you switch files, rename a diagram, or close its tab. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
+
 ## [0.3.4] - 2026-11-01
 
 ### Changed

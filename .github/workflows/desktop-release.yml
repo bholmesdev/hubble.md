@@ -18,6 +18,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Require tldraw license key
+        env:
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
+        run: node scripts/require-tldraw-license.mjs
+
       - name: Verify tag matches desktop version
         run: |
           VERSION="$(node -p "require('./apps/desktop/package.json').version")"
@@ -60,6 +65,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Require tldraw license key
+        env:
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
+        run: node scripts/require-tldraw-license.mjs
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -127,6 +137,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Require tldraw license key
+        env:
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
+        run: node scripts/require-tldraw-license.mjs
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -181,6 +196,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Require tldraw license key
+        env:
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
+        run: node scripts/require-tldraw-license.mjs
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4

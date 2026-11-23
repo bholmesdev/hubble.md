@@ -4,20 +4,33 @@ import type { EditCommand, ZoomCommand } from "../desktopApi/types";
 
 // Like `getActiveEditor()` for TipTap: the open diagram's editor is an
 // imperative handle, so it lives here rather than in a store.
-let active: Editor | null = null;
+let active: {
+	editor: Editor;
+	path: string;
+	readDraft: () => string | undefined;
+} | null = null;
 
-export function setActiveDiagram(editor: Editor) {
-	active = editor;
+export function setActiveDiagram(
+	editor: Editor,
+	path: string,
+	readDraft: () => string | undefined,
+) {
+	active = { editor, path, readDraft };
 }
 
 export function clearActiveDiagram(editor: Editor) {
 	// An old editor may clean up after its replacement mounts.
-	if (active === editor) active = null;
+	if (active?.editor === editor) active = null;
 }
 
 export function getActiveDiagram(): Editor | null {
-	if (active?.isDisposed) return null;
-	return active;
+	return active && !active.editor.isDisposed ? active.editor : null;
+}
+
+/** Reads edits before the debounced save or store listener has run. */
+export function readDiagramDraft(path: string): string | undefined {
+	if (active?.path !== path || !getActiveDiagram()) return undefined;
+	return active.readDraft();
 }
 
 /**

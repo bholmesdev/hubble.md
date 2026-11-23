@@ -108,15 +108,27 @@ type DiagramSession = {
 	editor: Editor | null;
 	/** Last JSON written by this view or loaded from disk. */
 	content: string;
+	documentSnapshot: string | null;
 	saveTimer: number | null;
 };
 
+function readDiagramDraft(session: DiagramSession): string | undefined {
+	if (!session.editor) return undefined;
+	const snapshot = JSON.stringify(
+		session.editor.store.getStoreSnapshot("document"),
+	);
+	if (snapshot === session.documentSnapshot) return undefined;
+	session.documentSnapshot = snapshot;
+	session.content = serializeDiagram(session.editor.store);
+	return session.content;
+}
+
 function flushDiagramSave(session: DiagramSession) {
-	if (session.saveTimer === null || !session.editor) return;
-	window.clearTimeout(session.saveTimer);
+	const draft = readDiagramDraft(session);
+	if (session.saveTimer === null && draft === undefined) return;
+	if (session.saveTimer !== null) window.clearTimeout(session.saveTimer);
 	session.saveTimer = null;
-	const next = serializeDiagram(session.editor.store);
-	session.content = next;
+	const next = draft ?? session.content;
 	updateEditorContent(session.path, next);
 	void savePathContent(session.path, next);
 }
@@ -143,6 +155,7 @@ export function DiagramView({
 		path,
 		editor: null,
 		content,
+		documentSnapshot: null,
 		saveTimer: null,
 	});
 	const isDark = useSyncExternalStore(subscribeTheme, isDarkTheme);
@@ -151,13 +164,16 @@ export function DiagramView({
 	const handleMount = (editor: Editor) => {
 		const session = sessionRef.current;
 		session.editor = editor;
+		session.documentSnapshot = JSON.stringify(
+			editor.store.getStoreSnapshot("document"),
+		);
 		const stopLicenseWatch = react("diagram license", () => {
 			if (!isLicenseRejected(editor)) return;
 			licenseRejected = true;
 			flushDiagramSave(session);
 			setRejected(true);
 		});
-		setActiveDiagram(editor);
+		setActiveDiagram(editor, path, () => readDiagramDraft(session));
 		editor.user.updateUserPreferences({
 			colorScheme: isDarkTheme() ? "dark" : "light",
 		});
@@ -211,6 +227,9 @@ export function DiagramView({
 				document: next.store.getStoreSnapshot("document"),
 			});
 		});
+		session.documentSnapshot = JSON.stringify(
+			editor.store.getStoreSnapshot("document"),
+		);
 	}, [content]);
 
 	useEffect(() => {

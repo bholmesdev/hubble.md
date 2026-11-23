@@ -185,3 +185,69 @@ test("draws a shape in a diagram and saves it", async ({ hubble }) => {
 		})
 		.toBe(1);
 });
+
+for (const action of [
+	"navigate",
+	"switch tab",
+	"rename",
+	"close tab",
+] as const) {
+	test(`saves pending diagram edits before ${action}`, async ({ hubble }) => {
+		test.skip(
+			!process.env.VITE_TLDRAW_LICENSE_KEY,
+			"This build has no tldraw license key.",
+		);
+		const file = path.join(hubble.workspace, "flow.tldr");
+		await fs.writeFile(file, "");
+		const page = await hubble.launch();
+		await sidebarFile(page, "existing.md").click();
+		await page.getByRole("button", { name: /^New tab/ }).click();
+		await sidebarFile(page, "flow.tldr").click();
+		const canvas = page.locator("[data-hubble-diagram] .tl-canvas");
+		await expect(canvas).toBeVisible();
+		// Hold debounced saves so leaving the diagram must save the latest edit.
+		await page.evaluate(() => {
+			const original = window.setTimeout;
+			Object.defineProperty(window, "setTimeout", {
+				value: (handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
+					original(handler, timeout === 300 ? 60_000 : timeout, ...args),
+				configurable: true,
+				writable: true,
+			});
+		});
+		const box = await canvas.boundingBox();
+		if (!box) throw new Error("Diagram canvas has no size");
+		await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+		await page.keyboard.press("r");
+		await page.mouse.move(box.x + 200, box.y + 150);
+		await page.mouse.down();
+		await page.mouse.move(box.x + 400, box.y + 300, { steps: 5 });
+		await page.mouse.up();
+		await expect(page.locator(".tl-shape")).toHaveCount(1);
+
+		let savedPath = file;
+		if (action === "navigate") await sidebarFile(page, "existing.md").click();
+		if (action === "switch tab") await page.getByRole("tab").first().click();
+		if (action === "close tab") {
+			await page.getByRole("button", { name: /^Close flow/ }).click();
+		}
+		if (action === "rename") {
+			await page.getByRole("button", { name: "Actions for flow.tldr" }).click();
+			await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+			const input = page.getByRole("tree").getByRole("textbox");
+			await input.fill("renamed");
+			await input.press("Enter");
+			savedPath = path.join(hubble.workspace, "renamed.tldr");
+		}
+		await expect
+			.poll(async () => {
+				const saved = JSON.parse((await readDisk(savedPath)) || "{}");
+				return (saved.records ?? []).filter(
+					(record: { typeName: string }) => record.typeName === "shape",
+				).length;
+			})
+			.toBe(1);
+		await sidebarFile(page, path.basename(savedPath)).click();
+		await expect(page.locator(".tl-shape")).toHaveCount(1);
+	});
+}

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import changelogRaw from "../../../../CHANGELOG.md?raw";
 import { desktopApi } from "../desktopApi";
 import type { TelemetryChoice, WorkspaceDelta } from "../desktopApi/types";
+import { readDiagramDraft } from "../editor/diagramCommands";
 import { classifyFileChange } from "../externalFileChange";
 import {
 	isChangelogPath,
@@ -887,9 +888,14 @@ async function savePathContentNow(
 	if (isVirtualPath(path) || !isEditableFile(path)) return;
 	// A save already queued by the editor must not recreate a staged deletion.
 	if (!options?.allowBlocked && deletionActions.isSaveBlocked(path)) return;
+	if (viewerStore.get().currentPath !== path) return;
+	const draft = readDiagramDraft(path);
+	if (draft !== undefined) {
+		content = draft;
+		updateEditorContent(path, content);
+	}
 	const current = viewerStore.get();
 	const force = options?.force === true;
-	if (current.currentPath !== path) return;
 	if (!force && current.externalChange.kind === "conflict") return;
 	if (!force && current.content === content && content === getBaseline(current))
 		return;
