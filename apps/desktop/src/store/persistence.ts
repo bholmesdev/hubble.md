@@ -1,5 +1,6 @@
 import { type CommandBindings, cleanCommandBindings } from "@hubble.md/editor";
 import { z } from "zod";
+import { CHAT_CONTEXT_LIMIT, chatMessageSchema } from "../desktopApi/chat";
 import type { ThemePreference } from "../theme";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
 import {
@@ -195,8 +196,22 @@ const closedTabSchema = z.object({
 	index: z.number().int().nonnegative(),
 });
 
+const chatSchema = z.object({
+	messages: z.array(chatMessageSchema).max(100),
+	draft: z.string().max(CHAT_CONTEXT_LIMIT),
+	model: z.string().max(200),
+});
+
 const tabSessionSchema = z
 	.object({
+		ids: z.record(z.string(), z.string().uuid()).optional().catch(undefined),
+		chats: z
+			.record(
+				z.string(),
+				chatSchema.catch({ messages: [], draft: "", model: "" }),
+			)
+			.optional()
+			.catch(undefined),
 		paths: z
 			.array(z.string().min(1).catch(""))
 			.transform((paths) => [...new Set(paths.filter(Boolean))]),
@@ -207,7 +222,9 @@ const tabSessionSchema = z
 			.transform((closed) => closed.slice(-MAX_CLOSED_TABS)),
 	})
 	.transform(
-		({ paths, activePath, closed }): TabSession => ({
+		({ paths, activePath, closed, ids, chats }): TabSession => ({
+			ids,
+			chats,
 			closed,
 			paths,
 			activePath:

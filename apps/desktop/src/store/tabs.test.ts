@@ -4,6 +4,8 @@ import {
 	nextActiveTabId,
 	type TabsState,
 	tabLabels,
+	tabSession,
+	tabsFromSession,
 	withBackgroundTab,
 	withClosedTab,
 	withOpenedTab,
@@ -12,7 +14,7 @@ import {
 	withRewrittenTabPaths,
 } from "./tabs";
 
-/** Fixed ids keep assertions readable; only `withOpenedTab` mints real ones. */
+/** Fixed IDs keep tab assertions readable. */
 function strip(paths: Record<string, string>, activeTabId: string | null) {
 	return {
 		closed: [],
@@ -175,4 +177,51 @@ describe("reordering tabs", () => {
 		expect(withReorderedTab(before, "missing", 0)).toBe(before);
 		expect(withReorderedTab(before, "b", 1)).toBe(before);
 	});
+});
+
+it("migrates path-only sessions to stable unique tab IDs across restores", () => {
+	const first = tabsFromSession({
+		paths: ["/w/one.md", "/w/two.md"],
+		activePath: "/w/two.md",
+	});
+	const restored = tabsFromSession(tabSession(first));
+	expect(restored.order).toEqual(first.order);
+	expect(restored.activeTabId).toBe(first.activeTabId);
+	const extra = withOpenedTab(restored, "/w/three.md", "new");
+	expect(new Set(extra.order).size).toBe(3);
+	expect(first.order.every((id) => /^[0-9a-f-]{36}$/.test(id))).toBe(true);
+});
+
+it("serializes a conversation and restores an interrupted reply as stopped", () => {
+	const tabs = withOpenedTab(emptyTabs(), "/notes/a.md");
+	const id = tabs.order[0];
+	tabs.byId[id].chat = {
+		messages: [
+			{ id: "user", role: "user", text: "Question", status: "complete" },
+			{
+				id: "reply",
+				role: "assistant",
+				text: "Partial reply",
+				status: "streaming",
+			},
+		],
+		draft: "Unsent draft",
+		model: "chosen-model",
+	};
+	const session = JSON.parse(JSON.stringify(tabSession(tabs)));
+	const restored = tabsFromSession(session);
+	expect(restored.byId[id].chat).toEqual({
+		messages: [
+			{ id: "user", role: "user", text: "Question", status: "complete" },
+			{
+				id: "reply",
+				role: "assistant",
+				text: "Partial reply",
+				status: "stopped",
+			},
+		],
+		draft: "Unsent draft",
+		model: "chosen-model",
+	});
+	expect(tabs.byId[id].chat?.messages[1].status).toBe("streaming");
 });

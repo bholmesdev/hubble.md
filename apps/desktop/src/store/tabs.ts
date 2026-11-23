@@ -1,9 +1,10 @@
+import type { ChatConversation } from "../desktopApi/chat";
 import { isChangelogPath } from "../lib/changelogNote";
 import { fileStem, pathEquals } from "../lib/filePath";
 import { isNewTabPath } from "../lib/newTabPage";
 
-/** Tabs hold paths; DocumentState holds the active document's contents. */
-export type Tab = { path: string };
+/** A tab owns its navigation target and conversation. */
+export type Tab = { path: string; chat?: ChatConversation };
 
 export type TabId = string;
 
@@ -19,6 +20,8 @@ export type TabsState = {
 };
 
 export type TabSession = {
+	ids?: Record<string, TabId>;
+	chats?: Record<TabId, ChatConversation>;
 	closed?: ClosedTab[];
 	paths: string[];
 	activePath: string | null;
@@ -26,6 +29,13 @@ export type TabSession = {
 
 export function tabSession(tabs: TabsState): TabSession {
 	return {
+		ids: Object.fromEntries(tabs.order.map((id) => [tabs.byId[id].path, id])),
+		chats: Object.fromEntries(
+			tabs.order.flatMap((id) => {
+				const chat = tabs.byId[id].chat;
+				return chat ? [[id, chat]] : [];
+			}),
+		),
 		closed: tabs.closed,
 		paths: tabs.order.map((id) => tabs.byId[id].path),
 		activePath: tabs.activeTabId
@@ -35,10 +45,27 @@ export function tabSession(tabs: TabsState): TabSession {
 }
 
 export function tabsFromSession(session?: TabSession): TabsState {
-	let tabs = emptyTabs();
+	const tabs = emptyTabs();
 	for (const path of session?.paths ?? []) {
-		tabs = withOpenedTab(tabs, path, "new");
+		if (findTabByPath(tabs, path)) continue;
+		const saved = session?.ids?.[path];
+		const id = saved && !tabs.byId[saved] ? saved : mintTabId();
+		const chat = session?.chats?.[id];
+		tabs.order.push(id);
+		tabs.byId[id] = { path };
+		if (chat) {
+			tabs.byId[id].chat = {
+				...chat,
+				// A saved stream cannot resume after a workspace change or restart.
+				messages: chat.messages.map((message) =>
+					message.status === "streaming"
+						? { ...message, status: "stopped" }
+						: message,
+				),
+			};
+		}
 	}
+
 	return {
 		...tabs,
 		closed: session?.closed ?? [],
@@ -58,12 +85,8 @@ export const emptyTabs = (): TabsState => ({
 	byId: {},
 });
 
-// Keep tab identity stable when a file is renamed or moved.
-let lastTabId = 0;
-
 function mintTabId(): TabId {
-	lastTabId += 1;
-	return `tab-${lastTabId}`;
+	return crypto.randomUUID();
 }
 
 export function findTabByPath(tabs: TabsState, path: string): TabId | null {
@@ -88,7 +111,7 @@ export function withOpenedTab(
 			return {
 				...tabs,
 				activeTabId: id,
-				byId: { ...tabs.byId, [id]: { path } },
+				byId: { ...tabs.byId, [id]: { ...tabs.byId[id], path } },
 			};
 		}
 	}

@@ -15,13 +15,13 @@ import { toast } from "sonner";
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteArrowLeftLine from "~icons/mingcute/arrow-left-line";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
-import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDeleteLine from "~icons/mingcute/delete-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
+import MingcuteOpenaiLine from "~icons/mingcute/openai-line";
 import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { desktopApi } from "../desktopApi";
 import type { AgentClient } from "../desktopApi/types";
@@ -62,7 +62,7 @@ import {
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
-import { ClaudeLogo, CodexLogo } from "./AgentLogos";
+import { ClaudeLogo } from "./AgentLogos";
 import { TOGGLE_CHAT_EVENT } from "./ChatPanel";
 
 const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
@@ -182,7 +182,7 @@ export function FileInfoBar({
 							title="ChatGPT chat"
 							onClick={() => window.dispatchEvent(new Event(TOGGLE_CHAT_EVENT))}
 						>
-							<MingcuteChat3Line className="size-3.5" />
+							<MingcuteOpenaiLine aria-hidden="true" className="size-3.5" />
 						</Button>
 						{comments ? <ReviewCommentSummary {...comments} /> : null}
 						<ActionsMenu
@@ -347,7 +347,10 @@ function ActionsMenu({
 									className={menuItemClass}
 									onClick={() => void openInAgent("codex")}
 								>
-									<CodexLogo className="size-3 shrink-0" />
+									<MingcuteOpenaiLine
+										aria-hidden="true"
+										className="size-3 shrink-0"
+									/>
 									<span className="min-w-0 flex-1">Open in Codex</span>
 								</Menu.Item>
 								<Menu.Item

@@ -1005,8 +1005,16 @@ function App() {
 					<TerminalPanel />
 				</section>
 				<ChatPanel
-					key={workspacePath ?? state.currentPath ?? "empty"}
-					filePath={state.currentPath}
+					key={tabs.activeTabId ?? "empty"}
+					tabId={tabs.activeTabId}
+					onOpenSettings={() => {
+						settingsRequestId.current += 1;
+						setSettingsTarget({
+							page: "chat",
+							requestId: settingsRequestId.current,
+						});
+						setSettingsOpen(true);
+					}}
 				/>
 			</div>
 			<GlobalSearchPalette
