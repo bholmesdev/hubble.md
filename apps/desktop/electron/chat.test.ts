@@ -83,9 +83,6 @@ function request(): ChatRequest {
 				role: "user",
 				text: "Explain this",
 				status: "complete",
-				quotes: [
-					{ id: "q1", source: "note.md", text: "Unsaved selected text" },
-				],
 			},
 		],
 	};
@@ -97,7 +94,7 @@ function stream(events: object[]) {
 }
 
 describe("ChatGPT IPC and Responses", () => {
-	it("sends explicit history and quotes with storage off, then streams only to its owner", async () => {
+	it("sends explicit message history with storage off, then streams only to its owner", async () => {
 		mocks.create.mockResolvedValue(
 			stream([
 				{ type: "response.output_text.delta", delta: "Hello" },
@@ -118,8 +115,7 @@ describe("ChatGPT IPC and Responses", () => {
 		expect(body.input).toEqual([
 			{
 				role: "user",
-				content:
-					"Explain this\n\nQuoted document passage 1 (note.md):\nUnsaved selected text",
+				content: "Explain this",
 			},
 		]);
 		expect(body).not.toHaveProperty("previous_response_id");
@@ -159,7 +155,6 @@ describe("ChatGPT IPC and Responses", () => {
 			role: "assistant",
 			status: "failed",
 			text: "Do not send this",
-			quotes: [],
 		});
 		mocks.create.mockResolvedValue(stream([{ type: "response.completed" }]));
 		await call("send", input);
@@ -208,8 +203,64 @@ describe("ChatGPT IPC and Responses", () => {
 	it("rejects oversized context before authentication or inference", async () => {
 		const input = request();
 		input.messages[0].text = "x".repeat(CHAT_CONTEXT_LIMIT);
+		input.messages.push({
+			id: "u2",
+			role: "user",
+			text: "One more character",
+			status: "complete",
+		});
 		await expect(call("send", input)).rejects.toThrow("too long");
 		expect(mocks.token).not.toHaveBeenCalled();
 		expect(mocks.create).not.toHaveBeenCalled();
 	});
+});
+
+it("sends attached file text through IPC without changing earlier request prefixes", async () => {
+	mocks.create.mockImplementation(() =>
+		Promise.resolve(stream([{ type: "response.completed" }])),
+	);
+	const input = request();
+	Object.assign(input.messages[0], {
+		file: {
+			path: "notes/a.md",
+			version: "snapshot-a",
+			text: "Original note contents",
+		},
+	});
+	await call("send", input);
+	const first = mocks.create.mock.calls[0][0].input;
+	expect(first[0].content).toContain("Original note contents");
+	input.messages.push({
+		id: "a1",
+		role: "assistant",
+		text: "Read it",
+		status: "complete",
+	});
+	input.messages.push({
+		id: "u2",
+		role: "user",
+		text: "Continue",
+		status: "complete",
+		...{ file: { path: "notes/a.md", version: "snapshot-a" } },
+	});
+	await call("send", input);
+	const second = mocks.create.mock.calls[1][0].input;
+	expect(second.slice(0, 1)).toEqual(first);
+	expect(second.at(-1).content).toContain("snapshot-a");
+	expect(JSON.stringify(second).match(/Original note contents/g)).toHaveLength(
+		1,
+	);
+});
+
+it("rejects file context that exceeds the request budget before calling OpenAI", async () => {
+	const input = request();
+	Object.assign(input.messages[0], {
+		file: {
+			path: "notes/a.md",
+			version: "snapshot-a",
+			text: "x".repeat(CHAT_CONTEXT_LIMIT),
+		},
+	});
+	await expect(call("send", input)).rejects.toThrow("Chat is too long");
+	expect(mocks.create).not.toHaveBeenCalled();
 });

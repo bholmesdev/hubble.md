@@ -1,26 +1,38 @@
 # ChatGPT chat prototype
 
-Run `pnpm dev:desktop`, then use the chat icon beside the note actions. Choose
-**Continue with ChatGPT**, complete browser authorization, and select an available
-model. An eligible ChatGPT Plus or Pro plan and permission to use that plan are
-required. Manage usage opens ChatGPT's app usage settings.
+Run `pnpm dev:desktop`, then open **Settings → Chat** and choose
+**Continue with ChatGPT**. Complete browser authorization with an eligible ChatGPT
+Plus or Pro plan and permission to use that plan. Reconnect, sign-out, and Manage
+usage are also in Settings → Chat.
 
-Select a passage in the rich text editor and choose **Add selection**. Quotes are
-snapshots of the live editor, including unsaved text. Send transmits the message,
-attached quotes, and completed conversation history. The model has no tools or
-filesystem access. Stop preserves partial text but excludes it from later context.
+Use the OpenAI icon beside the note actions to open chat. Select an available model
+beside **Send**. Sending includes the current text file, including unsaved edits,
+alongside your message and completed conversation history. The model has no tools
+or filesystem access.
+Stop preserves partial text but excludes it from later context.
 
 ## Prototype limits
 
-- Chats stay in memory. Closing the panel preserves them; switching folders,
-  changing a Loose File, signing out, or quitting clears them.
+- Each tab owns its conversation, draft, and model choice. App state persists
+  these in localStorage with stable tab IDs. Switching files in a tab, renaming,
+  switching workspaces, and restarting preserve them. Closing a tab or signing
+  out clears its chat. Switching tabs stops an in-progress reply and preserves
+  its partial text as incomplete. Reopening a closed tab starts a new chat.
 - One ChatGPT registration per app installation. Reconnect uses the same account
   and registration. Account switching and automatic token renewal are deferred;
   reconnect when the access token expires (normally after an hour).
-- Text and rich text selections only. No source-editor selection, saved-highlight
-  browser, source navigation, voice, file editing, or transcript sync.
-- Replies render as text. Context is capped at 80,000 characters and 100 messages.
-  Oversized chats require a new conversation or fewer quotes.
+- File context is captured on send, never while browsing. First use and edits add
+  full text snapshots at that turn; unchanged content references an earlier
+  snapshot in the same tab. Returning to a file or renaming it reuses identical
+  text. Earlier turns remain unchanged to preserve cacheable prefixes. All needed
+  history, including snapshots, is transmitted on each HTTP request; caching does
+  not remove it from the context window. New chat clears the snapshot history.
+- Markdown, HTML, plain text, and code files are supported. Binary files and
+  virtual pages are not attached. Sending waits while a text file loads or fails
+  to load, so another file's editor buffer cannot be included accidentally.
+- No selections, source navigation, voice, file editing, or transcript sync.
+- Replies render as text. Context, including file snapshots, is capped at 80,000 characters and 100 messages.
+  Oversized chats require a new conversation.
 
 ## Connection and credentials
 
