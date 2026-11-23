@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteArrowLeftLine from "~icons/mingcute/arrow-left-line";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
+import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDeleteLine from "~icons/mingcute/delete-line";
@@ -62,6 +63,7 @@ import {
 	workspacePathStore,
 } from "../store/state";
 import { ClaudeLogo, CodexLogo } from "./AgentLogos";
+import { TOGGLE_CHAT_EVENT } from "./ChatPanel";
 
 const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
 
@@ -173,6 +175,15 @@ export function FileInfoBar({
 			>
 				<div className="flex items-center gap-1" style={noDragStyle}>
 					<div data-file-info-actions className="flex items-center gap-1">
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label="Toggle ChatGPT chat"
+							title="ChatGPT chat"
+							onClick={() => window.dispatchEvent(new Event(TOGGLE_CHAT_EVENT))}
+						>
+							<MingcuteChat3Line className="size-3.5" />
+						</Button>
 						{comments ? <ReviewCommentSummary {...comments} /> : null}
 						<ActionsMenu
 							path={actionPath}

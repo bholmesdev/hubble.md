@@ -2,6 +2,13 @@ import type { CommandBindings } from "@hubble.md/editor";
 import type { FileKind } from "../lib/filePath";
 import type { NotePreview } from "../lib/titleGeneration";
 import type { ThemePreference } from "../theme";
+import type {
+	ChatAccount,
+	ChatDelta,
+	ChatModel,
+	ChatRequest,
+	ChatResult,
+} from "./chat";
 
 export type FileEntry = {
 	path: string;
@@ -153,6 +160,15 @@ export type SpellcheckState = {
 };
 
 export type DesktopApi = {
+	chatAccount(): Promise<ChatAccount>;
+	chatSignIn(): Promise<ChatAccount>;
+	chatCancelSignIn(): Promise<void>;
+	chatDisconnect(): Promise<void>;
+	chatModels(): Promise<ChatModel[]>;
+	chatSend(input: ChatRequest): Promise<ChatResult>;
+	chatStop(id: string): Promise<void>;
+	onChatDelta(callback: (delta: ChatDelta) => void): Unsubscribe;
+
 	platform: DesktopPlatform;
 	homeDir: string;
 	listDirectory(path: string): Promise<DirectoryListing>;

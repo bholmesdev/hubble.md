@@ -60,6 +60,7 @@ import {
 } from "../src/lib/searchContent";
 import type { ThemePreference } from "../src/theme";
 import { AgentSkills } from "./agentSkills";
+import { setupChatIpc } from "./chat";
 import { DeleteUndo } from "./deleteUndo";
 import { readNotePreviews } from "./notePreviews";
 import publishedSkillHashes from "./publishedSkillHashes.json";
@@ -1488,6 +1489,7 @@ async function createWindow() {
 
 function registerIpc() {
 	setupTerminalIpc(sendToRenderer);
+	setupChatIpc(() => mainWindow?.webContents);
 
 	ipcMain.handle(
 		"desktop:start-workspace-watcher",
