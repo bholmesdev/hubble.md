@@ -38,6 +38,7 @@ import {
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
+import { ChatPanel } from "./components/ChatPanel";
 import { FileInfoBar } from "./components/FileInfoBar";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { NewTabPage } from "./components/NewTabPage";
@@ -1003,6 +1004,10 @@ function App() {
 					</div>
 					<TerminalPanel />
 				</section>
+				<ChatPanel
+					key={workspacePath ?? state.currentPath ?? "empty"}
+					filePath={state.currentPath}
+				/>
 			</div>
 			<GlobalSearchPalette
 				open={searchOpen}

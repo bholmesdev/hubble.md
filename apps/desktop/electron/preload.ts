@@ -26,6 +26,14 @@ function subscribe<T extends unknown[]>(
 let nextWatchId = 0;
 
 const desktopApi = {
+	chatAccount: () => ipcRenderer.invoke("desktop:chat-account"),
+	chatSignIn: () => ipcRenderer.invoke("desktop:chat-sign-in"),
+	chatCancelSignIn: () => ipcRenderer.invoke("desktop:chat-cancel-sign-in"),
+	chatDisconnect: () => ipcRenderer.invoke("desktop:chat-disconnect"),
+	chatModels: () => ipcRenderer.invoke("desktop:chat-models"),
+	chatSend: (input) => ipcRenderer.invoke("desktop:chat-send", input),
+	chatStop: (id) => ipcRenderer.invoke("desktop:chat-stop", id),
+	onChatDelta: (callback) => subscribe("desktop:chat-delta", callback),
 	platform: process.platform,
 	homeDir: os.homedir(),
 	listDirectory: (path) =>
