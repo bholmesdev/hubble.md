@@ -20,6 +20,7 @@ import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDeleteLine from "~icons/mingcute/delete-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
+import MingcuteLayoutRightbarOpenLine from "~icons/mingcute/layout-rightbar-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteOpenaiLine from "~icons/mingcute/openai-line";
 import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
@@ -178,11 +179,14 @@ export function FileInfoBar({
 						<Button
 							variant="ghost"
 							size="icon-sm"
-							aria-label="Toggle ChatGPT chat"
-							title="ChatGPT chat"
+							aria-label="Open Chat"
+							title="Open Chat"
 							onClick={() => window.dispatchEvent(new Event(TOGGLE_CHAT_EVENT))}
 						>
-							<MingcuteOpenaiLine aria-hidden="true" className="size-3.5" />
+							<MingcuteLayoutRightbarOpenLine
+								aria-hidden="true"
+								className="size-3.5"
+							/>
 						</Button>
 						{comments ? <ReviewCommentSummary {...comments} /> : null}
 						<ActionsMenu

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
-import MingcuteOpenaiLine from "~icons/mingcute/openai-line";
 import { desktopApi } from "../desktopApi";
 import {
 	CHAT_CONTEXT_LIMIT,
@@ -30,6 +29,7 @@ import { chatPanelOpen, EMPTY_CHAT, updateTabChat } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import type { TabId } from "../store/tabs";
 import { ChatReply } from "./ChatReply";
+import { HubbleMark } from "./HubbleMark";
 
 export const TOGGLE_CHAT_EVENT = "hubble:toggle-chat";
 
@@ -252,7 +252,7 @@ export function ChatPanel({
 
 	return (
 		<aside
-			aria-label="ChatGPT chat"
+			aria-label="Chat"
 			className="flex h-full w-[360px] max-w-[85vw] shrink-0 flex-col border-s border-border bg-background text-sm"
 		>
 			<header
@@ -284,7 +284,7 @@ export function ChatPanel({
 			</header>
 			{panel.kind === "checking" ? (
 				<div className="flex flex-1 items-center justify-center p-6 text-muted-foreground">
-					<output>Checking ChatGPT connection…</output>
+					<output>Checking chat connection…</output>
 				</div>
 			) : panel.kind === "reset-required" ? (
 				<div className="flex flex-1 items-center justify-center p-6">
@@ -319,7 +319,7 @@ export function ChatPanel({
 			) : panel.kind === "signed-out" || panel.kind === "signing-in" ? (
 				<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
 					<div className="flex w-full max-w-sm flex-col gap-3">
-						<MingcuteOpenaiLine
+						<HubbleMark
 							aria-hidden="true"
 							className="mb-3 size-12 self-center text-muted-foreground"
 						/>
@@ -382,7 +382,7 @@ export function ChatPanel({
 						{messages.map((message) => (
 							<article key={message.id} className="space-y-2">
 								<p className="text-xs font-medium text-muted-foreground">
-									{message.role === "user" ? "You" : "ChatGPT"}
+									{message.role === "user" ? "You" : "Chat"}
 								</p>
 								{message.file ? (
 									<p
@@ -450,8 +450,8 @@ export function ChatPanel({
 							</output>
 						) : null}
 						<textarea
-							aria-label="Message ChatGPT"
-							placeholder="Message ChatGPT…"
+							aria-label="Message Chat"
+							placeholder="Message Chat…"
 							className="min-h-24 max-h-48 w-full resize-y rounded-md border border-input bg-background p-2 outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
 							value={draft}
 							maxLength={CHAT_CONTEXT_LIMIT}
@@ -469,7 +469,7 @@ export function ChatPanel({
 						/>
 						<div className="flex items-center justify-between gap-2">
 							<select
-								aria-label="ChatGPT model"
+								aria-label="Chat model"
 								className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
 								value={model}
 								disabled={sending || accountBusy || !models.length}

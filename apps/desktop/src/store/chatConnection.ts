@@ -19,7 +19,7 @@ export function errorText(error: unknown) {
 				/^Error invoking remote method '[^']+': (?:Error: )?/,
 				"",
 			)
-		: "ChatGPT is unavailable. Try again.";
+		: "Chat is unavailable. Try again.";
 }
 
 // Keep exception handling outside component handlers for React Compiler.

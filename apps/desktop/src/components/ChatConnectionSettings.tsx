@@ -22,7 +22,7 @@ export function ChatConnectionSettings() {
 	}
 	return (
 		<SettingsSection
-			title="ChatGPT"
+			title="Chat"
 			description="Connect your ChatGPT plan to use the chat panel."
 		>
 			{account?.label ? (
@@ -56,7 +56,7 @@ export function ChatConnectionSettings() {
 						disabled={busy || sending}
 						onClick={() => void refreshChatConnection(true)}
 					>
-						{account?.connected ? "Reconnect ChatGPT" : "Continue with ChatGPT"}
+						{account?.connected ? "Reconnect" : "Continue with ChatGPT"}
 					</Button>
 				)}
 				{account?.label ? (
@@ -88,13 +88,13 @@ export function ChatConnectionSettings() {
 			) : null}
 			{!busy && account?.connected && (!account.sharing || !models.length) ? (
 				<p className="mt-2 text-xs text-muted-foreground">
-					Enable ChatGPT plan usage in Manage usage, then reconnect.
+					Enable plan usage in Manage usage, then reconnect.
 				</p>
 			) : null}
 			{account?.issue === "unreadable-credentials" && !error ? (
 				<p role="alert" className="mt-2 text-xs text-destructive">
-					Your saved ChatGPT sign-in could not be opened. Reset the connection
-					and sign in again. Your notes and chats will stay here.
+					Your saved sign-in could not be opened. Reset the connection and sign
+					in again. Your notes and chats will stay here.
 				</p>
 			) : null}
 			{error ? (
