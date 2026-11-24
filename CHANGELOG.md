@@ -9,7 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Draw diagrams in Hubble: `.tldr` files open in a full-screen tldraw canvas that matches your theme and works offline. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
+- You can now draw diagrams in Hubble with the dedicated whiteboarding tool. Backed by [tldraw](https://tldraw.com) and works offline like everything else in Hubble. Click the "new file" button next to the folder switcher to try it out. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
 - Install the Hubble agent skills from inside Hubble, and they stay up to date as Hubble updates, including copies you installed with `npx skills`. [#337](https://github.com/bholmesdev/hubble.md/pull/337)
 
 ### Changed
