@@ -12,7 +12,7 @@ export function SkillsSettings({
 	installVariant = "default",
 	description = "Teach your agents how to use Hubble's features: build HTML apps, edit diagrams, or leave and respond to comments.",
 }: {
-	title?: string;
+	title?: ReactNode;
 	installVariant?: "default" | "outline";
 	description?: ReactNode;
 }) {

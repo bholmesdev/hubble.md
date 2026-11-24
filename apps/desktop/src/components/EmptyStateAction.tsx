@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "../lib/utils";
 
 export function EmptyStateAction({
 	icon,
@@ -6,6 +7,7 @@ export function EmptyStateAction({
 	detail,
 	trailing,
 	shortcut,
+	className,
 	onClick,
 }: {
 	icon: ReactNode;
@@ -13,6 +15,7 @@ export function EmptyStateAction({
 	detail?: string;
 	trailing?: string;
 	shortcut?: string | null;
+	className?: string;
 	onClick: () => void;
 }) {
 	return (
@@ -20,7 +23,10 @@ export function EmptyStateAction({
 			type="button"
 			data-new-tab-option
 			onClick={onClick}
-			className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden"
+			className={cn(
+				"flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden",
+				className,
+			)}
 		>
 			<span className="text-muted-foreground">{icon}</span>
 			<span className="truncate">{label}</span>

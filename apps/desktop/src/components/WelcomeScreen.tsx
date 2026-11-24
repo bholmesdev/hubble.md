@@ -36,7 +36,7 @@ export function WelcomeScreen({
 					type="button"
 					onClick={onCreateWorkspace}
 					style={{ animationDelay: "0.15s" }}
-					className="welcome-rise flex w-full items-center gap-2.5 rounded-md border border-brand-accent bg-accent px-3 py-2 text-start text-sm transition-colors hover:bg-brand-accent/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent"
+					className="welcome-rise flex min-h-10 w-full items-center gap-2.5 rounded-md border border-brand-accent bg-accent px-3 py-2 text-start text-sm transition-colors hover:bg-brand-accent/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent"
 				>
 					<MingcuteFolderLine className="size-4 text-brand-accent" />
 					Create new workspace
@@ -51,6 +51,7 @@ export function WelcomeScreen({
 					<div className="welcome-rise" style={{ animationDelay: "0.25s" }}>
 						<EmptyStateAction
 							icon={<MingcuteFolderOpenLine className="size-4" />}
+							className="min-h-10 border border-transparent px-3 py-2"
 							label="Open existing folder"
 							shortcut={folderShortcut}
 							onClick={onOpenFolder}
@@ -59,6 +60,7 @@ export function WelcomeScreen({
 					<div className="welcome-rise" style={{ animationDelay: "0.35s" }}>
 						<EmptyStateAction
 							icon={<MingcuteFileLine className="size-4" />}
+							className="min-h-10 border border-transparent px-3 py-2"
 							label="Open file"
 							shortcut={fileShortcut}
 							onClick={onOpenFile}
@@ -66,13 +68,15 @@ export function WelcomeScreen({
 					</div>
 				</section>
 				<div
-					className="welcome-rise flex items-center gap-2.5 rounded-md border border-border bg-muted/40 px-3 py-1"
+					className="welcome-rise flex min-h-10 items-center gap-2.5 rounded-md border border-border bg-muted/40 px-3 py-1"
 					style={{ animationDelay: "0.45s" }}
 				>
 					<MingcuteLightningLine className="size-4 shrink-0 text-muted-foreground" />
 					<div className="min-w-0 flex-1">
 						<SkillsSettings
-							title="Set up agent skills"
+							title={
+								<span className="text-sm font-normal">Set up agent skills</span>
+							}
 							description={null}
 							installVariant="outline"
 						/>
