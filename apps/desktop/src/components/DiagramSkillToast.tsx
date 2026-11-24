@@ -13,7 +13,13 @@ const TOAST_ID = "hubble-skills";
  * Offers the Hubble skills in a toast while a diagram is open, so agents edit
  * it with edit-diagram. Renders nothing itself.
  */
-export function DiagramSkillToast({ path }: { path: string }) {
+export function DiagramSkillToast({
+	path,
+	onOpenSettings,
+}: {
+	path: string;
+	onOpenSettings: () => void;
+}) {
 	const workspacePath = useStoreValue(workspacePathStore);
 	const dismissed = useStoreValue(skillToastDismissedStore);
 	const { installed } = useHubbleSkills(workspacePath ?? dirname(path) ?? path);
@@ -21,19 +27,19 @@ export function DiagramSkillToast({ path }: { path: string }) {
 
 	useEffect(() => {
 		if (!show) return;
-		toast.custom(() => <SkillToast />, {
+		toast.custom(() => <SkillToast onOpenSettings={onOpenSettings} />, {
 			id: TOAST_ID,
 			duration: Number.POSITIVE_INFINITY,
 		});
 		return () => {
 			toast.dismiss(TOAST_ID);
 		};
-	}, [show]);
+	}, [show, onOpenSettings]);
 
 	return null;
 }
 
-function SkillToast() {
+function SkillToast({ onOpenSettings }: { onOpenSettings: () => void }) {
 	const [installing, setInstalling] = useState(false);
 	const [manualOpen, setManualOpen] = useState(false);
 
@@ -52,7 +58,22 @@ function SkillToast() {
 				// can still install them.
 				onClick={() => {
 					skillToastDismissedStore.set(true);
-					toast("Install skills anytime from Settings.");
+					const hint = toast(
+						<>
+							Install skills anytime from{" "}
+							<button
+								type="button"
+								className="cursor-pointer underline underline-offset-2 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+								onClick={() => {
+									toast.dismiss(hint);
+									onOpenSettings();
+								}}
+							>
+								Settings
+							</button>
+							.
+						</>,
+					);
 				}}
 				className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
 			>
