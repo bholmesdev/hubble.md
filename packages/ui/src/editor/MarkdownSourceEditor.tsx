@@ -10,6 +10,7 @@ import {
 	type PendingSave,
 	schedulePendingSave,
 } from "./pendingSave";
+import { replaceEditorContent } from "./replaceEditorContent";
 import "./EditorView.css";
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 120;
@@ -24,6 +25,7 @@ export type MarkdownSourceEditorProps = {
 	/** Focus on mount; wanted for the source-mode toggle, not for navigation. */
 	autoFocus?: boolean;
 	preserveHistoryOnUpdate?: boolean;
+	undoableUpdate?: string;
 	saveDebounceMs?: number;
 	onLocalChange: (path: string, markdown: string) => void;
 	onSave: (path: string, markdown: string) => void | Promise<void>;
@@ -37,12 +39,14 @@ export function MarkdownSourceEditor({
 	sourceLanguage = "md",
 	autoFocus = true,
 	preserveHistoryOnUpdate = false,
+	undoableUpdate,
 	saveDebounceMs = DEFAULT_SAVE_DEBOUNCE_MS,
 	onLocalChange,
 	onSave,
 	onScrollContainerChange,
 }: MarkdownSourceEditorProps) {
 	const pathRef = useRef(path);
+	const updateRef = useRef(undoableUpdate);
 	const latestMarkdownRef = useRef(initialMarkdown);
 	const pendingSaveRef = useRef<PendingSave | null>(null);
 	useLayoutEffect(() => {
@@ -99,17 +103,25 @@ export function MarkdownSourceEditor({
 
 	useEffect(() => {
 		if (!editor) return;
+		const undoable = Boolean(
+			undoableUpdate && updateRef.current !== undoableUpdate,
+		);
+		updateRef.current = undoableUpdate;
 		if (initialMarkdown === latestMarkdownRef.current) return;
 		latestMarkdownRef.current = initialMarkdown;
-		editor
-			.chain()
-			.setMeta("addToHistory", false)
-			.setContent(sourceDocFromMarkdown(initialMarkdown, sourceLanguage), {
-				emitUpdate: false,
-			})
-			.run();
-		if (!preserveHistoryOnUpdate) resetEditorHistory(editor);
-	}, [editor, initialMarkdown, preserveHistoryOnUpdate, sourceLanguage]);
+		replaceEditorContent(
+			editor,
+			sourceDocFromMarkdown(initialMarkdown, sourceLanguage),
+			undoable,
+			preserveHistoryOnUpdate,
+		);
+	}, [
+		editor,
+		initialMarkdown,
+		preserveHistoryOnUpdate,
+		sourceLanguage,
+		undoableUpdate,
+	]);
 
 	useEffect(() => {
 		void documentId;
