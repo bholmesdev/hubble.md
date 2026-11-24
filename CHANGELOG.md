@@ -15,7 +15,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
-- Get started with a new workspace from the welcome screen, and find your recent notes in Inbox by default on new installs. [#347](https://github.com/bholmesdev/hubble.md/pull/347)
+- Get started with a workspace and agent skills from the welcome screen, and find your recent notes in Inbox by default on new installs. [#347](https://github.com/bholmesdev/hubble.md/pull/347)
 
 ### Fixed
 
