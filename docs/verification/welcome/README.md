@@ -2,7 +2,7 @@
 
 Electron screenshots from a fresh, isolated profile:
 
-- [Welcome](welcome.png): no top bar, workspace creation as the primary action, shortcut hints for all three file/workspace actions, and an Install Hubble skills row with Install manually and Install controls.
+- [Welcome](welcome.png): no top bar, workspace creation as the primary action, shortcut hints for all three file/workspace actions, and an Install agent skills row with Install manually and Install controls.
 - [First workspace](inbox.png): the top bar returns and Inbox is selected.
 
 Verified in the real Electron app with native dialog results stubbed at the Electron boundary: all three buttons and keyboard shortcuts reach the expected picker, and creating a workspace creates and opens its folder. The welcome reveal uses 100 ms staggered delays and disables motion when reduced motion is requested.

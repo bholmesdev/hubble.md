@@ -65,7 +65,7 @@ export function WelcomeScreen({
 					</div>
 				</section>
 				<div className="welcome-rise" style={{ animationDelay: "0.45s" }}>
-					<SkillsSettings title="Install Hubble skills" description={null} />
+					<SkillsSettings title="Install agent skills" description={null} />
 				</div>
 			</div>
 		</div>
