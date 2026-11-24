@@ -1,11 +1,9 @@
 import { useCommandShortcut } from "@hubble.md/ui";
-import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
-import MingcuteDownload2Line from "~icons/mingcute/download-2-line";
 import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteFolderLine from "~icons/mingcute/folder-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
-import { useHubbleSkills } from "../lib/hubbleSkills";
 import { EmptyStateAction, EmptyStateKbd } from "./EmptyStateAction";
+import { SkillsSettings } from "./SkillsSettings";
 
 export function WelcomeScreen({
 	onCreateWorkspace,
@@ -19,7 +17,6 @@ export function WelcomeScreen({
 	const createShortcut = useCommandShortcut("app.new-workspace");
 	const folderShortcut = useCommandShortcut("app.open-folder");
 	const fileShortcut = useCommandShortcut("app.open-file");
-	const { installed, installing, install } = useHubbleSkills();
 	return (
 		<div className="flex h-full justify-center overflow-auto p-6 pt-[25vh]">
 			<div className="flex w-full max-w-sm flex-col gap-6">
@@ -67,25 +64,9 @@ export function WelcomeScreen({
 						/>
 					</div>
 				</section>
-				<button
-					type="button"
-					disabled={installed !== false || installing}
-					aria-busy={installing}
-					onClick={() => void install()}
-					style={{ animationDelay: "0.45s" }}
-					className="welcome-rise flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden disabled:cursor-default disabled:text-muted-foreground disabled:hover:bg-transparent"
-				>
-					{installed ? (
-						<MingcuteCheckCircleFill className="size-4 text-primary" />
-					) : (
-						<MingcuteDownload2Line className="size-4 text-muted-foreground" />
-					)}
-					{installed
-						? "Hubble skills installed"
-						: installing
-							? "Installing..."
-							: "Install Hubble skills"}
-				</button>
+				<div className="welcome-rise" style={{ animationDelay: "0.45s" }}>
+					<SkillsSettings title="Install Hubble skills" description={null} />
+				</div>
 			</div>
 		</div>
 	);
