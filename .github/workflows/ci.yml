@@ -99,6 +99,8 @@ jobs:
         # Runners lack the setuid sandbox helper and a display.
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
+          # Builds without it leave diagrams out, and the diagram test skips.
+          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
         run: xvfb-run --auto-servernum pnpm test:e2e
 
       - name: Upload traces

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import changelogRaw from "../../../../CHANGELOG.md?raw";
 import { desktopApi } from "../desktopApi";
 import type { TelemetryChoice, WorkspaceDelta } from "../desktopApi/types";
+import { readDiagramDraft } from "../editor/diagramCommands";
 import { classifyFileChange } from "../externalFileChange";
 import {
 	isChangelogPath,
@@ -76,6 +77,7 @@ import {
 	chatCommandStore,
 	cleanFileState,
 	codeFileOpenModeStore,
+	diagramGridStore,
 	emptyDoc,
 	type FileEntry,
 	type FolderEntry,
@@ -599,6 +601,10 @@ export function setCodeFileOpenMode(mode: CodeFileOpenMode) {
 	codeFileOpenModeStore.set(mode);
 }
 
+export function setDiagramGrid(on: boolean) {
+	diagramGridStore.set(on);
+}
+
 export async function openPathInDefaultApp(path: string) {
 	try {
 		await desktopApi.openPathInDefaultApp(path);
@@ -882,9 +888,14 @@ async function savePathContentNow(
 	if (isVirtualPath(path) || !isEditableFile(path)) return;
 	// A save already queued by the editor must not recreate a staged deletion.
 	if (!options?.allowBlocked && deletionActions.isSaveBlocked(path)) return;
+	if (viewerStore.get().currentPath !== path) return;
+	const draft = readDiagramDraft(path);
+	if (draft !== undefined) {
+		content = draft;
+		updateEditorContent(path, content);
+	}
 	const current = viewerStore.get();
 	const force = options?.force === true;
-	if (current.currentPath !== path) return;
 	if (!force && current.externalChange.kind === "conflict") return;
 	if (!force && current.content === content && content === getBaseline(current))
 		return;
@@ -1374,6 +1385,10 @@ export function createMarkdownFileInFolder(
 
 export function createHtmlFileInFolder(parentPath: string) {
 	return createEmptyFileInFolder(parentPath, "new-app", ".html");
+}
+
+export function createDiagramFileInFolder(parentPath: string) {
+	return createEmptyFileInFolder(parentPath, "new-diagram", ".tldr");
 }
 
 export async function createFolderInFolder(parentPath: string) {

@@ -2,10 +2,13 @@
  * Key positions by path so they survive closing and reopening a tab.
  * Capture before navigation: replacing editor content can reset scrollTop,
  * which a scroll listener would mistake for the user's position.
+ * Notes remember a scroll offset; diagrams remember their camera.
  */
 const MAX_REMEMBERED = 50;
 
-const positions = new Map<string, number>();
+export type Camera = { x: number; y: number; z: number };
+
+const positions = new Map<string, number | Camera>();
 
 let container: HTMLElement | null = null;
 
@@ -13,15 +16,19 @@ export function setScrollContainer(element: HTMLElement | null) {
 	container = element;
 }
 
-export function rememberScroll(path: string, top: number) {
+function remember(path: string, position: number | Camera) {
 	if (!path) return;
 	// Reinsert so the oldest entry stays first for eviction.
 	positions.delete(path);
-	positions.set(path, top);
+	positions.set(path, position);
 	if (positions.size > MAX_REMEMBERED) {
 		const oldest = positions.keys().next().value;
 		if (oldest !== undefined) positions.delete(oldest);
 	}
+}
+
+export function rememberScroll(path: string, top: number) {
+	remember(path, top);
 }
 
 /** Capture before navigation replaces the shared editor content. */
@@ -31,7 +38,17 @@ export function captureScroll(path: string | null) {
 }
 
 export function recallScroll(path: string) {
-	return positions.get(path);
+	const position = positions.get(path);
+	return typeof position === "number" ? position : undefined;
+}
+
+export function rememberCamera(path: string, { x, y, z }: Camera) {
+	remember(path, { x, y, z });
+}
+
+export function recallCamera(path: string) {
+	const position = positions.get(path);
+	return typeof position === "object" ? position : undefined;
 }
 
 /** Share the file operation's path rewrite so scroll positions follow renames and moves. */

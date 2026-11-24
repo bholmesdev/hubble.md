@@ -86,7 +86,7 @@ export function UpdatesSection({
 	);
 }
 
-function getPrimaryButton(state: DesktopUpdateState) {
+export function getPrimaryButton(state: DesktopUpdateState) {
 	if (!state.isSupported) {
 		return {
 			label: "Updates Unavailable",

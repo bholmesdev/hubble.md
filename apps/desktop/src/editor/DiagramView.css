@@ -1,0 +1,196 @@
+/* tldraw's UI layers run from z-index 300 up; keep them below app overlays. */
+[data-hubble-diagram] {
+	isolation: isolate;
+}
+
+/* Hubble's palette on tldraw's theme variables. Both theme classes are
+ * overridden because Hubble's own tokens already switch with `.dark`. */
+[data-hubble-diagram] :is(.tl-theme__light, .tl-theme__dark) {
+	--tl-color-background: var(--background);
+	--tl-color-low: var(--secondary);
+	--tl-color-low-border: var(--border);
+	--tl-color-divider: var(--border);
+	--tl-color-panel: var(--popover);
+	--tl-color-panel-contrast: var(--popover);
+	--tl-color-panel-overlay: color-mix(
+		in oklab,
+		var(--popover) 82%,
+		transparent
+	);
+	--tl-color-panel-transparent: color-mix(
+		in oklab,
+		var(--popover) 0%,
+		transparent
+	);
+	/* Grayscale hover and selected, like Hubble's ghost buttons. */
+	--tl-color-muted-2: color-mix(in oklab, var(--muted) 60%, transparent);
+	--tl-color-hint: var(--muted);
+	--tl-color-text: var(--popover-foreground);
+	--tl-color-text-0: var(--popover-foreground);
+	--tl-color-text-1: var(--popover-foreground);
+	--tl-color-text-3: var(--muted-foreground);
+	--tl-color-text-shadow: var(--background);
+
+	/* Panels and menus: bordered overlay surface, like Hubble's popovers. */
+	--tl-shadow-2: 0 0 0 1px var(--border);
+	--tl-shadow-3: 0 0 0 1px var(--border), var(--shadow-overlay);
+	--tl-shadow-4: 0 0 0 1px var(--border), var(--shadow-overlay);
+	--tl-radius-2: var(--radius-row);
+	--tl-radius-3: var(--radius-popover);
+	--tl-radius-4: var(--radius-popover);
+}
+
+/* Menus use Hubble's overlay metrics: p-1 popup, compact 11px rows, amber
+ * highlight. Covers the main menu, its submenus and the context menu. */
+[data-hubble-diagram] .tlui-menu {
+	--tl-color-muted-2: var(--accent);
+	padding-inline: 4px;
+}
+
+[data-hubble-diagram] .tlui-menu__group {
+	padding-block: 4px;
+}
+
+[data-hubble-diagram] .tlui-menu .tlui-button__menu {
+	height: auto;
+	min-height: 0;
+	margin-top: 0;
+	padding: 6px 8px;
+}
+
+[data-hubble-diagram] .tlui-menu .tlui-button__menu::after {
+	inset: 0;
+}
+
+[data-hubble-diagram] .tlui-menu :is(.tlui-button__label, .tlui-kbd) {
+	font-size: 11px;
+}
+
+/* A button whose popover or submenu is open keeps a flat hover fill, not
+ * tldraw's fade toward the popover. Covers submenu triggers, the toolbar's
+ * overflow, the style panel's pickers, and the zoom and page menus. */
+[data-hubble-diagram]
+	.tlui-button[aria-expanded="true"][data-direction="left"] {
+	background: none;
+}
+
+[data-hubble-diagram] .tlui-button[data-state="open"]::after,
+[data-hubble-diagram]
+	.tlui-button[aria-expanded="true"][data-direction="left"]:not(:hover)::after,
+[data-hubble-diagram]
+	.tlui-menu__submenu__trigger:is(:hover, [data-state="open"])::after {
+	background: var(--tl-color-muted-2);
+}
+
+/* The bottom toolbar keeps Hubble's amber: pale on hover, and the active
+ * tool goes from pale to solid while the toolbar has focus, like the
+ * sidebar's selected row. Everywhere else stays grayscale. */
+[data-hubble-diagram] .tlui-main-toolbar {
+	--tool-active: var(--accent);
+	--tool-active-foreground: var(--accent-foreground);
+}
+
+[data-hubble-diagram] .tlui-main-toolbar:focus-within {
+	--tool-active: var(--selected);
+	--tool-active-foreground: var(--selected-foreground);
+}
+
+[data-hubble-diagram] .tlui-main-toolbar .tlui-button__tool {
+	--tl-color-muted-2: var(--accent);
+}
+
+[data-hubble-diagram]
+	.tlui-main-toolbar
+	.tlui-button__tool[aria-pressed="true"],
+[data-hubble-diagram]
+	.tlui-main-toolbar
+	.tlui-button__tool[aria-pressed="true"]:not(
+		:disabled,
+		[data-disabled],
+		:focus-visible
+	):active {
+	color: var(--tool-active-foreground);
+}
+
+[data-hubble-diagram]
+	.tlui-main-toolbar
+	.tlui-button__tool[aria-pressed="true"]:not(
+		:disabled,
+		[data-disabled]
+	)::after {
+	background: var(--tool-active);
+}
+
+/* The slider fill goes grayscale instead of tldraw's blue. */
+[data-hubble-diagram] .tlui-slider__range {
+	background-color: var(--muted-foreground);
+}
+
+/* Text selection uses Hubble's highlight and keeps the shape's own text
+ * color, instead of tldraw's blue highlight with inverted text. Its child
+ * paragraphs inherit this color, so it has to be set here. */
+[data-hubble-diagram]
+	.tl-text-input:not(:has(.ProseMirror-hideselection))::selection {
+	background: color-mix(in oklab, var(--selected) 70%, transparent);
+	color: inherit;
+}
+
+.dark
+	[data-hubble-diagram]
+	.tl-text-input:not(:has(.ProseMirror-hideselection))::selection {
+	background: color-mix(in oklab, #8a764b 88%, transparent);
+}
+
+/* The text formatting toolbar matches Markdown's selection toolbar: p-1,
+ * 28px ghost buttons with 16px icons, and a fade and scale on appear. */
+[data-hubble-diagram] .tlui-rich-text__toolbar {
+	transition: opacity 150ms ease;
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-toolbar {
+	--tl-color-muted-2: var(--muted);
+	--tl-color-hint: var(--muted);
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 4px;
+	transform-origin: center bottom;
+	scale: 0.95;
+	transition: scale 150ms ease;
+}
+
+[data-hubble-diagram]
+	.tlui-rich-text__toolbar[data-visible="true"]
+	.tlui-toolbar {
+	scale: 1;
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-button {
+	height: 28px;
+	min-width: 28px;
+	/* tldraw's row layout overlaps neighbors with -2px margins. */
+	margin: 0;
+	padding: 0;
+	color: var(--muted-foreground);
+	transition: color var(--default-transition-duration) var(--ease-snappy);
+}
+
+[data-hubble-diagram]
+	.tlui-rich-text__toolbar
+	.tlui-button:is(:hover, [data-isactive="true"]) {
+	color: var(--foreground);
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-button::after {
+	inset: 0;
+	border-radius: var(--radius-sm);
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-icon {
+	width: 16px;
+	height: 16px;
+}
+
+[data-hubble-diagram] .tlui-rich-text__toolbar .tlui-input__wrapper {
+	height: 28px;
+}

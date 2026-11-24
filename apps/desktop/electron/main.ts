@@ -35,12 +35,15 @@ import { keymatch } from "keymatch";
 import { z } from "zod/v4";
 import type {
 	DesktopUpdateState,
+	EditCommand,
 	HtmlAppFileEntry,
 	MenuState,
 	SearchFileResult,
 	WorkspaceConfig,
+	ZoomCommand,
 } from "../src/desktopApi/types";
 import {
+	DIAGRAMS_ENABLED,
 	fileKindForPath,
 	HUBBLE_DIR,
 	hasMarkdownExtension,
@@ -207,6 +210,7 @@ let menuState: MenuState = {
 	canGoForward: false,
 	tabCount: 0,
 	hasClosedTabs: false,
+	hasDiagramOpen: false,
 };
 let updateState: DesktopUpdateState = {
 	isSupported: supportsAutoUpdates,
@@ -964,6 +968,35 @@ function commandMenuItem(
 	};
 }
 
+/**
+ * Undo, Redo and Select All use built-in roles until a diagram opens. Those
+ * roles run browser editing commands the canvas never sees, so with a diagram
+ * open the renderer routes them instead.
+ */
+function editMenuItem(
+	command: EditCommand,
+	label: string,
+	accelerator: string,
+): Electron.MenuItemConstructorOptions {
+	if (!menuState.hasDiagramOpen) return { role: command };
+	return {
+		label,
+		accelerator,
+		click: () => sendToRenderer("desktop:menu-edit", command),
+	};
+}
+
+/** The diagram canvas's own Zoom to Fit key. The menu only displays it. */
+const ZOOM_TO_FIT_BINDING = "Shift+1";
+
+/** With a diagram open, zoom acts on the canvas instead of the window. */
+function zoomClick(command: ZoomCommand, zoomWindow: () => void) {
+	return () =>
+		menuState.hasDiagramOpen
+			? sendToRenderer("desktop:menu-zoom", command)
+			: zoomWindow();
+}
+
 function buildMenu() {
 	const template: Electron.MenuItemConstructorOptions[] = [
 		{
@@ -976,6 +1009,15 @@ function buildMenu() {
 					id: "new-html-file",
 					label: "New HTML App",
 					click: () => sendToRenderer("desktop:menu-create-html-file"),
+				},
+				{
+					id: "new-diagram-file",
+					label: "New Diagram",
+					accelerator: "CmdOrCtrl+Alt+N",
+					// Hidden items keep their shortcut on Windows and Linux.
+					visible: DIAGRAMS_ENABLED,
+					enabled: DIAGRAMS_ENABLED,
+					click: () => sendToRenderer("desktop:menu-create-diagram-file"),
 				},
 				{ type: "separator" },
 				commandMenuItem("app.open-file", () =>
@@ -1030,16 +1072,17 @@ function buildMenu() {
 							accelerator: "CmdOrCtrl+Z",
 							click: () => sendToRenderer("desktop:undo-delete"),
 						}
-					: { role: "undo" },
-				{ role: "redo" },
+					: editMenuItem("undo", "Undo", "CmdOrCtrl+Z"),
+				editMenuItem("redo", "Redo", "Shift+CmdOrCtrl+Z"),
 				{ type: "separator" },
+				// Clipboard roles fire DOM clipboard events, which tldraw handles.
 				{ role: "cut" },
 				{ role: "copy" },
 				commandMenuItem("app.copy-as-markdown", () =>
 					sendToRenderer("desktop:menu-copy-as-markdown"),
 				),
 				{ role: "paste" },
-				{ role: "selectAll" },
+				editMenuItem("selectAll", "Select All", "CmdOrCtrl+A"),
 			],
 		},
 		{
@@ -1073,19 +1116,28 @@ function buildMenu() {
 					id: "zoom-in",
 					label: "Zoom In",
 					accelerator: "CmdOrCtrl+=",
-					click: () => stepWindowZoom(mainWindow, zoomStep),
+					click: zoomClick("in", () => stepWindowZoom(mainWindow, zoomStep)),
 				},
 				{
 					id: "zoom-out",
 					label: "Zoom Out",
 					accelerator: "CmdOrCtrl+-",
-					click: () => stepWindowZoom(mainWindow, -zoomStep),
+					click: zoomClick("out", () => stepWindowZoom(mainWindow, -zoomStep)),
 				},
 				{
 					id: "reset-zoom",
 					label: "Reset Zoom",
 					accelerator: "CmdOrCtrl+0",
-					click: () => resetWindowZoom(mainWindow),
+					click: zoomClick("reset", () => resetWindowZoom(mainWindow)),
+				},
+				{
+					id: "zoom-to-fit",
+					label: "Zoom to Fit",
+					// The canvas binds Shift+1 itself, so text fields can still type "!".
+					accelerator: ZOOM_TO_FIT_BINDING,
+					registerAccelerator: false,
+					enabled: menuState.hasDiagramOpen,
+					click: () => sendToRenderer("desktop:menu-zoom", "fit"),
 				},
 				{ type: "separator" },
 				commandMenuItem("app.toggle-terminal", () =>
@@ -1371,23 +1423,24 @@ async function createWindow() {
 	if (process.platform === "darwin") {
 		window.webContents.on("before-input-event", (_event, input) => {
 			const command: CommandDefinition = getCommand("app.go-to-file");
-			const binding = command.allowConflictWith
-				? getCommandBinding("app.go-to-file")
-				: null;
-			// macOS still registers accelerators with registerAccelerator: false.
+			const pageBindings = [
+				ZOOM_TO_FIT_BINDING,
+				command.allowConflictWith ? getCommandBinding("app.go-to-file") : null,
+			];
+			const event = {
+				key: input.key,
+				code: input.code,
+				metaKey: input.meta,
+				ctrlKey: input.control,
+				altKey: input.alt,
+				shiftKey: input.shift,
+			} as KeyboardEvent;
+			// macOS still registers accelerators with registerAccelerator: false,
+			// so the menu would act on these keys, and flash, before the page sees them.
 			window.webContents.setIgnoreMenuShortcuts(
 				input.type === "keyDown" &&
-					binding !== null &&
-					keymatch(
-						{
-							key: input.key,
-							code: input.code,
-							metaKey: input.meta,
-							ctrlKey: input.control,
-							altKey: input.alt,
-							shiftKey: input.shift,
-						} as KeyboardEvent,
-						binding,
+					pageBindings.some(
+						(binding) => binding !== null && keymatch(event, binding),
 					),
 			);
 		});
@@ -1769,7 +1822,11 @@ function registerIpc() {
 			buildMenu();
 		},
 	);
-	ipcMain.handle("desktop:undo-text", (event) => event.sender.undo());
+	ipcMain.handle("desktop:run-native-edit", (event, command: EditCommand) => {
+		if (command === "undo") event.sender.undo();
+		else if (command === "redo") event.sender.redo();
+		else if (command === "selectAll") event.sender.selectAll();
+	});
 
 	ipcMain.handle(
 		"desktop:delete-file",
@@ -1822,6 +1879,9 @@ function registerIpc() {
 				{ name: "Documents", extensions: ["md", "markdown", "mdown", "html"] },
 				{ name: "Text", extensions: ["txt", "text"] },
 				{ name: "PDF", extensions: ["pdf"] },
+				...(DIAGRAMS_ENABLED
+					? [{ name: "Diagram", extensions: ["tldr"] }]
+					: []),
 				{ name: "All Files", extensions: ["*"] },
 			],
 		});
@@ -2121,6 +2181,7 @@ function registerIpc() {
 					? state.tabCount
 					: 0,
 			hasClosedTabs: state.hasClosedTabs === true,
+			hasDiagramOpen: state.hasDiagramOpen === true,
 		};
 		buildMenu();
 	});
