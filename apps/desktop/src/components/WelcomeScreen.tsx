@@ -2,6 +2,7 @@ import { useCommandShortcut } from "@hubble.md/ui";
 import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteFolderLine from "~icons/mingcute/folder-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
+import MingcuteLightningLine from "~icons/mingcute/lightning-line";
 import { EmptyStateAction, EmptyStateKbd } from "./EmptyStateAction";
 import { SkillsSettings } from "./SkillsSettings";
 
@@ -65,14 +66,17 @@ export function WelcomeScreen({
 					</div>
 				</section>
 				<div
-					className="welcome-rise border-t border-border pt-6"
+					className="welcome-rise flex items-center gap-2.5 rounded-md border border-border bg-muted/40 px-3 py-1"
 					style={{ animationDelay: "0.45s" }}
 				>
-					<SkillsSettings
-						title="Install agent skills"
-						description={null}
-						installVariant="outline"
-					/>
+					<MingcuteLightningLine className="size-4 shrink-0 text-muted-foreground" />
+					<div className="min-w-0 flex-1">
+						<SkillsSettings
+							title="Set up agent skills"
+							description={null}
+							installVariant="outline"
+						/>
+					</div>
 				</div>
 			</div>
 		</div>
