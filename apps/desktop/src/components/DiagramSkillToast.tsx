@@ -73,6 +73,7 @@ function SkillToast({ onOpenSettings }: { onOpenSettings: () => void }) {
 							</button>
 							.
 						</>,
+						{ closeButton: true },
 					);
 				}}
 				className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
