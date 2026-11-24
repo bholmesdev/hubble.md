@@ -31,6 +31,25 @@ test("keeps editor shortcuts in sync with live layout changes and renderer reloa
 		const editor = page.locator(".ProseMirror");
 		await expect(editor).toContainText("Hello");
 
+		const readMode = () =>
+			page.evaluate(() => {
+				let current: boolean | null = null;
+				const api = (window as unknown as { desktopApi: DesktopApi })
+					.desktopApi;
+				const stop = api.onKeyboardLayoutChange((enabled) => {
+					current = enabled;
+				});
+				stop();
+				return current;
+			});
+		const nativeMode = await app.evaluate(({ app }) => {
+			const { createRequire } = require("node:module");
+			const require = createRequire(`${app.getAppPath()}/package.json`);
+			const layout = require("native-keymap").getCurrentKeyboardLayout();
+			return layout?.id === "com.apple.keylayout.DVORAK-QWERTYCMD";
+		});
+		expect(await readMode()).toBe(nativeMode);
+
 		// Simulate native notifications without changing the user's actual input source.
 		await app.evaluate(({ BrowserWindow, ipcMain }) => {
 			ipcMain.removeAllListeners("desktop:keyboard-layout");
@@ -70,16 +89,7 @@ test("keeps editor shortcuts in sync with live layout changes and renderer reloa
 
 		await page.reload();
 		await expect(editor).toContainText("Hello");
-		const mode = await page.evaluate(() => {
-			let current: boolean | null = null;
-			const api = (window as Window & { desktopApi: DesktopApi }).desktopApi;
-			const stop = api.onKeyboardLayoutChange((enabled) => {
-				current = enabled;
-			});
-			stop();
-			return current;
-		});
-		expect(mode).toBe(true);
+		expect(await readMode()).toBe(true);
 	} finally {
 		await app.close();
 		await fs.rm(root, { recursive: true, force: true });
