@@ -146,9 +146,11 @@ function scheduleDiagramSave(session: DiagramSession) {
 export function DiagramView({
 	path,
 	content,
+	onOpenSettings,
 }: {
 	path: string;
 	content: string;
+	onOpenSettings: () => void;
 }) {
 	const [parsed] = useState(() => parseDiagram(content));
 	const sessionRef = useRef<DiagramSession>({
@@ -253,7 +255,7 @@ export function DiagramView({
 				overrides={overrides}
 				onMount={handleMount}
 			/>
-			<DiagramSkillToast path={path} />
+			<DiagramSkillToast path={path} onOpenSettings={onOpenSettings} />
 		</div>
 	);
 }

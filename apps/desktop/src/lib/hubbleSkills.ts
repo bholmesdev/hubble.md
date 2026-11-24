@@ -33,7 +33,7 @@ export async function installHubbleSkills(): Promise<void> {
  * desktop:detect-hubble-skills handler for the exact locations checked.
  */
 export async function hasHubbleSkillsInstalled(
-	workspacePath: string,
+	workspacePath?: string,
 ): Promise<boolean> {
 	try {
 		return await desktopApi.detectHubbleSkills(workspacePath);
@@ -47,9 +47,10 @@ export async function hasHubbleSkillsInstalled(
  * returns. Polls until they are, so installing from a terminal (e.g. with the
  * skills CLI) shows up without refocusing the window. Detection is a handful
  * of readdirs. Window focus re-checks either way, so skills removed while
- * Hubble was in the background bring the Install button back.
+ * Hubble was in the background bring the Install button back. Without a
+ * workspace, only the home dir's skill folders are checked.
  */
-export function useHubbleSkills(workspacePath: string) {
+export function useHubbleSkills(workspacePath?: string) {
 	const [installed, setInstalled] = useState<boolean | null>(null);
 	const [installing, setInstalling] = useState(false);
 

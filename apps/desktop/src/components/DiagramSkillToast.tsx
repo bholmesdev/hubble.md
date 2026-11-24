@@ -1,16 +1,11 @@
-import { Modal } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import { dirname } from "../lib/filePath";
-import {
-	INSTALL_COMMAND,
-	installHubbleSkills,
-	useHubbleSkills,
-} from "../lib/hubbleSkills";
+import { installHubbleSkills, useHubbleSkills } from "../lib/hubbleSkills";
 import { skillToastDismissedStore, workspacePathStore } from "../store/state";
-import { CopyBlock } from "./CopyBlock";
+import { ManualInstallModal } from "./ManualInstallModal";
 
 const TOAST_ID = "hubble-skills";
 
@@ -18,7 +13,13 @@ const TOAST_ID = "hubble-skills";
  * Offers the Hubble skills in a toast while a diagram is open, so agents edit
  * it with edit-diagram. Renders nothing itself.
  */
-export function DiagramSkillToast({ path }: { path: string }) {
+export function DiagramSkillToast({
+	path,
+	onOpenSettings,
+}: {
+	path: string;
+	onOpenSettings: () => void;
+}) {
 	const workspacePath = useStoreValue(workspacePathStore);
 	const dismissed = useStoreValue(skillToastDismissedStore);
 	const { installed } = useHubbleSkills(workspacePath ?? dirname(path) ?? path);
@@ -26,19 +27,19 @@ export function DiagramSkillToast({ path }: { path: string }) {
 
 	useEffect(() => {
 		if (!show) return;
-		toast.custom(() => <SkillToast />, {
+		toast.custom(() => <SkillToast onOpenSettings={onOpenSettings} />, {
 			id: TOAST_ID,
 			duration: Number.POSITIVE_INFINITY,
 		});
 		return () => {
 			toast.dismiss(TOAST_ID);
 		};
-	}, [show]);
+	}, [show, onOpenSettings]);
 
 	return null;
 }
 
-function SkillToast() {
+function SkillToast({ onOpenSettings }: { onOpenSettings: () => void }) {
 	const [installing, setInstalling] = useState(false);
 	const [manualOpen, setManualOpen] = useState(false);
 
@@ -53,9 +54,40 @@ function SkillToast() {
 			<button
 				type="button"
 				aria-label="Dismiss"
-				// Closing it keeps it away for good; Help → Install Agent Skills
-				// still works.
-				onClick={() => skillToastDismissedStore.set(true)}
+				// Closing it keeps it away for good, so point to Settings, which
+				// can still install them.
+				onClick={() => {
+					skillToastDismissedStore.set(true);
+					toast.custom(
+						(hint) => (
+							<div className="hubble-toast relative w-[var(--width)] p-4 pe-9">
+								<button
+									type="button"
+									aria-label="Dismiss"
+									onClick={() => toast.dismiss(hint)}
+									className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+								>
+									<MingcuteCloseLine className="size-3.5" />
+								</button>
+								<span className="hubble-toast-title">
+									Install skills anytime from{" "}
+									<button
+										type="button"
+										className="cursor-pointer underline underline-offset-2 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+										onClick={() => {
+											toast.dismiss(hint);
+											onOpenSettings();
+										}}
+									>
+										Settings
+									</button>
+									.
+								</span>
+							</div>
+						),
+						{ duration: 4000 },
+					);
+				}}
 				className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
 			>
 				<MingcuteCloseLine className="size-3.5" />
@@ -83,18 +115,7 @@ function SkillToast() {
 					Install manually
 				</button>
 			</div>
-			<Modal
-				open={manualOpen}
-				onOpenChange={setManualOpen}
-				title="Install the skills manually"
-				description="Run this in your terminal. The skills CLI asks which agents to install them for."
-			>
-				<CopyBlock
-					value={INSTALL_COMMAND}
-					label="Command"
-					ariaLabel="Copy install command"
-				/>
-			</Modal>
+			<ManualInstallModal open={manualOpen} onOpenChange={setManualOpen} />
 		</div>
 	);
 }

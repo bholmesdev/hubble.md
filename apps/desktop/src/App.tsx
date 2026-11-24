@@ -254,6 +254,14 @@ function App() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [settingsTarget, setSettingsTarget] = useState<SettingsTarget>();
 	const settingsRequestId = useRef(0);
+	const openSkillsSettings = () => {
+		settingsRequestId.current += 1;
+		setSettingsTarget({
+			page: "agents",
+			requestId: settingsRequestId.current,
+		});
+		setSettingsOpen(true);
+	};
 	const changeSettingsOpen = (open: boolean) => {
 		setSettingsOpen(open);
 		if (!open) setSettingsTarget(undefined);
@@ -976,6 +984,7 @@ function App() {
 											copyAsMarkdownRequest={copyAsMarkdownRequest}
 											viewMode={state.viewMode}
 											spellcheckStatus={spellcheckStatus}
+											onOpenSettings={openSkillsSettings}
 											onScrollContainerChange={setScrollContainerEl}
 										/>
 									</div>
@@ -1015,7 +1024,9 @@ function DocumentViewer({
 	viewMode,
 	spellcheckStatus,
 	onScrollContainerChange,
+	onOpenSettings,
 }: {
+	onOpenSettings: () => void;
 	path: string;
 	content: string;
 	copyAsMarkdownRequest: number;
@@ -1025,7 +1036,14 @@ function DocumentViewer({
 }) {
 	const documentId = editorDocumentId(path);
 	if (isDiagramFile(path)) {
-		return <DiagramView key={path} path={path} content={content} />;
+		return (
+			<DiagramView
+				key={path}
+				path={path}
+				content={content}
+				onOpenSettings={onOpenSettings}
+			/>
+		);
 	}
 
 	if (viewMode === "source" && supportsSourceToggle(path)) {

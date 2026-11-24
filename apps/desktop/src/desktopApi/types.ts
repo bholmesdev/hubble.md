@@ -173,7 +173,7 @@ export type DesktopApi = {
 	searchFileContents(
 		input: SearchFileContentsInput,
 	): Promise<SearchFileContentsOutput>;
-	detectHubbleSkills(workspacePath: string): Promise<boolean>;
+	detectHubbleSkills(workspacePath?: string): Promise<boolean>;
 	/**
 	 * Copies the skills bundled with Hubble into the user's agent folders.
 	 * Resolves to the folders left alone because a skill Hubble didn't install

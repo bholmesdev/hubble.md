@@ -16,10 +16,12 @@ import {
 	useRef,
 	useState,
 } from "react";
+import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import MingcuteRefresh2Line from "~icons/mingcute/refresh-2-line";
 import type { DesktopUpdateState } from "../desktopApi/types";
+import { useHubbleSkills } from "../lib/hubbleSkills";
 import {
 	resetShortcutBindings,
 	setChatCommand,
@@ -37,7 +39,9 @@ import {
 	spellcheckStore,
 	telemetryConsentStore,
 	themePreferenceStore,
+	workspacePathStore,
 } from "../store/state";
+import { ManualInstallModal } from "./ManualInstallModal";
 import { SettingsDialog, SettingsSection } from "./SettingsDialog";
 import { SpellcheckSettingsSection } from "./SpellcheckSection";
 import {
@@ -50,7 +54,7 @@ import {
 import { TelemetrySettingsSection } from "./TelemetrySection";
 import { UpdatesSection } from "./UpdatesSection";
 
-type SettingsPage = "general" | "chat" | "shortcuts";
+type SettingsPage = "general" | "agents" | "shortcuts";
 type Errors = Partial<Record<CommandId, string>>;
 
 export type SettingsTarget = {
@@ -108,11 +112,11 @@ export function Settings({
 						General
 					</NavButton>
 					<NavButton
-						active={page === "chat"}
-						buttonRef={page === "chat" ? activeTabRef : undefined}
-						onClick={() => setPage("chat")}
+						active={page === "agents"}
+						buttonRef={page === "agents" ? activeTabRef : undefined}
+						onClick={() => setPage("agents")}
 					>
-						Chat
+						Agents
 					</NavButton>
 					<NavButton
 						active={page === "shortcuts"}
@@ -132,8 +136,8 @@ export function Settings({
 							onUpdateAction={onUpdateAction}
 							onViewChangelog={onViewChangelog}
 						/>
-					) : page === "chat" ? (
-						<ChatSettings />
+					) : page === "agents" ? (
+						<AgentSettings />
 					) : (
 						<ShortcutSettings
 							open={open}
@@ -150,7 +154,7 @@ export function Settings({
 
 const pageTitles: Record<SettingsPage, string> = {
 	general: "General",
-	chat: "Chat",
+	agents: "Agents",
 	shortcuts: "Keyboard shortcuts",
 };
 
@@ -222,6 +226,47 @@ function AppearanceSettings() {
 	);
 }
 
+function SkillsSettings() {
+	const workspacePath = useStoreValue(workspacePathStore);
+	const { installed, installing, install } = useHubbleSkills(workspacePath);
+	const [manualOpen, setManualOpen] = useState(false);
+
+	return (
+		<>
+			<SettingsSection
+				title="Agent skills"
+				description="Teach your agents how to use Hubble's features: build HTML apps, edit diagrams, or leave and respond to comments."
+				action={
+					installed ? (
+						<span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary">
+							<MingcuteCheckCircleFill className="size-3.5" />
+							Skills installed
+						</span>
+					) : installed === false ? (
+						<span className="inline-flex shrink-0 items-center gap-1">
+							<Button
+								size="sm"
+								variant="ghost"
+								onClick={() => setManualOpen(true)}
+							>
+								Install manually
+							</Button>
+							<Button
+								size="sm"
+								disabled={installing}
+								onClick={() => void install()}
+							>
+								{installing ? "Installing..." : "Install"}
+							</Button>
+						</span>
+					) : null
+				}
+			/>
+			<ManualInstallModal open={manualOpen} onOpenChange={setManualOpen} />
+		</>
+	);
+}
+
 function CodeFilesSettings() {
 	const mode = useStoreValue(codeFileOpenModeStore);
 	return (
@@ -251,11 +296,12 @@ function CodeFilesSettings() {
 	);
 }
 
-function ChatSettings() {
+function AgentSettings() {
 	const [draft, setDraft] = useState(() => chatCommandStore.get());
 
 	return (
 		<div className="flex flex-col divide-y divide-border p-4">
+			<SkillsSettings />
 			<SettingsSection
 				title="Chat about this note"
 				description={`This command runs in a new terminal when you pick "Chat about this note" from a note's ⋯ menu. The shell replaces $HUBBLE_NOTE_PATH with the current note's file path.`}
