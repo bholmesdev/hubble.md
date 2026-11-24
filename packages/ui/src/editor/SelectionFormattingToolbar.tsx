@@ -7,7 +7,6 @@ import {
 } from "@floating-ui/dom";
 import type { Editor } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
-import { keymatch } from "keymatch";
 import {
 	type ComponentType,
 	type CSSProperties,
@@ -29,6 +28,7 @@ import MingcuteListOrderedLine from "~icons/mingcute/list-ordered-line";
 import MingcuteMore1Line from "~icons/mingcute/more-1-line";
 import MingcuteQuoteLeftLine from "~icons/mingcute/quote-left-line";
 import MingcuteStrikethroughLine from "~icons/mingcute/strikethrough-line";
+import { matchShortcut } from "../lib/keyboard";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 import { Separator } from "../primitives/separator";
@@ -372,7 +372,7 @@ export function SelectionFormattingToolbar({
 			}, 0);
 		};
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (!keymatch(event, "Escape")) return;
+			if (!matchShortcut(event, "Escape")) return;
 			// Someone else (link popover, format menu) consumed this Escape.
 			if (event.defaultPrevented) return;
 			if (!openRef.current && showTimer === null) return;

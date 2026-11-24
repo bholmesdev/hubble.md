@@ -1,7 +1,11 @@
 // @vitest-environment happy-dom
 
-import { formatShortcut } from "@hubble.md/ui";
-import { describe, expect, it } from "vitest";
+import {
+	formatShortcut,
+	matchShortcut,
+	setQwertyCommandKeys,
+} from "@hubble.md/ui";
+import { afterEach, describe, expect, it } from "vitest";
 
 Object.defineProperty(window, "desktopApi", { value: {} });
 
@@ -105,5 +109,37 @@ describe("shortcutBindingFromEvent", () => {
 		});
 
 		expect(shortcutBindingFromEvent(event, true)).toBe("CmdOrCtrl+Alt+[");
+	});
+});
+
+afterEach(() => setQwertyCommandKeys(false));
+
+describe("layout-aware recording", () => {
+	it.each([
+		false,
+		true,
+	])("round-trips Command shortcuts with hybrid layout %s", (hybrid) => {
+		setQwertyCommandKeys(hybrid);
+		const event = new KeyboardEvent("keydown", {
+			key: "b",
+			code: "KeyN",
+			metaKey: true,
+		});
+		const binding = shortcutBindingFromEvent(event, true);
+		expect(binding).toBe(hybrid ? "CmdOrCtrl+N" : "CmdOrCtrl+B");
+		expect(
+			matchShortcut(event, (binding ?? "").replace("CmdOrCtrl", "Cmd")),
+		).toBe(true);
+	});
+
+	it("keeps Option dead keys tied to their base key", () => {
+		const event = new KeyboardEvent("keydown", {
+			key: "ø",
+			code: "KeyO",
+			metaKey: true,
+			altKey: true,
+		});
+		expect(shortcutBindingFromEvent(event, true)).toBe("CmdOrCtrl+Alt+O");
+		expect(matchShortcut(event, "Cmd+Alt+O")).toBe(true);
 	});
 });

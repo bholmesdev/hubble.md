@@ -12,7 +12,6 @@ import {
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
-import { keymatch } from "keymatch";
 import {
 	type RefObject,
 	useEffect,
@@ -26,6 +25,7 @@ import MingcuteCheckLine from "~icons/mingcute/check-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDelete2Line from "~icons/mingcute/delete-2-line";
 import MingcutePencilFill from "~icons/mingcute/pencil-fill";
+import { matchShortcut } from "../lib/keyboard";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 import { Input } from "../primitives/input";
@@ -1082,7 +1082,7 @@ export function LinkPopover({
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (document.activeElement !== inputRef.current) return;
 			const binding = getCommandBinding("app.go-to-file");
-			if (!binding || !keymatch(event, binding)) return;
+			if (!binding || !matchShortcut(event, binding)) return;
 			event.preventDefault();
 			event.stopPropagation();
 		};
@@ -1107,7 +1107,7 @@ export function LinkPopover({
 				return;
 			}
 
-			if (isInputFocused && keymatch(event, "Enter")) {
+			if (isInputFocused && matchShortcut(event, "Enter")) {
 				event.preventDefault();
 				event.stopPropagation();
 				const suggestion = wikiSuggestions[boundedActiveSuggestionIndex];
@@ -1131,7 +1131,7 @@ export function LinkPopover({
 				return;
 			}
 
-			if (keymatch(event, "Escape")) {
+			if (matchShortcut(event, "Escape")) {
 				event.preventDefault();
 				event.stopPropagation();
 				clearGhostText(editor);
@@ -1181,7 +1181,7 @@ export function LinkPopover({
 
 			if (
 				isInputFocused &&
-				keymatch(event, "Enter") &&
+				matchShortcut(event, "Enter") &&
 				wikiSuggestions.length > 0
 			) {
 				event.preventDefault();
@@ -1207,14 +1207,14 @@ export function LinkPopover({
 				return;
 			}
 
-			if (isInputFocused && keymatch(event, "Enter")) {
+			if (isInputFocused && matchShortcut(event, "Enter")) {
 				event.preventDefault();
 				dispatchMachineEvent({ type: "ESCAPE_REQUESTED" });
 				editor.commands.focus(undefined, { scrollIntoView: false });
 				return;
 			}
 
-			if ((isVisible || editor.isFocused) && keymatch(event, "Escape")) {
+			if ((isVisible || editor.isFocused) && matchShortcut(event, "Escape")) {
 				event.preventDefault();
 				const shouldReturnFocusToEditor =
 					machineState.mode === "preview" || machineState.mode === "actions";

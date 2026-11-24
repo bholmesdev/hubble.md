@@ -5,9 +5,8 @@ import {
 	getCommandBinding,
 	resolveCommandBinding,
 } from "@hubble.md/editor";
-import { Button, formatShortcut, Input } from "@hubble.md/ui";
+import { Button, formatShortcut, Input, matchShortcut } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { keymatch } from "keymatch";
 import {
 	type ReactNode,
 	type Ref,
@@ -296,7 +295,7 @@ function ShortcutSettings({
 		if (!open || state.recordingId) return;
 		const onKeyDown = (event: KeyboardEvent) => {
 			const binding = getCommandBinding("app.find");
-			if (!binding || !keymatch(event, binding)) return;
+			if (!binding || !matchShortcut(event, binding)) return;
 			event.preventDefault();
 			event.stopPropagation();
 			scrollRef.current?.scrollTo({ top: 0 });

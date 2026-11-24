@@ -7,7 +7,7 @@ import {
 	resolveCommandBinding,
 	sortCommandBinding,
 } from "@hubble.md/editor";
-import { formatShortcut } from "@hubble.md/ui";
+import { formatShortcut, shortcutKey } from "@hubble.md/ui";
 import { isMac } from "keymatch";
 
 export type ShortcutCommand = {
@@ -203,11 +203,10 @@ export function shortcutBindingFromEvent(
 		Semicolon: ";",
 		Slash: "/",
 	};
-	const key = /^Key[A-Z]$/.test(event.code)
-		? event.code.slice(3)
-		: /^Digit[0-9]$/.test(event.code)
-			? event.code.slice(5)
-			: (punctuationKeys[event.code] ?? keyAliases[event.key] ?? event.key);
+	const normalized = shortcutKey(event);
+	const key = /^[a-z0-9]$/.test(normalized)
+		? normalized
+		: (punctuationKeys[event.code] ?? keyAliases[event.key] ?? event.key);
 	if (["Alt", "Control", "Meta", "Shift"].includes(key)) return null;
 
 	const parts: string[] = [];

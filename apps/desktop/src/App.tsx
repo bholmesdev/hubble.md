@@ -15,6 +15,7 @@ import {
 	GlobalSearchPalette,
 	getActiveEditor,
 	MarkdownSourceEditor,
+	matchShortcut,
 	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
 	PlainTextEditor,
@@ -23,7 +24,6 @@ import {
 	type WikiTarget,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { keymatch } from "keymatch";
 import {
 	useEffect,
 	useLayoutEffect,
@@ -540,7 +540,7 @@ function App() {
 		const onKeyDown = async (event: KeyboardEvent) => {
 			if (event.defaultPrevented) return;
 			const formatBinding = getCommandBinding("app.format-menu");
-			if (formatBinding && keymatch(event, formatBinding)) {
+			if (formatBinding && matchShortcut(event, formatBinding)) {
 				const editor = getActiveEditor();
 				if (editor?.isFocused && !editor.state.selection.empty) return;
 				event.preventDefault();
@@ -591,7 +591,11 @@ function App() {
 			][]) {
 				const command = getCommand(id);
 				const binding = getCommandBinding(id);
-				if (binding && keymatch(event, binding) && command.isEnabled(context)) {
+				if (
+					binding &&
+					matchShortcut(event, binding) &&
+					command.isEnabled(context)
+				) {
 					event.preventDefault();
 					await handler();
 					return;
@@ -600,13 +604,13 @@ function App() {
 			// The palette's binding can claim Cmd-P even when unavailable here; editor commands can too.
 			if (
 				!event.repeat &&
-				keymatch(event, "CmdOrCtrl+P") &&
+				matchShortcut(event, "CmdOrCtrl+P") &&
 				!Object.keys(commandRegistry).some((id) => {
 					const binding = resolveCommandBinding(
 						id as keyof typeof commandRegistry,
 						getCommandBindings(),
 					);
-					return binding && keymatch(event, binding);
+					return binding && matchShortcut(event, binding);
 				})
 			) {
 				event.preventDefault();

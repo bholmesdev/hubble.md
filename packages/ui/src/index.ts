@@ -71,6 +71,11 @@ export {
 	useResizeSeparator,
 } from "./hooks/useResizeSeparator";
 export {
+	matchShortcut,
+	setQwertyCommandKeys,
+	shortcutKey,
+} from "./lib/keyboard";
+export {
 	COMMAND_PREFIX,
 	groupCommands,
 	isCommandQuery,

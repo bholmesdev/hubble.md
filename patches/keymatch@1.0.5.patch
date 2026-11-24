@@ -1,0 +1,101 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 076784738d19382bd9fcc64d5ad3ca1a49bd0eab..60b47eb14658c31c4d5e63e507e7c18ba9b94c96 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -1,2 +1,2 @@
+-export { keymatch } from './keymatch.js';
+ export { isMac } from './isMac.js';
++export { type KeymatchOptions, keymatch, normalizedEventKey, } from './keymatch.js';
+diff --git a/dist/index.js b/dist/index.js
+index 076784738d19382bd9fcc64d5ad3ca1a49bd0eab..0f34a0bddc0f62975ef77ee3387095b8050a9d83 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,2 +1,2 @@
+-export { keymatch } from './keymatch.js';
+ export { isMac } from './isMac.js';
++export { keymatch, normalizedEventKey, } from './keymatch.js';
+diff --git a/dist/keymatch.d.ts b/dist/keymatch.d.ts
+index 4e211b8f18f21402554031e58747e7d02985fd68..f8e65cf00f50c73c0a1434bd5a99030cbd810a68 100644
+--- a/dist/keymatch.d.ts
++++ b/dist/keymatch.d.ts
+@@ -1,3 +1,13 @@
++export type KeymatchOptions = {
++    keyMode?: 'character' | 'physical';
++};
++/**
++ * Shares the matcher's base key with shortcut recorders. Character mode follows
++ * ASCII letters and digits; Alt, non-ASCII keys, and physical mode use the
++ * letter/digit key position. Other keys retain their reported names.
++ * The caller chooses the mode because events do not identify the OS layout.
++ */
++export declare function normalizedEventKey({ code, key, altKey }: KeyboardEvent, { keyMode }?: KeymatchOptions): string;
+ /**
+  * Checks if a KeyboardEvent matches an Electron accelerator string
+  *
+@@ -9,4 +19,4 @@
+  * }
+  * ```
+  */
+-export declare function keymatch(event: KeyboardEvent, matchString: string): boolean;
++export declare function keymatch(event: KeyboardEvent, matchString: string, options?: KeymatchOptions): boolean;
+diff --git a/dist/keymatch.js b/dist/keymatch.js
+index 8f88078a806058e074dd92e289eb2d1983f56bd2..408207723ab7c33fe54d75b86fdae199a46e0f52 100644
+--- a/dist/keymatch.js
++++ b/dist/keymatch.js
+@@ -11,7 +11,7 @@ function parseMatchString(matchString) {
+     if (!key) {
+         throw new Error(`Invalid accelerator: ${matchString}`);
+     }
+-    const modifierParts = parts.slice(0, -1).map(part => part.toLowerCase());
++    const modifierParts = parts.slice(0, -1).map((part) => part.toLowerCase());
+     let ctrl = false, alt = false, shift = false, meta = false;
+     for (const modifier of modifierParts) {
+         switch (modifier) {
+@@ -57,20 +57,24 @@ function parseMatchString(matchString) {
+ function normalizeKey(key) {
+     const keyMap = {
+         ' ': 'space',
+-        'arrowup': 'up',
+-        'arrowdown': 'down',
+-        'arrowleft': 'left',
+-        'arrowright': 'right',
++        arrowup: 'up',
++        arrowdown: 'down',
++        arrowleft: 'left',
++        arrowright: 'right',
+     };
+     const normalized = key.toLowerCase();
+     return keyMap[normalized] || normalized;
+ }
+ /**
+- * Derive a normalized base key from a KeyboardEvent, preferring `code` for letters/digits.
+- * This ensures Option/Alt dead-key compositions on macOS (e.g. Option+O => 'ø')
+- * still match the intended base key ('o').
++ * Shares the matcher's base key with shortcut recorders. Character mode follows
++ * ASCII letters and digits; Alt, non-ASCII keys, and physical mode use the
++ * letter/digit key position. Other keys retain their reported names.
++ * The caller chooses the mode because events do not identify the OS layout.
+  */
+-function normalizedEventKey({ code, key }) {
++export function normalizedEventKey({ code, key, altKey }, { keyMode = 'character' } = {}) {
++    if (keyMode === 'character' && !altKey && /^[a-zA-Z0-9]$/.test(key)) {
++        return key.toLowerCase();
++    }
+     if (code) {
+         if (/^Key[A-Z]$/.test(code)) {
+             // e.g. KeyO => 'o'
+@@ -95,11 +99,11 @@ function normalizedEventKey({ code, key }) {
+  * }
+  * ```
+  */
+-export function keymatch(event, matchString) {
++export function keymatch(event, matchString, options) {
+     const { ctrl, alt, shift, meta, key } = parseMatchString(matchString);
+-    return normalizedEventKey(event) === key &&
++    return (normalizedEventKey(event, options) === key &&
+         event.ctrlKey === ctrl &&
+         event.altKey === alt &&
+         event.shiftKey === shift &&
+-        event.metaKey === meta;
++        event.metaKey === meta);
+ }

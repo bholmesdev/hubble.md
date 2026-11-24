@@ -169,5 +169,8 @@
 				"rank": "Owner"
 			}
 		]
+	},
+	"optionalDependencies": {
+		"native-keymap": "3.3.9"
 	}
 }
