@@ -58,22 +58,34 @@ function SkillToast({ onOpenSettings }: { onOpenSettings: () => void }) {
 				// can still install them.
 				onClick={() => {
 					skillToastDismissedStore.set(true);
-					const hint = toast(
-						<>
-							Install skills anytime from{" "}
-							<button
-								type="button"
-								className="cursor-pointer underline underline-offset-2 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-								onClick={() => {
-									toast.dismiss(hint);
-									onOpenSettings();
-								}}
-							>
-								Settings
-							</button>
-							.
-						</>,
-						{ closeButton: true },
+					toast.custom(
+						(hint) => (
+							<div className="hubble-toast relative w-[var(--width)] p-4 pe-9">
+								<button
+									type="button"
+									aria-label="Dismiss"
+									onClick={() => toast.dismiss(hint)}
+									className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+								>
+									<MingcuteCloseLine className="size-3.5" />
+								</button>
+								<span className="hubble-toast-title">
+									Install skills anytime from{" "}
+									<button
+										type="button"
+										className="cursor-pointer underline underline-offset-2 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+										onClick={() => {
+											toast.dismiss(hint);
+											onOpenSettings();
+										}}
+									>
+										Settings
+									</button>
+									.
+								</span>
+							</div>
+						),
+						{ duration: 4000 },
 					);
 				}}
 				className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
