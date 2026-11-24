@@ -54,7 +54,7 @@ import {
 import { TelemetrySettingsSection } from "./TelemetrySection";
 import { UpdatesSection } from "./UpdatesSection";
 
-type SettingsPage = "general" | "chat" | "shortcuts";
+type SettingsPage = "general" | "agents" | "shortcuts";
 type Errors = Partial<Record<CommandId, string>>;
 
 export type SettingsTarget = {
@@ -112,11 +112,11 @@ export function Settings({
 						General
 					</NavButton>
 					<NavButton
-						active={page === "chat"}
-						buttonRef={page === "chat" ? activeTabRef : undefined}
-						onClick={() => setPage("chat")}
+						active={page === "agents"}
+						buttonRef={page === "agents" ? activeTabRef : undefined}
+						onClick={() => setPage("agents")}
 					>
-						Chat
+						Agents
 					</NavButton>
 					<NavButton
 						active={page === "shortcuts"}
@@ -136,8 +136,8 @@ export function Settings({
 							onUpdateAction={onUpdateAction}
 							onViewChangelog={onViewChangelog}
 						/>
-					) : page === "chat" ? (
-						<ChatSettings />
+					) : page === "agents" ? (
+						<AgentSettings />
 					) : (
 						<ShortcutSettings
 							open={open}
@@ -154,7 +154,7 @@ export function Settings({
 
 const pageTitles: Record<SettingsPage, string> = {
 	general: "General",
-	chat: "Chat",
+	agents: "Agents",
 	shortcuts: "Keyboard shortcuts",
 };
 
@@ -190,7 +190,6 @@ function GeneralSettings({
 				/>
 			) : null}
 			<CodeFilesSettings />
-			<SkillsSettings />
 			{telemetryConsent ? (
 				<TelemetrySettingsSection
 					consent={telemetryConsent}
@@ -297,11 +296,12 @@ function CodeFilesSettings() {
 	);
 }
 
-function ChatSettings() {
+function AgentSettings() {
 	const [draft, setDraft] = useState(() => chatCommandStore.get());
 
 	return (
 		<div className="flex flex-col divide-y divide-border p-4">
+			<SkillsSettings />
 			<SettingsSection
 				title="Chat about this note"
 				description={`This command runs in a new terminal when you pick "Chat about this note" from a note's ⋯ menu. The shell replaces $HUBBLE_NOTE_PATH with the current note's file path.`}

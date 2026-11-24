@@ -257,7 +257,7 @@ function App() {
 	const openSkillsSettings = () => {
 		settingsRequestId.current += 1;
 		setSettingsTarget({
-			page: "general",
+			page: "agents",
 			requestId: settingsRequestId.current,
 		});
 		setSettingsOpen(true);
