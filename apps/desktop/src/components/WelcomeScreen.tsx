@@ -78,7 +78,6 @@ export function WelcomeScreen({
 								<span className="text-sm font-normal">Set up agent skills</span>
 							}
 							description={null}
-							installVariant="outline"
 						/>
 					</div>
 				</div>
