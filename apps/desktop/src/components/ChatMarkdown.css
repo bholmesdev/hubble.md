@@ -1,0 +1,27 @@
+.chat-markdown {
+	font-size: var(--font-size-content);
+}
+.chat-markdown li + li,
+.chat-markdown li > :is(ul, ol) {
+	margin-block-start: var(--editor-list-gap);
+}
+.chat-markdown pre {
+	white-space: pre;
+	overflow-wrap: normal;
+}
+@keyframes chat-chunk-enter {
+	from {
+		opacity: 0.25;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.chat-chunk-enter {
+	animation: chat-chunk-enter 140ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+	.chat-chunk-enter {
+		animation: none;
+	}
+}
