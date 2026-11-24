@@ -840,7 +840,11 @@ export async function openWorkspace(path?: string) {
 	await restoreTabs();
 }
 
-export function updateEditorContent(path: string, content: string) {
+export function updateEditorContent(
+	path: string,
+	content: string,
+	options?: { undoable?: boolean },
+) {
 	const currentPath = titleManager.currentPath(path);
 	const current = viewerStore.get();
 	if (current.currentPath !== currentPath || current.content === content)
@@ -861,6 +865,7 @@ export function updateEditorContent(path: string, content: string) {
 		return {
 			...state,
 			content,
+			...(options?.undoable ? { undoableUpdate: crypto.randomUUID() } : {}),
 			status: "ready",
 			error: null,
 		};
@@ -882,7 +887,12 @@ export function setViewerMode(viewMode: ViewMode) {
 async function savePathContentNow(
 	path: string,
 	content: string,
-	options?: { force?: boolean; throwOnError?: boolean; allowBlocked?: boolean },
+	options?: {
+		force?: boolean;
+		throwOnError?: boolean;
+		allowBlocked?: boolean;
+		beforeWrite?: () => void;
+	},
 ) {
 	// Binary viewers, external files, and the virtual changelog never enter text saves.
 	if (isVirtualPath(path) || !isEditableFile(path)) return;
@@ -932,6 +942,8 @@ async function savePathContentNow(
 		}
 	}
 
+	// Tool edits recheck their scope and editor version after queued saves and disk preflight.
+	options?.beforeWrite?.();
 	try {
 		rememberSelfSave(path, content);
 		await desktopApi.writeFileText(path, content);
@@ -975,7 +987,11 @@ async function savePathContentNow(
 export function savePathContent(
 	path: string,
 	content: string,
-	options?: { force?: boolean; throwOnError?: boolean },
+	options?: {
+		force?: boolean;
+		throwOnError?: boolean;
+		beforeWrite?: () => void;
+	},
 ) {
 	const currentPath = titleManager.currentPath(path);
 	return saves.run(currentPath, () =>
