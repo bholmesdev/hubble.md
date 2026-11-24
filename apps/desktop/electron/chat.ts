@@ -129,8 +129,8 @@ export function setupChatIpc(
 		if (!response.ok)
 			throw new Error(
 				response.status === 401
-					? "ChatGPT connection expired. Reconnect."
-					: "Could not load ChatGPT models. Try reconnecting.",
+					? "Chat connection expired. Reconnect."
+					: "Could not load Chat models. Try reconnecting.",
 			);
 		const catalog = z
 			.object({
@@ -289,7 +289,7 @@ export function setupChatIpc(
 						throw new Error(responseError(event.response.error?.code));
 					else if (event.type === "response.incomplete")
 						throw new Error(
-							"ChatGPT returned an incomplete reply. Start a new message to continue.",
+							"Chat returned an incomplete reply. Start a new message to continue.",
 						);
 					else if (event.type === "error")
 						throw new Error(responseError(event.code));
@@ -359,7 +359,7 @@ export function setupChatIpc(
 						? responseError(error.code)
 						: error instanceof Error
 							? error.message
-							: "ChatGPT request failed.",
+							: "Chat request failed.",
 			};
 		} finally {
 			sender.removeListener("destroyed", destroyed);
@@ -383,7 +383,7 @@ function assertEncryption() {
 			safeStorage.getSelectedStorageBackend() === "basic_text")
 	) {
 		throw new Error(
-			"ChatGPT sign-in needs an OS keychain. Unlock or configure your keychain and restart Hubble.",
+			"Chat sign-in needs an OS keychain. Unlock or configure your keychain and restart Hubble.",
 		);
 	}
 }
@@ -393,8 +393,8 @@ function responseError(code?: string | null) {
 		code === "subscription_sharing_usage_limit_exceeded" ||
 		code === "subscription_sharing_usage_unavailable"
 	)
-		return "ChatGPT plan usage is unavailable or at its limit. Open Manage usage in ChatGPT.";
+		return "Chat plan usage is unavailable or at its limit. Open Manage usage.";
 	if (code === "invalid_api_key" || code === "token_expired")
-		return "ChatGPT connection expired. Reconnect.";
-	return "ChatGPT could not complete the request. Check your connection, model access, and ChatGPT usage limits.";
+		return "Chat connection expired. Reconnect.";
+	return "Chat could not complete the request. Check your connection, model access, and Chat usage limits.";
 }

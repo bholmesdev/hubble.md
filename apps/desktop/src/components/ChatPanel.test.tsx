@@ -586,7 +586,7 @@ it("offers a working reset and sign-in from an unreadable saved connection", asy
 			},
 		});
 	});
-	expect(host.textContent).toContain("saved ChatGPT sign-in");
+	expect(host.textContent).toContain("saved sign-in");
 	expect(host.querySelector("textarea")).toBeNull();
 	mocks.api.chatReset.mockRejectedValueOnce(
 		new Error("Could not remove the saved sign-in. Try again."),

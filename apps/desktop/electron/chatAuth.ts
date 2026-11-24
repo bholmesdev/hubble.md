@@ -81,11 +81,11 @@ export class ChatGPTAuth {
 		const account = await this.account();
 		if (!account.connected)
 			throw new Error(
-				"Sign in with ChatGPT to continue. Prototype sessions need reconnecting after an hour.",
+				"Sign in to continue. Prototype sessions need reconnecting after an hour.",
 			);
 		if (!account.sharing)
 			throw new Error(
-				"ChatGPT plan usage is not enabled. Manage usage in ChatGPT, then reconnect.",
+				"Plan usage is not enabled. Open Manage usage, then reconnect.",
 			);
 		return (await this.load()).tokens.access;
 	}
@@ -130,7 +130,7 @@ export class ChatGPTAuth {
 					(saved.clientId && clientId !== saved.clientId)
 				) {
 					throw new Error(
-						"ChatGPT returned an unexpected registration. Try signing in again.",
+						"The connection returned an unexpected registration. Try signing in again.",
 					);
 				}
 				// Keep registration even if its one-time code expires during exchange.
@@ -150,7 +150,7 @@ export class ChatGPTAuth {
 					}),
 				});
 				if (!response.ok)
-					throw new Error("ChatGPT sign-in exchange failed. Please reconnect.");
+					throw new Error("Sign-in exchange failed. Please reconnect.");
 				const tokens = tokenSchema.parse(await response.json());
 				const { payload } = await jwtVerify(
 					tokens.id_token,
@@ -167,7 +167,9 @@ export class ChatGPTAuth {
 					!payload.sub ||
 					(saved.subject && saved.subject !== payload.sub)
 				) {
-					throw new Error("ChatGPT identity did not match this sign-in.");
+					throw new Error(
+						"Sign-in identity could not be verified. Please reconnect.",
+					);
 				}
 				controller.signal.throwIfAborted();
 				const label =
@@ -175,7 +177,7 @@ export class ChatGPTAuth {
 						? payload.email
 						: typeof payload.name === "string"
 							? payload.name
-							: "ChatGPT account";
+							: "Chat account";
 				const credentials = {
 					access: tokens.access_token,
 					refresh: tokens.refresh_token,
@@ -233,7 +235,7 @@ export class ChatGPTAuth {
 			if (!response.ok) throw new Error();
 		} catch {
 			throw new Error(
-				"Signed out locally. Remote sign-out was not confirmed; disconnect Hubble in ChatGPT Settings → Usage.",
+				"Signed out locally. Remote sign-out was not confirmed; disconnect Hubble in your account’s Settings → Usage.",
 			);
 		}
 	}
@@ -258,7 +260,7 @@ export class ChatGPTAuth {
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code !== "ENOENT")
 				throw new UnreadableConnection(
-					"Your saved ChatGPT sign-in could not be opened. Reset the connection and sign in again.",
+					"Your saved sign-in could not be opened. Reset the connection and sign in again.",
 				);
 			await this.save({ hostId: `urn:uuid:${randomUUID()}` });
 		}
@@ -279,8 +281,7 @@ export class ChatGPTAuth {
 		const response = await fetch(`${ISSUER}/.well-known/openid-configuration`, {
 			signal,
 		});
-		if (!response.ok)
-			throw new Error("ChatGPT sign-in is unavailable. Try again.");
+		if (!response.ok) throw new Error("Sign-in is unavailable. Try again.");
 		const endpoint = z
 			.url()
 			.refine((value) => new URL(value).origin === ISSUER);
@@ -321,7 +322,7 @@ export class ChatGPTAuth {
 			response.setHeader("Cache-Control", "no-store");
 			if (url.searchParams.has("error") || !url.searchParams.get("code")) {
 				response.end("Sign-in was declined. Return to Hubble.");
-				reject(new Error("ChatGPT sign-in was declined. You can try again."));
+				reject(new Error("Sign-in was declined. You can try again."));
 			} else {
 				response.end(
 					"Sign-in received. Return to Hubble to finish connecting.",
@@ -330,7 +331,7 @@ export class ChatGPTAuth {
 			}
 		});
 		const abort = () => {
-			reject(new Error("ChatGPT sign-in cancelled or timed out."));
+			reject(new Error("Sign-in cancelled or timed out."));
 			server.close();
 		};
 		signal.addEventListener("abort", abort, { once: true });
@@ -347,7 +348,7 @@ export class ChatGPTAuth {
 		}
 		const address = server.address();
 		if (!address || typeof address === "string")
-			throw new Error("Could not start ChatGPT sign-in.");
+			throw new Error("Could not start sign-in.");
 		return {
 			uri: `http://127.0.0.1:${address.port}/auth/callback`,
 			result,

@@ -26,7 +26,7 @@ export function getChatPanelState(
 			kind: "reset-required",
 			message:
 				connection.error ??
-				"Your saved ChatGPT sign-in could not be opened. Reset the connection and sign in again. Your notes and chats will stay here.",
+				"Your saved sign-in could not be opened. Reset the connection and sign in again. Your notes and chats will stay here.",
 		};
 	if (!connection.account && connection.error)
 		return { kind: "connection-error", message: connection.error };
@@ -36,7 +36,7 @@ export function getChatPanelState(
 	if (!connection.account.sharing)
 		return {
 			kind: "setup-required",
-			message: "Enable ChatGPT plan usage in Chat settings, then reconnect.",
+			message: "Enable plan usage in Chat settings, then reconnect.",
 		};
 	if (!connection.models.length)
 		return {
