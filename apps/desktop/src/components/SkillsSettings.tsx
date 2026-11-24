@@ -9,9 +9,11 @@ import { SettingsSection } from "./SettingsDialog";
 
 export function SkillsSettings({
 	title = "Agent skills",
+	installVariant = "default",
 	description = "Teach your agents how to use Hubble's features: build HTML apps, edit diagrams, or leave and respond to comments.",
 }: {
 	title?: string;
+	installVariant?: "default" | "outline";
 	description?: ReactNode;
 }) {
 	const workspacePath = useStoreValue(workspacePathStore);
@@ -40,6 +42,7 @@ export function SkillsSettings({
 							</Button>
 							<Button
 								size="sm"
+								variant={installVariant}
 								disabled={installing}
 								onClick={() => void install()}
 							>

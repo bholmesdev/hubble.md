@@ -64,8 +64,15 @@ export function WelcomeScreen({
 						/>
 					</div>
 				</section>
-				<div className="welcome-rise" style={{ animationDelay: "0.45s" }}>
-					<SkillsSettings title="Install agent skills" description={null} />
+				<div
+					className="welcome-rise border-t border-border pt-6"
+					style={{ animationDelay: "0.45s" }}
+				>
+					<SkillsSettings
+						title="Install agent skills"
+						description={null}
+						installVariant="outline"
+					/>
 				</div>
 			</div>
 		</div>
