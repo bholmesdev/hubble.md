@@ -1,7 +1,11 @@
 import { EventEmitter } from "node:events";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CHAT_CONTEXT_LIMIT, type ChatRequest } from "../src/desktopApi/chat";
+import {
+	CHAT_CONTEXT_LIMIT,
+	type ChatRequest,
+	type ChatResult,
+} from "../src/desktopApi/chat";
 import { setupChatIpc } from "./chat";
 
 const mocks = vi.hoisted(() => ({
@@ -263,4 +267,197 @@ it("rejects file context that exceeds the request budget before calling OpenAI",
 	});
 	await expect(call("send", input)).rejects.toThrow("Chat is too long");
 	expect(mocks.create).not.toHaveBeenCalled();
+});
+
+it("runs namespaced workspace tools and retains calls and results for follow-ups", async () => {
+	const fs = await import("node:fs/promises");
+	const os = await import("node:os");
+	const path = await import("node:path");
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "hubble-tool-loop-"));
+	try {
+		await fs.writeFile(path.join(root, "note.md"), "Original note\n");
+		setupChatIpc(
+			() => sender as unknown as WebContents,
+			() => root,
+		);
+		sender.send.mockImplementation((channel, payload) => {
+			if (channel === "desktop:chat-file-request")
+				queueMicrotask(() =>
+					call("file-reply", {
+						requestId: payload.requestId,
+						callId: payload.callId,
+						open: false,
+					}),
+				);
+		});
+		const toolCall = (name: string, args: object, call_id: string) => ({
+			type: "function_call",
+			namespace: "workspace",
+			name,
+			arguments: JSON.stringify(args),
+			call_id,
+			id: `fc_${call_id}`,
+		});
+		mocks.create.mockImplementation(async (body) => {
+			const result = body.input
+				.filter((item) => item.type === "function_call_output")
+				.slice(-1)[0];
+			if (!result)
+				return stream([
+					{ type: "response.output_text.delta", delta: "Reading note." },
+					{
+						type: "response.completed",
+						response: {
+							output: [
+								{
+									type: "message",
+									role: "assistant",
+									id: "msg_read",
+									status: "completed",
+									content: [
+										{
+											type: "output_text",
+											text: "Reading note.",
+											annotations: [],
+										},
+									],
+								},
+								toolCall("read_file", { path: "note.md" }, "read"),
+							],
+						},
+					},
+				]);
+			if (result.call_id === "read") {
+				const version = JSON.parse(result.output).version;
+				return stream([
+					{
+						type: "response.completed",
+						response: {
+							output: [
+								toolCall(
+									"apply_patch",
+									{
+										expected_version: version,
+										patch:
+											"*** Begin Patch\n*** Update File: note.md\n@@\n-Original note\n+Edited note\n*** End Patch",
+									},
+									"edit",
+								),
+							],
+						},
+					},
+				]);
+			}
+			return stream([
+				{ type: "response.output_text.delta", delta: "Edited it." },
+				{
+					type: "response.completed",
+					response: {
+						output: [
+							{
+								type: "message",
+								role: "assistant",
+								content: [
+									{ type: "output_text", text: "Edited it.", annotations: [] },
+								],
+								id: "msg_final",
+								status: "completed",
+							},
+						],
+					},
+				},
+			]);
+		});
+		const input = request();
+		const result = (await call("send", input)) as ChatResult;
+		expect(result.status).toBe("complete");
+		expect(result.text).toBe("Reading note.\n\nEdited it.");
+		expect(await fs.readFile(path.join(root, "note.md"), "utf8")).toBe(
+			"Edited note\n",
+		);
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(mocks.create.mock.calls[0][0].tools[0]).toMatchObject({
+			type: "namespace",
+			name: "workspace",
+		});
+		expect(
+			mocks.create.mock.calls[0][0].tools[0].tools.map((t) => t.name),
+		).toEqual(["list_files", "search_content", "read_file", "apply_patch"]);
+		const lastInput = mocks.create.mock.calls[2][0].input;
+		const completed = { ...input.messages[0] };
+		const followup = request();
+		followup.messages = [
+			completed,
+			{
+				id: "reply",
+				role: "assistant",
+				text: result.text,
+				status: "complete",
+				context: result.context,
+			},
+			...followup.messages,
+		];
+		await call("send", followup);
+		expect(
+			mocks.create.mock.calls[3][0].input.slice(0, lastInput.length),
+		).toEqual(lastInput);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
+it("stops tool continuation when the workspace changes", async () => {
+	const fs = await import("node:fs/promises");
+	const os = await import("node:os");
+	const path = await import("node:path");
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "hubble-tool-scope-"));
+	let workspace = root;
+	try {
+		await fs.writeFile(path.join(root, "note.md"), "Keep this");
+		setupChatIpc(
+			() => sender as unknown as WebContents,
+			() => workspace,
+		);
+		sender.send.mockImplementation((channel, payload) => {
+			if (channel === "desktop:chat-file-request")
+				queueMicrotask(() =>
+					call("file-reply", {
+						requestId: payload.requestId,
+						callId: payload.callId,
+						open: false,
+					}),
+				);
+			if (
+				channel === "desktop:chat-delta" &&
+				payload.context?.some((item) => item.type === "function_call_output")
+			)
+				workspace = "/another-workspace";
+		});
+		mocks.create.mockResolvedValue(
+			stream([
+				{
+					type: "response.completed",
+					response: {
+						output: [
+							{
+								type: "function_call",
+								namespace: "workspace",
+								name: "read_file",
+								arguments: '{"path":"note.md"}',
+								call_id: "read",
+								id: "fc_read",
+							},
+						],
+					},
+				},
+			]),
+		);
+		expect(await call("send", request())).toMatchObject({ status: "stopped" });
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(await fs.readFile(path.join(root, "note.md"), "utf8")).toBe(
+			"Keep this",
+		);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
 });

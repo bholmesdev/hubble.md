@@ -9,8 +9,9 @@ import { desktopApi } from "../desktopApi";
 import {
 	CHAT_CONTEXT_LIMIT,
 	type ChatMessage,
+	chatActivities,
+	chatContextSize,
 	chatFile,
-	chatInput,
 } from "../desktopApi/chat";
 import { basename, isEditableFile } from "../lib/filePath";
 import { isVirtualPath } from "../lib/newTabPage";
@@ -19,9 +20,11 @@ import {
 	chatConnection,
 	errorText,
 	refreshChatConnection,
+	resetChatConnection,
 } from "../store/chatConnection";
+import { handleChatFileRequest } from "../store/chatFiles";
+import { getChatPanelState } from "../store/chatPanelState";
 import { viewerStore, workspacePathStore } from "../store/state";
-
 import { chatPanelOpen, EMPTY_CHAT, updateTabChat } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import type { TabId } from "../store/tabs";
@@ -66,19 +69,31 @@ export function ChatPanel({
 		if (tabId) updateTabChat(tabId, (chat) => ({ ...chat, model }));
 	}
 
+	const connection = useStoreValue(chatConnection);
 	const {
-		account,
 		models,
 		busy: accountBusy,
 		error: connectionError,
 		revision,
 		sending,
 		signingIn,
-	} = useStoreValue(chatConnection);
+	} = connection;
+	const panel = getChatPanelState(
+		connection,
+		{
+			ready: fileReady,
+			error:
+				filePath && editable && document.status === "error"
+					? (document.error ?? "The current file could not be loaded.")
+					: null,
+		},
+		messages.length > 0,
+	);
 	const model = models.some((item) => item.slug === selectedModel)
 		? selectedModel
 		: (models[0]?.slug ?? "");
 	const [error, setError] = useState<string | null>(null);
+	const [activity, setActivity] = useState<string | undefined>();
 	const [scrolled, setScrolled] = useState(false);
 	const active = useRef<string | null>(null);
 	const transcript = useRef<HTMLDivElement>(null);
@@ -86,19 +101,38 @@ export function ChatPanel({
 	useEffect(() => {
 		const toggle = () => chatPanelOpen.set(!chatPanelOpen.get());
 		window.addEventListener(TOGGLE_CHAT_EVENT, toggle);
-		const unsubscribe = desktopApi.onChatDelta(({ id, text }) => {
-			if (id !== active.current) return;
-			if (tabId)
-				updateTabChat(tabId, (chat) => ({
-					...chat,
-					messages: chat.messages.map((message) =>
-						message.id === id
-							? { ...message, text: message.text + text }
-							: message,
-					),
-				}));
+		const unsubscribe = desktopApi.onChatDelta(
+			({ id, text, context, activity }) => {
+				if (id !== active.current) return;
+				if (context) setActivity(activity);
+				if (tabId)
+					updateTabChat(tabId, (chat) => ({
+						...chat,
+						messages: chat.messages.map((message) =>
+							message.id === id
+								? {
+										...message,
+										text: message.text + text,
+										...(context ? { context } : {}),
+									}
+								: message,
+						),
+					}));
+			},
+		);
+		const unsubscribeFiles = desktopApi.onChatFileRequest((request) => {
+			if (request.requestId !== active.current) return;
+			void handleChatFileRequest(
+				request,
+				() => active.current === request.requestId,
+			)
+				.then((reply) => desktopApi.chatFileReply(reply))
+				.catch((error) => {
+					if (active.current === request.requestId) setError(errorText(error));
+				});
 		});
 		return () => {
+			unsubscribeFiles();
 			window.removeEventListener(TOGGLE_CHAT_EVENT, toggle);
 			unsubscribe();
 			if (active.current)
@@ -141,9 +175,9 @@ export function ChatPanel({
 			active.current ||
 			accountBusy ||
 			!model ||
-			!account?.sharing ||
-			!draft.trim() ||
-			!fileReady
+			panel.kind !== "conversation" ||
+			panel.composer !== "ready" ||
+			!draft.trim()
 		)
 			return;
 		// Capture the editor buffer before the request; later edits must not rewrite history.
@@ -161,13 +195,7 @@ export function ChatPanel({
 			status: "complete",
 		};
 		const history = [...messages, user];
-		if (
-			history.length > 99 ||
-			chatInput(history).reduce(
-				(size, message) => size + message.content.length,
-				0,
-			) > CHAT_CONTEXT_LIMIT
-		) {
+		if (history.length > 99 || chatContextSize(history) > CHAT_CONTEXT_LIMIT) {
 			setError("Chat is too long. Start a new chat.");
 			return;
 		}
@@ -176,6 +204,7 @@ export function ChatPanel({
 
 		chatConnection.set({ ...chatConnection.get(), sending: true });
 		setError(null);
+		setActivity(undefined);
 		setModel(model);
 		setDraft("");
 		setMessages([
@@ -191,7 +220,12 @@ export function ChatPanel({
 			setMessages((messages) =>
 				messages.map((message) =>
 					message.id === id
-						? { ...message, text: reply.text, status: reply.status }
+						? {
+								...message,
+								text: reply.text,
+								status: reply.status,
+								...(reply.context ? { context: reply.context } : {}),
+							}
 						: message,
 				),
 			);
@@ -227,7 +261,7 @@ export function ChatPanel({
 					size="icon-sm"
 					aria-label="New chat"
 					title="New chat"
-					disabled={sending}
+					disabled={sending || panel.kind !== "conversation"}
 					onClick={() => {
 						setMessages([]);
 						setDraft("");
@@ -246,7 +280,41 @@ export function ChatPanel({
 					<MingcuteCloseLine aria-hidden="true" className="size-4" />
 				</Button>
 			</header>
-			{!account?.connected && !messages.length ? (
+			{panel.kind === "checking" ? (
+				<div className="flex flex-1 items-center justify-center p-6 text-muted-foreground">
+					<output>Checking ChatGPT connection…</output>
+				</div>
+			) : panel.kind === "reset-required" ? (
+				<div className="flex flex-1 items-center justify-center p-6">
+					<div className="space-y-3">
+						<p role="alert">{panel.message}</p>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => void resetChatConnection()}
+						>
+							Reset connection and sign in again
+						</Button>
+					</div>
+				</div>
+			) : panel.kind === "connection-error" ||
+				panel.kind === "setup-required" ? (
+				<div className="flex flex-1 items-center justify-center p-6">
+					<div className="space-y-3">
+						<p role="alert">{panel.message}</p>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => void refreshChatConnection()}
+						>
+							Retry connection
+						</Button>
+						<Button variant="ghost" size="sm" onClick={onOpenSettings}>
+							Chat settings
+						</Button>
+					</div>
+				</div>
+			) : panel.kind === "signed-out" || panel.kind === "signing-in" ? (
 				<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
 					<div className="flex w-full max-w-sm flex-col gap-3">
 						<MingcuteOpenaiLine
@@ -294,7 +362,7 @@ export function ChatPanel({
 						aria-label="Chat messages"
 						aria-live="off"
 					>
-						{!messages.length ? (
+						{panel.kind === "conversation" && panel.conversation === "new" ? (
 							<div className="space-y-2 py-6 text-muted-foreground">
 								<p className="font-medium text-foreground">
 									Start a conversation.
@@ -326,15 +394,27 @@ export function ChatPanel({
 								<div className="whitespace-pre-wrap break-words leading-relaxed select-text">
 									{message.text ||
 										(message.status === "streaming"
-											? "Thinking…"
+											? activity || "Thinking…"
 											: "No reply received.")}
 								</div>
+								{message.role === "assistant" &&
+								chatActivities(message.context).length > 0 ? (
+									<details className="text-xs text-muted-foreground">
+										<summary>Workspace activity</summary>
+										<ul>
+											{chatActivities(message.context).map((item) => (
+												<li key={item.id}>{item.text}</li>
+											))}
+										</ul>
+									</details>
+								) : null}
+
 								{message.status === "stopped" || message.status === "failed" ? (
 									<p className="text-xs text-muted-foreground">
 										{message.status === "stopped"
 											? "Stopped"
 											: "Reply incomplete"}{" "}
-										· excluded from later context
+										· partial reply excluded from later context
 									</p>
 								) : null}
 							</article>
@@ -351,10 +431,10 @@ export function ChatPanel({
 								{connectionError}
 							</p>
 						) : null}
-						{!accountBusy && (!account?.sharing || !models.length) ? (
-							<Button variant="outline" size="sm" onClick={onOpenSettings}>
-								Set up ChatGPT in Settings
-							</Button>
+						{panel.kind === "conversation" && panel.reason ? (
+							<output className="block text-xs text-muted-foreground">
+								{panel.reason}
+							</output>
 						) : null}
 						<textarea
 							aria-label="Message ChatGPT"
@@ -410,11 +490,9 @@ export function ChatPanel({
 								<Button
 									size="sm"
 									disabled={
-										accountBusy ||
-										!model ||
-										!account?.sharing ||
-										!draft.trim() ||
-										!fileReady
+										panel.kind !== "conversation" ||
+										panel.composer !== "ready" ||
+										!draft.trim()
 									}
 									onClick={() => void send()}
 								>

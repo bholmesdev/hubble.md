@@ -5,6 +5,8 @@ import type { ThemePreference } from "../theme";
 import type {
 	ChatAccount,
 	ChatDelta,
+	ChatFileReply,
+	ChatFileRequest,
 	ChatModel,
 	ChatRequest,
 	ChatResult,
@@ -163,9 +165,12 @@ export type DesktopApi = {
 	chatAccount(): Promise<ChatAccount>;
 	chatSignIn(): Promise<ChatAccount>;
 	chatCancelSignIn(): Promise<void>;
+	chatReset(): Promise<void>;
 	chatDisconnect(): Promise<void>;
 	chatModels(): Promise<ChatModel[]>;
 	chatSend(input: ChatRequest): Promise<ChatResult>;
+	chatFileReply(reply: ChatFileReply): Promise<void>;
+	onChatFileRequest(callback: (request: ChatFileRequest) => void): Unsubscribe;
 	chatStop(id: string): Promise<void>;
 	onChatDelta(callback: (delta: ChatDelta) => void): Unsubscribe;
 

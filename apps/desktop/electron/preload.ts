@@ -29,9 +29,14 @@ const desktopApi = {
 	chatAccount: () => ipcRenderer.invoke("desktop:chat-account"),
 	chatSignIn: () => ipcRenderer.invoke("desktop:chat-sign-in"),
 	chatCancelSignIn: () => ipcRenderer.invoke("desktop:chat-cancel-sign-in"),
+	chatReset: () => ipcRenderer.invoke("desktop:chat-reset"),
 	chatDisconnect: () => ipcRenderer.invoke("desktop:chat-disconnect"),
 	chatModels: () => ipcRenderer.invoke("desktop:chat-models"),
 	chatSend: (input) => ipcRenderer.invoke("desktop:chat-send", input),
+	chatFileReply: (reply) =>
+		ipcRenderer.invoke("desktop:chat-file-reply", reply),
+	onChatFileRequest: (callback) =>
+		subscribe("desktop:chat-file-request", callback),
 	chatStop: (id) => ipcRenderer.invoke("desktop:chat-stop", id),
 	onChatDelta: (callback) => subscribe("desktop:chat-delta", callback),
 	platform: process.platform,
