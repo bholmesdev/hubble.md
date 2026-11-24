@@ -9,12 +9,13 @@ import { desktopApi } from "../desktopApi";
 import {
 	CHAT_CONTEXT_LIMIT,
 	type ChatMessage,
-	chatActivities,
 	chatContextSize,
 	chatFile,
 } from "../desktopApi/chat";
 import { basename, isEditableFile } from "../lib/filePath";
 import { isVirtualPath } from "../lib/newTabPage";
+import { resolveRelativeLinkPath } from "../lib/relativeLinkPath";
+import { loadPath } from "../store/actions";
 import {
 	attempt,
 	chatConnection,
@@ -28,6 +29,7 @@ import { viewerStore, workspacePathStore } from "../store/state";
 import { chatPanelOpen, EMPTY_CHAT, updateTabChat } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import type { TabId } from "../store/tabs";
+import { ChatReply } from "./ChatReply";
 
 export const TOGGLE_CHAT_EVENT = "hubble:toggle-chat";
 
@@ -391,23 +393,34 @@ export function ChatPanel({
 										{message.file.text === undefined ? "unchanged" : "snapshot"}
 									</p>
 								) : null}
-								<div className="whitespace-pre-wrap break-words leading-relaxed select-text">
-									{message.text ||
-										(message.status === "streaming"
-											? activity || "Thinking…"
-											: "No reply received.")}
-								</div>
-								{message.role === "assistant" &&
-								chatActivities(message.context).length > 0 ? (
-									<details className="text-xs text-muted-foreground">
-										<summary>Workspace activity</summary>
-										<ul>
-											{chatActivities(message.context).map((item) => (
-												<li key={item.id}>{item.text}</li>
-											))}
-										</ul>
-									</details>
-								) : null}
+								{message.role === "assistant" ? (
+									<ChatReply
+										message={message}
+										activity={activity}
+										onOpenLink={(href) => {
+											void attempt(async () => {
+												if (/^https?:|^mailto:/i.test(href)) {
+													await desktopApi.openExternalUrl(href);
+													return;
+												}
+												if (!workspace || href.startsWith("#")) return;
+												const path = resolveRelativeLinkPath({
+													href: decodeURIComponent(href),
+													currentFilePath: `${workspace}/chat.md`,
+													workspacePath: workspace,
+												});
+												const result = await desktopApi.openPathFromLink(path);
+												if (result.kind === "file") await loadPath(result.path);
+											}).then((result) => {
+												if (!result.ok) setError(result.error);
+											});
+										}}
+									/>
+								) : (
+									<div className="whitespace-pre-wrap break-words leading-relaxed select-text">
+										{message.text}
+									</div>
+								)}
 
 								{message.status === "stopped" || message.status === "failed" ? (
 									<p className="text-xs text-muted-foreground">

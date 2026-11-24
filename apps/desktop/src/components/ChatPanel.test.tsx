@@ -608,3 +608,129 @@ it("offers a working reset and sign-in from an unreadable saved connection", asy
 	expect(host.querySelector("textarea")).not.toBeNull();
 });
 
+it("renders Markdown as streamed formatting and code fences become complete", async () => {
+	await sendMessage();
+	const { id } = mocks.api.chatSend.mock.calls[0][0];
+	const first = "## Topics\n\n- **Event";
+	await act(async () => delta({ id, text: first }));
+	expect(host.querySelector("h2")?.textContent).toBe("Topics");
+	const rest = " sourcing** and `replay`\n\n```ts\nconst value = 1;";
+	await act(async () => delta({ id, text: rest }));
+	expect(host.querySelector("strong")?.textContent).toBe("Event sourcing");
+	expect(host.querySelector("li code")?.textContent).toBe("replay");
+	expect(host.querySelector("pre code")?.textContent).toContain(
+		"const value = 1;",
+	);
+	const end =
+		"\n```\n\n| Topic | Value |\n| --- | --- |\n| CQRS | Useful |\n\n[Docs](https://example.com)\n\n<script>window.bad=true</script>\n\n[Unsafe](javascript:alert(1))";
+	await act(async () => delta({ id, text: end }));
+	await act(async () =>
+		finish({ status: "complete", text: first + rest + end }),
+	);
+	expect(host.querySelector("table td")?.textContent).toBe("CQRS");
+	expect(
+		host.querySelector("table > span, thead > span, tbody > span, tr > span"),
+	).toBeNull();
+	expect(host.querySelector('a[href="https://example.com"]')?.textContent).toBe(
+		"Docs",
+	);
+	await act(async () =>
+		host
+			.querySelector<HTMLAnchorElement>('a[href="https://example.com"]')
+			?.click(),
+	);
+	expect(mocks.api.openExternalUrl).toHaveBeenCalledWith("https://example.com");
+	expect(host.querySelector("script")).toBeNull();
+	expect(host.querySelector('a[href^="javascript:"]')).toBeNull();
+});
+
+it("interweaves streamed text and workspace operations and restores their order", async () => {
+	await sendMessage();
+	const { id } = mocks.api.chatSend.mock.calls[0][0];
+	const message = (id: string, text: string) => ({
+		type: "message",
+		id,
+		role: "assistant",
+		content: [{ type: "output_text", text }],
+	});
+	const operation = (id: string, name: string) => [
+		{
+			type: "function_call",
+			call_id: id,
+			name,
+			namespace: "workspace",
+			arguments: "{}",
+		},
+		{
+			type: "function_call_output",
+			call_id: id,
+			output: JSON.stringify({ path: "note.md" }),
+		},
+	];
+	const context = [
+		message("m0", "First thought"),
+		message("m1", "More detail"),
+		...operation("read", "read_file"),
+	];
+	await act(async () => delta({ id, text: "First thoughtMore detail" }));
+	await act(async () => delta({ id, text: "", context }));
+	await act(async () => delta({ id, text: "\n\nSecond thought" }));
+	const reply = () => {
+		const articles = host.querySelectorAll("article");
+		const article = articles[articles.length - 1];
+		if (!article) throw new Error("Expected an assistant reply");
+		return article;
+	};
+	expect(reply().textContent?.indexOf("Read note.md")).toBeLessThan(
+		reply().textContent?.indexOf("Second thought") ?? 0,
+	);
+	const completed = [
+		...context,
+		message("m2", "Second thought"),
+		...operation("write", "apply_patch"),
+		message("m3", "Done"),
+	];
+	await act(async () =>
+		finish({
+			status: "complete",
+			text: "First thoughtMore detail\n\nSecond thought\n\nDone",
+			context: completed,
+		}),
+	);
+	const assertOrder = () => {
+		const text = reply().textContent ?? "";
+		const positions = [
+			"First thought",
+			"Read note.md",
+			"Second thought",
+			"Edited note.md",
+			"Done",
+		].map((label) => text.indexOf(label));
+		expect(positions.every((position) => position >= 0)).toBe(true);
+		expect(positions).toEqual([...positions].sort((a, b) => a - b));
+	};
+	assertOrder();
+	const saved = JSON.stringify(serialize(appStore.get()));
+	localStorage.setItem(STORAGE_KEY, saved);
+	await act(async () => appStore.set(getInitialState()));
+	assertOrder();
+});
+
+it("fades only appended text while preserving streaming Markdown", async () => {
+	await sendMessage();
+	const { id } = mocks.api.chatSend.mock.calls[0][0];
+	await act(async () => delta({ id, text: "First chunk " }));
+	const first = host.querySelector(".chat-markdown [data-stream-chunk]");
+	expect(first?.textContent?.trim()).toBe("First chunk");
+	await act(async () => delta({ id, text: "and **bold" }));
+	expect(host.querySelector(".chat-markdown [data-stream-chunk]")).toBe(first);
+	expect(first?.classList.contains("chat-chunk-enter")).toBe(false);
+	await act(async () => delta({ id, text: " text**" }));
+	expect(host.querySelector("strong")?.textContent).toBe("bold text");
+	expect(host.querySelectorAll(".chat-chunk-enter").length).toBeGreaterThan(0);
+	await act(async () =>
+		finish({ status: "complete", text: "First chunk and **bold text**" }),
+	);
+	expect(host.querySelector(".chat-chunk-enter")).toBeNull();
+	expect(host.querySelector("strong")?.textContent).toBe("bold text");
+});
