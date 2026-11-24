@@ -15,6 +15,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Get started with a new workspace from the welcome screen, and find your recent notes in Inbox by default on new installs.
+
 ### Fixed
 
 - Diagram edits stay saved when you switch files, rename a diagram, or close its tab. [#322](https://github.com/bholmesdev/hubble.md/pull/322)

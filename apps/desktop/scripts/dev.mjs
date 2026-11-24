@@ -282,12 +282,21 @@ function startElectronVite(env) {
 
 const env = { ...process.env };
 
-await ensurePlayground();
-await ensurePlaygroundHtml();
+if (process.env.HUBBLE_DESKTOP_FRESH_START === "1") {
+	await fs.mkdir(devAppDir, { recursive: true });
+	env.HUBBLE_DESKTOP_DEV_USER_DATA = await fs.mkdtemp(
+		path.join(devAppDir, "fresh-profile-"),
+	);
+	env.HUBBLE_DESKTOP_DEV_WORKSPACE = "";
+	console.log(`Fresh profile: ${env.HUBBLE_DESKTOP_DEV_USER_DATA}`);
+} else {
+	await ensurePlayground();
+	await ensurePlaygroundHtml();
+}
 // Default to the playground, but let an explicit env value win (set it empty
 // to launch with no workspace and test the first-run welcome screen).
 env.HUBBLE_DESKTOP_DEV_WORKSPACE =
-	process.env.HUBBLE_DESKTOP_DEV_WORKSPACE ?? playgroundPath;
+	env.HUBBLE_DESKTOP_DEV_WORKSPACE ?? playgroundPath;
 
 if (process.platform === "darwin") {
 	env.ELECTRON_EXEC_PATH = await ensureDevApp();
@@ -295,7 +304,11 @@ if (process.platform === "darwin") {
 	env.HUBBLE_DESKTOP_DEV_APP_NAME = devAppName;
 	await killExistingDevAppProcesses();
 	console.log(`Computer Use app: ${devBundleId}`);
-	console.log(`Playground: ${playgroundPath}`);
+	if (env.HUBBLE_DESKTOP_DEV_WORKSPACE) {
+		console.log(`Workspace: ${env.HUBBLE_DESKTOP_DEV_WORKSPACE}`);
+	} else {
+		console.log("Workspace: none (welcome screen)");
+	}
 }
 
 startElectronVite(env);

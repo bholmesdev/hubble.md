@@ -26,6 +26,7 @@ import {
 	closeAllTabs,
 	closeOtherTabs,
 	createFolderInFolder,
+	createWorkspaceWithSidebar,
 	deleteMarkdownFile,
 	goBack,
 	goForward,
@@ -274,6 +275,12 @@ function defineCommands(
 			"Navigate",
 			["workspace", "vault", "switch", "recent"],
 			() => setWorkspaceSwitcherOpen(true),
+		),
+		fromRegistry(
+			"app.new-workspace",
+			"Navigate",
+			["workspace", "create", "folder"],
+			createWorkspaceWithSidebar,
 		),
 		fromRegistry(
 			"app.open-folder",

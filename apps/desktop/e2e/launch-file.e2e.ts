@@ -51,6 +51,7 @@ test("binds the first terminal to the file Hubble was launched with", async () =
 
 	// Leave the terminal open on a restored note, like a previous session.
 	let page = await launch([], workspace);
+	await page.getByRole("button", { name: "Folders", exact: true }).click();
 	await page
 		.getByRole("tree")
 		.getByRole("button", { name: "restored.md", exact: true })

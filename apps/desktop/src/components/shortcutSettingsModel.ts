@@ -21,6 +21,7 @@ const descriptions: Record<CommandId, string> = {
 	"app.new-file": "Create a Markdown file in the open folder.",
 	"app.open-recent": "Switch to another recently opened folder.",
 	"app.open-file": "Choose a file from the filesystem.",
+	"app.new-workspace": "Create a folder and open it as a workspace.",
 	"app.open-folder": "Choose a folder to open as a workspace.",
 	"app.go-to-file": "Search files in the current open folder.",
 	"app.all-tabs": "Show or hide the list of open tabs.",

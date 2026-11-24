@@ -1,6 +1,6 @@
 import { useCommandShortcut } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import MingcuteCodeLine from "~icons/mingcute/code-line";
 import MingcuteDrawingBoardLine from "~icons/mingcute/drawing-board-line";
 import MingcuteFileLine from "~icons/mingcute/file-line";
@@ -23,6 +23,7 @@ import { loadPath } from "../store/actions";
 import { workspacePathStore, workspaceStore } from "../store/state";
 import { tabsStore } from "../store/tabStore";
 import { findTabByPath } from "../store/tabs";
+import { EmptyStateAction, EmptyStateKbd } from "./EmptyStateAction";
 
 const RECENT_LIMIT = 3;
 
@@ -88,22 +89,24 @@ export function NewTabPage({
 				>
 					<MingcuteSearchLine className="size-4" />
 					Search for files
-					{searchShortcut && <Kbd className="ms-auto">{searchShortcut}</Kbd>}
+					{searchShortcut && (
+						<EmptyStateKbd className="ms-auto">{searchShortcut}</EmptyStateKbd>
+					)}
 				</button>
 				<section className="flex flex-col gap-1">
-					<NewTabAction
+					<EmptyStateAction
 						icon={<MingcuteFileNewLine className="size-4" />}
 						label="New file"
 						shortcut={newFileShortcut}
 						onClick={() => void createMarkdownFile(folder)}
 					/>
-					<NewTabAction
+					<EmptyStateAction
 						icon={<MingcuteCodeLine className="size-4" />}
 						label="New HTML app"
 						onClick={() => void createHtmlFile(folder)}
 					/>
 					{DIAGRAMS_ENABLED && (
-						<NewTabAction
+						<EmptyStateAction
 							icon={<MingcuteDrawingBoardLine className="size-4" />}
 							label="New diagram"
 							onClick={() => void createDiagramFile(folder)}
@@ -120,7 +123,7 @@ export function NewTabPage({
 								relativeWorkspacePath(file.path, workspacePath ?? null),
 							);
 							return (
-								<NewTabAction
+								<EmptyStateAction
 									key={file.path}
 									icon={<MingcuteFileLine className="size-4" />}
 									label={fileStem(file.path)}
@@ -136,58 +139,5 @@ export function NewTabPage({
 				)}
 			</div>
 		</div>
-	);
-}
-
-function NewTabAction({
-	icon,
-	label,
-	detail,
-	trailing,
-	shortcut,
-	onClick,
-}: {
-	icon: ReactNode;
-	label: string;
-	detail?: string;
-	trailing?: string;
-	shortcut?: string | null;
-	onClick: () => void;
-}) {
-	return (
-		<button
-			type="button"
-			data-new-tab-option
-			onClick={onClick}
-			className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden"
-		>
-			<span className="text-muted-foreground">{icon}</span>
-			<span className="truncate">{label}</span>
-			{detail && (
-				<span className="truncate text-xs text-muted-foreground">{detail}</span>
-			)}
-			{trailing && (
-				<span className="ms-auto shrink-0 text-xs text-muted-foreground tabular-nums">
-					{trailing}
-				</span>
-			)}
-			{shortcut && <Kbd className="ms-auto">{shortcut}</Kbd>}
-		</button>
-	);
-}
-
-function Kbd({
-	children,
-	className,
-}: {
-	children: string;
-	className?: string;
-}) {
-	return (
-		<kbd
-			className={`shrink-0 rounded-[var(--radius-inner)] border border-border px-1.5 py-0.5 font-sans text-[10px] leading-none text-muted-foreground ${className ?? ""}`}
-		>
-			{children}
-		</kbd>
 	);
 }
