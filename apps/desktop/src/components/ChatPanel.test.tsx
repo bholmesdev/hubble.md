@@ -3,7 +3,12 @@ import { useStoreValue } from "@simplestack/store/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { type ChatDelta, type ChatResult, chatInput } from "../desktopApi/chat";
+import {
+	type ChatDelta,
+	type ChatResult,
+	chatInput,
+	chatResponseInput,
+} from "../desktopApi/chat";
 import { chatConnection } from "../store/chatConnection";
 import { getInitialState, STORAGE_KEY, serialize } from "../store/persistence";
 import {
@@ -23,10 +28,14 @@ const mocks = vi.hoisted(() => ({
 		chatAccount: vi.fn(),
 		chatSignIn: vi.fn(),
 		chatDisconnect: vi.fn(),
+		chatReset: vi.fn(),
+		openExternalUrl: vi.fn(),
 		chatModels: vi.fn(),
 		chatSend: vi.fn(),
 		chatStop: vi.fn(),
 		onChatDelta: vi.fn(),
+		onChatFileRequest: vi.fn(() => vi.fn()),
+		chatFileReply: vi.fn(),
 	},
 }));
 vi.mock("../desktopApi", () => ({ desktopApi: mocks.api }));
@@ -437,3 +446,165 @@ it("starts a fresh snapshot history when New chat is clicked", async () => {
 	expect(request.messages).toHaveLength(1);
 	expect(chatInput(request.messages)[0].content).toContain("A note");
 });
+
+it("keeps tool results after a stopped reply and restores them as model context", async () => {
+	await sendMessage("Read another note");
+	const request = mocks.api.chatSend.mock.calls[0][0];
+	const context = [
+		{
+			type: "function_call",
+			name: "read_file",
+			namespace: "workspace",
+			call_id: "read",
+			arguments: '{"path":"other.md"}',
+		},
+		{
+			type: "function_call_output",
+			call_id: "read",
+			output: JSON.stringify({
+				path: "other.md",
+				text: "Tool-only source contents",
+				version: "v1",
+			}),
+		},
+	];
+	await act(async () =>
+		delta({ id: request.id, text: "", context, activity: "Reading a file…" }),
+	);
+	expect(host.textContent).toContain("Reading a file…");
+	await act(async () => finish({ status: "stopped", text: "", context }));
+	expect(host.textContent).toContain("Read other.md");
+	expect(host.textContent).not.toContain("Tool-only source contents");
+	await act(async () =>
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/notes" },
+		})),
+	);
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(appStore.get())));
+	const saved = getInitialState().tabs;
+	const id = saved.activeTabId;
+	if (!id) throw new Error("Missing tab");
+	const history = saved.byId[id].chat?.messages ?? [];
+	expect(chatResponseInput(history)).toContainEqual(context[1]);
+});
+
+it("shows sign-in instead of a disabled composer when a saved chat loses its connection", async () => {
+	await sendMessage("Saved conversation");
+	await act(async () => finish({ status: "complete", text: "Saved reply" }));
+	await act(async () =>
+		chatConnection.set({
+			...chatConnection.get(),
+			account: {
+				connected: false,
+				sharing: false,
+				label: "Expired account",
+				expiresAt: 0,
+			},
+			models: [],
+		}),
+	);
+	expect(host.querySelector("aside")?.textContent).toContain(
+		"Sign in with ChatGPT",
+	);
+	expect(host.querySelector("aside textarea")).toBeNull();
+	expect(
+		tabsStore.get().byId[tabsStore.get().activeTabId ?? ""].chat?.messages,
+	).toHaveLength(2);
+	mocks.api.chatSignIn.mockResolvedValue({
+		connected: true,
+		sharing: true,
+		label: "Reconnected",
+		expiresAt: Date.now() + 3600000,
+	});
+	const signIn = host.querySelector<HTMLButtonElement>(
+		"aside button[data-oai-siwc-button]",
+	);
+	if (!signIn) throw new Error("Missing sign-in");
+	await act(async () => signIn.click());
+	expect(host.querySelector("aside")?.textContent).toContain("Saved reply");
+	await fillDraft("Continue");
+	expect(button("Send").disabled).toBe(false);
+});
+
+it("gives missing models a recovery state, then opens a ready new conversation after retry", async () => {
+	await act(async () =>
+		chatConnection.set({ ...chatConnection.get(), models: [] }),
+	);
+	expect(host.querySelector("aside")?.textContent).toContain(
+		"No chat models are available",
+	);
+	expect(host.querySelector("aside textarea")).toBeNull();
+	await act(async () => button("Retry connection").click());
+	await fillDraft("Now ready");
+	expect(button("Send").disabled).toBe(false);
+});
+
+it("explains loading and failed file states rather than silently disabling Send", async () => {
+	await act(async () =>
+		viewerStore.set((doc) => ({ ...doc, status: "loading" })),
+	);
+	expect(host.querySelector("aside")?.textContent).toContain(
+		"Loading the current file",
+	);
+	await act(async () =>
+		viewerStore.set((doc) => ({
+			...doc,
+			status: "error",
+			error: "Could not read the file",
+		})),
+	);
+	expect(host.querySelector("aside")?.textContent).toContain(
+		"Could not read the file",
+	);
+});
+
+it("offers a working reset and sign-in from an unreadable saved connection", async () => {
+	const tabId = tabsStore.get().activeTabId;
+	if (!tabId) throw new Error("Expected an active tab");
+	const { updateTabChat } = await import("../store/tabChat");
+	await act(async () => {
+		updateTabChat(tabId, (chat) => ({
+			...chat,
+			messages: [
+				{
+					id: "saved",
+					role: "assistant",
+					text: "Saved reply",
+					status: "complete",
+				},
+			],
+		}));
+		chatConnection.set({
+			...chatConnection.get(),
+			account: {
+				connected: false,
+				sharing: false,
+				label: null,
+				expiresAt: null,
+				issue: "unreadable-credentials",
+			},
+		});
+	});
+	expect(host.textContent).toContain("saved ChatGPT sign-in");
+	expect(host.querySelector("textarea")).toBeNull();
+	mocks.api.chatReset.mockRejectedValueOnce(
+		new Error("Could not remove the saved sign-in. Try again."),
+	);
+	await act(async () => button("Reset connection and sign in again").click());
+	expect(host.textContent).toContain("Could not remove");
+	expect(mocks.api.chatSignIn).not.toHaveBeenCalled();
+	mocks.api.chatReset.mockResolvedValueOnce(undefined);
+	mocks.api.chatSignIn.mockResolvedValueOnce({
+		connected: true,
+		sharing: true,
+		label: "Test account",
+		expiresAt: Date.now() + 3600000,
+	});
+	await act(async () => button("Reset connection and sign in again").click());
+	expect(mocks.api.chatReset).toHaveBeenCalledTimes(2);
+	expect(mocks.api.chatSignIn).toHaveBeenCalledTimes(1);
+	expect(host.textContent).toContain("Saved reply");
+	expect(host.querySelector("textarea")).not.toBeNull();
+});
+

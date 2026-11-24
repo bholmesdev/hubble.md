@@ -34,8 +34,7 @@ export async function attempt<T>(
 }
 
 export async function refreshChatConnection(signIn = false) {
-	if (chatConnection.get().busy || (signIn && chatConnection.get().sending))
-		return;
+	if (chatConnection.get().busy || chatConnection.get().sending) return;
 	chatConnection.set({
 		...chatConnection.get(),
 		busy: true,
@@ -57,7 +56,9 @@ export async function refreshChatConnection(signIn = false) {
 	});
 	chatConnection.set({
 		...chatConnection.get(),
-		...(result.ok ? result.value : { error: result.error }),
+		...(result.ok
+			? result.value
+			: { account: null, models: [], error: result.error }),
 		busy: false,
 		signingIn: false,
 	});
@@ -76,4 +77,19 @@ export async function disconnectChat() {
 		revision: chatConnection.get().revision + 1,
 		error: result.ok ? null : result.error,
 	});
+}
+
+export async function resetChatConnection() {
+	if (chatConnection.get().busy || chatConnection.get().sending) return;
+	chatConnection.set({ ...chatConnection.get(), busy: true, error: null });
+	const result = await attempt(() => desktopApi.chatReset());
+	chatConnection.set({
+		...chatConnection.get(),
+		busy: false,
+		error: result.ok ? null : result.error,
+	});
+	if (result.ok) {
+		chatConnection.set({ ...chatConnection.get(), account: null, models: [] });
+		await refreshChatConnection(true);
+	}
 }

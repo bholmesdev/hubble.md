@@ -234,3 +234,19 @@ describe("ChatGPT public-client sign-in", () => {
 		await expect(auth.accessToken()).rejects.toThrow("Sign in");
 	});
 });
+
+it("recovers an unreadable connection by resetting without decrypting it", async () => {
+	await fs.writeFile(options.storagePath, "Unreadable credentials");
+	const decrypt = vi.spyOn(options, "decrypt");
+	await expect(auth.account()).resolves.toMatchObject({
+		connected: false,
+		issue: "unreadable-credentials",
+	});
+	expect(decrypt).toHaveBeenCalledTimes(1);
+	await auth.reset();
+	expect(decrypt).toHaveBeenCalledTimes(1);
+	await expect(fs.readFile(options.storagePath)).rejects.toMatchObject({
+		code: "ENOENT",
+	});
+	await expect(auth.signIn()).resolves.toMatchObject({ connected: true });
+});

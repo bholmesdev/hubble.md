@@ -7,6 +7,7 @@ import {
 	disconnectChat,
 	errorText,
 	refreshChatConnection,
+	resetChatConnection,
 } from "../store/chatConnection";
 import { SettingsSection } from "./SettingsDialog";
 
@@ -30,7 +31,16 @@ export function ChatConnectionSettings() {
 				</p>
 			) : null}
 			<div className="flex flex-wrap items-center gap-2">
-				{signingIn ? (
+				{account?.issue === "unreadable-credentials" ? (
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={busy || sending}
+						onClick={() => void resetChatConnection()}
+					>
+						Reset connection and sign in again
+					</Button>
+				) : signingIn ? (
 					<Button
 						variant="outline"
 						size="sm"
@@ -79,6 +89,12 @@ export function ChatConnectionSettings() {
 			{!busy && account?.connected && (!account.sharing || !models.length) ? (
 				<p className="mt-2 text-xs text-muted-foreground">
 					Enable ChatGPT plan usage in Manage usage, then reconnect.
+				</p>
+			) : null}
+			{account?.issue === "unreadable-credentials" && !error ? (
+				<p role="alert" className="mt-2 text-xs text-destructive">
+					Your saved ChatGPT sign-in could not be opened. Reset the connection
+					and sign in again. Your notes and chats will stay here.
 				</p>
 			) : null}
 			{error ? (

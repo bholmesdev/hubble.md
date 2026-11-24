@@ -66,12 +66,12 @@ import { readNotePreviews } from "./notePreviews";
 import publishedSkillHashes from "./publishedSkillHashes.json";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
+import { WorkspaceSession } from "./workspaceSession";
 import {
 	collectWorkspaceFiles,
 	listSidebarFiles,
 	sidebarDeltaForPath,
 } from "./workspaceSidebar";
-import { type WatchHandle, watchWorkspace } from "./workspaceWatcher";
 import {
 	loadZoomFactor,
 	resetWindowZoom,
@@ -225,13 +225,9 @@ let updateState: DesktopUpdateState = {
 	lastCheckedAt: null,
 };
 const watchers = new Map<string, FSWatcher>();
-type ActiveWorkspaceWatcher = {
-	root: string;
-	generation: number;
-	handle: WatchHandle;
-};
-let workspaceWatcher: ActiveWorkspaceWatcher | null = null;
-let workspaceWatcherGeneration = 0;
+const workspaceSession = new WorkspaceSession((change) =>
+	sendToRenderer("desktop:workspace-changed", change),
+);
 // Root validation is async; serialize starts so stale IPC requests cannot
 // replace a newer workspace watcher while validation is in flight.
 let workspaceWatcherStart = Promise.resolve();
@@ -615,12 +611,6 @@ function isWithin(rootPath: string, candidatePath: string): boolean {
 		relative === "" ||
 		(!relative.startsWith("..") && !path.isAbsolute(relative))
 	);
-}
-
-function stopWorkspaceWatcher() {
-	workspaceWatcherGeneration += 1;
-	workspaceWatcher?.handle.close();
-	workspaceWatcher = null;
 }
 
 /**
@@ -1489,7 +1479,11 @@ async function createWindow() {
 
 function registerIpc() {
 	setupTerminalIpc(sendToRenderer);
-	setupChatIpc(() => mainWindow?.webContents);
+	setupChatIpc(
+		() => mainWindow?.webContents,
+		() =>
+			workspaceSession.root ? toRendererPath(workspaceSession.root) : undefined,
+	);
 
 	ipcMain.handle(
 		"desktop:start-workspace-watcher",
@@ -1498,34 +1492,7 @@ function registerIpc() {
 				const root = assertGrantedRoot(dirPath);
 				const rootStat = await fs.stat(root);
 				if (!rootStat.isDirectory()) return null;
-				if (workspaceWatcher?.root === root) {
-					return workspaceWatcher.generation;
-				}
-				stopWorkspaceWatcher();
-				const generation = workspaceWatcherGeneration;
-				const watcher = watchWorkspace(
-					root,
-					(paths) => {
-						if (workspaceWatcher?.generation !== generation) return;
-						sendToRenderer("desktop:workspace-changed", {
-							kind: "paths",
-							paths,
-						});
-					},
-					(reason) => {
-						if (workspaceWatcher?.generation !== generation) return;
-						if (reason === "watch-error") stopWorkspaceWatcher();
-						sendToRenderer("desktop:workspace-changed", {
-							kind: "refresh",
-						});
-					},
-				);
-				if (!watcher || workspaceWatcherGeneration !== generation) {
-					watcher?.close();
-					return null;
-				}
-				workspaceWatcher = { root, generation, handle: watcher };
-				return generation;
+				return workspaceSession.start(root);
 			});
 			workspaceWatcherStart = start.then(
 				() => undefined,
@@ -1538,9 +1505,7 @@ function registerIpc() {
 	ipcMain.handle(
 		"desktop:stop-workspace-watcher",
 		async (_event, { generation }) => {
-			if (workspaceWatcher?.generation === generation) {
-				stopWorkspaceWatcher();
-			}
+			workspaceSession.stop(generation);
 		},
 	);
 
@@ -1548,7 +1513,7 @@ function registerIpc() {
 		"desktop:sidebar-delta-for-path",
 		async (_event, { workspacePath, changedPath }) => {
 			const root = assertGranted(workspacePath);
-			if (!workspaceWatcher || workspaceWatcher.root !== root) return null;
+			if (workspaceSession.root !== root) return null;
 			const resolvedPath = resolvePath(changedPath);
 			if (!isWithin(root, resolvedPath)) return { kind: "refresh" };
 			try {

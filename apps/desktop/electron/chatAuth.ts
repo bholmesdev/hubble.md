@@ -6,6 +6,8 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { z } from "zod/v4";
 import type { ChatAccount } from "../src/desktopApi/chat";
 
+class UnreadableConnection extends Error {}
+
 const ISSUER = "https://auth.openai.com";
 const RESOURCE = "https://api.openai.com/v1";
 const SCOPES =
@@ -51,7 +53,19 @@ export class ChatGPTAuth {
 	constructor(private options: AuthOptions) {}
 
 	async account(): Promise<ChatAccount> {
-		const saved = await this.load();
+		let saved: SavedAccount;
+		try {
+			saved = await this.load();
+		} catch (error) {
+			if (!(error instanceof UnreadableConnection)) throw error;
+			return {
+				connected: false,
+				sharing: false,
+				label: null,
+				expiresAt: null,
+				issue: "unreadable-credentials",
+			};
+		}
 		const connected = !!saved.tokens && saved.tokens.expiresAt > Date.now();
 		return {
 			connected,
@@ -189,6 +203,14 @@ export class ChatGPTAuth {
 		this.attempt?.abort();
 	}
 
+	/** Recovery must not decrypt the credentials it is trying to discard. */
+	async reset() {
+		this.cancel();
+		await fs.rm(this.options.storagePath, { force: true });
+		this.saved = undefined;
+		this.loading = undefined;
+	}
+
 	async disconnect() {
 		this.cancel();
 		const saved = { ...(await this.load()) };
@@ -235,7 +257,9 @@ export class ChatGPTAuth {
 			);
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code !== "ENOENT")
-				throw new Error("Could not unlock the saved ChatGPT connection.");
+				throw new UnreadableConnection(
+					"Your saved ChatGPT sign-in could not be opened. Reset the connection and sign in again.",
+				);
 			await this.save({ hostId: `urn:uuid:${randomUUID()}` });
 		}
 		return this.saved;

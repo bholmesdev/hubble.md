@@ -1,6 +1,8 @@
+import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { z } from "zod";
 
 export type ChatAccount = {
+	issue?: "unreadable-credentials";
 	connected: boolean;
 	sharing: boolean;
 	label: string | null;
@@ -10,11 +12,16 @@ export type ChatAccount = {
 export type ChatModel = { slug: string; name: string };
 export const CHAT_CONTEXT_LIMIT = 80_000;
 
+export const chatContextSchema = z
+	.array(z.record(z.string(), z.unknown()))
+	.max(200);
+
 export const chatMessageSchema = z.object({
 	id: z.string().max(100),
 	role: z.enum(["user", "assistant"]),
 	text: z.string().max(CHAT_CONTEXT_LIMIT),
 	status: z.enum(["complete", "streaming", "stopped", "failed"]),
+	context: chatContextSchema.optional(),
 	file: z
 		.object({
 			path: z.string().min(1).max(4096),
@@ -60,9 +67,47 @@ export type ChatResult = {
 	status: "complete" | "stopped" | "failed";
 	text: string;
 	error?: string;
+	context?: z.infer<typeof chatContextSchema>;
 };
 
-export type ChatDelta = { id: string; text: string };
+export type ChatDelta = {
+	id: string;
+	text: string;
+	context?: z.infer<typeof chatContextSchema>;
+	activity?: string;
+};
+
+export type ChatFileRequest = {
+	requestId: string;
+	callId: string;
+	workspacePath: string;
+	path: string;
+	operation: "read" | "write";
+	before?: string;
+	after?: string;
+};
+export type ChatFileReply = {
+	requestId: string;
+	callId: string;
+	open: boolean;
+	text?: string;
+	diskContent?: string;
+	error?: string;
+};
+
+// Replay original tool calls, results, and reasoning instead of rewriting them as chat text.
+export function chatResponseInput(
+	messages: ChatMessage[],
+): ResponseInputItem[] {
+	return messages.flatMap((message) =>
+		message.role === "assistant" && message.context?.length
+			? (message.context as unknown as ResponseInputItem[])
+			: chatInput([message]),
+	);
+}
+export function chatContextSize(messages: ChatMessage[]) {
+	return JSON.stringify(chatResponseInput(messages)).length;
+}
 
 export function chatInput(messages: ChatMessage[]) {
 	return messages
@@ -76,4 +121,35 @@ export function chatInput(messages: ChatMessage[]) {
 						? `No current file attached.\n\n${message.text}`
 						: message.text,
 		}));
+}
+
+export function chatActivities(context: ChatMessage["context"]) {
+	return (context ?? [])
+		.filter((item) => item.type === "function_call_output")
+		.map((item) => {
+			const call = context?.find(
+				(call) =>
+					call.type === "function_call" && call.call_id === item.call_id,
+			);
+			let result: { path?: string; error?: string } = {};
+			try {
+				const parsed = JSON.parse(String(item.output));
+				if (parsed && typeof parsed === "object") result = parsed;
+			} catch {
+				// Malformed saved activity must not prevent the conversation from opening.
+			}
+			const labels: Record<string, string> = {
+				list_files: "Listed workspace files",
+				search_content: "Searched workspace",
+				read_file: "Read",
+				apply_patch: "Edited",
+			};
+			const action = labels[String(call?.name)] ?? "Workspace operation";
+			return {
+				id: String(item.call_id),
+				text: result.error
+					? `Could not complete operation: ${result.error}`
+					: `${action}${result.path ? ` ${result.path}` : ""}`,
+			};
+		});
 }
