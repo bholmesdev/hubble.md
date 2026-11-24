@@ -236,7 +236,7 @@ function SkillsSettings() {
 		<>
 			<SettingsSection
 				title="Agent skills"
-				description="Let your coding agents build HTML apps, edit diagrams, and reply to review comments."
+				description="Teach your agents how to use Hubble's features: build HTML apps, edit diagrams, or leave and respond to comments."
 				action={
 					installed ? (
 						<span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary">
