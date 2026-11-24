@@ -68,18 +68,22 @@ export function WelcomeScreen({
 					</div>
 				</section>
 				<div
-					className="welcome-rise flex min-h-10 items-center gap-2.5 rounded-md border border-border bg-muted/40 px-3 py-1"
+					className="welcome-rise border-t border-border pt-6"
 					style={{ animationDelay: "0.45s" }}
 				>
-					<MingcuteLightningLine className="size-4 shrink-0 text-muted-foreground" />
-					<div className="min-w-0 flex-1">
-						<SkillsSettings
-							title={
-								<span className="text-sm font-normal">Set up agent skills</span>
-							}
-							description={null}
-							installVariant="ghost"
-						/>
+					<div className="flex min-h-10 items-center gap-2.5 border border-transparent px-3 py-1">
+						<MingcuteLightningLine className="size-4 shrink-0 text-muted-foreground" />
+						<div className="min-w-0 flex-1">
+							<SkillsSettings
+								title={
+									<span className="text-sm font-normal">
+										Set up agent skills
+									</span>
+								}
+								description={null}
+								installVariant="outline"
+							/>
+						</div>
 					</div>
 				</div>
 			</div>

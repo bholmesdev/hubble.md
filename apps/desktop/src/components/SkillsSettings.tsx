@@ -13,7 +13,7 @@ export function SkillsSettings({
 	description = "Teach your agents how to use Hubble's features: build HTML apps, edit diagrams, or leave and respond to comments.",
 }: {
 	title?: ReactNode;
-	installVariant?: "default" | "ghost";
+	installVariant?: "default" | "outline";
 	description?: ReactNode;
 }) {
 	const workspacePath = useStoreValue(workspacePathStore);
@@ -44,7 +44,7 @@ export function SkillsSettings({
 								size="sm"
 								variant={installVariant}
 								className={
-									installVariant === "ghost"
+									installVariant === "outline"
 										? "font-bold text-foreground"
 										: undefined
 								}
