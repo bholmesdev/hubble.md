@@ -2,6 +2,8 @@ import { Button } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { type ReactNode, useState } from "react";
 import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
+import MingcuteDownload2Line from "~icons/mingcute/download-2-line";
+import MingcuteLoadingLine from "~icons/mingcute/loading-line";
 import { useHubbleSkills } from "../lib/hubbleSkills";
 import { workspacePathStore } from "../store/state";
 import { ManualInstallModal } from "./ManualInstallModal";
@@ -9,11 +11,11 @@ import { SettingsSection } from "./SettingsDialog";
 
 export function SkillsSettings({
 	title = "Agent skills",
-	installVariant = "default",
+	iconOnlyInstall = false,
 	description = "Teach your agents how to use Hubble's features: build HTML apps, edit diagrams, or leave and respond to comments.",
 }: {
 	title?: ReactNode;
-	installVariant?: "default" | "outline";
+	iconOnlyInstall?: boolean;
 	description?: ReactNode;
 }) {
 	const workspacePath = useStoreValue(workspacePathStore);
@@ -27,7 +29,10 @@ export function SkillsSettings({
 				description={description}
 				action={
 					installed ? (
-						<span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary">
+						<span
+							data-skills-installed
+							className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary"
+						>
 							<MingcuteCheckCircleFill className="size-3.5" />
 							Skills installed
 						</span>
@@ -41,17 +46,25 @@ export function SkillsSettings({
 								Install manually
 							</Button>
 							<Button
-								size="sm"
-								variant={installVariant}
-								className={
-									installVariant === "outline"
-										? "font-bold text-foreground"
-										: undefined
+								size={iconOnlyInstall ? "icon-sm" : "sm"}
+								aria-label={
+									iconOnlyInstall ? "Install Hubble skills" : undefined
 								}
+								aria-busy={installing}
 								disabled={installing}
 								onClick={() => void install()}
 							>
-								{installing ? "Installing..." : "Install"}
+								{iconOnlyInstall ? (
+									installing ? (
+										<MingcuteLoadingLine className="size-4 animate-spin motion-reduce:animate-none" />
+									) : (
+										<MingcuteDownload2Line className="size-4" />
+									)
+								) : installing ? (
+									"Installing..."
+								) : (
+									"Install"
+								)}
 							</Button>
 						</span>
 					) : null
