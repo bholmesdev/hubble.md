@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { Toaster } from "./components/Toaster";
+import { preloadDiagrams } from "./editor/lazyDiagram";
 import { initThemePreference } from "./store/actions";
 import "./components/toast.css";
 import "./index.css";
@@ -17,3 +18,5 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 		<Toaster />
 	</React.StrictMode>,
 );
+
+preloadDiagrams();

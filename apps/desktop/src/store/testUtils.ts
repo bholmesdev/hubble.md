@@ -13,7 +13,7 @@ export type MockDesktopApi = {
 	restoreDelete: ReturnType<typeof vi.fn>;
 	finalizeDelete: ReturnType<typeof vi.fn>;
 	setDeleteUndoAvailable: ReturnType<typeof vi.fn>;
-	undoText: ReturnType<typeof vi.fn>;
+	runNativeEdit: ReturnType<typeof vi.fn>;
 	pathExists: ReturnType<typeof vi.fn>;
 	openPathFromLink: ReturnType<typeof vi.fn>;
 	openPathInDefaultApp: ReturnType<typeof vi.fn>;
@@ -41,7 +41,7 @@ export function createDesktopApi(): MockDesktopApi {
 		restoreDelete: vi.fn(async () => {}),
 		finalizeDelete: vi.fn(async () => {}),
 		setDeleteUndoAvailable: vi.fn(async () => {}),
-		undoText: vi.fn(async () => {}),
+		runNativeEdit: vi.fn(async () => {}),
 		pathExists: vi.fn(async () => false),
 		openPathFromLink: vi.fn(async () => ({ kind: "opened" })),
 		openPathInDefaultApp: vi.fn(async () => {}),

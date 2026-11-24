@@ -9,6 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- You can now draw diagrams in Hubble with the dedicated whiteboarding tool. Backed by [tldraw](https://tldraw.com) and works offline like everything else in Hubble. Click the "new file" button next to the folder switcher to try it out. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
 - Install the Hubble agent skills from inside Hubble, and they stay up to date as Hubble updates, including copies you installed with `npx skills`. [#337](https://github.com/bholmesdev/hubble.md/pull/337)
 
 ### Changed
@@ -16,6 +17,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 ### Fixed
 
 - Letter shortcuts follow your keyboard layout, including Dvorak, while Dvorak – QWERTY ⌘ keeps its familiar Command shortcuts. Thanks [@lenshinanatali-sys](https://github.com/lenshinanatali-sys)! [#333](https://github.com/bholmesdev/hubble.md/pull/333)
+
+- Diagram edits stay saved when you switch files, rename a diagram, or close its tab. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
 
 ## [0.3.4] - 2026-11-01
 

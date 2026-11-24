@@ -44,8 +44,8 @@ test("keeps editor shortcuts in sync with live layout changes and renderer reloa
 			});
 		const nativeMode = await app.evaluate(({ app }) => {
 			const { createRequire } = require("node:module");
-			const require = createRequire(`${app.getAppPath()}/package.json`);
-			const layout = require("native-keymap").getCurrentKeyboardLayout();
+			const appRequire = createRequire(`${app.getAppPath()}/package.json`);
+			const layout = appRequire("native-keymap").getCurrentKeyboardLayout();
 			return layout?.id === "com.apple.keylayout.DVORAK-QWERTYCMD";
 		});
 		expect(await readMode()).toBe(nativeMode);
