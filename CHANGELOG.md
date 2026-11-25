@@ -14,8 +14,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Open files in your current tab even when another tab already shows them, keeping each tab’s chat intact. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 ### Fixed
 
+- Keep longer Chat conversations going when working with large notes. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 ## [0.3.5] - 2026-11-25
 
 ### Added
@@ -26,13 +28,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
-- Open files in your current tab even when another tab already shows them, keeping each tab’s chat intact. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 - Get started with a workspace and agent skills from the welcome screen, and find your recent notes in Inbox by default on new installs. [#347](https://github.com/bholmesdev/hubble.md/pull/347)
 - The website’s agent demo no longer displays Claude Code branding.
 
 ### Fixed
 
-- Keep longer Chat conversations going when working with large notes. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 - Diagram edits stay saved when you switch files, rename a diagram, or close its tab. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
 
 ## [0.3.4] - 2026-11-01
