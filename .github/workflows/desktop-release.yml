@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      prerelease: ${{ steps.version.outputs.prerelease }}
 
     steps:
       - name: Checkout repository
@@ -24,6 +26,7 @@ jobs:
         run: node scripts/require-tldraw-license.mjs
 
       - name: Verify tag matches desktop version
+        id: version
         run: |
           VERSION="$(node -p "require('./apps/desktop/package.json').version")"
           TAG="${GITHUB_REF_NAME#desktop-v}"
@@ -31,12 +34,21 @@ jobs:
             echo "Tag desktop-v$TAG does not match apps/desktop package version $VERSION"
             exit 1
           fi
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#desktop-v}"
+          FLAGS=(--latest)
+          if [[ "$VERSION" == *-* ]]; then
+            FLAGS=(--prerelease --latest=false)
+          fi
           awk -v ver="$VERSION" '
             $0 ~ "^## \\[" ver "\\]" { flag=1; next }
             /^## / && flag { flag=0 }
@@ -45,14 +57,14 @@ jobs:
 
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             if [ -s notes.md ]; then
-              gh release edit "$GITHUB_REF_NAME" --notes-file notes.md --draft=false --latest
+              gh release edit "$GITHUB_REF_NAME" --notes-file notes.md --draft=false "${FLAGS[@]}"
             else
-              gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+              gh release edit "$GITHUB_REF_NAME" --draft=false "${FLAGS[@]}"
             fi
           elif [ -s notes.md ]; then
-            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md --latest
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md "${FLAGS[@]}"
           else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --generate-notes --latest
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --generate-notes "${FLAGS[@]}"
           fi
   release-macos:
     name: Build and publish desktop app (macOS)
@@ -240,8 +252,8 @@ jobs:
 
   publish-winget:
     name: Submit WinGet update
-    needs: release-windows
-    if: github.event_name == 'push' && vars.WINGET_SUBMIT_ENABLED == 'true'
+    needs: [prepare-release, release-windows]
+    if: github.event_name == 'push' && needs.prepare-release.outputs.prerelease != 'true' && vars.WINGET_SUBMIT_ENABLED == 'true'
     runs-on: windows-latest
 
     steps:
