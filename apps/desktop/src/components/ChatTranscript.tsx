@@ -26,7 +26,11 @@ export function ChatTranscript({
 						{part.attachment ? (
 							<>
 								<span className="whitespace-normal"> </span>
-								<QuotePill attachment={part.attachment} onReveal={onReveal} />
+								<QuotePill
+									attachment={part.attachment}
+									onReveal={onReveal}
+									inBubble
+								/>
 								<span className="whitespace-normal"> </span>
 							</>
 						) : null}
@@ -41,14 +45,18 @@ export function QuotePill({
 	attachment,
 	onReveal,
 	onRemove,
+	inBubble = false,
 }: {
 	attachment: ChatAttachment;
 	onReveal: (attachment: ChatAttachment) => void;
 	onRemove?: (id: string) => void;
+	inBubble?: boolean;
 }) {
 	const preview = quotePreview(attachment.text);
 	return (
-		<span className="my-1 inline rounded-md bg-[color-mix(in_srgb,var(--brand)_12%,var(--background))] box-decoration-clone whitespace-normal px-2 py-1 align-baseline text-xs leading-[inherit] text-foreground">
+		<span
+			className={`my-1 inline rounded-md box-decoration-clone whitespace-normal px-2 py-1 align-baseline text-xs leading-[inherit] ${inBubble ? "bg-white/15 text-primary-foreground" : "bg-[color-mix(in_srgb,var(--brand)_12%,var(--background))] text-foreground"}`}
+		>
 			{/* Native buttons form one unbreakable box in inline text. */}
 			<BaseButton
 				nativeButton={false}
