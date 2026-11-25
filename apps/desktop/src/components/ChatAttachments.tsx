@@ -1,6 +1,7 @@
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import type { ChatAttachment } from "../desktopApi/chat";
 import { basename } from "../lib/filePath";
+import { quotePreview, shortQuote } from "../lib/quotePreview";
 
 export function ChatAttachments({
 	attachments,
@@ -20,6 +21,7 @@ export function ChatAttachments({
 					attachment.kind === "thread"
 						? attachment.comments?.[0]?.body || attachment.text
 						: attachment.text;
+				const preview = quotePreview(quote);
 				return (
 					<li
 						key={attachment.id}
@@ -30,8 +32,11 @@ export function ChatAttachments({
 								{basename(attachment.path)} ·{" "}
 								{attachment.kind === "thread" ? "Comment thread" : "Selection"}
 							</p>
-							<blockquote className="line-clamp-2 border-s-2 border-border ps-2 text-xs text-foreground">
-								{quote}
+							<blockquote
+								title={preview}
+								className="line-clamp-2 border-s-2 border-border ps-2 text-xs text-foreground"
+							>
+								{shortQuote(preview)}
 							</blockquote>
 						</div>
 						{onRemove && (

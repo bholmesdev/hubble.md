@@ -10,11 +10,13 @@ import MingcuteMicLine from "~icons/mingcute/mic-line";
 import { desktopApi } from "../desktopApi";
 import {
 	CHAT_CONTEXT_LIMIT,
+	type ChatAttachment,
 	type ChatMessage,
 	chatContextSize,
 	chatFile,
 } from "../desktopApi/chat";
-import { basename, isEditableFile } from "../lib/filePath";
+import { editChatDraft } from "../desktopApi/chatTranscript";
+import { isEditableFile } from "../lib/filePath";
 import { isVirtualPath } from "../lib/newTabPage";
 import { resolveRelativeLinkPath } from "../lib/relativeLinkPath";
 import { loadPath } from "../store/actions";
@@ -28,12 +30,18 @@ import {
 import { handleChatFileRequest } from "../store/chatFiles";
 import { getChatPanelState } from "../store/chatPanelState";
 import { viewerStore, workspacePathStore } from "../store/state";
-import { chatPanelOpen, EMPTY_CHAT, updateTabChat } from "../store/tabChat";
+import {
+	chatPanelOpen,
+	chatSelection,
+	EMPTY_CHAT,
+	updateTabChat,
+} from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import type { TabId } from "../store/tabs";
 import { isRecording, startVoice, stopVoice, voice } from "../store/voice";
 import { ChatAttachments } from "./ChatAttachments";
 import { ChatReply } from "./ChatReply";
+import { ChatTranscript } from "./ChatTranscript";
 import { VoiceMeter } from "./VoiceMeter";
 
 export const TOGGLE_CHAT_EVENT = "hubble:toggle-chat";
@@ -56,6 +64,7 @@ export function ChatPanel({
 	const tab = tabs.byId[tabId ?? ""];
 	const chat = tab?.chat ?? EMPTY_CHAT;
 	const attachments = chat.attachments ?? [];
+	const attachmentKey = attachments.map((item) => item.id).join(",");
 	const document = useStoreValue(viewerStore);
 	const workspace = useStoreValue(workspacePathStore);
 	useEffect(() => {
@@ -85,8 +94,9 @@ export function ChatPanel({
 				messages: typeof update === "function" ? update(chat.messages) : update,
 			}));
 	}
-	function setDraft(draft: string) {
-		if (tabId) updateTabChat(tabId, (chat) => ({ ...chat, draft }));
+	function setDraft(draft: string, part?: number) {
+		if (draft.length > CHAT_CONTEXT_LIMIT) return;
+		if (tabId) updateTabChat(tabId, (chat) => editChatDraft(chat, draft, part));
 	}
 	function setModel(model: string) {
 		if (tabId) updateTabChat(tabId, (chat) => ({ ...chat, model }));
@@ -129,12 +139,28 @@ export function ChatPanel({
 	useEffect(() => {
 		if (
 			open &&
-			attachments.length &&
+			attachmentKey &&
 			panel.kind === "conversation" &&
 			!(voice.get()?.tabId === tabId && isRecording())
 		)
 			prompt.current?.focus();
-	}, [open, attachments, panel.kind, tabId]);
+	}, [open, attachmentKey, panel.kind, tabId]);
+	function revealSelection(attachment: ChatAttachment) {
+		void attempt(async () => {
+			if (!tabId) return;
+			if (viewerStore.get().currentPath !== attachment.path)
+				await loadPath(attachment.path);
+			if (tabsStore.get().activeTabId !== tabId) return;
+			if (
+				viewerStore.get().currentPath !== attachment.path ||
+				viewerStore.get().status !== "ready"
+			)
+				throw new Error("Could not open the selection’s file.");
+			chatSelection.set({ ...attachment, tabId });
+		}).then((result) => {
+			if (!result.ok) setError(result.error);
+		});
+	}
 	function removeAttachment(id: string) {
 		if (tabId)
 			updateTabChat(tabId, (chat) => ({
@@ -240,7 +266,9 @@ export function ChatPanel({
 		const user: ChatMessage = {
 			id: crypto.randomUUID(),
 			role: "user",
-			text: draft.trim(),
+			text: attachments.some((item) => item.offset !== undefined)
+				? draft
+				: draft.trim(),
 			file: file ?? null,
 			...(attachments.length ? { attachments } : {}),
 			status: "complete",
@@ -426,7 +454,9 @@ export function ChatPanel({
 							Use your ChatGPT subscription to chat with your notes
 						</p>
 						<ChatAttachments
-							attachments={attachments}
+							attachments={attachments.filter(
+								(item) => item.offset === undefined,
+							)}
 							onRemove={removeAttachment}
 						/>
 						{connectionError || error ? (
@@ -455,16 +485,11 @@ export function ChatPanel({
 								className="space-y-2 border-b border-dashed border-border pb-5 last:border-b-0 last:pb-0"
 							>
 								{message.attachments?.length ? (
-									<ChatAttachments attachments={message.attachments} />
-								) : null}
-								{message.file ? (
-									<p
-										className="truncate text-xs text-muted-foreground"
-										title={message.file.path}
-									>
-										{basename(message.file.path)} ·{" "}
-										{message.file.text === undefined ? "unchanged" : "snapshot"}
-									</p>
+									<ChatAttachments
+										attachments={message.attachments.filter(
+											(item) => item.offset === undefined,
+										)}
+									/>
 								) : null}
 								{message.role === "assistant" ? (
 									<ChatReply
@@ -490,8 +515,13 @@ export function ChatPanel({
 										}}
 									/>
 								) : (
-									<div className="whitespace-pre-wrap break-words leading-relaxed select-text">
-										{message.text}
+									<div className="rounded-xl bg-brand px-4 py-3 text-primary-foreground">
+										<ChatTranscript
+											text={message.text}
+											attachments={message.attachments ?? []}
+											onReveal={revealSelection}
+											inBubble
+										/>
 									</div>
 								)}
 
@@ -528,29 +558,21 @@ export function ChatPanel({
 							</output>
 						) : null}
 						<ChatAttachments
-							attachments={attachments}
+							attachments={attachments.filter(
+								(item) => item.offset === undefined,
+							)}
 							onRemove={removeAttachment}
 						/>
-						<textarea
-							ref={prompt}
-							aria-label="Message Chat"
-							placeholder={voiceBusy ? "Recording..." : "Message Chat…"}
-							rows={2}
-							className="block min-h-16 max-h-[min(40vh,20rem)] w-full resize-none border-0 bg-transparent py-2 outline-hidden [field-sizing:content]"
-							value={draft}
-							maxLength={CHAT_CONTEXT_LIMIT}
+						<ChatTranscript
+							text={draft}
+							attachments={attachments}
+							onReveal={revealSelection}
+							onRemove={removeAttachment}
+							onEdit={setDraft}
 							readOnly={voiceBusy}
-							onChange={(event) => setDraft(event.target.value)}
-							onKeyDown={(event) => {
-								if (
-									event.key === "Enter" &&
-									!event.shiftKey &&
-									!event.nativeEvent.isComposing
-								) {
-									event.preventDefault();
-									void send();
-								}
-							}}
+							promptRef={prompt}
+							placeholder={voiceBusy ? "Recording..." : "Let's discuss..."}
+							onSend={() => void send()}
 						/>
 						<div className="flex items-center gap-3">
 							<div className="relative min-w-0">
@@ -665,7 +687,7 @@ function voiceLabel(recording: NonNullable<ReturnType<typeof voice.get>>) {
 			return recording.error;
 		case "stopped":
 			return recording.text?.trim()
-				? "Transcript ready to review and send."
+				? null
 				: "No speech detected. Try recording again.";
 	}
 }
