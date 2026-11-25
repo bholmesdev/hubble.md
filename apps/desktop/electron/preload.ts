@@ -36,6 +36,8 @@ const desktopApi = {
 	chatDisconnect: () => ipcRenderer.invoke("desktop:chat-disconnect"),
 	chatModels: () => ipcRenderer.invoke("desktop:chat-models"),
 	chatPayloads: (id) => ipcRenderer.invoke("desktop:chat-payloads", id),
+	chatCheckBudget: (messages) =>
+		ipcRenderer.invoke("desktop:chat-check-budget", messages),
 	chatSend: (input) => ipcRenderer.invoke("desktop:chat-send", input),
 	chatFileReply: (reply) =>
 		ipcRenderer.invoke("desktop:chat-file-reply", reply),

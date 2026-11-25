@@ -11,7 +11,8 @@ export type ChatAccount = {
 };
 
 export type ChatModel = { slug: string; name: string };
-export const CHAT_CONTEXT_LIMIT = 80_000;
+// Bound stored text separately from the model's input token budget.
+export const CHAT_TEXT_LIMIT = 4_000_000;
 
 export const chatContextSchema = z
 	.array(z.record(z.string(), z.unknown()))
@@ -21,13 +22,13 @@ export const chatAttachmentSchema = z.object({
 	id: z.string().min(1).max(100),
 	kind: z.enum(["selection", "thread"]),
 	path: z.string().min(1).max(4096),
-	text: z.string().max(CHAT_CONTEXT_LIMIT),
-	offset: z.number().int().nonnegative().max(CHAT_CONTEXT_LIMIT).optional(),
+	text: z.string().max(CHAT_TEXT_LIMIT),
+	offset: z.number().int().nonnegative().max(CHAT_TEXT_LIMIT).optional(),
 	source: z
 		.object({
 			from: z.number().int().nonnegative(),
 			to: z.number().int().nonnegative(),
-			text: z.string().max(CHAT_CONTEXT_LIMIT),
+			text: z.string().max(CHAT_TEXT_LIMIT),
 		})
 		.optional(),
 	threadId: z.string().max(100).optional(),
@@ -35,7 +36,7 @@ export const chatAttachmentSchema = z.object({
 		.array(
 			z.object({
 				author: z.enum(["human", "agent"]),
-				body: z.string().max(CHAT_CONTEXT_LIMIT),
+				body: z.string().max(CHAT_TEXT_LIMIT),
 			}),
 		)
 		.max(200)
@@ -46,7 +47,7 @@ export type ChatAttachment = z.infer<typeof chatAttachmentSchema>;
 export const chatMessageSchema = z.object({
 	id: z.string().max(100),
 	role: z.enum(["user", "assistant"]),
-	text: z.string().max(CHAT_CONTEXT_LIMIT),
+	text: z.string().max(CHAT_TEXT_LIMIT),
 	status: z.enum(["complete", "streaming", "stopped", "failed"]),
 	context: chatContextSchema.optional(),
 	startedAt: z.number().finite().nonnegative().optional(),
@@ -56,7 +57,7 @@ export const chatMessageSchema = z.object({
 		.object({
 			path: z.string().min(1).max(4096),
 			version: z.string().min(1).max(100),
-			text: z.string().max(CHAT_CONTEXT_LIMIT).optional(),
+			text: z.string().max(CHAT_TEXT_LIMIT).optional(),
 		})
 		.nullable()
 		.optional(),
@@ -144,10 +145,6 @@ export function chatResponseInput(
 			: chatInput([message]),
 	);
 }
-export function chatContextSize(messages: ChatMessage[]) {
-	return JSON.stringify(chatResponseInput(messages)).length;
-}
-
 export function chatInput(messages: ChatMessage[]) {
 	return messages
 		.filter((message) => message.status === "complete")

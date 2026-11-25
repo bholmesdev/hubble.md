@@ -63,8 +63,11 @@ Stop preserves partial text but excludes it from later context.
 - Replies render Markdown while streaming, including lists, links, tables, and
   fenced code blocks. Workspace activity appears between text segments in response
   order, including after restoring a chat. New chunks fade in over 140 ms; reduced
-  motion disables the animation. Context, including file snapshots and tool results, is capped at
-  80,000 characters and 100 messages.
+  motion disables the animation. Context, including file snapshots, tool results, and opaque reasoning items, is
+  budgeted at 200,000 input tokens using o200k_base tokenization of the wire input,
+  with 4,096 tokens reserved for framing and request overhead. This is a local
+  estimate, not server-reported usage. A separate 100-message guard and four-million-character
+  per-text safety bound remain.
   Oversized chats require a new conversation.
 
 ## Connection and credentials

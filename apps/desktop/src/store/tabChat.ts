@@ -1,6 +1,6 @@
 import { store } from "@simplestack/store";
 import {
-	CHAT_CONTEXT_LIMIT,
+	CHAT_TEXT_LIMIT,
 	type ChatAttachment,
 	type ChatConversation,
 	chatAttachmentSchema,
@@ -106,7 +106,7 @@ export function attachToChat(
 					: item,
 			)
 		: [...pending, attachment.data];
-	if (JSON.stringify(next).length > CHAT_CONTEXT_LIMIT) return false;
+	if (JSON.stringify(next).length > CHAT_TEXT_LIMIT) return false;
 	updateTabChat(id, (chat) => ({ ...chat, attachments: next }));
 	chatPanelOpen.set(true);
 	return true;

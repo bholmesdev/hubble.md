@@ -50,6 +50,7 @@
 		"clsx": "^2.1.1",
 		"diff": "^8.0.3",
 		"electron-updater": "^6.8.3",
+		"gpt-tokenizer": "^4.1.2",
 		"ignore": "^7.0.5",
 		"jose": "^6.2.18",
 		"keymatch": "^1.0.5",

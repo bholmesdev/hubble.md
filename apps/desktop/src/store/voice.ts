@@ -1,6 +1,6 @@
 import { store } from "@simplestack/store";
 import { desktopApi } from "../desktopApi";
-import { CHAT_CONTEXT_LIMIT } from "../desktopApi/chat";
+import { CHAT_TEXT_LIMIT } from "../desktopApi/chat";
 import { editChatDraft } from "../desktopApi/chatTranscript";
 import type { VoiceEvent } from "../desktopApi/voice";
 import { errorText } from "./chatConnection";
@@ -48,9 +48,9 @@ export async function startVoice(tabId: TabId) {
 		if (event.text !== undefined && workspacePathStore.get() === workspace) {
 			const draft = [base, event.text].filter(Boolean).join("\n");
 			updateTabChat(tabId, (chat) =>
-				editChatDraft(chat, draft.slice(0, CHAT_CONTEXT_LIMIT)),
+				editChatDraft(chat, draft.slice(0, CHAT_TEXT_LIMIT)),
 			);
-			if (draft.length > CHAT_CONTEXT_LIMIT) stopVoice();
+			if (draft.length > CHAT_TEXT_LIMIT) stopVoice();
 		}
 	});
 	try {

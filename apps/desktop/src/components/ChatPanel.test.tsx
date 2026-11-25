@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => ({
 		openExternalUrl: vi.fn(),
 		chatModels: vi.fn(),
 		chatPayloads: vi.fn(),
+		chatCheckBudget: vi.fn(),
 		chatSend: vi.fn(),
 		chatStop: vi.fn(),
 		onChatDelta: vi.fn(),
@@ -64,6 +65,7 @@ beforeEach(async () => {
 	chatDebug.set(false);
 	chatPayloads.set({});
 	mocks.api.chatPayloads.mockResolvedValue([]);
+	mocks.api.chatCheckBudget.mockResolvedValue(true);
 	mocks.api.voiceStart.mockResolvedValue(undefined);
 	mocks.api.voiceStop.mockResolvedValue(undefined);
 	localStorage.clear();
@@ -449,7 +451,7 @@ it("keeps file context independent per tab and restores snapshots from local sto
 	expect(JSON.stringify(resumed)).not.toContain("Second tab");
 });
 
-it("waits for the active file to load and counts file contents against the context limit", async () => {
+it("waits for the active file and preserves the draft when budget preflight rejects", async () => {
 	await act(async () =>
 		viewerStore.set({
 			...emptyDoc(),
@@ -462,9 +464,10 @@ it("waits for the active file to load and counts file contents against the conte
 	await act(async () =>
 		viewerStore.set((doc) => ({
 			...doc,
-			...cleanFileState("x".repeat(80_000)),
+			...cleanFileState(" word".repeat(210_000)),
 		})),
 	);
+	mocks.api.chatCheckBudget.mockResolvedValueOnce(false);
 	await sendMessage();
 	expect(mocks.api.chatSend).not.toHaveBeenCalled();
 	expect(host.textContent).toContain("Chat is too long");
@@ -1684,4 +1687,64 @@ it("keeps inline quotes anchored while editing across them, including deletion a
 	expect(editor.state.selection.head).toBe(13);
 	expect(draftText()).toBe("More Before after");
 	expect(tabsStore.get().byId[tab].chat?.attachments).toEqual([]);
+});
+
+it("keeps an edited draft when a stale budget check finishes", async () => {
+	let release!: (fits: boolean) => void;
+	mocks.api.chatCheckBudget.mockImplementationOnce(
+		() =>
+			new Promise<boolean>((resolve) => {
+				release = resolve;
+			}),
+	);
+	await sendMessage("Before counting");
+	await fillDraft("Edited while counting");
+	await act(async () => release(true));
+	expect(mocks.api.chatSend).not.toHaveBeenCalled();
+	expect(draftText()).toBe("Edited while counting");
+});
+
+it("discards a budget check from an unmounted Chat panel even after returning to its tab", async () => {
+	let release!: (fits: boolean) => void;
+	mocks.api.chatCheckBudget.mockImplementationOnce(
+		() =>
+			new Promise<boolean>((resolve) => {
+				release = resolve;
+			}),
+	);
+	await sendMessage("Keep this draft");
+	const tabId = tabsStore.get().activeTabId;
+	await act(async () => root.render(null));
+	await act(async () =>
+		root.render(
+			<ChatPanel key="returned-tab" tabId={tabId} onOpenSettings={() => {}} />,
+		),
+	);
+	await act(async () => release(true));
+	expect(mocks.api.chatSend).not.toHaveBeenCalled();
+	expect(draftText()).toBe("Keep this draft");
+});
+
+it("keeps the draft if the account or model catalog changes during budget preflight", async () => {
+	let release!: (fits: boolean) => void;
+	mocks.api.chatCheckBudget.mockImplementationOnce(
+		() =>
+			new Promise<boolean>((resolve) => {
+				release = resolve;
+			}),
+	);
+	await sendMessage("Before account refresh");
+	await act(async () =>
+		chatConnection.set((current) => ({
+			...current,
+			account: current.account && {
+				...current.account,
+				label: "Refreshed account",
+			},
+			models: [{ slug: "replacement-model", name: "Replacement model" }],
+		})),
+	);
+	await act(async () => release(true));
+	expect(mocks.api.chatSend).not.toHaveBeenCalled();
+	expect(draftText()).toBe("Before account refresh");
 });

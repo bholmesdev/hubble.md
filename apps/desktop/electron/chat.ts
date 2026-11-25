@@ -9,17 +9,16 @@ import type {
 } from "openai/resources/responses/responses";
 import { z } from "zod/v4";
 import {
-	CHAT_CONTEXT_LIMIT,
 	type ChatFileReply,
 	type ChatFileRequest,
 	type ChatPayload,
 	type ChatResult,
-	chatContextSize,
 	chatInput,
 	chatMessageSchema,
 	chatResponseInput,
 } from "../src/desktopApi/chat";
 import { ChatGPTAuth } from "./chatAuth";
+import { withinChatTokenBudget } from "./chatBudget";
 import { ChatPayloadCache } from "./chatPayloadCache";
 import { WorkspaceTools, workspaceTool } from "./chatTools";
 
@@ -94,6 +93,10 @@ export function setupChatIpc(
 		if (pending?.requestId === reply.requestId) pending.resolve(reply);
 	});
 
+	handle("desktop:chat-check-budget", (input) => {
+		const messages = z.array(chatMessageSchema).min(1).max(100).parse(input);
+		return withinChatTokenBudget(chatResponseInput(messages));
+	});
 	handle("desktop:chat-payloads", (id: string) => payloadCache.read(id));
 	handle("desktop:chat-account", () => auth.account());
 	handle("desktop:chat-sign-in", async () => {
@@ -161,9 +164,6 @@ export function setupChatIpc(
 		const messages = chatInput(request.messages);
 		if (!messages.length || messages[messages.length - 1]?.role !== "user")
 			throw new Error("Enter a message first.");
-		if (chatContextSize(request.messages) > CHAT_CONTEXT_LIMIT) {
-			throw new Error("Chat is too long. Start a new chat.");
-		}
 		const controller = new AbortController();
 		active = { id: request.id, controller };
 		const destroyed = () => controller.abort();
@@ -262,6 +262,9 @@ export function setupChatIpc(
 				});
 		};
 		try {
+			if (!(await withinChatTokenBudget(chatResponseInput(request.messages))))
+				throw new Error("Chat is too long. Start a new chat.");
+			checkScope();
 			const token = await auth.accessToken();
 			controller.signal.throwIfAborted();
 			const client = new OpenAI({
@@ -273,8 +276,9 @@ export function setupChatIpc(
 			for (let round = 0; round < 12; round++) {
 				checkScope();
 				const input = [...history, ...context];
-				if (JSON.stringify(input).length > CHAT_CONTEXT_LIMIT)
+				if (!(await withinChatTokenBudget(input)))
 					throw new Error("Chat is too long. Start a new chat.");
+				checkScope();
 				const body = {
 					model: request.model,
 					input,

@@ -1,11 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	CHAT_CONTEXT_LIMIT,
-	type ChatRequest,
-	type ChatResult,
-} from "../src/desktopApi/chat";
+import type { ChatRequest, ChatResult } from "../src/desktopApi/chat";
 import { setupChatIpc } from "./chat";
 
 const mocks = vi.hoisted(() => ({
@@ -210,14 +206,17 @@ describe("ChatGPT IPC and Responses", () => {
 
 	it("rejects oversized context before authentication or inference", async () => {
 		const input = request();
-		input.messages[0].text = "x".repeat(CHAT_CONTEXT_LIMIT);
+		input.messages[0].text = " word".repeat(210_000);
 		input.messages.push({
 			id: "u2",
 			role: "user",
 			text: "One more character",
 			status: "complete",
 		});
-		await expect(call("send", input)).rejects.toThrow("too long");
+		await expect(call("send", input)).resolves.toMatchObject({
+			status: "failed",
+			error: "Chat is too long. Start a new chat.",
+		});
 		expect(mocks.token).not.toHaveBeenCalled();
 		expect(mocks.create).not.toHaveBeenCalled();
 	});
@@ -260,17 +259,18 @@ it("sends attached file text through IPC without changing earlier request prefix
 	);
 });
 
-it("rejects file context that exceeds the request budget before calling OpenAI", async () => {
+it("accepts file context above the old character cap when it fits the token budget", async () => {
 	const input = request();
 	Object.assign(input.messages[0], {
 		file: {
 			path: "notes/a.md",
 			version: "snapshot-a",
-			text: "x".repeat(CHAT_CONTEXT_LIMIT),
+			text: "A note about trees.\n".repeat(8_000),
 		},
 	});
-	await expect(call("send", input)).rejects.toThrow("Chat is too long");
-	expect(mocks.create).not.toHaveBeenCalled();
+	mocks.create.mockResolvedValue(stream([{ type: "response.completed" }]));
+	expect(await call("send", input)).toMatchObject({ status: "complete" });
+	expect(mocks.create).toHaveBeenCalledOnce();
 });
 
 it("runs namespaced workspace tools and retains calls and results for follow-ups", async () => {
