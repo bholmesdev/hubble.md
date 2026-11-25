@@ -2,6 +2,7 @@
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { afterEach, expect, it, vi } from "vitest";
+import { revealAttachment } from "./attachments";
 import { watchSelection } from "./autoAttach";
 
 afterEach(() => vi.useRealTimers());
@@ -27,6 +28,7 @@ it("waits for a settled selection, avoids repeats, and cancels pending attachmen
 		kind: "selection",
 		path: "/notes/a.md",
 		text: "Alpha beta",
+		source: { from: 1, to: 11, text: "Alpha beta" },
 	});
 	expect(editor.view.dom.classList.contains("hubble-selection-attached")).toBe(
 		true,
@@ -61,6 +63,34 @@ it("does not capture while dragging or flash rejected attachments", () => {
 	expect(editor.view.dom.classList.contains("hubble-selection-attached")).toBe(
 		false,
 	);
+	stop();
+	editor.destroy();
+});
+
+it("does not auto-attach a selection revealed from a transcript pill", () => {
+	vi.useFakeTimers();
+	const editor = new Editor({
+		extensions: [StarterKit],
+		content: "<p>Alpha beta gamma</p>",
+	});
+	document.body.append(editor.view.dom);
+	editor.view.dom.focus();
+	const attach = vi.fn(() => true);
+	const stop = watchSelection(editor, "/notes/a.md", attach);
+	editor.commands.setTextSelection({ from: 1, to: 6 });
+	vi.advanceTimersByTime(700);
+	expect(attach).toHaveBeenCalledTimes(1);
+	editor.commands.setTextSelection({ from: 7, to: 11 });
+	vi.advanceTimersByTime(700);
+	expect(attach).toHaveBeenCalledTimes(2);
+	revealAttachment(editor, {
+		kind: "selection",
+		path: "/notes/a.md",
+		text: "Alpha",
+		source: { from: 1, to: 6, text: "Alpha" },
+	});
+	vi.advanceTimersByTime(1000);
+	expect(attach).toHaveBeenCalledTimes(2);
 	stop();
 	editor.destroy();
 });

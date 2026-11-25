@@ -9,6 +9,10 @@ import { appStore } from "./state";
 import { tabsStore } from "./tabStore";
 import type { TabId } from "./tabs";
 
+export const chatSelection = store<(ChatAttachment & { tabId: TabId }) | null>(
+	null,
+);
+
 export const chatPanelOpen = store(false);
 export const EMPTY_CHAT: ChatConversation = {
 	messages: [],
@@ -55,22 +59,31 @@ export function clearChats() {
 	}));
 }
 
-export function attachToChat(input: Omit<ChatAttachment, "id">) {
+export function attachToChat(
+	input: Omit<ChatAttachment, "id">,
+	inline = false,
+) {
 	const id = tabsStore.get().activeTabId;
 	const attachment = chatAttachmentSchema.safeParse({
 		...input,
+		...(inline
+			? { offset: tabsStore.get().byId[id ?? ""]?.chat?.draft.length ?? 0 }
+			: {}),
 		id: crypto.randomUUID(),
 	});
 	if (!id || !attachment.success) return false;
 	const pending = tabsStore.get().byId[id].chat?.attachments ?? [];
-	const match = pending.find(
-		(item) =>
-			item.kind === input.kind &&
-			item.path === input.path &&
-			(input.kind === "thread"
-				? item.threadId === input.threadId
-				: item.text === input.text),
-	);
+	const match =
+		!inline &&
+		pending.find(
+			(item) =>
+				item.offset === undefined &&
+				item.kind === input.kind &&
+				item.path === input.path &&
+				(input.kind === "thread"
+					? item.threadId === input.threadId
+					: item.text === input.text),
+		);
 	if (!match && pending.length >= 20) return false;
 	const next = match
 		? pending.map((item) =>

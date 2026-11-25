@@ -18,6 +18,7 @@ import {
 	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
 	PlainTextEditor,
+	revealAttachment,
 	type SpellcheckStatus,
 	setAllSidebarFoldersExpanded,
 	type WikiTarget,
@@ -146,7 +147,7 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
-import { attachToChat } from "./store/tabChat";
+import { attachToChat, chatSelection } from "./store/tabChat";
 import { tabsStore } from "./store/tabStore";
 import { voice } from "./store/voice";
 import { isDarkTheme, subscribeTheme } from "./theme";
@@ -1262,6 +1263,20 @@ function MarkdownEditor({
 	spellcheckStatus?: SpellcheckStatus | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
+	const selection = useStoreValue(chatSelection);
+	useEffect(() => {
+		if (
+			!selection ||
+			selection.path !== path ||
+			selection.tabId !== tabsStore.get().activeTabId
+		)
+			return;
+		const editor = getActiveEditor();
+		if (!editor) return;
+		chatSelection.set(null);
+		if (!revealAttachment(editor, selection))
+			toast.error("This selection has changed or was removed.");
+	}, [selection, path]);
 	const recording = useStoreValue(voice);
 	const autoAttach = useCallback(
 		(attachment: Parameters<typeof attachToChat>[0]) => {
@@ -1272,7 +1287,7 @@ function MarkdownEditor({
 				current.workspace !== workspacePathStore.get()
 			)
 				return false;
-			const attached = attachToChat(attachment);
+			const attached = attachToChat(attachment, true);
 			if (!attached)
 				toast.error(
 					"Could not attach. Try a smaller selection or remove an attachment.",

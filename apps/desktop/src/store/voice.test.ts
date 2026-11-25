@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, expect, it, vi } from "vitest";
+import { chatInput } from "../desktopApi/chat";
 import type { VoiceEvent } from "../desktopApi/voice";
 import { appStore } from "./state";
 import { attachToChat } from "./tabChat";
@@ -114,4 +115,50 @@ it("updates microphone levels without clearing speech or changing chat state", a
 	emit({ id, status: "stopped", text: "Keep my words." });
 	await startVoice(activeTab());
 	expect(voiceLevel.get()).toBe(0);
+});
+
+it("keeps voice highlights between spoken phrases through speech corrections", async () => {
+	const tabId = activeTab();
+	await startVoice(tabId);
+	const id = api.voiceStart.mock.calls[0][0];
+	emit({ id, status: "listening", text: "read this" });
+	attachToChat(
+		{ kind: "selection", path: "/notes/a.md", text: "First quote" },
+		true,
+	);
+	emit({ id, status: "listening", text: "Read this. Then compare" });
+	attachToChat(
+		{ kind: "selection", path: "/notes/a.md", text: "Second quote" },
+		true,
+	);
+	emit({
+		id,
+		status: "stopped",
+		text: "Read this. Then compare both sections.",
+	});
+	const chat = tabsStore.get().byId[tabId].chat;
+	if (!chat) throw new Error("Missing chat");
+	expect(chat.attachments?.map((a) => a.offset)).toEqual([10, 23]);
+	const input = chatInput([
+		{
+			id: "turn",
+			role: "user",
+			status: "complete",
+			text: chat.draft,
+			attachments: chat.attachments,
+		},
+	])[0].content;
+	expect(input.indexOf("Read this.")).toBeLessThan(
+		input.indexOf("First quote"),
+	);
+	expect(input.indexOf("First quote")).toBeLessThan(
+		input.indexOf("Then compare"),
+	);
+	expect(input.indexOf("Then compare")).toBeLessThan(
+		input.indexOf("Second quote"),
+	);
+	expect(input.indexOf("Second quote")).toBeLessThan(
+		input.indexOf("both sections."),
+	);
+	expect(input.match(/First quote/g)).toHaveLength(1);
 });
