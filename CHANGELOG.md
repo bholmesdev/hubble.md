@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Chat with your notes and edit files using your ChatGPT subscription, with voice drafts on macOS. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
+
 ### Changed
 
 ### Fixed
