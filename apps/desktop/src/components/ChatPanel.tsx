@@ -276,7 +276,6 @@ export function ChatPanel({
 					),
 				}));
 			active.current = null;
-			chatConnection.set({ ...chatConnection.get(), sending: false });
 		};
 	}, [tabId]);
 
@@ -358,7 +357,10 @@ export function ChatPanel({
 		const result = await attempt(() =>
 			desktopApi.chatSend({ id, model, messages: history }),
 		);
-		if (active.current !== id) return;
+		if (active.current !== id) {
+			chatConnection.set({ ...chatConnection.get(), sending: false });
+			return;
+		}
 		if (result.ok) {
 			const reply = result.value;
 			setMessages((messages) =>
