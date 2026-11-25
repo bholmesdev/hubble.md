@@ -88,7 +88,9 @@ function workedFor(message: ChatMessage) {
 		0,
 		Math.floor((message.finishedAt - message.startedAt) / 1000),
 	);
-	return `Worked for ${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+	return seconds < 60
+		? `Worked for ${seconds}s`
+		: `Worked for ${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
 /** Response items keep completed text and tools in order; the stream supplies only the unfinished tail. */
