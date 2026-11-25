@@ -68,7 +68,7 @@
 		"react-dom": "^19.1.0"
 	},
 	"devDependencies": {
-		"@iconify-json/mingcute": "^1.2.7",
+		"@iconify-json/mingcute": "^1.2.10",
 		"@types/react": "^19.1.8",
 		"@vitejs/plugin-react": "^4.6.0",
 		"babel-plugin-react-compiler": "^1.0.0",

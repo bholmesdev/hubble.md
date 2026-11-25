@@ -18,7 +18,7 @@ import {
 	emptyDoc,
 	viewerStore,
 } from "../store/state";
-import { chatPanelOpen, updateTabChat } from "../store/tabChat";
+import { chatPanelOpen, chatPanelWidth, updateTabChat } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import { emptyTabs, withOpenedTab } from "../store/tabs";
 import { voice } from "../store/voice";
@@ -66,6 +66,7 @@ beforeEach(async () => {
 		...cleanFileState(""),
 	});
 	chatPanelOpen.set(false);
+	chatPanelWidth.set(360);
 	tabsStore.set(withOpenedTab(emptyTabs(), "/notes/note.md"));
 	Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 	chatConnection.set({
@@ -1119,4 +1120,69 @@ it.each([
 	const sent = mocks.api.chatSend.mock.calls[0][0].messages.slice(-1)[0];
 	expect(sent.text).toBe(text);
 	expect(sent.attachments[0].offset).toBe(offset);
+});
+
+it("resizes Chat within its bounds and keeps the width across tabs and reopening", async () => {
+	const separator = () =>
+		host.querySelector<HTMLElement>(
+			'[role="separator"][aria-label="Resize chat panel"]',
+		);
+	expect(separator()).not.toBeNull();
+	const resize = async (key: string) =>
+		act(async () =>
+			separator()?.dispatchEvent(
+				new KeyboardEvent("keydown", { key, bubbles: true }),
+			),
+		);
+	await resize("ArrowRight");
+	expect(separator()?.getAttribute("aria-valuenow")).toBe("376");
+	await act(async () =>
+		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new")),
+	);
+	expect(separator()?.getAttribute("aria-valuenow")).toBe("376");
+	await act(async () => chatPanelOpen.set(false));
+	await act(async () => chatPanelOpen.set(true));
+	expect(separator()?.getAttribute("aria-valuenow")).toBe("376");
+	await resize("Home");
+	await resize("ArrowLeft");
+	expect(separator()?.getAttribute("aria-valuenow")).toBe("280");
+	await resize("End");
+	await resize("ArrowRight");
+	expect(Number(separator()?.getAttribute("aria-valuenow"))).toBe(
+		Math.round(Number(separator()?.getAttribute("aria-valuemax"))),
+	);
+});
+
+it("moves the Chat toggle into the panel while open and keeps New tab independent", async () => {
+	const { FileInfoBar } = await import("./FileInfoBar");
+	const newTab = vi.fn();
+	await act(async () =>
+		root.render(
+			<>
+				<FileInfoBar scrollContainer={null} onNewTab={newTab} />
+				<TabChat />
+			</>,
+		),
+	);
+	const toggle = () =>
+		host.querySelector<HTMLButtonElement>('[aria-controls="chat-sidebar"]');
+	const viewerToggle = () =>
+		host.querySelector('[data-file-info-bar] [aria-controls="chat-sidebar"]');
+	expect(viewerToggle()).toBeNull();
+	expect(toggle()?.getAttribute("aria-expanded")).toBe("true");
+	expect(toggle()?.getAttribute("aria-label")).toBe("Close Chat");
+	await act(async () => toggle()?.click());
+	expect(chatPanelOpen.get()).toBe(false);
+	expect(toggle()?.getAttribute("aria-expanded")).toBe("false");
+	expect(toggle()?.getAttribute("aria-label")).toBe("Open Chat");
+	expect(viewerToggle()).toBe(toggle());
+	await act(async () =>
+		host.querySelector<HTMLButtonElement>('[aria-label^="New tab"]')?.click(),
+	);
+	expect(newTab).toHaveBeenCalledTimes(1);
+	expect(chatPanelOpen.get()).toBe(false);
+	await act(async () => toggle()?.click());
+	expect(chatPanelOpen.get()).toBe(true);
+	expect(viewerToggle()).toBeNull();
+	expect(toggle()?.getAttribute("aria-expanded")).toBe("true");
 });

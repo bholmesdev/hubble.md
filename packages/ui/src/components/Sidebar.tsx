@@ -43,7 +43,6 @@ import MingcutePinFill from "~icons/mingcute/pin-fill";
 import MingcutePinLine from "~icons/mingcute/pin-line";
 import MingcuteRightLine from "~icons/mingcute/right-line";
 import MingcuteSortDescendingLine from "~icons/mingcute/sort-descending-line";
-import { useResizeSeparator } from "../hooks/useResizeSeparator";
 import { isEditableEventTarget } from "../lib/dom";
 import {
 	dirname,
@@ -55,6 +54,7 @@ import { shouldShowFooterDivider } from "../lib/scrollOverflow";
 import { useCommandShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
+import { ResizableSidebar } from "./ResizableSidebar";
 import {
 	EDITOR_INPUT_SELECTOR,
 	useSidebarKeyboardNav,
@@ -369,8 +369,6 @@ const sidebarRowActionButtonClass =
 const DEFAULT_SIDEBAR_WIDTH = 220;
 const MIN_SIDEBAR_WIDTH = 180;
 const MAX_SIDEBAR_WIDTH = 360;
-const COLLAPSE_EDGE_DISTANCE = 24;
-const RESIZE_HANDLE_WIDTH = 10;
 const DRAG_EXPAND_DELAY_MS = 500;
 const DRAG_CHIP_OFFSET = 2;
 const SEGMENT_DROP = "sidebar-drop:segment:";
@@ -1837,14 +1835,11 @@ export function SidebarFrame({
 	onCollapse?: () => void;
 	storageScope?: string | null;
 }) {
-	const asideRef = useRef<HTMLElement | null>(null);
 	const widthStorageKey = sidebarWidthStorageKey(storageScope);
 	const [sidebarWidth, setSidebarWidth] = useState(() =>
 		readSidebarWidth(widthStorageKey),
 	);
 	const sidebarWidthRef = useRef(sidebarWidth);
-	const previewCollapsedRef = useRef(false);
-	const [previewCollapsed, setPreviewCollapsedState] = useState(false);
 
 	useEffect(() => {
 		const nextWidth = readSidebarWidth(widthStorageKey);
@@ -1871,87 +1866,24 @@ export function SidebarFrame({
 		setSidebarWidth(clampedWidth);
 	}
 
-	function setPreviewCollapsed(nextPreviewCollapsed: boolean) {
-		if (previewCollapsedRef.current === nextPreviewCollapsed) return;
-		previewCollapsedRef.current = nextPreviewCollapsed;
-		setPreviewCollapsedState(nextPreviewCollapsed);
-	}
-
-	function commitResize() {
-		const shouldCollapse = previewCollapsedRef.current;
-		if (shouldCollapse && onCollapse) {
-			onCollapse();
-			return;
-		}
-		writeSidebarWidth(widthStorageKey, sidebarWidthRef.current);
-	}
-
-	const { isResizing, separatorProps } = useResizeSeparator({
-		axis: "col",
-		label: "Resize sidebar",
-		value: sidebarWidth,
-		min: MIN_SIDEBAR_WIDTH,
-		max: MAX_SIDEBAR_WIDTH,
-		onChange: setWidth,
-		targetRef: asideRef,
-		onResizeStart: () => {
-			setPreviewCollapsed(false);
-		},
-		onResizeEnd: () => {
-			setPreviewCollapsed(false);
-		},
-		onCommit: () => {
-			commitResize();
-			setPreviewCollapsed(false);
-		},
-		getPointerValue: ({ event, startRect }) => {
-			if (onCollapse && event.clientX <= COLLAPSE_EDGE_DISTANCE) {
-				setPreviewCollapsed(true);
-				return null;
-			}
-			setPreviewCollapsed(false);
-			return event.clientX - (startRect?.left ?? 0);
-		},
-	});
-
 	return (
-		<aside
-			ref={asideRef}
-			data-sidebar-root
-			className={cn(
-				"relative flex shrink-0 flex-col overflow-visible border-e border-sidebar-border bg-sidebar",
-				isResizing && "select-none",
-			)}
-			style={
-				{
-					"--sidebar-width": `${sidebarWidth}px`,
-					inlineSize: previewCollapsed ? 0 : sidebarWidth,
-					maxInlineSize: MAX_SIDEBAR_WIDTH,
-					minInlineSize: previewCollapsed ? 0 : MIN_SIDEBAR_WIDTH,
-				} as CSSProperties & Record<"--sidebar-width", string>
+		<ResizableSidebar
+			side="left"
+			resizeLabel="Resize sidebar"
+			width={sidebarWidth}
+			minWidth={MIN_SIDEBAR_WIDTH}
+			maxWidth={MAX_SIDEBAR_WIDTH}
+			onWidthChange={setWidth}
+			onCollapse={onCollapse}
+			onCommit={() =>
+				writeSidebarWidth(widthStorageKey, sidebarWidthRef.current)
 			}
+			data-sidebar-root
+			className="bg-sidebar"
+			style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
 		>
-			<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-				{children}
-			</div>
-			<div
-				className="group absolute z-20 cursor-col-resize outline-none [inset-block:0]"
-				style={{
-					inlineSize: RESIZE_HANDLE_WIDTH,
-					insetInlineEnd: -(RESIZE_HANDLE_WIDTH / 2),
-				}}
-				// A resizable split pane maps to the ARIA separator pattern:
-				// arrow keys resize, Home/End jump to min/max, and pointer drag works normally.
-				{...separatorProps}
-			>
-				<span
-					className={cn(
-						"absolute bg-transparent [inset-block:0] [inset-inline-start:50%] [inline-size:1px] group-focus:bg-primary",
-						isResizing && "bg-primary",
-					)}
-				/>
-			</div>
-		</aside>
+			{children}
+		</ResizableSidebar>
 	);
 }
 

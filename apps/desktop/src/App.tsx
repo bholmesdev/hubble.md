@@ -147,7 +147,7 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
-import { attachToChat, chatSelection } from "./store/tabChat";
+import { attachToChat, chatPanelOpen, chatSelection } from "./store/tabChat";
 import { tabsStore } from "./store/tabStore";
 import { voice } from "./store/voice";
 import { isDarkTheme, subscribeTheme } from "./theme";
@@ -346,6 +346,8 @@ function App() {
 	const wantsTabStrip = tabs.order.length > 1 || !hasWorkspace;
 	// Trails wantsTabStrip by one view transition, so the strip slides.
 	const [showTabStrip, setShowTabStrip] = useState(wantsTabStrip);
+	const chatOpen = useStoreValue(chatPanelOpen);
+	const fullHeightChat = chatOpen && !showTabStrip && Boolean(tabs.activeTabId);
 	const tabStripTransitionRef = useRef<ViewTransition | null>(null);
 	const activeTabPath = tabs.activeTabId
 		? tabs.byId[tabs.activeTabId]?.path
@@ -848,7 +850,7 @@ function App() {
 
 	return (
 		<main
-			className="relative flex h-dvh flex-col bg-background text-foreground"
+			className={`relative h-dvh bg-background text-foreground ${fullHeightChat ? "grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[36px_minmax(0,1fr)]" : "flex flex-col"}`}
 			onPointerDownCapture={(event) => {
 				if (
 					event.target instanceof Element &&
@@ -896,122 +898,134 @@ function App() {
 				</WindowTitleBar>
 			)}
 			{/* Compact windows anchor the sidebar overlay to the window instead. */}
-			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px max-sm:static">
-				{/* Compact sidebar stays mounted while closed so it can slide out. */}
+			<div
+				className={
+					fullHeightChat
+						? "contents"
+						: "relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px max-sm:static"
+				}
+			>
 				<div
-					data-sidebar-overlay
-					aria-hidden={!sidebarOpen}
-					inert={!sidebarOpen}
-					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
+					className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden max-sm:static ${fullHeightChat ? "col-start-1 row-start-2 -mt-px pt-px" : ""}`}
 				>
-					{compact ? <SidebarOverlayTitleRow /> : null}
-					<Sidebar
-						onFocusedItemChange={updateFocusedSidebarItem}
-						footer={
-							showReadyCallout ? (
-								<SidebarCallout
-									message={
-										<>
-											<span className="font-semibold">A new version</span> is
-											ready to install.
-										</>
-									}
-									primaryLabel="Restart"
-									onPrimary={installUpdate}
-									onDismiss={() =>
-										setDismissedVersion(readyVersion ?? "__unknown__")
-									}
-								/>
-							) : whatsNewVersion !== null ? (
-								<SidebarCallout
-									message={
-										<>
-											<span className="font-semibold">Hubble updated</span> to{" "}
-											{whatsNewVersion}.
-										</>
-									}
-									primaryLabel="See what's new"
-									onPrimary={() => {
-										// Only consume the one-shot callout once the changelog is
-										// actually showing; openChangelog can bail on a conflict.
-										void openChangelog().then((opened) => {
-											if (opened) markWhatsNewSeen();
-										});
-									}}
-									onDismiss={markWhatsNewSeen}
-								/>
-							) : telemetryConsent === "unset" ? (
-								<TelemetryConsentCallout
-									onChoose={(choice) => void setTelemetryConsent(choice)}
-								/>
-							) : undefined
+					{/* Compact sidebar stays mounted while closed so it can slide out. */}
+					<div
+						data-sidebar-overlay
+						aria-hidden={!sidebarOpen}
+						inert={!sidebarOpen}
+						className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
+					>
+						{compact ? <SidebarOverlayTitleRow /> : null}
+						<Sidebar
+							onFocusedItemChange={updateFocusedSidebarItem}
+							footer={
+								showReadyCallout ? (
+									<SidebarCallout
+										message={
+											<>
+												<span className="font-semibold">A new version</span> is
+												ready to install.
+											</>
+										}
+										primaryLabel="Restart"
+										onPrimary={installUpdate}
+										onDismiss={() =>
+											setDismissedVersion(readyVersion ?? "__unknown__")
+										}
+									/>
+								) : whatsNewVersion !== null ? (
+									<SidebarCallout
+										message={
+											<>
+												<span className="font-semibold">Hubble updated</span> to{" "}
+												{whatsNewVersion}.
+											</>
+										}
+										primaryLabel="See what's new"
+										onPrimary={() => {
+											// Only consume the one-shot callout once the changelog is
+											// actually showing; openChangelog can bail on a conflict.
+											void openChangelog().then((opened) => {
+												if (opened) markWhatsNewSeen();
+											});
+										}}
+										onDismiss={markWhatsNewSeen}
+									/>
+								) : telemetryConsent === "unset" ? (
+									<TelemetryConsentCallout
+										onChoose={(choice) => void setTelemetryConsent(choice)}
+									/>
+								) : undefined
+							}
+						/>
+					</div>
+					<section
+						data-chat-editor-area
+						className={
+							terminalPosition === "right"
+								? "flex-1 flex flex-row overflow-hidden"
+								: "flex-1 flex flex-col overflow-hidden"
 						}
-					/>
-				</div>
-				<section
-					className={
-						terminalPosition === "right"
-							? "flex-1 flex flex-row overflow-hidden"
-							: "flex-1 flex flex-col overflow-hidden"
-					}
-					aria-live="polite"
-					onFocusCapture={closeSidebarOverlay}
-				>
-					<div className="flex-1 min-h-0 min-w-0 flex flex-col">
-						{showTabStrip && isFileOpen ? (
-							<FileInfoBar scrollContainer={scrollContainerEl} />
-						) : null}
-						<div data-note-body className="flex-1 min-h-0 min-w-0 relative">
-							{state.status === "loading" && <p>Loading…</p>}
-							{state.status === "error" && (
-								<p>{state.error ?? "Failed to open file."}</p>
-							)}
-							{showWelcome && (
-								<WelcomeScreen
-									onCreateWorkspace={() => void createWorkspaceWithSidebar()}
-									onOpenFolder={() => void openWorkspaceWithSidebar()}
-									onOpenFile={() => void openFilePicker()}
-								/>
-							)}
-							{/* With no tabs open, the blank page doubles as the empty state. */}
-							{state.status !== "loading" &&
-								state.status !== "error" &&
-								(isNewTabPath(state.currentPath) ||
-									(!state.currentPath && hasWorkspace)) && (
-									<NewTabPage
-										folder={focusedCreationFolder}
-										onSearch={openSearch}
+						aria-live="polite"
+						onFocusCapture={closeSidebarOverlay}
+					>
+						<div className="flex-1 min-h-0 min-w-0 flex flex-col">
+							{showTabStrip && isFileOpen ? (
+								<FileInfoBar scrollContainer={scrollContainerEl} />
+							) : null}
+							<div data-note-body className="flex-1 min-h-0 min-w-0 relative">
+								{state.status === "loading" && <p>Loading…</p>}
+								{state.status === "error" && (
+									<p>{state.error ?? "Failed to open file."}</p>
+								)}
+								{showWelcome && (
+									<WelcomeScreen
+										onCreateWorkspace={() => void createWorkspaceWithSidebar()}
+										onOpenFolder={() => void openWorkspaceWithSidebar()}
+										onOpenFile={() => void openFilePicker()}
 									/>
 								)}
-							{state.status === "ready" &&
-								state.currentPath &&
-								!isNewTabPath(state.currentPath) && (
-									<div className="flex h-full min-h-0 flex-col">
-										{state.externalChange.kind === "conflict" && (
-											<ExternalChangeBanner
-												onKeepMyEdits={() => void forceKeepLocalEdits()}
-												onReloadFromDisk={reloadFromDiskConflict}
-											/>
-										)}
-										<DocumentViewer
-											path={state.currentPath}
-											content={state.content}
-											undoableUpdate={state.undoableUpdate}
-											copyAsMarkdownRequest={copyAsMarkdownRequest}
-											viewMode={state.viewMode}
-											spellcheckStatus={spellcheckStatus}
-											onOpenSettings={openSkillsSettings}
-											onScrollContainerChange={setScrollContainerEl}
+								{/* With no tabs open, the blank page doubles as the empty state. */}
+								{state.status !== "loading" &&
+									state.status !== "error" &&
+									(isNewTabPath(state.currentPath) ||
+										(!state.currentPath && hasWorkspace)) && (
+										<NewTabPage
+											folder={focusedCreationFolder}
+											onSearch={openSearch}
 										/>
-									</div>
-								)}
+									)}
+								{state.status === "ready" &&
+									state.currentPath &&
+									!isNewTabPath(state.currentPath) && (
+										<div className="flex h-full min-h-0 flex-col">
+											{state.externalChange.kind === "conflict" && (
+												<ExternalChangeBanner
+													onKeepMyEdits={() => void forceKeepLocalEdits()}
+													onReloadFromDisk={reloadFromDiskConflict}
+												/>
+											)}
+											<DocumentViewer
+												path={state.currentPath}
+												content={state.content}
+												undoableUpdate={state.undoableUpdate}
+												copyAsMarkdownRequest={copyAsMarkdownRequest}
+												viewMode={state.viewMode}
+												spellcheckStatus={spellcheckStatus}
+												onOpenSettings={openSkillsSettings}
+												onScrollContainerChange={setScrollContainerEl}
+											/>
+										</div>
+									)}
+							</div>
 						</div>
-					</div>
-					<TerminalPanel />
-				</section>
+						<TerminalPanel />
+					</section>
+				</div>
 				<ChatPanel
 					key={tabs.activeTabId ?? "empty"}
 					tabId={tabs.activeTabId}
+					fullHeight={fullHeightChat}
 					onOpenSettings={() => {
 						settingsRequestId.current += 1;
 						setSettingsTarget({

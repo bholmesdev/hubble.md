@@ -20,9 +20,9 @@ import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDeleteLine from "~icons/mingcute/delete-line";
 import MingcuteExternalLinkLine from "~icons/mingcute/external-link-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
-import MingcuteLayoutRightbarOpenLine from "~icons/mingcute/layout-rightbar-open-line";
 import MingcuteMore2Line from "~icons/mingcute/more-2-line";
 import MingcuteOpenaiLine from "~icons/mingcute/openai-line";
+import MingcuteSidebarRightCollapseLine from "~icons/mingcute/sidebar-right-collapse-line";
 import MingcuteTerminalLine from "~icons/mingcute/terminal-line";
 import { desktopApi } from "../desktopApi";
 import type { AgentClient } from "../desktopApi/types";
@@ -63,8 +63,8 @@ import {
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
+import { chatPanelOpen } from "../store/tabChat";
 import { ClaudeLogo } from "./AgentLogos";
-import { TOGGLE_CHAT_EVENT } from "./ChatPanel";
 
 const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
 
@@ -80,6 +80,7 @@ export function FileInfoBar({
 	onNewTab?: () => void;
 }) {
 	const workspacePath = useStoreValue(workspacePathStore);
+	const chatOpen = useStoreValue(chatPanelOpen);
 	const currentPath = useStoreValue(currentPathStore);
 	const titlePreview = useStoreValue(titleGenerationPreviewStore);
 	const titlePath = filePathForTitlePreview(currentPath, titlePreview);
@@ -126,7 +127,7 @@ export function FileInfoBar({
 		<div
 			key={currentPath ?? "empty"}
 			data-file-info-bar
-			className={`relative grid h-9 min-w-0 shrink-0 grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center overflow-hidden select-none ${onNewTab ? "px-2" : "px-3"} after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
+			className={`relative grid h-9 min-w-0 shrink-0 grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center overflow-hidden select-none ${onNewTab ? "px-2" : "ps-3 pe-2"} after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${showBorder ? "after:border-border" : "after:border-transparent"}`}
 		>
 			<div
 				className="flex items-center pe-4"
@@ -176,20 +177,21 @@ export function FileInfoBar({
 				style={{ paddingInlineEnd: "var(--title-bar-end, 0px)" }}
 			>
 				<div className="flex items-center gap-1" style={noDragStyle}>
+					{onNewTab ? (
+						<>
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={newTabTitle}
+								title={newTabTitle}
+								onClick={onNewTab}
+							>
+								<MingcuteAddLine className="size-4" />
+							</Button>
+							<span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
+						</>
+					) : null}
 					<div data-file-info-actions className="flex items-center gap-1">
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label="Open Chat"
-							title="Open Chat"
-							onClick={() => window.dispatchEvent(new Event(TOGGLE_CHAT_EVENT))}
-						>
-							<MingcuteLayoutRightbarOpenLine
-								aria-hidden="true"
-								className="size-3.5"
-							/>
-						</Button>
-						{comments ? <ReviewCommentSummary {...comments} /> : null}
 						<ActionsMenu
 							path={actionPath}
 							canDelete={Boolean(
@@ -201,20 +203,23 @@ export function FileInfoBar({
 									: null
 							}
 						/>
+						{comments ? <ReviewCommentSummary {...comments} /> : null}
 					</div>
-					{onNewTab ? (
-						<>
-							<span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
-							<Button
-								variant="ghost"
-								size="icon-sm"
-								aria-label={newTabTitle}
-								title={newTabTitle}
-								onClick={onNewTab}
-							>
-								<MingcuteAddLine className="size-4" />
-							</Button>
-						</>
+					{!chatOpen ? (
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label="Open Chat"
+							title="Open Chat"
+							aria-expanded={false}
+							aria-controls="chat-sidebar"
+							onClick={() => chatPanelOpen.set(true)}
+						>
+							<MingcuteSidebarRightCollapseLine
+								aria-hidden="true"
+								className="size-4"
+							/>
+						</Button>
 					) : null}
 				</div>
 			</div>

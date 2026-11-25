@@ -14,6 +14,7 @@ export const chatSelection = store<(ChatAttachment & { tabId: TabId }) | null>(
 );
 
 export const chatPanelOpen = store(false);
+export const chatPanelWidth = store(360);
 export const EMPTY_CHAT: ChatConversation = {
 	messages: [],
 	draft: "",

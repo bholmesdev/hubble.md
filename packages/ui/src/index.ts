@@ -9,6 +9,7 @@ export {
 	type PaletteFileMatches,
 } from "./components/GlobalSearchPalette";
 export { NewNoteButton } from "./components/NewNoteButton";
+export { ResizableSidebar } from "./components/ResizableSidebar";
 export {
 	Sidebar,
 	type SidebarDeleteItem,
