@@ -696,3 +696,21 @@
 		--hubble-attach-flash: 100%;
 	}
 }
+
+@media (prefers-reduced-motion: no-preference) {
+	.ProseMirror .hubble-tool-edit {
+		color: color-mix(
+			in oklab,
+			var(--brand-accent-foreground) var(--hubble-attach-flash),
+			var(--foreground)
+		);
+		animation: hubble-selection-attach 800ms ease-out;
+		background: color-mix(
+			in oklab,
+			var(--brand-accent) var(--hubble-attach-flash),
+			transparent
+		);
+		border-radius: 2px;
+		box-decoration-break: clone;
+	}
+}

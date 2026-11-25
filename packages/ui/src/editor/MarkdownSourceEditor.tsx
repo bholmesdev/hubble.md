@@ -11,6 +11,7 @@ import {
 	schedulePendingSave,
 } from "./pendingSave";
 import { replaceEditorContent } from "./replaceEditorContent";
+import { ToolEditHighlight } from "./ToolEditHighlight";
 import "./EditorView.css";
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 120;
@@ -70,6 +71,7 @@ export function MarkdownSourceEditor({
 	const editor = useEditor({
 		textDirection: "ltr",
 		extensions: [
+			ToolEditHighlight,
 			SourceDocument,
 			StarterKit.configure({ codeBlock: false, document: false }),
 			HubbleCodeBlock.configure({ defaultLanguage: sourceLanguage }),

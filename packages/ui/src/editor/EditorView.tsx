@@ -48,6 +48,7 @@ import {
 	MarkdownTableCell,
 	MarkdownTableHeader,
 } from "./TableMarkdownExtensions";
+import { ToolEditHighlight } from "./ToolEditHighlight";
 import { VirtualCursor } from "./VirtualCursor";
 import "./EditorView.css";
 import type { EditorAttachment } from "./attachments";
@@ -198,6 +199,7 @@ export function EditorView({
 		editable,
 		textDirection: "auto",
 		extensions: [
+			ToolEditHighlight,
 			FrontMatterHistory,
 			...starterKitWithRegistryShortcuts({
 				code: false,

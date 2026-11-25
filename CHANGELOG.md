@@ -9,6 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- See where agents edited your notes with brief line highlights. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 - Chat with your notes and edit files using your ChatGPT subscription, with voice drafts on macOS. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 
 ### Changed
