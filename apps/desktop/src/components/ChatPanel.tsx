@@ -460,17 +460,19 @@ export function ChatPanel({
 					<MingcuteEditLine aria-hidden="true" className="size-4" />
 				</Button>
 				<div className="ms-auto flex items-center [-webkit-app-region:no-drag]">
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						aria-label={debugOpen ? "Hide API payloads" : "Show API payloads"}
-						title={debugOpen ? "Hide API payloads" : "Show API payloads"}
-						aria-pressed={debugOpen}
-						className="aria-pressed:bg-accent"
-						onClick={() => chatDebug.set(!chatDebug.get())}
-					>
-						<MingcuteBugLine aria-hidden="true" className="size-4" />
-					</Button>
+					{import.meta.env.DEV ? (
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label={debugOpen ? "Hide API payloads" : "Show API payloads"}
+							title={debugOpen ? "Hide API payloads" : "Show API payloads"}
+							aria-pressed={debugOpen}
+							className="aria-pressed:bg-accent"
+							onClick={() => chatDebug.set(!chatDebug.get())}
+						>
+							<MingcuteBugLine aria-hidden="true" className="size-4" />
+						</Button>
+					) : null}
 					<Button
 						variant="ghost"
 						size="icon-sm"
@@ -646,7 +648,7 @@ export function ChatPanel({
 										· partial reply excluded from later context
 									</p>
 								) : null}
-								{debugOpen ? (
+								{import.meta.env.DEV && debugOpen ? (
 									<ChatPayloads
 										message={message}
 										history={messages.slice(0, index + 1)}
