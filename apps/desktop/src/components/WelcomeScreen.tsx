@@ -25,9 +25,9 @@ export function WelcomeScreen({
 					className="welcome-rise flex flex-col gap-2"
 					style={{ animationDelay: "0.05s" }}
 				>
-					<h2 className="text-3xl font-medium tracking-tight">
+					<h2 className="text-2xl font-medium tracking-tight">
 						Welcome to{" "}
-						<span className="font-rounded font-semibold">hubble</span>
+						<span className="font-rounded text-3xl font-semibold">hubble</span>
 					</h2>
 					<p className="text-sm text-muted-foreground">
 						Let's start writing together.
