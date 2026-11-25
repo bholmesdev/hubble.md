@@ -1,4 +1,8 @@
-import { Button, ResizableSidebar } from "@hubble.md/ui";
+import {
+	Button,
+	ResizableSidebar,
+	useCommandShortcutLabel,
+} from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import {
 	useEffect,
@@ -7,13 +11,12 @@ import {
 	useRef,
 	useState,
 } from "react";
-import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
-import MingcuteArrowUpLine from "~icons/mingcute/arrow-up-line";
 import MingcuteBugLine from "~icons/mingcute/bug-line";
-import MingcuteDownLine from "~icons/mingcute/down-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteMicLine from "~icons/mingcute/mic-line";
 import MingcuteSidebarRightLine from "~icons/mingcute/sidebar-right-line";
+import openaiBlossomBlack from "../assets/openai-blossom-black.svg";
+import openaiBlossomWhite from "../assets/openai-blossom-white.svg";
 import { desktopApi } from "../desktopApi";
 import {
 	CHAT_CONTEXT_LIMIT,
@@ -22,12 +25,11 @@ import {
 	chatContextSize,
 	chatFile,
 } from "../desktopApi/chat";
-import { editChatDraft } from "../desktopApi/chatTranscript";
 import { isEditableFile } from "../lib/filePath";
-import { isVirtualPath } from "../lib/newTabPage";
+import { isNewTabPath, isVirtualPath } from "../lib/newTabPage";
 import { resolveRelativeLinkPath } from "../lib/relativeLinkPath";
 import { windowControlsInset } from "../lib/windowChrome";
-import { loadPath } from "../store/actions";
+import { loadPath, setTerminalOpen } from "../store/actions";
 import {
 	attempt,
 	chatConnection,
@@ -50,12 +52,14 @@ import { tabsStore } from "../store/tabStore";
 import type { TabId } from "../store/tabs";
 import { isRecording, startVoice, stopVoice, voice } from "../store/voice";
 import { ChatAttachments } from "./ChatAttachments";
+import { ChatComposer } from "./ChatComposer";
+import { ChatMark } from "./ChatMark";
+import { ChatModelPicker } from "./ChatModelPicker";
 import { ChatPayloads } from "./ChatPayloads";
 import { ChatReply } from "./ChatReply";
 import { ChatTranscript } from "./ChatTranscript";
+import { SendArrow } from "./SendArrow";
 import { VoiceMeter } from "./VoiceMeter";
-
-export const TOGGLE_CHAT_EVENT = "hubble:toggle-chat";
 
 export function ChatPanel({
 	tabId,
@@ -67,12 +71,19 @@ export function ChatPanel({
 	fullHeight?: boolean;
 }) {
 	const open = useStoreValue(chatPanelOpen);
+	const closeChatTitle = useCommandShortcutLabel(
+		"Close Chat",
+		"app.toggle-chat",
+	);
 	const debugOpen = useStoreValue(chatDebug);
 	const width = useStoreValue(chatPanelWidth);
+	const tabs = useStoreValue(tabsStore);
+	const tab = tabs.byId[tabId ?? ""];
+	const hasFile = Boolean(tab?.path && !isNewTabPath(tab.path));
 	const panelRef = useRef<HTMLElement>(null);
 	const [limit, setLimit] = useState(() => window.innerWidth * 0.85);
 	useLayoutEffect(() => {
-		if (!open) return;
+		if (!open || !hasFile) return;
 		const panel = panelRef.current;
 		const parent = panel?.parentElement;
 		const editor =
@@ -92,7 +103,7 @@ export function ChatPanel({
 		observer.observe(parent);
 		observer.observe(editor);
 		return () => observer.disconnect();
-	}, [open]);
+	}, [open, hasFile]);
 	const panelWidth = Math.min(width, limit);
 
 	const recording = useStoreValue(voice);
@@ -101,21 +112,25 @@ export function ChatPanel({
 		["starting", "listening", "stopping"].includes(recording.status);
 	const recordingLabel =
 		recording?.tabId === tabId ? voiceLabel(recording) : null;
-	const tabs = useStoreValue(tabsStore);
-	const tab = tabs.byId[tabId ?? ""];
 	const chat = tab?.chat ?? EMPTY_CHAT;
 	const attachments = chat.attachments ?? [];
-	const attachmentKey = attachments.map((item) => item.id).join(",");
+	const attachmentKey = attachments
+		.filter((item) => item.offset === undefined)
+		.map((item) => item.id)
+		.join(",");
 	const document = useStoreValue(viewerStore);
 	const workspace = useStoreValue(workspacePathStore);
 	useEffect(() => {
 		const current = voice.get();
 		if (
 			current &&
-			(!open || current.tabId !== tabId || current.workspace !== workspace)
+			(!open ||
+				!hasFile ||
+				current.tabId !== tabId ||
+				current.workspace !== workspace)
 		)
 			stopVoice();
-	}, [open, tabId, workspace]);
+	}, [open, hasFile, tabId, workspace]);
 	useEffect(() => () => stopVoice(), []);
 	const filePath = tab?.path && !isVirtualPath(tab.path) ? tab.path : null;
 	const editable = Boolean(filePath && isEditableFile(filePath));
@@ -135,9 +150,10 @@ export function ChatPanel({
 				messages: typeof update === "function" ? update(chat.messages) : update,
 			}));
 	}
-	function setDraft(draft: string, part?: number) {
+	function setDraft(draft: string, attachments: ChatAttachment[]) {
 		if (draft.length > CHAT_CONTEXT_LIMIT) return;
-		if (tabId) updateTabChat(tabId, (chat) => editChatDraft(chat, draft, part));
+		if (tabId)
+			updateTabChat(tabId, (chat) => ({ ...chat, draft, attachments }));
 	}
 	function setModel(model: string) {
 		if (tabId) updateTabChat(tabId, (chat) => ({ ...chat, model }));
@@ -176,7 +192,7 @@ export function ChatPanel({
 	} | null>(null);
 	const active = useRef<string | null>(null);
 	const transcript = useRef<HTMLDivElement>(null);
-	const prompt = useRef<HTMLTextAreaElement>(null);
+	const prompt = useRef<{ focus: () => void }>(null);
 	useEffect(() => {
 		if (
 			open &&
@@ -211,8 +227,6 @@ export function ChatPanel({
 	}
 
 	useEffect(() => {
-		const toggle = () => chatPanelOpen.set(!chatPanelOpen.get());
-		window.addEventListener(TOGGLE_CHAT_EVENT, toggle);
 		const unsubscribe = desktopApi.onChatDelta(
 			({ id, text, context, activity, debug }) => {
 				if (debug) {
@@ -220,7 +234,7 @@ export function ChatPanel({
 					return;
 				}
 				if (id !== active.current) return;
-				if (context) setActivity(activity);
+				if (activity) setActivity(activity);
 				if (tabId)
 					updateTabChat(tabId, (chat) => ({
 						...chat,
@@ -249,7 +263,6 @@ export function ChatPanel({
 		});
 		return () => {
 			unsubscribeFiles();
-			window.removeEventListener(TOGGLE_CHAT_EVENT, toggle);
 			unsubscribe();
 			if (active.current)
 				void desktopApi.chatStop(active.current).catch(() => {});
@@ -330,7 +343,7 @@ export function ChatPanel({
 		setError(null);
 		setActivity(undefined);
 		setModel(model);
-		setDraft("");
+		setDraft("", []);
 		if (tabId) updateTabChat(tabId, (chat) => ({ ...chat, attachments: [] }));
 		setMessages([
 			...history,
@@ -401,7 +414,7 @@ export function ChatPanel({
 		if (recording.status === "stopped") sendTranscript();
 	}, [sendAfterVoice, open, recording, tabId, workspace, revision]);
 
-	if (!open || !tabId) return null;
+	if (!open || !tabId || !hasFile) return null;
 
 	return (
 		<ResizableSidebar
@@ -438,7 +451,7 @@ export function ChatPanel({
 						setMessages([]);
 						if (tabId)
 							updateTabChat(tabId, (chat) => ({ ...chat, attachments: [] }));
-						setDraft("");
+						setDraft("", []);
 						setError(null);
 					}}
 				>
@@ -460,7 +473,7 @@ export function ChatPanel({
 						variant="ghost"
 						size="icon-sm"
 						aria-label="Close Chat"
-						title="Close Chat"
+						title={closeChatTitle}
 						aria-expanded={true}
 						aria-controls="chat-sidebar"
 						className="bg-muted text-foreground"
@@ -506,8 +519,17 @@ export function ChatPanel({
 				</div>
 			) : panel.kind === "signed-out" || panel.kind === "signing-in" ? (
 				<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
-					<div className="flex w-full max-w-sm flex-col gap-3">
-						<button
+					<div className="flex w-full max-w-[250px] flex-col gap-3">
+						<ChatMark />
+						<h2 className="text-center text-lg font-semibold">
+							Chat with your notes
+						</h2>
+						<p className="mx-auto mb-3 w-full max-w-[250px] text-center text-xs leading-relaxed text-muted-foreground">
+							Work with your agents to draft notes, leave comments, and connect
+							ideas across files
+						</p>
+						<Button
+							variant="outline"
 							type="button"
 							data-oai-siwc-button
 							disabled={accountBusy && !signingIn}
@@ -518,25 +540,37 @@ export function ChatPanel({
 											.catch((error) => setError(errorText(error)))
 									: void refreshChatConnection(true)
 							}
-							className="flex w-full items-center gap-2.5 rounded-md border border-border px-3 py-2 text-start text-sm text-muted-foreground hover:border-brand-accent hover:text-foreground focus-visible:border-brand-accent focus-visible:text-foreground focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+							className="h-auto min-h-10 w-full justify-center gap-2.5 rounded-md px-3 py-2 text-center text-sm font-normal"
 						>
-							{signingIn ? "Cancel sign-in" : "Sign in with ChatGPT"}
 							{!signingIn ? (
-								<MingcuteArrowRightLine
+								<span
 									aria-hidden="true"
-									className="ms-auto size-4 shrink-0"
-								/>
+									className="flex size-5 shrink-0 items-center justify-center"
+								>
+									<img
+										src={openaiBlossomBlack}
+										alt=""
+										className="size-5 dark:hidden"
+									/>
+									<img
+										src={openaiBlossomWhite}
+										alt=""
+										className="hidden size-5 dark:block"
+									/>
+								</span>
 							) : null}
-						</button>
-						<p className="px-3 text-xs text-muted-foreground">
-							Use your ChatGPT subscription to chat with your notes
-						</p>
-						<ChatAttachments
-							attachments={attachments.filter(
-								(item) => item.offset === undefined,
-							)}
-							onRemove={removeAttachment}
-						/>
+							{signingIn ? "Cancel sign-in" : "Sign in with ChatGPT"}
+						</Button>
+						<Button
+							variant="ghost"
+							className="h-auto self-center px-0 py-1 text-sm font-normal hover:bg-transparent"
+							onClick={() => {
+								setTerminalOpen(true);
+								chatPanelOpen.set(false);
+							}}
+						>
+							Use the terminal
+						</Button>
 						{connectionError || error ? (
 							<p role="alert" className="text-xs text-destructive">
 								{connectionError || error}
@@ -593,12 +627,11 @@ export function ChatPanel({
 										}}
 									/>
 								) : (
-									<div className="rounded-xl bg-brand px-4 py-3 text-primary-foreground">
+									<div className="rounded-lg bg-brand px-4 py-3 text-primary-foreground">
 										<ChatTranscript
 											text={message.text}
 											attachments={message.attachments ?? []}
 											onReveal={revealSelection}
-											inBubble
 										/>
 									</div>
 								)}
@@ -654,11 +687,10 @@ export function ChatPanel({
 							)}
 							onRemove={removeAttachment}
 						/>
-						<ChatTranscript
+						<ChatComposer
 							text={draft}
 							attachments={attachments}
 							onReveal={revealSelection}
-							onRemove={removeAttachment}
 							onEdit={setDraft}
 							readOnly={voiceBusy}
 							promptRef={prompt}
@@ -666,30 +698,12 @@ export function ChatPanel({
 							onSend={() => void send()}
 						/>
 						<div className="flex items-center gap-3">
-							<div className="relative min-w-0">
-								<select
-									aria-label="Chat model"
-									className="block max-w-full appearance-none rounded-xs border-0 bg-transparent py-1.5 pe-6 text-xs text-muted-foreground outline-hidden hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 [field-sizing:content]"
-									value={model}
-									disabled={sending || accountBusy || !models.length}
-									onChange={(event) => setModel(event.target.value)}
-								>
-									{!models.length ? (
-										<option value="">
-											{accountBusy ? "Connecting…" : "No model available"}
-										</option>
-									) : null}
-									{models.map((item) => (
-										<option key={item.slug} value={item.slug}>
-											{item.name}
-										</option>
-									))}
-								</select>
-								<MingcuteDownLine
-									aria-hidden="true"
-									className="pointer-events-none absolute end-0.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-								/>
-							</div>
+							<ChatModelPicker
+								models={models}
+								value={model}
+								disabled={sending || accountBusy || !models.length}
+								onValueChange={setModel}
+							/>
 							<div className="ms-auto flex shrink-0 items-center gap-2">
 								{voiceBusy && recording?.status === "listening" ? (
 									<VoiceMeter />
@@ -751,10 +765,7 @@ export function ChatPanel({
 										}
 										onClick={() => void send()}
 									>
-										<MingcuteArrowUpLine
-											aria-hidden="true"
-											className="size-4"
-										/>
+										<SendArrow />
 									</Button>
 								)}
 							</div>

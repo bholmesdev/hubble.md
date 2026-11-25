@@ -10,10 +10,9 @@ import {
 } from "@playwright/test";
 
 const appDir = path.resolve(import.meta.dirname, "..");
-const chat = (page: Page) =>
-	page.getByRole("complementary", { name: "ChatGPT chat" });
+const chat = (page: Page) => page.getByRole("complementary", { name: "Chat" });
 const composer = (page: Page) =>
-	chat(page).getByRole("textbox", { name: "Message ChatGPT" });
+	chat(page).getByRole("textbox", { name: "Message Chat", exact: true });
 
 // Keep real preload, rendering, and persistence without account credentials or network requests.
 async function fakeChat(app: ElectronApplication) {
@@ -54,23 +53,26 @@ test("restores a tab’s conversation and draft after restarting Electron", asyn
 		});
 		const page = await app.firstWindow();
 		await fakeChat(app);
+		await page.reload();
+		await page.getByRole("button", { name: "Folders", exact: true }).click();
 		return page;
 	}
 	try {
 		let page = await launch();
+		await expect(chat(page)).toBeHidden();
 		await page
 			.getByRole("tree")
 			.getByRole("button", { name: "note.md", exact: true })
 			.click();
-		await page.getByRole("button", { name: "Toggle ChatGPT chat" }).click();
 		await composer(page).fill("Remember this conversation");
-		await chat(page).getByRole("button", { name: "Send", exact: true }).click();
+		await chat(page)
+			.getByRole("button", { name: "Send message", exact: true })
+			.click();
 		await expect(chat(page).getByRole("log")).toContainText("Remembered reply");
 		await composer(page).fill("Unsent draft");
 		await app?.close();
 		page = await launch();
-		await page.getByRole("button", { name: "Toggle ChatGPT chat" }).click();
-		await expect(composer(page)).toHaveValue("Unsent draft");
+		await expect(composer(page)).toHaveText("Unsent draft");
 		await expect(chat(page).getByRole("log")).toContainText(
 			"Remember this conversation",
 		);

@@ -1,0 +1,1 @@
+The OpenAI Blossom SVGs are unmodified assets from [OpenAI’s official logo download](https://cdn.openai.com/brand/OpenAI-Logos-2025.zip), linked from its [brand guidelines](https://openai.com/brand/). The marks belong to OpenAI. Use the supplied black and white versions for light and dark themes.

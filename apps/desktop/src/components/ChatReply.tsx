@@ -21,7 +21,9 @@ export function ChatReply({
 	const parts = replyParts(message);
 	const lastActivity = parts.map((part) => part.type).lastIndexOf("activity");
 	const workLabel =
-		message.status === "streaming" ? "Thinking" : workedFor(message);
+		message.status === "streaming"
+			? activity || "Thinking"
+			: workedFor(message);
 	return (
 		<>
 			{parts.map((part) =>
@@ -33,7 +35,15 @@ export function ChatReply({
 						onOpenLink={onOpenLink}
 					/>
 				) : (
-					<WorkDetails key={part.id} label={workLabel}>
+					<WorkDetails
+						key={part.id}
+						label={
+							parts[lastActivity] === part ? workLabel : workedFor(message)
+						}
+						working={
+							message.status === "streaming" && parts[lastActivity] === part
+						}
+					>
 						<ul className="mt-2 space-y-1 ps-5">
 							{part.items.map((item) => (
 								<li key={item.id}>{item.text}</li>
@@ -49,7 +59,7 @@ export function ChatReply({
 			)}
 			{message.status === "streaming" ? (
 				lastActivity < 0 && (activity || !parts.length) ? (
-					<WorkDetails label="Thinking">
+					<WorkDetails label={workLabel} working>
 						{activity ? <p className="mt-2 ps-5">{activity}</p> : null}
 					</WorkDetails>
 				) : null
@@ -62,9 +72,11 @@ export function ChatReply({
 
 function WorkDetails({
 	label,
+	working = false,
 	children,
 }: {
 	label: string;
+	working?: boolean;
 	children: ReactNode;
 }) {
 	return (
@@ -74,7 +86,9 @@ function WorkDetails({
 					aria-hidden="true"
 					className="size-3 shrink-0 transition-transform duration-150 ease-out group-open/work:rotate-90 motion-reduce:transition-none"
 				/>
-				{label}
+				<span className="chat-work-label" data-working={working || undefined}>
+					{label}
+				</span>
 			</summary>
 			{children}
 		</details>

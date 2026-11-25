@@ -44,6 +44,7 @@ import {
 	toggleTerminal,
 } from "../store/actions";
 import { canGoBack, canGoForward } from "../store/history";
+import { toggleChatPanel } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 
 const CONTRIBUTING_URL =
@@ -342,6 +343,12 @@ function defineCommands(
 			["files", "panel", "explorer"],
 			toggleSidebar,
 			{ label: context.sidebarOpen ? "Hide Sidebar" : "Show Sidebar" },
+		),
+		fromRegistry(
+			"app.toggle-chat",
+			"View",
+			["chat", "right", "sidebar", "panel"],
+			toggleChatPanel,
 		),
 		fromRegistry(
 			"app.show-folders",

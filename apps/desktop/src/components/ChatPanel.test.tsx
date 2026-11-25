@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { useStoreValue } from "@simplestack/store/react";
+import type { Editor } from "@tiptap/core";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -19,12 +20,17 @@ import {
 	emptyDoc,
 	viewerStore,
 } from "../store/state";
-import { chatPanelOpen, chatPanelWidth, updateTabChat } from "../store/tabChat";
+import {
+	chatPanelOpen,
+	chatPanelWidth,
+	toggleChatPanel,
+	updateTabChat,
+} from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import { emptyTabs, withOpenedTab } from "../store/tabs";
 import { voice } from "../store/voice";
 import { ChatConnectionSettings } from "./ChatConnectionSettings";
-import { ChatPanel, TOGGLE_CHAT_EVENT } from "./ChatPanel";
+import { ChatPanel } from "./ChatPanel";
 
 const mocks = vi.hoisted(() => ({
 	api: {
@@ -115,7 +121,7 @@ beforeEach(async () => {
 			</>,
 		),
 	);
-	await act(async () => window.dispatchEvent(new Event(TOGGLE_CHAT_EVENT)));
+	await act(async () => toggleChatPanel());
 });
 afterEach(async () => {
 	await act(async () => root.unmount());
@@ -143,17 +149,20 @@ function button(text: string) {
 	return element;
 }
 
+function composer() {
+	return host.querySelector<HTMLElement & { editor: Editor }>(
+		'[role="textbox"][aria-label="Message Chat"]',
+	);
+}
+function draftText() {
+	return composer()?.editor.getText({ blockSeparator: "\n" });
+}
 async function fillDraft(text: string) {
-	const textarea = host.querySelector("textarea");
-	if (!textarea) throw new Error("Missing composer");
+	const editor = composer()?.editor;
+	if (!editor) throw new Error("Missing composer");
 	await act(async () => {
-		const setValue = Object.getOwnPropertyDescriptor(
-			HTMLTextAreaElement.prototype,
-			"value",
-		)?.set;
-		if (!setValue) throw new Error("Missing textarea value setter");
-		setValue.call(textarea, text);
-		textarea.dispatchEvent(new Event("input", { bubbles: true }));
+		editor.commands.selectAll();
+		editor.view.dispatch(editor.state.tr.insertText(text));
 	});
 }
 
@@ -240,7 +249,9 @@ it("clears a signed-out conversation and picks up a reconnected account from Set
 	if (!(signIn instanceof HTMLButtonElement))
 		throw new Error("Missing settings sign-in button");
 	await act(async () => signIn.click());
-	expect(host.querySelector("select")?.value).toBe("new-model");
+	expect(
+		host.querySelector('[aria-label="Chat model"]')?.textContent,
+	).toContain("New available model");
 	await sendMessage();
 	expect(mocks.api.chatSend.mock.calls[1][0]).toMatchObject({
 		model: "new-model",
@@ -256,7 +267,7 @@ it("shows each tab’s own conversation and draft when switching tabs", async ()
 	await act(async () =>
 		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new")),
 	);
-	expect(host.querySelector("textarea")?.value).toBe("");
+	expect(draftText()).toBe("");
 	expect(host.textContent).not.toContain("Reply A");
 	await act(async () =>
 		viewerStore.set((doc) => ({ ...doc, currentPath: "/notes/other.md" })),
@@ -267,7 +278,7 @@ it("shows each tab’s own conversation and draft when switching tabs", async ()
 	await act(async () =>
 		tabsStore.set((tabs) => ({ ...tabs, activeTabId: first })),
 	);
-	expect(host.querySelector("textarea")?.value).toBe("Draft A");
+	expect(draftText()).toBe("Draft A");
 	expect(host.textContent).toContain("Reply A");
 	expect(host.textContent).not.toContain("Reply B");
 });
@@ -422,7 +433,7 @@ it("waits for the active file to load and counts file contents against the conte
 	await sendMessage();
 	expect(mocks.api.chatSend).not.toHaveBeenCalled();
 	expect(host.textContent).toContain("Chat is too long");
-	expect(host.querySelector("textarea")?.value).toBe("Explain this");
+	expect(draftText()).toBe("Explain this");
 });
 
 it("does not attach a stale editor buffer or pretend a binary file is included", async () => {
@@ -525,7 +536,7 @@ it("shows sign-in instead of a disabled composer when a saved chat loses its con
 	expect(host.querySelector("aside")?.textContent).toContain(
 		"Sign in with ChatGPT",
 	);
-	expect(host.querySelector("aside textarea")).toBeNull();
+	expect(composer()).toBeNull();
 	expect(
 		tabsStore.get().byId[tabsStore.get().activeTabId ?? ""].chat?.messages,
 	).toHaveLength(2);
@@ -552,7 +563,7 @@ it("gives missing models a recovery state, then opens a ready new conversation a
 	expect(host.querySelector("aside")?.textContent).toContain(
 		"No chat models are available",
 	);
-	expect(host.querySelector("aside textarea")).toBeNull();
+	expect(composer()).toBeNull();
 	await act(async () => button("Retry connection").click());
 	await fillDraft("Now ready");
 	expect(button("Send").disabled).toBe(false);
@@ -605,7 +616,7 @@ it("offers a working reset and sign-in from an unreadable saved connection", asy
 		});
 	});
 	expect(host.textContent).toContain("saved sign-in");
-	expect(host.querySelector("textarea")).toBeNull();
+	expect(composer()).toBeNull();
 	mocks.api.chatReset.mockRejectedValueOnce(
 		new Error("Could not remove the saved sign-in. Try again."),
 	);
@@ -623,7 +634,7 @@ it("offers a working reset and sign-in from an unreadable saved connection", asy
 	expect(mocks.api.chatReset).toHaveBeenCalledTimes(2);
 	expect(mocks.api.chatSignIn).toHaveBeenCalledTimes(1);
 	expect(host.textContent).toContain("Saved reply");
-	expect(host.querySelector("textarea")).not.toBeNull();
+	expect(composer()).not.toBeNull();
 });
 
 it("renders Markdown as streamed formatting and code fences become complete", async () => {
@@ -780,18 +791,28 @@ it("keeps attachments with their tab, removes them, and sends their snapshots on
 			{ author: "agent" as const, body: "Earlier reply" },
 		],
 	};
+	await fillDraft("Discuss this ");
 	await act(async () => {
 		attachToChat(selection);
 		attachToChat(selection);
 		attachToChat(thread);
 	});
 	const pending = () => host.querySelector('[aria-label="Attachments"]');
-	expect(pending()?.textContent).toContain("A highlighted passage");
-	expect(pending()?.querySelector("blockquote")?.title).toBe(
-		"A highlighted passage",
-	);
+	expect(
+		tabsStore
+			.get()
+			.byId[firstTab].chat?.attachments?.find((a) => a.kind === "selection")
+			?.offset,
+	).toBe(13);
+
+	expect(
+		composer()?.querySelector(
+			'[aria-label="Reveal selection: A highlighted passage"]',
+		),
+	).not.toBeNull();
+	expect(pending()?.textContent).not.toContain("A highlighted passage");
 	expect(pending()?.textContent).toContain("Explain this claim");
-	expect(pending()?.querySelectorAll("li")).toHaveLength(2);
+	expect(pending()?.querySelectorAll("li")).toHaveLength(1);
 	await act(async () =>
 		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new")),
 	);
@@ -799,11 +820,13 @@ it("keeps attachments with their tab, removes them, and sends their snapshots on
 	await act(async () =>
 		tabsStore.set((tabs) => ({ ...tabs, activeTabId: firstTab })),
 	);
-	expect(pending()?.textContent).toContain("A highlighted passage");
-	expect(pending()?.querySelector("blockquote")?.title).toBe(
-		"A highlighted passage",
-	);
-	const remove = pending()?.querySelector<HTMLButtonElement>(
+	expect(
+		composer()?.querySelector(
+			'[aria-label="Reveal selection: A highlighted passage"]',
+		),
+	).not.toBeNull();
+	expect(pending()?.textContent).not.toContain("A highlighted passage");
+	const remove = composer()?.querySelector<HTMLButtonElement>(
 		'button[aria-label="Remove attachment: A highlighted passage"]',
 	);
 	expect(remove).not.toBeNull();
@@ -863,9 +886,8 @@ it("records a draft for review, leaves selection focus alone, and stops when cha
 	await act(async () =>
 		voiceEvent?.({ id, status: "listening", text: "Explain this passage" }),
 	);
-	expect(host.querySelector("textarea")?.value).toBe("Explain this passage");
-	expect(host.querySelector("textarea")?.readOnly).toBe(true);
-	expect(host.querySelector("textarea")?.placeholder).toBe("Recording...");
+	expect(draftText()).toBe("Explain this passage");
+	expect(!composer()?.editor.isEditable).toBe(true);
 	expect(button("Send").disabled).toBe(false);
 	const { attachToChat } = await import("../store/tabChat");
 	const editor = document.createElement("div");
@@ -901,7 +923,7 @@ it("records a draft for review, leaves selection focus alone, and stops when cha
 	expect(tabsStore.get().byId[original].chat?.draft).toBe(
 		"Explain this passage.",
 	);
-	expect(host.querySelector("textarea")?.value).toBe("");
+	expect(draftText()).toBe("");
 	editor.remove();
 });
 
@@ -986,7 +1008,7 @@ it.each([
 it("uses the startup connection across sidebar opens, settings, and tab changes", async () => {
 	expect(mocks.api.chatAccount).toHaveBeenCalledTimes(1);
 	expect(mocks.api.chatModels).toHaveBeenCalledTimes(1);
-	expect(host.querySelector("aside textarea")).not.toBeNull();
+	expect(composer()).not.toBeNull();
 	await act(async () => chatPanelOpen.set(false));
 	await act(async () => chatPanelOpen.set(true));
 	await act(async () =>
@@ -999,7 +1021,7 @@ it("uses the startup connection across sidebar opens, settings, and tab changes"
 			...cleanFileState(""),
 		}),
 	);
-	expect(host.querySelector("aside textarea")).not.toBeNull();
+	expect(composer()).not.toBeNull();
 	expect(host.textContent).not.toContain("Checking chat connection");
 	expect(mocks.api.chatAccount).toHaveBeenCalledTimes(1);
 	expect(mocks.api.chatModels).toHaveBeenCalledTimes(1);
@@ -1036,21 +1058,22 @@ it("reviews and sends voice highlights in place, and reveals a pill's source wit
 		emit?.({ id, status: "stopped", text: "Explain this. Then compare." }),
 	);
 	expect(host.querySelector('[aria-label="Attachments"]')).toBeNull();
-	const inputs = host.querySelectorAll("textarea");
-	expect([...inputs].map((input) => input.value)).toEqual([
-		"Explain this.",
-		" Then compare.",
-	]);
-	inputs[0].focus();
+	const input = composer();
+	expect(draftText()).toBe("Explain this. Then compare.");
+	expect(
+		input?.querySelectorAll('[aria-label="Reveal selection: A passage"]'),
+	).toHaveLength(1);
 	await act(async () => {
-		Object.getOwnPropertyDescriptor(
-			HTMLTextAreaElement.prototype,
-			"value",
-		)?.set?.call(inputs[0], "Please explain this. More");
-		inputs[0].dispatchEvent(new Event("input", { bubbles: true }));
+		input?.focus();
+		const editor = input?.editor;
+		if (!editor) throw new Error("Missing composer");
+		editor.view.dispatch(
+			editor.state.tr.insertText("Please explain this. More", 1, 14),
+		);
 	});
-	expect(host.querySelectorAll("textarea")[1].value).toBe(" Then compare.");
-	expect(document.activeElement).toBe(inputs[0]);
+	expect(draftText()).toBe("Please explain this. More Then compare.");
+	expect(document.activeElement).toBe(input);
+
 	await act(async () =>
 		host
 			.querySelector<HTMLButtonElement>(
@@ -1410,4 +1433,220 @@ it("moves the Chat toggle into the panel while open and keeps New tab independen
 	expect(chatPanelOpen.get()).toBe(true);
 	expect(viewerToggle()).toBeNull();
 	expect(toggle()?.getAttribute("aria-expanded")).toBe("true");
+});
+
+it("opens Chat by default and restores the saved open or closed preference", async () => {
+	localStorage.clear();
+	expect(getInitialState().ui.chatPanelOpen).toBe(true);
+	localStorage.setItem(
+		STORAGE_KEY,
+		JSON.stringify({ ui: { sidebarOpen: false } }),
+	);
+	expect(getInitialState().ui.chatPanelOpen).toBe(true);
+	for (const open of [false, true]) {
+		await act(async () => chatPanelOpen.set(!open));
+		await act(async () => chatPanelOpen.set(open));
+		expect(getInitialState().ui.chatPanelOpen).toBe(open);
+	}
+});
+
+it.each([
+	false,
+	true,
+])("opens the terminal and closes Chat from sign-in (terminal initially open: %s)", async (terminalOpen) => {
+	await act(async () => {
+		appStore.set((state) => ({
+			...state,
+			ui: { ...state.ui, isTerminalOpen: terminalOpen },
+		}));
+		chatConnection.set({
+			...chatConnection.get(),
+			account: {
+				connected: false,
+				sharing: false,
+				label: null,
+				expiresAt: null,
+			},
+			models: [],
+		});
+	});
+	await act(async () => button("Use the terminal").click());
+	expect(appStore.get().ui.isTerminalOpen).toBe(true);
+	expect(chatPanelOpen.get()).toBe(false);
+});
+
+it.each([
+	"selection",
+	"thread",
+] as const)("opens sign-in without adding %s context while signed out", async (kind) => {
+	const { attachToChat } = await import("../store/tabChat");
+	const attachment = {
+		kind,
+		path: "/notes/note.md",
+		text: "Context that needs sign-in",
+		...(kind === "thread" ? { threadId: "thread-1" } : {}),
+	};
+	await act(async () => {
+		attachToChat({
+			kind: "selection",
+			path: "/notes/note.md",
+			text: "Saved context",
+		});
+		chatConnection.set({
+			...chatConnection.get(),
+			account: {
+				connected: false,
+				sharing: false,
+				label: null,
+				expiresAt: null,
+			},
+			models: [],
+		});
+		chatPanelOpen.set(false);
+	});
+	let attached = true;
+	await act(async () => {
+		attached = attachToChat(attachment);
+	});
+	expect(attached).toBe(false);
+	expect(chatPanelOpen.get()).toBe(true);
+	expect(host.textContent).toContain("Sign in with ChatGPT");
+	expect(host.querySelector('[aria-label="Attachments"]')).toBeNull();
+	const tab = tabsStore.get().activeTabId ?? "";
+	expect(
+		tabsStore.get().byId[tab].chat?.attachments?.map((a) => a.text),
+	).toEqual(["Saved context"]);
+});
+
+it.each([
+	{ path: null, preference: true },
+	{ path: null, preference: false },
+	{ path: "hubble://new-tab/first", preference: true },
+	{ path: "hubble://new-tab/first", preference: false },
+])("waits for a file before showing Chat or accepting its toggle: $path / $preference", async ({
+	path,
+	preference,
+}) => {
+	await act(async () => {
+		chatPanelOpen.set(preference);
+		tabsStore.set(path ? withOpenedTab(emptyTabs(), path) : emptyTabs());
+		viewerStore.set((state) => ({ ...state, currentPath: path }));
+	});
+	expect(host.querySelector('[aria-label="Chat"]')).toBeNull();
+	await act(async () => toggleChatPanel());
+	expect(host.querySelector('[aria-label="Chat"]')).toBeNull();
+	expect(chatPanelOpen.get()).toBe(preference);
+	await act(async () => {
+		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/first.md"));
+		viewerStore.set((state) => ({ ...state, currentPath: "/notes/first.md" }));
+	});
+	expect(Boolean(host.querySelector('[aria-label="Chat"]'))).toBe(preference);
+});
+
+it("keeps the latest tool label between updates and resets it for the next reply", async () => {
+	await sendMessage();
+	const { id } = mocks.api.chatSend.mock.calls[0][0];
+	const label = () => {
+		const replies = host.querySelectorAll('article[aria-label="Chat reply"]');
+		return replies[replies.length - 1]?.querySelector("summary")?.textContent;
+	};
+	expect(label()).toBe("Thinking");
+	await act(async () =>
+		delta({ id, text: "", context: [], activity: "Reading files" }),
+	);
+	expect(label()).toBe("Reading files");
+	await act(async () => delta({ id, text: "", context: [] }));
+	expect(label()).toBe("Reading files");
+	await act(async () =>
+		delta({ id, text: "", context: [], activity: "Updating files" }),
+	);
+	expect(label()).toBe("Updating files");
+	await act(async () => delta({ id, text: "", context: [] }));
+	expect(label()).toBe("Updating files");
+	await act(async () => finish({ status: "complete", text: "Done" }));
+	await sendMessage("Next turn");
+	expect(label()).toBe("Thinking");
+});
+
+it("chooses a model from the popover and sends with that model", async () => {
+	await act(async () =>
+		chatConnection.set({
+			...chatConnection.get(),
+			models: [
+				{ slug: "model", name: "First model" },
+				{ slug: "second", name: "Second model" },
+			],
+		}),
+	);
+	const trigger = () =>
+		host.querySelector<HTMLButtonElement>('[aria-label="Chat model"]');
+	await act(async () => trigger()?.click());
+	const listbox = document.querySelector('[role="listbox"]');
+	expect(listbox).not.toBeNull();
+	const option = [
+		...document.querySelectorAll<HTMLElement>('[role="option"]'),
+	].find((item) => item.textContent === "Second model");
+	if (!option) throw new Error("Missing second model option");
+	await act(async () =>
+		option.dispatchEvent(new MouseEvent("mousemove", { bubbles: true })),
+	);
+	await act(async () => option.click());
+	expect(trigger()?.textContent).toContain("Second model");
+	await sendMessage("Use this model");
+	expect(mocks.api.chatSend.mock.calls[0][0].model).toBe("second");
+});
+
+it("keeps inline quotes anchored while editing across them, including deletion and undo", async () => {
+	const tab = tabsStore.get().activeTabId;
+	if (!tab) throw new Error("Missing tab");
+	const attachment = {
+		id: "inline",
+		kind: "selection" as const,
+		path: "/notes/note.md",
+		text: "A passage",
+		offset: 7,
+	};
+	await act(async () =>
+		updateTabChat(tab, (chat) => ({
+			...chat,
+			draft: "Before after",
+			attachments: [attachment],
+		})),
+	);
+	const editor = composer()?.editor;
+	if (!editor) throw new Error("Missing composer");
+	await act(async () =>
+		editor.view.dispatch(editor.state.tr.insertText("More ", 1)),
+	);
+	expect(tabsStore.get().byId[tab].chat).toMatchObject({
+		draft: "More Before after",
+		attachments: [expect.objectContaining({ offset: 12 })],
+	});
+	await act(async () =>
+		editor
+			.chain()
+			.setTextSelection({ from: 11, to: 16 })
+			.deleteSelection()
+			.run(),
+	);
+	expect(tabsStore.get().byId[tab].chat).toMatchObject({
+		draft: "More Beforter",
+		attachments: [],
+	});
+	expect(editor.state.selection.head).toBe(11);
+	await act(async () => editor.commands.undo());
+	expect(tabsStore.get().byId[tab].chat).toMatchObject({
+		draft: "More Before after",
+		attachments: [expect.objectContaining({ id: "inline", offset: 12 })],
+	});
+	await act(async () =>
+		host
+			.querySelector<HTMLButtonElement>(
+				'[aria-label="Remove attachment: A passage"]',
+			)
+			?.click(),
+	);
+	expect(editor.state.selection.head).toBe(13);
+	expect(draftText()).toBe("More Before after");
+	expect(tabsStore.get().byId[tab].chat?.attachments).toEqual([]);
 });

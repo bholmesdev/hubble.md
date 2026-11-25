@@ -348,11 +348,11 @@ export function setupChatIpc(
 				for (const call of calls) {
 					progress(
 						{
-							list_files: "Finding files…",
-							search_content: "Searching workspace…",
-							read_file: "Reading a file…",
-							apply_patch: "Editing a file…",
-						}[call.name] ?? "Working…",
+							list_files: "Finding files",
+							search_content: "Searching files",
+							read_file: "Reading files",
+							apply_patch: "Updating files",
+						}[call.name] ?? "Thinking",
 					);
 					let result: unknown;
 					try {

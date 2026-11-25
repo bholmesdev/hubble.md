@@ -129,6 +129,7 @@ import {
 	undoDelete,
 	updateEditorContent,
 } from "./store/actions";
+import { chatConnection } from "./store/chatConnection";
 import { canGoBack, canGoForward } from "./store/history";
 import { useHistoryNav } from "./store/hooks";
 import type { SidebarView } from "./store/persistence";
@@ -147,7 +148,12 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
-import { attachToChat, chatPanelOpen, chatSelection } from "./store/tabChat";
+import {
+	attachToChat,
+	chatPanelOpen,
+	chatSelection,
+	toggleChatPanel,
+} from "./store/tabChat";
 import { tabsStore } from "./store/tabStore";
 import { voice } from "./store/voice";
 import { isDarkTheme, subscribeTheme } from "./theme";
@@ -347,7 +353,8 @@ function App() {
 	// Trails wantsTabStrip by one view transition, so the strip slides.
 	const [showTabStrip, setShowTabStrip] = useState(wantsTabStrip);
 	const chatOpen = useStoreValue(chatPanelOpen);
-	const fullHeightChat = chatOpen && !showTabStrip && Boolean(tabs.activeTabId);
+	const fullHeightChat =
+		chatOpen && isFileOpen && !showTabStrip && Boolean(tabs.activeTabId);
 	const tabStripTransitionRef = useRef<ViewTransition | null>(null);
 	const activeTabPath = tabs.activeTabId
 		? tabs.byId[tabs.activeTabId]?.path
@@ -612,6 +619,7 @@ function App() {
 					setSidebarOpen(opening);
 					if (opening) requestAnimationFrame(() => focusSidebarNav());
 				},
+				"app.toggle-chat": toggleChatPanel,
 				"app.show-folders": () => showSidebarView("folders"),
 				"app.show-inbox": () => showSidebarView("inbox"),
 			};
@@ -1029,7 +1037,7 @@ function App() {
 					onOpenSettings={() => {
 						settingsRequestId.current += 1;
 						setSettingsTarget({
-							page: "chat",
+							page: "agents",
 							requestId: settingsRequestId.current,
 						});
 						setSettingsOpen(true);
@@ -1302,7 +1310,7 @@ function MarkdownEditor({
 			)
 				return false;
 			const attached = attachToChat(attachment, true);
-			if (!attached)
+			if (!attached && chatConnection.get().account?.connected)
 				toast.error(
 					"Could not attach. Try a smaller selection or remove an attachment.",
 				);
@@ -1387,7 +1395,10 @@ function MarkdownEditor({
 			}
 			onAutoAttach={recording?.status === "listening" ? autoAttach : undefined}
 			onAttach={(attachment) => {
-				if (!attachToChat(attachment))
+				if (
+					!attachToChat(attachment) &&
+					chatConnection.get().account?.connected
+				)
 					toast.error(
 						"Could not attach. Try a smaller selection or remove an attachment.",
 					);

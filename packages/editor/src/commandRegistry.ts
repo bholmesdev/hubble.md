@@ -149,6 +149,11 @@ export const commandRegistry = {
 		label: "Toggle Sidebar",
 		isEnabled: always,
 	},
+	"app.toggle-chat": {
+		defaultBinding: "CmdOrCtrl+Alt+B",
+		label: "Toggle Chat",
+		isEnabled: hasCurrentFile,
+	},
 	"app.show-folders": {
 		defaultBinding: "CmdOrCtrl+Shift+E",
 		label: "Show Folders",

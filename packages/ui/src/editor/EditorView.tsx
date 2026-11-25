@@ -418,6 +418,15 @@ export function EditorView({
 									? () =>
 											onAttach({
 												kind: "selection",
+												source: {
+													from: editor.state.selection.from,
+													to: editor.state.selection.to,
+													text: editor.state.doc.textBetween(
+														editor.state.selection.from,
+														editor.state.selection.to,
+														"\n",
+													),
+												},
 												path,
 												text: selectionToMarkdown(
 													editor.state.selection,
