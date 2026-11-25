@@ -382,7 +382,10 @@ export function EditorView({
 					<FilePropertiesPanel
 						path={path}
 						state={frontMatterState}
-						onChange={(_nextState, frontMatter) => {
+						onChange={(nextState, frontMatter) => {
+							// YAML omits unfinished keys and row ids; keep those drafts while recording history.
+							setFrontMatterState(nextState);
+							partsRef.current = { ...partsRef.current, frontMatter };
 							editor?.commands.command(({ tr }) => {
 								tr.setDocAttribute("hubbleFrontMatter", frontMatter);
 								return true;
