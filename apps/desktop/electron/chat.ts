@@ -235,6 +235,7 @@ export function setupChatIpc(
 							(await editor("write", filePath, before, after)).open,
 					},
 					controller.signal,
+					checkScope,
 				)
 			: null;
 		let apiRound = 0;

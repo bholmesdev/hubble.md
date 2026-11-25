@@ -67,10 +67,11 @@ export class WorkspaceTools {
 		private root: string,
 		private bridge: FileBridge,
 		private signal: AbortSignal,
+		private validateScope: () => void = () => {},
 	) {}
 
 	async run(name: string, args: unknown): Promise<Record<string, unknown>> {
-		this.signal.throwIfAborted();
+		this.checkScope();
 		switch (name) {
 			case "list_files": {
 				const input = schemas.list_files.parse(args);
@@ -87,12 +88,12 @@ export class WorkspaceTools {
 				for (const file of files) {
 					if (!isEditableFile(file)) continue;
 					if (scanned++ === 500) return { matches, truncated: true, skipped };
-					this.signal.throwIfAborted();
+					this.checkScope();
 					let text: string;
 					try {
 						text = (await this.read(file)).text;
 					} catch (error) {
-						this.signal.throwIfAborted();
+						this.checkScope();
 						if (error instanceof Error) {
 							skipped++;
 							continue;
@@ -160,7 +161,7 @@ export class WorkspaceTools {
 				const after = applyPatch(current.text, input.patch);
 				if (Buffer.byteLength(after) > MAX_FILE_BYTES)
 					throw new Error("Edited file exceeds the text size limit.");
-				this.signal.throwIfAborted();
+				this.checkScope();
 				if (
 					!(await this.bridge.write(resolved.absolute, current.text, after))
 				) {
@@ -176,7 +177,7 @@ export class WorkspaceTools {
 						const disk = await handle.readFile("utf8");
 						const checked = await this.resolve(file);
 						const currentStat = await fs.stat(checked.real);
-						this.signal.throwIfAborted();
+						this.checkScope();
 						if (
 							checked.real !== resolved.real ||
 							currentStat.ino !== stat.ino ||
@@ -210,8 +211,14 @@ export class WorkspaceTools {
 		}
 	}
 
-	private async resolve(relative: string) {
+	private checkScope() {
+		// Workspace changes can arrive while a filesystem or renderer operation is awaiting.
+		this.validateScope();
 		this.signal.throwIfAborted();
+	}
+
+	private async resolve(relative: string) {
+		this.checkScope();
 		if (
 			path.isAbsolute(relative) ||
 			path.win32.isAbsolute(relative) ||
@@ -232,7 +239,7 @@ export class WorkspaceTools {
 			path.isAbsolute(within)
 		)
 			throw new Error("Path leaves the workspace.");
-		this.signal.throwIfAborted();
+		this.checkScope();
 		return { absolute, real };
 	}
 
@@ -262,7 +269,7 @@ export class WorkspaceTools {
 		const folder = input.path ?? ".";
 		await this.resolve(folder);
 		const listing = await listSidebarFiles(this.root);
-		this.signal.throwIfAborted();
+		this.checkScope();
 		return listing.files
 			.map((file) =>
 				path.relative(this.root, file.path).split(path.sep).join("/"),
