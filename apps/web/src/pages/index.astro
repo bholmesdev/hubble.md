@@ -145,8 +145,6 @@ const route = pts.reduce((d, p1, i) => {
 		c2y = p1[1] - (p2[1] - p0[1]) / 6;
 	return `${d} C${c1x} ${c1y} ${c2x} ${c2y} ${p1[0]} ${p1[1]}`;
 }, "");
-const ccLogo =
-	'<svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fill-rule="evenodd"/></svg>';
 ---
 <Base title="Hubble.md">
   <div class="page">
@@ -266,7 +264,6 @@ const ccLogo =
                 </div>
 
                 <div class="ws-claude">
-                  <div class="cli-head"><span class="cc-logo" set:html={ccLogo} /></div>
                   <div class="cli-body">
                     <div class="cli-group s2">
                       <div class="cli-row"><span class="prompt">&gt;</span> <span class="path"></span><span class="ask"></span></div>
@@ -756,7 +753,6 @@ const ccLogo =
     .ws-claude { position:absolute; inset-block-end:16px; inset-inline:0; margin-inline:auto; width:460px; max-width:88%; border-radius:12px; border:1px solid rgba(255,255,255,.1); box-shadow:0 2px 6px rgba(0,0,0,.18), 0 22px 48px rgba(0,0,0,.26); opacity:0; transform:translateY(14px); transition:opacity .28s ease, transform .28s ease; z-index:6;
       background:#1c1e19; color:#e9e4d6; display:flex; align-items:center; gap:.55rem; padding:.5rem .85rem; font-family:"IBM Plex Mono", ui-monospace, monospace; }
     .ws-claude.shown { opacity:1; transform:translateY(0); }
-    .ws-claude .cli-head { border:none; padding:0; flex:none; }
     .ws-claude .cli-body { padding:0; flex:1; }
     .ws-claude .cli-row { margin-block-end:0; white-space:normal; }
     .ws-claude .cli-out { display:none; }
@@ -843,8 +839,6 @@ const ccLogo =
     .pin-gloss { fill:#fff; opacity:.7; }
     .pin-label { font-family:var(--app-font); font-size:10px; font-weight:600; fill:var(--hero-ink); }
 
-    .cli-head { display:flex; align-items:center; justify-content:space-between; padding:.5rem .7rem; border-block-end:1px solid rgba(255,255,255,.07); }
-    .cc-logo { display:flex; align-items:center; justify-content:center; padding:4px; border-radius:7px; background:rgba(217,119,87,.16); }
     .cli-body { padding:.8rem; font-size:.75rem; line-height:1.55; flex:1; overflow:hidden; }
     .prompt { color:var(--hero-gold); font-weight:700; } .ok { color:#7fd19a; }
     .cli-row { margin-block-end:.35rem; word-break:break-word; }
