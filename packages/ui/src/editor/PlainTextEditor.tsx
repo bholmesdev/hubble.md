@@ -8,6 +8,8 @@ import {
 	type PendingSave,
 	schedulePendingSave,
 } from "./pendingSave";
+import { replaceEditorContent } from "./replaceEditorContent";
+import { ToolEditHighlight } from "./ToolEditHighlight";
 import { VirtualCursor } from "./VirtualCursor";
 import "./EditorView.css";
 
@@ -16,6 +18,7 @@ const DEFAULT_SAVE_DEBOUNCE_MS = 120;
 export type PlainTextEditorProps = {
 	path: string;
 	initialText: string;
+	undoableUpdate?: string;
 	saveDebounceMs?: number;
 	onLocalChange: (path: string, text: string) => void;
 	onSave: (path: string, text: string) => void | Promise<void>;
@@ -25,12 +28,14 @@ export type PlainTextEditorProps = {
 export function PlainTextEditor({
 	path,
 	initialText,
+	undoableUpdate,
 	saveDebounceMs = DEFAULT_SAVE_DEBOUNCE_MS,
 	onLocalChange,
 	onSave,
 	onScrollContainerChange,
 }: PlainTextEditorProps) {
 	const pathRef = useRef(path);
+	const updateRef = useRef(undoableUpdate);
 	const latestTextRef = useRef(initialText);
 	const pendingSaveRef = useRef<PendingSave | null>(null);
 	const editorRootRef = useRef<HTMLDivElement | null>(null);
@@ -57,6 +62,7 @@ export function PlainTextEditor({
 	const editor = useEditor({
 		textDirection: "auto",
 		extensions: [
+			ToolEditHighlight,
 			StarterKit.configure({
 				blockquote: false,
 				bold: false,
@@ -96,12 +102,24 @@ export function PlainTextEditor({
 
 	useEffect(() => {
 		if (!editor) return;
+		const undoable = Boolean(
+			undoableUpdate && updateRef.current !== undoableUpdate,
+		);
+		updateRef.current = undoableUpdate;
 		if (initialText === latestTextRef.current) return;
 		latestTextRef.current = initialText;
-		editor.commands.setContent(plainTextDocFromText(initialText), {
-			emitUpdate: false,
-		});
-	}, [editor, initialText]);
+		if (undoable)
+			replaceEditorContent(
+				editor,
+				plainTextDocFromText(initialText),
+				true,
+				true,
+			);
+		else
+			editor.commands.setContent(plainTextDocFromText(initialText), {
+				emitUpdate: false,
+			});
+	}, [editor, initialText, undoableUpdate]);
 
 	useEffect(() => {
 		void path;

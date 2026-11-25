@@ -1,6 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
 import { Tabs } from "@base-ui/react/tabs";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import { Button } from "../primitives/button";
@@ -30,6 +30,7 @@ const EMPTY_LABEL: Record<Filter, string> = {
 export type ReviewCommentSummaryProps = {
 	filePath: string;
 	threads: ReviewThread[];
+	canAttach?: boolean;
 	onCommand: (kind: ReviewThreadCommand["kind"], id: string) => void;
 	onMessage?: (message: string, type: "success" | "error") => void;
 };
@@ -44,9 +45,11 @@ export function ReviewCommentSummary({
 	filePath,
 	threads,
 	onCommand,
+	canAttach,
 	onMessage,
 }: ReviewCommentSummaryProps) {
 	const [open, setOpen] = useState(false);
+	const attaching = useRef(false);
 	const [filter, setFilter] = useState<Filter>("unresolved");
 	const unresolved = unresolvedThreads(threads);
 	const visible =
@@ -66,7 +69,13 @@ export function ReviewCommentSummary({
 	};
 
 	return (
-		<Popover.Root open={open} onOpenChange={setOpen}>
+		<Popover.Root
+			open={open}
+			onOpenChange={(next) => {
+				if (next) attaching.current = false;
+				setOpen(next);
+			}}
+		>
 			<Popover.Trigger
 				render={
 					<Button
@@ -87,6 +96,7 @@ export function ReviewCommentSummary({
 					className="isolate z-50"
 				>
 					<Popover.Popup
+						finalFocus={() => !attaching.current}
 						data-review-comment-summary
 						className="flex w-[min(20rem,calc(100vw-1rem))] origin-(--transform-origin) flex-col rounded-[var(--radius-popover)] border border-border bg-popover text-popover-foreground shadow-overlay outline-hidden transition-[transform,opacity] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
 					>
@@ -122,13 +132,13 @@ export function ReviewCommentSummary({
 											</p>
 										) : (
 											<ReviewCommentList
-												filePath={filePath}
+												canAttach={canAttach}
 												threads={visible}
-												onMessage={onMessage}
 												onCommand={(kind, id) => {
-													// Opening jumps to the thread in the document, so the
-													// list has done its job and gets out of the way.
-													if (kind === "open") setOpen(false);
+													// Attaching hands focus to Chat; closing must not return it to the list trigger.
+													attaching.current = kind === "attach";
+													if (kind === "open" || kind === "attach")
+														setOpen(false);
 													onCommand(kind, id);
 												}}
 											/>

@@ -75,12 +75,12 @@ describe("EditorCommandShortcuts", () => {
 	it("applies a remap to an editor that is already open", () => {
 		const editor = createEditor();
 		editor.commands.selectAll();
-		setCommandBindings({ "editor.bold": "CmdOrCtrl+Alt+B" });
+		setCommandBindings({ "editor.bold": "CmdOrCtrl+Alt+Shift+B" });
 
 		editor.commands.keyboardShortcut("Mod-b");
 		expect(editor.isActive("bold")).toBe(false);
 
-		editor.commands.keyboardShortcut("Mod-Alt-b");
+		editor.commands.keyboardShortcut("Mod-Alt-Shift-b");
 		expect(editor.isActive("bold")).toBe(true);
 	});
 

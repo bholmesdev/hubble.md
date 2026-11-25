@@ -3,6 +3,83 @@ import { describe, expect, it, vi } from "vitest";
 import { createDesktopApi, loadStoreActions } from "./testUtils";
 
 describe("desktop tabs", () => {
+	it.each([
+		false,
+		true,
+	])("keeps the live buffer when activating another tab for the same file (conflict: %s)", async (conflict) => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("Saved text");
+		const app = await loadStoreActions(api);
+		await app.loadPath("/workspace/a.md");
+		const first = app.tabsStore.get().activeTabId;
+		await app.loadPath("/workspace/b.md", { tab: "new" });
+		await app.loadPath("/workspace/a.md");
+		app.updateEditorContent("/workspace/a.md", "Unsaved text");
+		if (conflict)
+			app.viewerStore.set((doc) => ({
+				...doc,
+				externalChange: { kind: "conflict", diskContent: "External text" },
+			}));
+		const document = app.viewerStore.get();
+		api.readFileText.mockClear();
+		if (!first) throw new Error("Missing first tab");
+		await app.activateTab(first);
+		expect(app.tabsStore.get().activeTabId).toBe(first);
+		expect(app.viewerStore.get()).toEqual(document);
+		expect(api.readFileText).not.toHaveBeenCalled();
+	});
+
+	it("keeps the live buffer when reopening a duplicate file tab", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("Saved text");
+		api.pathExists.mockResolvedValue(true);
+		const app = await loadStoreActions(api);
+		await app.loadPath("/workspace/a.md");
+		const first = app.tabsStore.get().activeTabId;
+		await app.loadPath("/workspace/b.md", { tab: "new" });
+		await app.loadPath("/workspace/a.md");
+		if (!first) throw new Error("Missing first tab");
+		await app.closeTab(first);
+		app.updateEditorContent("/workspace/a.md", "Unsaved text");
+		const document = app.viewerStore.get();
+		api.readFileText.mockClear();
+		await app.reopenClosedTab();
+		expect(app.tabsStore.get().order).toHaveLength(2);
+		expect(app.viewerStore.get()).toEqual(document);
+		expect(app.activeHistory()).toEqual({
+			entries: ["/workspace/a.md"],
+			index: 0,
+		});
+		expect(api.readFileText).not.toHaveBeenCalled();
+	});
+
+	it("cancels a pending navigation when activating a duplicate file tab", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("Saved text");
+		const app = await loadStoreActions(api);
+		await app.loadPath("/workspace/a.md");
+		const first = app.tabsStore.get().activeTabId;
+		await app.loadPath("/workspace/a.md", { tab: "new" });
+		let finish!: (text: string) => void;
+		api.readFileText.mockImplementationOnce(
+			() =>
+				new Promise<string>((resolve) => {
+					finish = resolve;
+				}),
+		);
+		const loading = app.loadPath("/workspace/b.md");
+		await vi.waitFor(() =>
+			expect(app.viewerStore.get().status).toBe("loading"),
+		);
+		if (!first) throw new Error("Missing first tab");
+		await app.activateTab(first);
+		expect(app.viewerStore.get().status).toBe("ready");
+		finish("Other file");
+		await loading;
+		expect(app.tabsStore.get().activeTabId).toBe(first);
+		expect(app.viewerStore.get().currentPath).toBe("/workspace/a.md");
+	});
+
 	it("keeps navigation history separate per tab", async () => {
 		const api = createDesktopApi();
 		api.pathExists.mockResolvedValue(true);
@@ -400,7 +477,6 @@ describe("desktop tabs", () => {
 		await loadPath("/workspace/a.md");
 		const first = appStore.get().tabs.activeTabId;
 		await openTabForPath("/workspace/b.md");
-		// Two tabs on one note would give it two autosave timers.
 		await openTabForPath("/workspace/a.md");
 
 		expect(appStore.get().tabs.order).toHaveLength(2);
@@ -408,8 +484,10 @@ describe("desktop tabs", () => {
 
 		await loadPath("/workspace/b.md");
 		expect(appStore.get().tabs.order).toHaveLength(2);
-		expect(appStore.get().tabs.activeTabId).not.toBe(first);
-		expect(appStore.get().tabs.activeTabId).toBe(appStore.get().tabs.order[1]);
+		expect(appStore.get().tabs.activeTabId).toBe(first);
+		expect(
+			Object.values(appStore.get().tabs.byId).map((tab) => tab.path),
+		).toEqual(["/workspace/b.md", "/workspace/b.md"]);
 	});
 
 	it("closing the active tab moves to the next one and opens it", async () => {

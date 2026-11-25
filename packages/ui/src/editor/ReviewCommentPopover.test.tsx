@@ -34,6 +34,57 @@ afterEach(() => {
 });
 
 describe("ReviewCommentPopover", () => {
+	it("attaches the highlighted passage and complete thread without editing the note", async () => {
+		const editor = new Editor({
+			element: document.createElement("div"),
+			extensions: [StarterKit, ReviewMarkExtension],
+			content: markdownToTiptapDoc("{==commented==}{>>A note<<}{#c1}"),
+		});
+		const mark = editor.state.doc.firstChild?.firstChild?.marks.find(
+			(mark) => mark.type.name === "reviewMark",
+		);
+		if (!mark) throw new Error("Missing comment mark");
+		editor.view.dispatch(
+			editor.state.tr.addMark(
+				1,
+				10,
+				mark.type.create({
+					...mark.attrs,
+					replies: [{ id: "r1", body: "A follow-up", author: "agent" }],
+				}),
+			),
+		);
+		editors.push(editor);
+		const viewport = document.createElement("div");
+		viewport.append(editor.view.dom);
+		document.body.append(viewport);
+		const onAttach = vi.fn();
+		renderPopover(editor, viewport, { onAttach });
+		const before = editor.getJSON();
+		await act(async () => commandReviewThread("open", "c1"));
+		const attach = document.querySelector<HTMLButtonElement>(
+			'button[aria-label="Attach to Chat"]',
+		);
+		expect(attach).not.toBeNull();
+		expect(
+			document.querySelector('[aria-label="Copy agent prompt"]'),
+		).toBeNull();
+		await act(async () => attach?.click());
+		expect(onAttach).toHaveBeenCalledWith({
+			kind: "thread",
+			path: "/notes/plan.md",
+			threadId: "c1",
+			text: "commented",
+			comments: [
+				{ author: "human", body: "A note" },
+				{ author: "agent", body: "A follow-up" },
+			],
+		});
+		await act(async () => commandReviewThread("attach", "c1"));
+		expect(onAttach).toHaveBeenCalledTimes(2);
+		expect(editor.getJSON()).toEqual(before);
+	});
+
 	it("does not leave an empty thread shell when its comment disappears", async () => {
 		const editor = new Editor({
 			element: document.createElement("div"),
@@ -96,40 +147,6 @@ describe("ReviewCommentPopover", () => {
 		});
 
 		expect(document.querySelector("[data-review-comment-popover]")).toBeNull();
-	});
-
-	it("offers the agent prompt on the thread itself, not behind a menu", async () => {
-		const editor = new Editor({
-			element: document.createElement("div"),
-			extensions: [StarterKit, ReviewMarkExtension],
-			content: markdownToTiptapDoc("{==commented==}{>>A note<<}{#c1}"),
-		});
-		editors.push(editor);
-
-		const viewport = document.createElement("div");
-		viewport.append(editor.view.dom);
-		document.body.append(viewport);
-		renderPopover(editor, viewport);
-
-		const writeText = stubClipboard();
-		const mark = editor.view.dom.querySelector(
-			'[data-review-type="reviewComment"]',
-		);
-		await act(async () => {
-			mark?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		});
-
-		const copy = document.querySelector<HTMLButtonElement>(
-			"[data-review-comment-popover] [data-review-copy-agent-prompt]",
-		);
-		expect(copy).toBeInstanceOf(HTMLButtonElement);
-		await act(async () => {
-			copy?.click();
-		});
-
-		expect(writeText).toHaveBeenCalledWith(
-			"Address comment c1 in /notes/plan.md",
-		);
 	});
 
 	it("publishes threads and acts on one by id", async () => {
@@ -539,15 +556,6 @@ function renderPopover(
 	};
 	act(() => render());
 	return render;
-}
-
-function stubClipboard() {
-	const writeText = vi.fn(async () => {});
-	Object.defineProperty(navigator, "clipboard", {
-		configurable: true,
-		value: { writeText },
-	});
-	return writeText;
 }
 
 function findTextPosition(editor: Editor, text: string) {

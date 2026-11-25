@@ -10,22 +10,13 @@ import {
 	useRef,
 	useState,
 } from "react";
+import MingcuteAttachmentLine from "~icons/mingcute/attachment-line";
 import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
-import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDelete2Line from "~icons/mingcute/delete-2-line";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
-import {
-	buildReviewAgentPrompt,
-	copyAgentPrompt,
-	type ReviewThread,
-	type ReviewThreadCommand,
-} from "./reviewComments";
-
-/** Open, resolve, copy, delete. Left/Right walks these in the same order the
- * thread popover shows them. */
-const LAST_COLUMN = 3;
+import type { ReviewThread, ReviewThreadCommand } from "./reviewComments";
 
 type Cell = { row: number; col: number };
 
@@ -39,18 +30,16 @@ function GridCell({ children }: { children: ReactNode }) {
 	);
 }
 
-/** One composite widget rather than four tab stops per row: Tab enters it once
+/** One composite widget rather than several tab stops per row: Tab enters it once
  * and moves on, arrows do the rest. */
 export function ReviewCommentList({
-	filePath,
 	threads,
 	onCommand,
-	onMessage,
+	canAttach,
 }: {
-	filePath: string;
 	threads: ReviewThread[];
+	canAttach?: boolean;
 	onCommand: (kind: ReviewThreadCommand["kind"], id: string) => void;
-	onMessage?: (message: string, type: "success" | "error") => void;
 }) {
 	const listRef = useRef<HTMLDivElement>(null);
 	const [cell, setCell] = useState<Cell>({ row: 0, col: 0 });
@@ -84,10 +73,10 @@ export function ReviewCommentList({
 			setNavigating(true);
 			setCell({
 				row: clamp(next.row, last),
-				col: clamp(next.col, LAST_COLUMN),
+				col: clamp(next.col, canAttach ? 3 : 2),
 			});
 		},
-		[cell.col, threads.length, row],
+		[cell.col, threads.length, row, canAttach],
 	);
 
 	return (
@@ -117,12 +106,11 @@ export function ReviewCommentList({
 			{threads.map((thread, index) => (
 				<Row
 					key={thread.id}
-					filePath={filePath}
 					thread={thread}
 					index={index}
 					focusedCol={index === row ? cell.col : null}
 					onCommand={onCommand}
-					onMessage={onMessage}
+					canAttach={canAttach}
 				/>
 			))}
 		</div>
@@ -130,20 +118,18 @@ export function ReviewCommentList({
 }
 
 function Row({
-	filePath,
 	thread,
 	index,
 	focusedCol,
 	onCommand,
-	onMessage,
+	canAttach,
 }: {
-	filePath: string;
 	thread: ReviewThread;
 	index: number;
 	/** Which column holds the single tab stop, when this is the active row. */
 	focusedCol: number | null;
+	canAttach?: boolean;
 	onCommand: (kind: ReviewThreadCommand["kind"], id: string) => void;
-	onMessage?: (message: string, type: "success" | "error") => void;
 }) {
 	const resolved = thread.resolved;
 
@@ -179,8 +165,11 @@ function Row({
 				>
 					<span
 						className={cn(
-							"line-clamp-1 border-s-2 ps-1.5 text-[11px] leading-snug text-muted-foreground group-hover/row:pe-20 group-focus-within/row:pe-20",
+							"line-clamp-1 border-s-2 ps-1.5 text-[11px] leading-snug text-muted-foreground",
 							resolved ? "border-muted-foreground/40" : "border-brand-accent",
+							canAttach
+								? "group-hover/row:pe-20 group-focus-within/row:pe-20"
+								: "group-hover/row:pe-14 group-focus-within/row:pe-14",
 						)}
 					>
 						{thread.anchor}
@@ -208,25 +197,22 @@ function Row({
 						)}
 					</Button>
 				</GridCell>
+
+				{canAttach && (
+					<GridCell>
+						<Button
+							{...action(2)}
+							aria-label="Attach to Chat"
+							title="Attach to Chat"
+							onClick={() => onCommand("attach", thread.id)}
+						>
+							<MingcuteAttachmentLine />
+						</Button>
+					</GridCell>
+				)}
 				<GridCell>
 					<Button
-						{...action(2)}
-						data-review-copy-agent-prompt
-						aria-label="Copy agent prompt"
-						title="Copy a prompt asking an agent to address this comment"
-						onClick={() =>
-							void copyAgentPrompt(
-								buildReviewAgentPrompt({ filePath, commentId: thread.id }),
-								onMessage,
-							)
-						}
-					>
-						<MingcuteCopy2Line />
-					</Button>
-				</GridCell>
-				<GridCell>
-					<Button
-						{...action(3)}
+						{...action(canAttach ? 3 : 2)}
 						aria-label="Delete comment"
 						title="Delete comment"
 						className="hover:bg-destructive/10 hover:text-destructive"

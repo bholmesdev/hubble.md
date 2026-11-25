@@ -1,5 +1,10 @@
 import { type CommandBindings, cleanCommandBindings } from "@hubble.md/editor";
 import { z } from "zod";
+import {
+	CHAT_TEXT_LIMIT,
+	chatAttachmentSchema,
+	chatMessageSchema,
+} from "../desktopApi/chat";
 import type { ThemePreference } from "../theme";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
 import {
@@ -32,6 +37,7 @@ export type SidebarView = "folders" | "inbox";
 
 type UiState = {
 	sidebarOpen: boolean;
+	chatPanelOpen: boolean;
 	sidebarView: SidebarView;
 	isSwitcherOpen: boolean;
 	isTerminalOpen: boolean;
@@ -71,6 +77,7 @@ type Persisted = {
 	};
 	ui?: {
 		sidebarOpen?: boolean;
+		chatPanelOpen?: boolean;
 		sidebarView?: SidebarView;
 		isTerminalOpen?: boolean;
 		terminalPosition?: TerminalPosition;
@@ -124,6 +131,7 @@ export function getInitialState(): DesktopState {
 		tabs: tabsFromSession(tabSessions[workspace.workspacePath ?? ""]),
 		ui: {
 			sidebarOpen: p?.ui?.sidebarOpen ?? false,
+			chatPanelOpen: p?.ui?.chatPanelOpen ?? true,
 			// Older profiles without a saved view keep their original Folders default.
 			sidebarView: !p || p.ui?.sidebarView === "inbox" ? "inbox" : "folders",
 			isSwitcherOpen: false,
@@ -174,6 +182,7 @@ export function serialize(state: DesktopState): Persisted {
 		},
 		ui: {
 			sidebarOpen: state.ui.sidebarOpen,
+			chatPanelOpen: state.ui.chatPanelOpen,
 			sidebarView: state.ui.sidebarView,
 			isTerminalOpen: state.ui.isTerminalOpen,
 			terminalPosition: state.ui.terminalPosition,
@@ -195,19 +204,53 @@ const closedTabSchema = z.object({
 	index: z.number().int().nonnegative(),
 });
 
+const chatSchema = z.object({
+	attachments: z.array(chatAttachmentSchema).max(20).optional(),
+	messages: z.array(chatMessageSchema).max(100),
+	draft: z.string().max(CHAT_TEXT_LIMIT),
+	model: z.string().max(200),
+});
+
 const tabSessionSchema = z
 	.object({
+		entries: z
+			.array(z.object({ id: z.string().uuid(), path: z.string().min(1) }))
+			.optional()
+			.catch(undefined),
+		activeTabId: z.string().uuid().nullable().optional().catch(undefined),
+		ids: z.record(z.string(), z.string().uuid()).optional().catch(undefined),
+		chats: z
+			.record(
+				z.string(),
+				chatSchema.catch({ messages: [], draft: "", model: "" }),
+			)
+			.optional()
+			.catch(undefined),
 		paths: z
 			.array(z.string().min(1).catch(""))
-			.transform((paths) => [...new Set(paths.filter(Boolean))]),
-		activePath: z.string().nullable().catch(null),
+			.optional()
+			.catch(undefined)
+			.transform((paths) => [...new Set((paths ?? []).filter(Boolean))]),
+		activePath: z.string().nullable().optional().catch(null),
 		closed: z
 			.array(closedTabSchema)
 			.catch([])
 			.transform((closed) => closed.slice(-MAX_CLOSED_TABS)),
 	})
 	.transform(
-		({ paths, activePath, closed }): TabSession => ({
+		({
+			paths,
+			activePath,
+			closed,
+			ids,
+			chats,
+			entries,
+			activeTabId,
+		}): TabSession => ({
+			entries,
+			activeTabId,
+			ids,
+			chats,
 			closed,
 			paths,
 			activePath:

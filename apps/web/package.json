@@ -24,7 +24,7 @@
 		"astro": "astro"
 	},
 	"dependencies": {
-		"@iconify-json/mingcute": "^1.2.7",
+		"@iconify-json/mingcute": "^1.2.10",
 		"@plausible-analytics/tracker": "^0.4.5",
 		"astro": "^6.4.6",
 		"astro-icon": "^1.1.5",

@@ -16,6 +16,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import MingcuteAttachmentLine from "~icons/mingcute/attachment-line";
 import MingcuteBoldLine from "~icons/mingcute/bold-line";
 import MingcuteChat3Line from "~icons/mingcute/chat-3-line";
 import MingcuteHeading1Line from "~icons/mingcute/heading-1-line";
@@ -133,13 +134,25 @@ type ActionGroups = readonly (readonly ToolbarAction[])[];
 
 // The bar floats, so it never shrinks on its own. Keep Comment in place and
 // drop formatting actions from the right until the bar fits.
-function fittingGroups(width: number, hasComment: boolean): ActionGroups {
+function fittingGroups(
+	width: number,
+	hasComment: boolean,
+	hasAttach: boolean,
+): ActionGroups {
 	for (let count = countActions(ACTION_GROUPS); count >= 0; count -= 1) {
 		const shown = [
 			...takeActions(ACTION_GROUPS, count),
 			...(hasComment ? [[COMMENT_ACTION]] : []),
 		];
-		if (toolbarWidth(shown) <= width - TOOLBAR_EDGE_GAP) return shown;
+		if (
+			toolbarWidth(shown) +
+				(hasAttach ? TOOLBAR_BUTTON_WIDTH + TOOLBAR_GAP_WIDTH : 0) +
+				(hasAttach && !hasComment
+					? TOOLBAR_SEPARATOR_WIDTH + TOOLBAR_GAP_WIDTH
+					: 0) <=
+			width - TOOLBAR_EDGE_GAP
+		)
+			return shown;
 	}
 	return [];
 }
@@ -192,10 +205,12 @@ export function SelectionFormattingToolbar({
 	editor,
 	viewport,
 	onComment,
+	onAttach,
 }: {
 	editor: Editor | null;
 	viewport: HTMLDivElement | null;
 	onComment?: () => void;
+	onAttach?: () => void;
 }) {
 	const [position, setPosition] = useState<ToolbarPosition | null>(null);
 	// Scale from the edge facing the selection, like Base UI popups do via
@@ -212,7 +227,11 @@ export function SelectionFormattingToolbar({
 	const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
 	// Show everything until the viewport has been measured.
 	const [viewportWidth, setViewportWidth] = useState(Number.POSITIVE_INFINITY);
-	const shownGroups = fittingGroups(viewportWidth, Boolean(onComment));
+	const shownGroups = fittingGroups(
+		viewportWidth,
+		Boolean(onComment),
+		Boolean(onAttach),
+	);
 	const openRef = useRef(false);
 
 	useLayoutEffect(() => {
@@ -457,7 +476,24 @@ export function SelectionFormattingToolbar({
 					))}
 				</div>
 			))}
-			{shownGroups.length > 0 && (
+			{onAttach && !onComment && shownGroups.length > 0 && (
+				<Separator orientation="vertical" className="mx-0.5" />
+			)}
+			{onAttach && (
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon-sm"
+					aria-label="Attach to Chat"
+					title="Attach to Chat"
+					className="text-muted-foreground"
+					onMouseDown={(event) => event.preventDefault()}
+					onClick={onAttach}
+				>
+					<MingcuteAttachmentLine className="size-4" />
+				</Button>
+			)}
+			{(shownGroups.length > 0 || onAttach) && (
 				<Separator orientation="vertical" className="mx-0.5" />
 			)}
 			<Button

@@ -2,6 +2,18 @@ import type { CommandBindings } from "@hubble.md/editor";
 import type { FileKind } from "../lib/filePath";
 import type { NotePreview } from "../lib/titleGeneration";
 import type { ThemePreference } from "../theme";
+import type {
+	ChatAccount,
+	ChatDelta,
+	ChatFileReply,
+	ChatFileRequest,
+	ChatMessage,
+	ChatModel,
+	ChatPayload,
+	ChatRequest,
+	ChatResult,
+} from "./chat";
+import type { VoiceEvent } from "./voice";
 
 export type FileEntry = {
 	path: string;
@@ -153,6 +165,23 @@ export type SpellcheckState = {
 };
 
 export type DesktopApi = {
+	chatAccount(): Promise<ChatAccount>;
+	chatSignIn(): Promise<ChatAccount>;
+	chatCancelSignIn(): Promise<void>;
+	chatReset(): Promise<void>;
+	chatDisconnect(): Promise<void>;
+	chatModels(): Promise<ChatModel[]>;
+	voiceStart(id: string): Promise<void>;
+	voiceStop(id: string): Promise<void>;
+	onVoice(callback: (event: VoiceEvent) => void): () => void;
+	chatPayloads(id: string): Promise<ChatPayload[]>;
+	chatCheckBudget(messages: ChatMessage[]): Promise<boolean>;
+	chatSend(input: ChatRequest): Promise<ChatResult>;
+	chatFileReply(reply: ChatFileReply): Promise<void>;
+	onChatFileRequest(callback: (request: ChatFileRequest) => void): Unsubscribe;
+	chatStop(id: string): Promise<void>;
+	onChatDelta(callback: (delta: ChatDelta) => void): Unsubscribe;
+
 	platform: DesktopPlatform;
 	homeDir: string;
 	listDirectory(path: string): Promise<DirectoryListing>;

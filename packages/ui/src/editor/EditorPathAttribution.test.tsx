@@ -8,6 +8,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorView } from "./EditorView";
 import { MarkdownSourceEditor } from "./MarkdownSourceEditor";
+import { PlainTextEditor } from "./PlainTextEditor";
 
 type Root = {
 	render(children: ReactNode): void;
@@ -304,3 +305,170 @@ function changeEditorText(editor: Editor, text: string) {
 	editor.commands.selectAll();
 	editor.commands.insertContent(text);
 }
+
+for (const initialMarkdown of ["Body", "---\ntitle: Before\n---\n\nBody"]) {
+	it(`keeps property drafts and focus while editing ${initialMarkdown === "Body" ? "a new" : "an existing"} property`, async () => {
+		const root = createTestRoot();
+		const onLocalChange = vi.fn();
+		await act(async () =>
+			root.render(
+				<EditorView
+					path="/note.md"
+					initialMarkdown={initialMarkdown}
+					onLocalChange={onLocalChange}
+					onSave={vi.fn()}
+					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
+					onOpenExternalLink={() => {}}
+					onOpenWikiLink={() => {}}
+				/>,
+			),
+		);
+		if (initialMarkdown === "Body") {
+			const add = [...document.querySelectorAll("button")].find(
+				(button) => button.textContent === "Add property",
+			);
+			act(() => add?.click());
+		}
+		const input = document.querySelector<HTMLInputElement>(
+			"[data-property-name]",
+		);
+		expect(input).not.toBeNull();
+		act(() => input?.focus());
+		const setter = Object.getOwnPropertyDescriptor(
+			HTMLInputElement.prototype,
+			"value",
+		)?.set;
+		for (const value of ["t", "ti", "title"]) {
+			act(() => {
+				setter?.call(input, value);
+				input?.dispatchEvent(new Event("input", { bubbles: true }));
+			});
+			expect(document.querySelector("[data-property-name]")).toBe(input);
+			expect(document.activeElement).toBe(input);
+			expect(input?.value).toBe(value);
+		}
+		expect(onLocalChange).toHaveBeenLastCalledWith(
+			"/note.md",
+			expect.stringContaining("title:"),
+		);
+	});
+}
+
+for (const kind of ["rich", "source"] as const) {
+	it(`undoes an agent update as one ${kind} editor action, including front matter`, async () => {
+		const root = createTestRoot();
+		const getEditor = captureEditorCreation();
+		const onLocalChange = vi.fn();
+		const before = "---\ntitle: Before\n---\n\nBefore body";
+		const after = "---\ntitle: After\n---\n\nAfter body";
+		const render = async (markdown: string, undoableUpdate?: string) =>
+			act(async () =>
+				root.render(
+					kind === "rich" ? (
+						<EditorView
+							path="/note.md"
+							initialMarkdown={markdown}
+							undoableUpdate={undoableUpdate}
+							onLocalChange={onLocalChange}
+							onSave={vi.fn()}
+							saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
+							onOpenExternalLink={() => {}}
+							onOpenWikiLink={() => {}}
+						/>
+					) : (
+						<MarkdownSourceEditor
+							path="/note.md"
+							initialMarkdown={markdown}
+							undoableUpdate={undoableUpdate}
+							onLocalChange={onLocalChange}
+							onSave={vi.fn()}
+							saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
+						/>
+					),
+				),
+			);
+		await render(before);
+		const editor = getEditor();
+		await render(after, "agent-1");
+		expect(editor.getText()).toContain("After body");
+		act(() => editor.commands.undo());
+		expect(editor.getText()).toContain("Before body");
+		expect(onLocalChange).toHaveBeenLastCalledWith(
+			"/note.md",
+			expect.stringContaining("title: Before"),
+		);
+		act(() => editor.commands.redo());
+		expect(onLocalChange).toHaveBeenLastCalledWith(
+			"/note.md",
+			expect.stringContaining("title: After"),
+		);
+		await render(after.replace("After body", "Second agent edit"), "agent-2");
+		act(() => editor.commands.undo());
+		expect(editor.getText()).toContain("After body");
+	});
+}
+
+it("keeps a plain-text agent edit separate from prior human typing", async () => {
+	const root = createTestRoot();
+	const getEditor = captureEditorCreation();
+	const onLocalChange = vi.fn();
+	const render = async (text: string, undoableUpdate?: string) =>
+		act(async () =>
+			root.render(
+				<PlainTextEditor
+					path="/note.txt"
+					initialText={text}
+					undoableUpdate={undoableUpdate}
+					onLocalChange={onLocalChange}
+					onSave={vi.fn()}
+					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
+				/>,
+			),
+		);
+	await render("Before");
+	const editor = getEditor();
+	act(() => changeEditorText(editor, "Human edit"));
+	await render("Human edit plus agent edit", "agent-1");
+	act(() => editor.commands.undo());
+	expect(editor.getText()).toBe("Human edit");
+	expect(onLocalChange).toHaveBeenLastCalledWith("/note.txt", "Human edit");
+	act(() => editor.commands.undo());
+	expect(editor.getText()).toBe("Before");
+	act(() => editor.commands.redo());
+	act(() => editor.commands.redo());
+	expect(editor.getText()).toBe("Human edit plus agent edit");
+});
+
+it("attaches a formatted selection from the live editor without changing the document", async () => {
+	const root = createTestRoot();
+	const getEditor = captureEditorCreation();
+	const onAttach = vi.fn();
+	await act(async () =>
+		root.render(
+			<EditorView
+				path="/note.md"
+				initialMarkdown="A **bold** passage"
+				onLocalChange={vi.fn()}
+				onSave={vi.fn()}
+				onOpenExternalLink={() => {}}
+				onOpenWikiLink={() => {}}
+				onAttach={onAttach}
+			/>,
+		),
+	);
+	const editor = getEditor();
+	await act(async () => editor.commands.setTextSelection({ from: 3, to: 7 }));
+	const before = editor.getJSON();
+	const attach = document.querySelector<HTMLButtonElement>(
+		'[aria-label="Attach to Chat"]',
+	);
+	expect(attach).not.toBeNull();
+	await act(async () => attach?.click());
+	expect(onAttach).toHaveBeenCalledWith({
+		kind: "selection",
+		path: "/note.md",
+		text: "**bold**",
+		source: { from: 3, to: 7, text: "bold" },
+	});
+	expect(editor.getJSON()).toEqual(before);
+});

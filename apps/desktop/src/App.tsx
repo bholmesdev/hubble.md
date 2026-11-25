@@ -18,6 +18,7 @@ import {
 	OPEN_COMMAND_PALETTE_EVENT,
 	type PaletteFile,
 	PlainTextEditor,
+	revealAttachment,
 	type SpellcheckStatus,
 	setAllSidebarFoldersExpanded,
 	type WikiTarget,
@@ -25,6 +26,7 @@ import {
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
 import {
+	useCallback,
 	useEffect,
 	useLayoutEffect,
 	useRef,
@@ -38,6 +40,7 @@ import {
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
+import { ChatPanel } from "./components/ChatPanel";
 import { FileInfoBar } from "./components/FileInfoBar";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { NewTabPage } from "./components/NewTabPage";
@@ -126,6 +129,7 @@ import {
 	undoDelete,
 	updateEditorContent,
 } from "./store/actions";
+import { chatConnection } from "./store/chatConnection";
 import { canGoBack, canGoForward } from "./store/history";
 import { useHistoryNav } from "./store/hooks";
 import type { SidebarView } from "./store/persistence";
@@ -144,7 +148,14 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
+import {
+	attachToChat,
+	chatPanelOpen,
+	chatSelection,
+	toggleChatPanel,
+} from "./store/tabChat";
 import { tabsStore } from "./store/tabStore";
+import { voice } from "./store/voice";
 import { isDarkTheme, subscribeTheme } from "./theme";
 
 // Forces editor refresh when underlying TipTap extensions change
@@ -341,6 +352,9 @@ function App() {
 	const wantsTabStrip = tabs.order.length > 1 || !hasWorkspace;
 	// Trails wantsTabStrip by one view transition, so the strip slides.
 	const [showTabStrip, setShowTabStrip] = useState(wantsTabStrip);
+	const chatOpen = useStoreValue(chatPanelOpen);
+	const fullHeightChat =
+		chatOpen && isFileOpen && !showTabStrip && Boolean(tabs.activeTabId);
 	const tabStripTransitionRef = useRef<ViewTransition | null>(null);
 	const activeTabPath = tabs.activeTabId
 		? tabs.byId[tabs.activeTabId]?.path
@@ -605,6 +619,7 @@ function App() {
 					setSidebarOpen(opening);
 					if (opening) requestAnimationFrame(() => focusSidebarNav());
 				},
+				"app.toggle-chat": toggleChatPanel,
 				"app.show-folders": () => showSidebarView("folders"),
 				"app.show-inbox": () => showSidebarView("inbox"),
 			};
@@ -843,7 +858,7 @@ function App() {
 
 	return (
 		<main
-			className="relative flex h-dvh flex-col bg-background text-foreground"
+			className={`relative h-dvh bg-background text-foreground ${fullHeightChat ? "grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[36px_minmax(0,1fr)]" : "flex flex-col"}`}
 			onPointerDownCapture={(event) => {
 				if (
 					event.target instanceof Element &&
@@ -891,118 +906,143 @@ function App() {
 				</WindowTitleBar>
 			)}
 			{/* Compact windows anchor the sidebar overlay to the window instead. */}
-			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px max-sm:static">
-				{/* Compact sidebar stays mounted while closed so it can slide out. */}
+			<div
+				className={
+					fullHeightChat
+						? "contents"
+						: "relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px max-sm:static"
+				}
+			>
 				<div
-					data-sidebar-overlay
-					aria-hidden={!sidebarOpen}
-					inert={!sidebarOpen}
-					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
+					className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden max-sm:static ${fullHeightChat ? "col-start-1 row-start-2 -mt-px pt-px" : ""}`}
 				>
-					{compact ? <SidebarOverlayTitleRow /> : null}
-					<Sidebar
-						onFocusedItemChange={updateFocusedSidebarItem}
-						footer={
-							showReadyCallout ? (
-								<SidebarCallout
-									message={
-										<>
-											<span className="font-semibold">A new version</span> is
-											ready to install.
-										</>
-									}
-									primaryLabel="Restart"
-									onPrimary={installUpdate}
-									onDismiss={() =>
-										setDismissedVersion(readyVersion ?? "__unknown__")
-									}
-								/>
-							) : whatsNewVersion !== null ? (
-								<SidebarCallout
-									message={
-										<>
-											<span className="font-semibold">Hubble updated</span> to{" "}
-											{whatsNewVersion}.
-										</>
-									}
-									primaryLabel="See what's new"
-									onPrimary={() => {
-										// Only consume the one-shot callout once the changelog is
-										// actually showing; openChangelog can bail on a conflict.
-										void openChangelog().then((opened) => {
-											if (opened) markWhatsNewSeen();
-										});
-									}}
-									onDismiss={markWhatsNewSeen}
-								/>
-							) : telemetryConsent === "unset" ? (
-								<TelemetryConsentCallout
-									onChoose={(choice) => void setTelemetryConsent(choice)}
-								/>
-							) : undefined
+					{/* Compact sidebar stays mounted while closed so it can slide out. */}
+					<div
+						data-sidebar-overlay
+						aria-hidden={!sidebarOpen}
+						inert={!sidebarOpen}
+						className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
+					>
+						{compact ? <SidebarOverlayTitleRow /> : null}
+						<Sidebar
+							onFocusedItemChange={updateFocusedSidebarItem}
+							footer={
+								showReadyCallout ? (
+									<SidebarCallout
+										message={
+											<>
+												<span className="font-semibold">A new version</span> is
+												ready to install.
+											</>
+										}
+										primaryLabel="Restart"
+										onPrimary={installUpdate}
+										onDismiss={() =>
+											setDismissedVersion(readyVersion ?? "__unknown__")
+										}
+									/>
+								) : whatsNewVersion !== null ? (
+									<SidebarCallout
+										message={
+											<>
+												<span className="font-semibold">Hubble updated</span> to{" "}
+												{whatsNewVersion}.
+											</>
+										}
+										primaryLabel="See what's new"
+										onPrimary={() => {
+											// Only consume the one-shot callout once the changelog is
+											// actually showing; openChangelog can bail on a conflict.
+											void openChangelog().then((opened) => {
+												if (opened) markWhatsNewSeen();
+											});
+										}}
+										onDismiss={markWhatsNewSeen}
+									/>
+								) : telemetryConsent === "unset" ? (
+									<TelemetryConsentCallout
+										onChoose={(choice) => void setTelemetryConsent(choice)}
+									/>
+								) : undefined
+							}
+						/>
+					</div>
+					<section
+						data-chat-editor-area
+						className={
+							terminalPosition === "right"
+								? "flex-1 flex flex-row overflow-hidden"
+								: "flex-1 flex flex-col overflow-hidden"
 						}
-					/>
-				</div>
-				<section
-					className={
-						terminalPosition === "right"
-							? "flex-1 flex flex-row overflow-hidden"
-							: "flex-1 flex flex-col overflow-hidden"
-					}
-					aria-live="polite"
-					onFocusCapture={closeSidebarOverlay}
-				>
-					<div className="flex-1 min-h-0 min-w-0 flex flex-col">
-						{showTabStrip && isFileOpen ? (
-							<FileInfoBar scrollContainer={scrollContainerEl} />
-						) : null}
-						<div data-note-body className="flex-1 min-h-0 min-w-0 relative">
-							{state.status === "loading" && <p>Loading…</p>}
-							{state.status === "error" && (
-								<p>{state.error ?? "Failed to open file."}</p>
-							)}
-							{showWelcome && (
-								<WelcomeScreen
-									onCreateWorkspace={() => void createWorkspaceWithSidebar()}
-									onOpenFolder={() => void openWorkspaceWithSidebar()}
-									onOpenFile={() => void openFilePicker()}
-								/>
-							)}
-							{/* With no tabs open, the blank page doubles as the empty state. */}
-							{state.status !== "loading" &&
-								state.status !== "error" &&
-								(isNewTabPath(state.currentPath) ||
-									(!state.currentPath && hasWorkspace)) && (
-									<NewTabPage
-										folder={focusedCreationFolder}
-										onSearch={openSearch}
+						aria-live="polite"
+						onFocusCapture={closeSidebarOverlay}
+					>
+						<div className="flex-1 min-h-0 min-w-0 flex flex-col">
+							{showTabStrip && isFileOpen ? (
+								<FileInfoBar scrollContainer={scrollContainerEl} />
+							) : null}
+							<div data-note-body className="flex-1 min-h-0 min-w-0 relative">
+								{state.status === "loading" && <p>Loading…</p>}
+								{state.status === "error" && (
+									<p>{state.error ?? "Failed to open file."}</p>
+								)}
+								{showWelcome && (
+									<WelcomeScreen
+										onCreateWorkspace={() => void createWorkspaceWithSidebar()}
+										onOpenFolder={() => void openWorkspaceWithSidebar()}
+										onOpenFile={() => void openFilePicker()}
 									/>
 								)}
-							{state.status === "ready" &&
-								state.currentPath &&
-								!isNewTabPath(state.currentPath) && (
-									<div className="flex h-full min-h-0 flex-col">
-										{state.externalChange.kind === "conflict" && (
-											<ExternalChangeBanner
-												onKeepMyEdits={() => void forceKeepLocalEdits()}
-												onReloadFromDisk={reloadFromDiskConflict}
-											/>
-										)}
-										<DocumentViewer
-											path={state.currentPath}
-											content={state.content}
-											copyAsMarkdownRequest={copyAsMarkdownRequest}
-											viewMode={state.viewMode}
-											spellcheckStatus={spellcheckStatus}
-											onOpenSettings={openSkillsSettings}
-											onScrollContainerChange={setScrollContainerEl}
+								{/* With no tabs open, the blank page doubles as the empty state. */}
+								{state.status !== "loading" &&
+									state.status !== "error" &&
+									(isNewTabPath(state.currentPath) ||
+										(!state.currentPath && hasWorkspace)) && (
+										<NewTabPage
+											folder={focusedCreationFolder}
+											onSearch={openSearch}
 										/>
-									</div>
-								)}
+									)}
+								{state.status === "ready" &&
+									state.currentPath &&
+									!isNewTabPath(state.currentPath) && (
+										<div className="flex h-full min-h-0 flex-col">
+											{state.externalChange.kind === "conflict" && (
+												<ExternalChangeBanner
+													onKeepMyEdits={() => void forceKeepLocalEdits()}
+													onReloadFromDisk={reloadFromDiskConflict}
+												/>
+											)}
+											<DocumentViewer
+												path={state.currentPath}
+												content={state.content}
+												undoableUpdate={state.undoableUpdate}
+												copyAsMarkdownRequest={copyAsMarkdownRequest}
+												viewMode={state.viewMode}
+												spellcheckStatus={spellcheckStatus}
+												onOpenSettings={openSkillsSettings}
+												onScrollContainerChange={setScrollContainerEl}
+											/>
+										</div>
+									)}
+							</div>
 						</div>
-					</div>
-					<TerminalPanel />
-				</section>
+						<TerminalPanel />
+					</section>
+				</div>
+				<ChatPanel
+					key={tabs.activeTabId ?? "empty"}
+					tabId={tabs.activeTabId}
+					fullHeight={fullHeightChat}
+					onOpenSettings={() => {
+						settingsRequestId.current += 1;
+						setSettingsTarget({
+							page: "agents",
+							requestId: settingsRequestId.current,
+						});
+						setSettingsOpen(true);
+					}}
+				/>
 			</div>
 			<GlobalSearchPalette
 				open={searchOpen}
@@ -1030,6 +1070,7 @@ function App() {
 function DocumentViewer({
 	path,
 	content,
+	undoableUpdate,
 	copyAsMarkdownRequest,
 	viewMode,
 	spellcheckStatus,
@@ -1039,6 +1080,7 @@ function DocumentViewer({
 	onOpenSettings: () => void;
 	path: string;
 	content: string;
+	undoableUpdate?: string;
 	copyAsMarkdownRequest: number;
 	viewMode: ViewMode;
 	spellcheckStatus?: SpellcheckStatus | null;
@@ -1065,6 +1107,7 @@ function DocumentViewer({
 				documentId={documentId}
 				preserveHistoryOnUpdate={documentId !== path}
 				initialMarkdown={content}
+				undoableUpdate={undoableUpdate}
 				sourceLanguage={
 					isHtml ? "html" : hasTextExtension(path) ? "text" : "md"
 				}
@@ -1081,6 +1124,7 @@ function DocumentViewer({
 				key={`${path}:code:${HMR_REV}`}
 				path={path}
 				initialMarkdown={content}
+				undoableUpdate={undoableUpdate}
 				sourceLanguage={sourceLanguageForPath(path)}
 				autoFocus={false}
 				onLocalChange={updateEditorContent}
@@ -1096,6 +1140,7 @@ function DocumentViewer({
 				key={`${path}:rich:${HMR_REV}`}
 				path={path}
 				initialText={content}
+				undoableUpdate={undoableUpdate}
 				onLocalChange={updateEditorContent}
 				onSave={savePathContent}
 				onScrollContainerChange={onScrollContainerChange}
@@ -1145,6 +1190,7 @@ function DocumentViewer({
 			path={path}
 			documentId={documentId}
 			initialMarkdown={content}
+			undoableUpdate={undoableUpdate}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
 			spellcheckStatus={spellcheckStatus}
 			onScrollContainerChange={onScrollContainerChange}
@@ -1224,6 +1270,7 @@ function ExternalChangeBanner({
 
 function MarkdownEditor({
 	path,
+	undoableUpdate,
 	documentId,
 	initialMarkdown,
 	copyAsMarkdownRequest,
@@ -1233,10 +1280,45 @@ function MarkdownEditor({
 	path: string;
 	documentId: string;
 	initialMarkdown: string;
+	undoableUpdate?: string;
 	copyAsMarkdownRequest: number;
 	spellcheckStatus?: SpellcheckStatus | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
+	const selection = useStoreValue(chatSelection);
+	useEffect(() => {
+		if (
+			!selection ||
+			selection.path !== path ||
+			selection.tabId !== tabsStore.get().activeTabId
+		)
+			return;
+		const editor = getActiveEditor();
+		if (!editor) return;
+		chatSelection.set(null);
+		if (!revealAttachment(editor, selection))
+			toast.error("This selection has changed or was removed.");
+	}, [selection, path]);
+	const recording = useStoreValue(voice);
+	const autoAttach = useCallback(
+		(attachment: Parameters<typeof attachToChat>[0]) => {
+			const current = voice.get();
+			if (
+				current?.status !== "listening" ||
+				current.tabId !== tabsStore.get().activeTabId ||
+				current.workspace !== workspacePathStore.get()
+			)
+				return false;
+			const attached = attachToChat(attachment, true);
+			if (!attached && chatConnection.get().account?.connected)
+				toast.error(
+					"Could not attach. Try a smaller selection or remove an attachment.",
+				);
+			return attached;
+		},
+		[],
+	);
+
 	const workspace = useStoreValue(workspaceStore);
 	const getPath = () => viewerStore.get().currentPath ?? path;
 	// External-only files stay out of autocomplete; explicit links still work.
@@ -1282,6 +1364,7 @@ function MarkdownEditor({
 			documentId={documentId}
 			preserveHistoryOnUpdate={documentId !== path}
 			initialMarkdown={initialMarkdown}
+			undoableUpdate={undoableUpdate}
 			editable={!isChangelogPath(path)}
 			wikiTargets={wikiTargets}
 			extensions={[
@@ -1310,6 +1393,16 @@ function MarkdownEditor({
 			onMessage={(message, kind) =>
 				kind === "success" ? toast.success(message) : toast.error(message)
 			}
+			onAutoAttach={recording?.status === "listening" ? autoAttach : undefined}
+			onAttach={(attachment) => {
+				if (
+					!attachToChat(attachment) &&
+					chatConnection.get().account?.connected
+				)
+					toast.error(
+						"Could not attach. Try a smaller selection or remove an attachment.",
+					);
+			}}
 			onReviewThreadsChange={setReviewThreads}
 			spellcheckStatus={spellcheckStatus}
 		/>

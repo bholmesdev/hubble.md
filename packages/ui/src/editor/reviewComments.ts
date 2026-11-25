@@ -23,7 +23,7 @@ export const REVIEW_THREAD_COMMAND_EVENT = "hubble:review-thread-command";
 
 /** Acts on a thread from outside the editor. */
 export type ReviewThreadCommand = {
-	kind: "open" | "toggleResolved" | "delete";
+	kind: "open" | "toggleResolved" | "delete" | "attach";
 	id: string;
 };
 
@@ -43,18 +43,6 @@ export function commandReviewThread(
 
 export function unresolvedThreads(threads: ReviewThread[]) {
 	return threads.filter((thread) => !thread.resolved);
-}
-
-/** Prompt for handing a single thread to an agent. The id is stable, so the
- * agent can find the thread even after the surrounding text moves. */
-export function buildReviewAgentPrompt({
-	filePath,
-	commentId,
-}: {
-	filePath: string;
-	commentId: string;
-}) {
-	return `Address comment ${commentId} in ${filePath}`;
 }
 
 /** Prompt for handing every open thread over at once. Unresolved threads are

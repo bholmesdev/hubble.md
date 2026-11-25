@@ -9,10 +9,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- See where agents edited your notes with brief line highlights. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
+- Chat with your notes and edit files using your ChatGPT subscription, with voice drafts on macOS. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
+
 ### Changed
 
+- Open files in your current tab even when another tab already shows them, keeping each tab’s chat intact. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 ### Fixed
 
+- Keep longer Chat conversations going when working with large notes. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 ## [0.3.5] - 2026-11-25
 
 ### Added

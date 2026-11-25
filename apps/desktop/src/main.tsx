@@ -4,10 +4,12 @@ import App from "./App";
 import { Toaster } from "./components/Toaster";
 import { preloadDiagrams } from "./editor/lazyDiagram";
 import { initThemePreference } from "./store/actions";
+import { refreshChatConnection } from "./store/chatConnection";
 import "./components/toast.css";
 import "./index.css";
 
 initThemePreference();
+void refreshChatConnection();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 	<React.StrictMode>

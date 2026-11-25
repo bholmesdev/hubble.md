@@ -48,13 +48,19 @@
 		"alpinejs": "^3.15.12",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
+		"diff": "^8.0.3",
 		"electron-updater": "^6.8.3",
+		"gpt-tokenizer": "^4.1.2",
 		"ignore": "^7.0.5",
+		"jose": "^6.2.18",
 		"keymatch": "^1.0.5",
 		"node-pty": "^1.1.0",
 		"open-props": "^1.7.23",
+		"openai": "^7.62.0",
 		"react": "^19.1.0",
 		"react-dom": "^19.1.0",
+		"react-markdown": "^10.1.0",
+		"remark-gfm": "^4.0.1",
 		"sonner": "^2.0.7",
 		"tailwind-merge": "^3.5.0",
 		"tldraw": "5.5.2",
@@ -62,11 +68,12 @@
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
-		"@iconify-json/mingcute": "^1.2.7",
+		"@iconify-json/mingcute": "^1.2.10",
 		"@playwright/test": "^1.63.0",
 		"@svgr/core": "^8.1.0",
 		"@svgr/plugin-jsx": "^8.1.0",
 		"@tailwindcss/vite": "^4.1.18",
+		"@types/hast": "^3.0.4",
 		"@types/node": "^25.5.0",
 		"@types/react": "^19.1.8",
 		"@types/react-dom": "^19.1.6",
@@ -114,7 +121,22 @@
 				"dmg",
 				"zip"
 			],
-			"category": "public.app-category.productivity"
+			"category": "public.app-category.productivity",
+			"extendInfo": {
+				"NSMicrophoneUsageDescription": "Record speech for your chat draft.",
+				"NSSpeechRecognitionUsageDescription": "Turn your speech into an editable chat draft using on-device recognition."
+			},
+			"extraResources": [
+				{
+					"from": "out/native",
+					"to": "native",
+					"filter": [
+						"Hubble Dictation.app/**"
+					]
+				}
+			],
+			"entitlements": "native/entitlements.mac.plist",
+			"entitlementsInherit": "native/entitlements.mac.plist"
 		},
 		"win": {
 			"icon": "assets/icon-master-1024.png",

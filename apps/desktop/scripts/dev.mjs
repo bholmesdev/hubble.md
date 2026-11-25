@@ -19,7 +19,7 @@ const devExecPath = path.join(devAppPath, "Contents", "MacOS", devAppName);
 const markerPath = path.join(devAppDir, "metadata.json");
 const fixturePath = path.join(appDir, "fixtures", "playground");
 const playgroundPath = path.join(devAppDir, "playground");
-const wrapperVersion = 1;
+const wrapperVersion = 2;
 const currentPlaygroundHtmlMarkers = ["bg-card", "text-foreground"];
 const stalePlaygroundHtmlMarkers = ["./vendor/", "px-6"];
 
@@ -123,6 +123,16 @@ async function patchMainBundle() {
 	await fs.copyFile(path.join(appDir, "assets", "icon.icns"), iconPath);
 
 	setPlistValue(plistPath, "CFBundleIdentifier", devBundleId);
+	setPlistValue(
+		plistPath,
+		"NSMicrophoneUsageDescription",
+		"Record speech for your chat draft.",
+	);
+	setPlistValue(
+		plistPath,
+		"NSSpeechRecognitionUsageDescription",
+		"Turn your speech into an editable chat draft using on-device recognition.",
+	);
 	setPlistValue(plistPath, "CFBundleName", devAppName);
 	setPlistValue(plistPath, "CFBundleDisplayName", devAppName);
 	setPlistValue(plistPath, "CFBundleExecutable", devAppName);

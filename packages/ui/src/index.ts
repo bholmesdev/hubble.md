@@ -9,6 +9,7 @@ export {
 	type PaletteFileMatches,
 } from "./components/GlobalSearchPalette";
 export { NewNoteButton } from "./components/NewNoteButton";
+export { ResizableSidebar } from "./components/ResizableSidebar";
 export {
 	Sidebar,
 	type SidebarDeleteItem,
@@ -36,6 +37,8 @@ export {
 	runEditorAction,
 	setActiveEditor,
 } from "./editor/activeEditor";
+export type { EditorAttachment } from "./editor/attachments";
+export { revealAttachment } from "./editor/attachments";
 export {
 	EditorView,
 	type EditorViewProps,
