@@ -56,7 +56,7 @@ export function SkillsSettings({
 							<Button
 								size="sm"
 								variant="ghost"
-								className={panelInstall ? "relative" : undefined}
+								className={panelInstall ? "relative border-0 px-0" : undefined}
 								onClick={() => setManualOpen(true)}
 							>
 								Install manually
