@@ -1,12 +1,12 @@
-# ChatGPT chat prototype
+# Chat prototype
 
-Run `pnpm dev:desktop`, then open **Settings → Chat** and choose
-**Continue with ChatGPT**. Complete browser authorization with an eligible ChatGPT
+Run `pnpm dev:desktop`, then open **Settings → Agents** and choose
+**Sign in with ChatGPT**. Complete browser authorization with an eligible ChatGPT
 Plus or Pro plan and permission to use that plan. Reconnect, sign-out, and Manage
-usage are also in Settings → Chat.
+usage are also in Settings → Agents.
 
-Use the OpenAI icon beside the note actions to open chat. Select an available model
-beside **Send**. Sending includes the current text file, including unsaved edits,
+Use the right sidebar button or **⌘⌥B** to open Chat. Select an available model
+beside the send arrow. Sending includes the current text file, including unsaved edits,
 alongside your message and completed conversation history. The agent can discover,
 read, and edit text files in the open workspace.
 Stop preserves partial text but excludes it from later context.
@@ -54,7 +54,6 @@ Stop preserves partial text but excludes it from later context.
   accounts see sign-in even when the tab has saved history. Connected accounts
   resume that history or show a new conversation. Missing models and connection
   failures show recovery actions; file-loading failures explain why Send is unavailable.
-- No selection attachments, voice, or transcript sync.
 - Replies render Markdown while streaming, including lists, links, tables, and
   fenced code blocks. Workspace activity appears between text segments in response
   order, including after restoring a chat. New chunks fade in over 140 ms; reduced
@@ -91,7 +90,7 @@ stays visible with the same retry action.
 
 ### Attachments
 
-The selection toolbar and each comment thread can attach context to the current tab's draft. The comments list offers the same action. Attach opens Chat and focuses the composer. Pending attachments show a short quote above the prompt, with a remove control; thread previews use the first comment.
+The selection toolbar attaches a quote pill at the end of the current tab's draft. The comments list and each comment thread attach a thread card above the prompt, previewing its first comment. Attach opens Chat and focuses the composer. Signed-out users see sign-in instead of adding context.
 
 Attachments capture the selection or the thread's highlighted text and comments at attachment time. They stay with the tab across file changes, workspace changes, and restarts. Sending moves them from the draft into that message, preserving the snapshot in later conversation context without attaching another copy on each follow-up. Reattaching the same selection avoids duplicates; reattaching a pending thread refreshes its snapshot. Starting a new chat clears pending attachments.
 
@@ -99,7 +98,7 @@ Attachments capture the selection or the thread's highlighted text and comments 
 
 The microphone records an editable draft using macOS on-device speech recognition. On supported macOS 26+ devices and languages it uses SpeechAnalyzer and SpeechTranscriber, installing system model assets when needed. Other Macs, unsupported languages, or unavailable model assets fall back to SFSpeechRecognizer, with automatic punctuation on macOS 13+. SpeechAnalyzer revisions replace their explicit audio ranges; the fallback keeps settled utterances separate from partial recognition updates. Audio is processed on device and is not saved. Stop recording to review the transcript and attachments before sending through the existing chat request. The prototype stops after three minutes, rolling recognition sessions over while microphone capture continues; another recording appends to the same draft. Microphone and speech permissions are requested only when starting a recording, with recovery instructions if denied or the current language is unavailable. Other platforms keep the text composer.
 
-During recording, selections in the rich editor attach after staying unchanged for 700 ms. Pointer drags must finish first. Successful attachments briefly flash the selection without moving focus out of the editor; reduced-motion settings suppress the flash. Each voice highlight appears as a truncated pill between the spoken phrases around it, in both the draft and sent message. Speech corrections and draft edits move the pill with its phrase. Sending interleaves each immutable quote with the transcript at that point; editor ranges are local navigation metadata and are not sent to the model. Clicking a pill opens its source in the same tab and selects the original passage. A moved passage is found by its unique text; changed, missing, or ambiguous passages show an error instead of selecting unrelated text. Revealing a pill never auto-attaches it again. Voice highlights can be removed before sending, and highlighting the same passage later creates another interrupt. Switching tabs or workspaces, closing Chat, and signing out stop the recording; partial transcripts remain in the originating tab. A file change inside the same tab keeps recording and attaches subsequent highlights from the new file.
+During recording, selections in the rich editor attach after staying unchanged for 700 ms. Pointer drags must finish first. Successful attachments briefly flash the selection without moving focus out of the editor; reduced-motion settings suppress the flash. Each voice highlight appears as a truncated pill between the spoken phrases around it, in both the draft and sent message. Speech corrections and draft edits move the pill with its phrase. Sending interleaves each immutable quote with the transcript at that point; editor ranges are local navigation metadata and are not sent to the model. Clicking a pill opens its source in the same tab, selects the original passage, and scrolls it into view. A moved passage is found by its unique text; changed, missing, or ambiguous passages show an error instead of selecting unrelated text. Revealing a pill never auto-attaches it again. Voice highlights can be removed before sending, and highlighting the same passage later creates another interrupt. Switching tabs or workspaces, closing Chat, and signing out stop the recording; partial transcripts remain in the originating tab. A file change inside the same tab keeps recording and attaches subsequent highlights from the new file.
 
 macOS builds require Xcode Command Line Tools. The build compiles a universal Swift helper app with its own privacy descriptions and audio-input entitlements. Launch Services starts it with a private Unix socket back to Hubble so microphone and speech permission belong to Hubble Dictation, even when the dev process was launched from a terminal. macOS Dictation must be enabled in System Settings → Keyboard → Dictation; the helper explains how to recover if it is disabled. The dev wrapper includes the same privacy descriptions.
 
@@ -107,8 +106,14 @@ Speech recognition results can cover only the latest utterance after a pause. Hu
 
 ## Chat panel layout
 
-Single-tab Chat spans the full window height beside the file title bar; with multiple tabs it remains below the tab strip. Changing that layout keeps the panel mounted.
+Chat opens by default after the first file opens, and remembers the open or closed preference. Welcome and empty tabs keep it hidden. Single-tab Chat spans the full window height beside the file title bar; with multiple tabs it remains below the tab strip. Changing that layout keeps the panel mounted. Both sidebars share drag resizing and collapse behavior. New windows default to 1200 × 900, clamped to the current display; existing window sizes are preserved.
+
+The composer is a plain-text Tiptap editor with inline quote nodes and the shared yellow virtual cursor. Editing and undo preserve quote anchors. The model picker uses the app's popover menu. The latest tool action stays visible while a reply is running; completed work shows its elapsed duration.
+
+![Chat with inline quote context](assets/chat-conversation.png)
+
+![Signed-out Chat](assets/chat-sign-in.png)
 
 ## API payload debugging
 
-The bug button beside Close chat toggles expandable payload details below each message. User turns expose the initial Responses request body; agent turns expose terminal response bodies, transport errors, and later requests made during tool rounds, in order. Captures come from the SDK call and stream events rather than reconstructing requests from visible messages. The latest 50 turns are retained in a file cache in app data, outside saved chat history and subsequent model input, and reloads fetch them on demand. Turns that were never captured expose their saved message input or reply under a distinct label. JSON is formatted only when its dropdown is expanded.
+The bug button beside Close chat toggles expandable payload details below each message. User turns expose the initial Responses request body; agent turns expose terminal response bodies, transport errors, and later requests made during tool rounds, in order. Captures come from the SDK call and stream events rather than reconstructing requests from visible messages. The latest 50 turns are retained in a file cache in app data, outside saved chat history and subsequent model input, and reloads fetch them on demand. Turns that were never captured expose their saved message input or reply under a distinct label. JSON is formatted only when its dropdown is expanded. Captures include note snapshots, tool results, and replies; they are stored locally without auth headers or tokens and can contain the same sensitive document text as the conversation.
