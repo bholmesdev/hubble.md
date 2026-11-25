@@ -16,6 +16,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Open files in your current tab even when another tab already shows them, keeping each tab’s chat intact. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 - Get started with a workspace and agent skills from the welcome screen, and find your recent notes in Inbox by default on new installs. [#347](https://github.com/bholmesdev/hubble.md/pull/347)
 - The website’s agent demo no longer displays Claude Code branding.
 
