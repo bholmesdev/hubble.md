@@ -9,7 +9,7 @@ export function chatAuthPage(declined: boolean) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>${title} · Hubble</title>
+  <title>Hubble | Sign In to ChatGPT</title>
   <style>
     :root { color-scheme: light dark; --background: #fdfcf9; --foreground: #262b27; --muted: #777970; --brand: #235d46; --tint: #e8eeea; }
     * { box-sizing: border-box; }
