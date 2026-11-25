@@ -260,7 +260,7 @@ const workspaceConfigSchema = z.object({
 	),
 });
 const minWindowWidth = 360;
-const defaultWindowState: WindowState = { width: 920, height: 720 };
+const defaultWindowState: WindowState = { width: 1200, height: 900 };
 const windowStateSchema = z.object({
 	width: z.number().int().min(minWindowWidth).max(4096),
 	height: z.number().int().min(480).max(4096),
@@ -470,7 +470,7 @@ async function loadWindowState(): Promise<WindowState> {
 	} catch {
 		// Missing or malformed window state should not block launch.
 	}
-	return defaultWindowState;
+	return resolveWindowState(defaultWindowState);
 }
 
 function resolveWindowState(state: WindowState): WindowState {
