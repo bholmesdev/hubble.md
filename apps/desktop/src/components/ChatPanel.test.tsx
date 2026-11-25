@@ -780,7 +780,10 @@ it("keeps attachments with their tab, removes them, and sends their snapshots on
 		attachToChat(thread);
 	});
 	const pending = () => host.querySelector('[aria-label="Attachments"]');
-	expect(pending()?.textContent).toContain("A highlighted passage");
+	expect(pending()?.textContent).toContain("A highlighted passag…");
+	expect(pending()?.querySelector("blockquote")?.title).toBe(
+		"A highlighted passage",
+	);
 	expect(pending()?.textContent).toContain("Explain this claim");
 	expect(pending()?.querySelectorAll("li")).toHaveLength(2);
 	await act(async () =>
@@ -790,13 +793,16 @@ it("keeps attachments with their tab, removes them, and sends their snapshots on
 	await act(async () =>
 		tabsStore.set((tabs) => ({ ...tabs, activeTabId: firstTab })),
 	);
-	expect(pending()?.textContent).toContain("A highlighted passage");
+	expect(pending()?.textContent).toContain("A highlighted passag…");
+	expect(pending()?.querySelector("blockquote")?.title).toBe(
+		"A highlighted passage",
+	);
 	const remove = pending()?.querySelector<HTMLButtonElement>(
 		'button[aria-label="Remove attachment: A highlighted passage"]',
 	);
 	expect(remove).not.toBeNull();
 	await act(async () => remove?.click());
-	expect(pending()?.textContent).not.toContain("A highlighted passage");
+	expect(pending()?.textContent).not.toContain("A highlighted passag…");
 	await act(async () =>
 		appStore.set((state) => ({
 			...state,
@@ -991,4 +997,91 @@ it("uses the startup connection across sidebar opens, settings, and tab changes"
 	expect(host.textContent).not.toContain("Checking chat connection");
 	expect(mocks.api.chatAccount).toHaveBeenCalledTimes(1);
 	expect(mocks.api.chatModels).toHaveBeenCalledTimes(1);
+});
+
+it("reviews and sends voice highlights in place, and reveals a pill's source without attaching it again", async () => {
+	let emit: ((event: VoiceEvent) => void) | undefined;
+	mocks.api.onVoice.mockImplementation((callback) => {
+		emit = callback;
+		return vi.fn();
+	});
+	await act(async () =>
+		host
+			.querySelector<HTMLButtonElement>('[aria-label="Record voice message"]')
+			?.click(),
+	);
+	const id = mocks.api.voiceStart.mock.calls[0][0];
+	await act(async () =>
+		emit?.({ id, status: "listening", text: "Explain this" }),
+	);
+	const { attachToChat, chatSelection } = await import("../store/tabChat");
+	await act(async () => {
+		attachToChat(
+			{
+				kind: "selection",
+				path: "/notes/note.md",
+				text: "A passage",
+				source: { from: 1, to: 10, text: "A passage" },
+			},
+			true,
+		);
+	});
+	await act(async () =>
+		emit?.({ id, status: "stopped", text: "Explain this. Then compare." }),
+	);
+	expect(host.querySelector('[aria-label="Attachments"]')).toBeNull();
+	const inputs = host.querySelectorAll("textarea");
+	expect([...inputs].map((input) => input.value)).toEqual([
+		"Explain this.",
+		" Then compare.",
+	]);
+	inputs[0].focus();
+	await act(async () => {
+		Object.getOwnPropertyDescriptor(
+			HTMLTextAreaElement.prototype,
+			"value",
+		)?.set?.call(inputs[0], "Please explain this. More");
+		inputs[0].dispatchEvent(new Event("input", { bubbles: true }));
+	});
+	expect(host.querySelectorAll("textarea")[1].value).toBe(" Then compare.");
+	expect(document.activeElement).toBe(inputs[0]);
+	await act(async () =>
+		host
+			.querySelector<HTMLButtonElement>(
+				'[aria-label="Reveal selection: A passage"]',
+			)
+			?.click(),
+	);
+	expect(chatSelection.get()).toMatchObject({
+		path: "/notes/note.md",
+		source: { from: 1, to: 10, text: "A passage" },
+	});
+	await act(async () => button("Send").click());
+	const sent = host.querySelector('article[aria-label="Your message"]');
+	expect(sent?.textContent).toContain("Please explain this. More");
+	expect(sent?.textContent?.indexOf("A passage")).toBeLessThan(
+		sent?.textContent?.indexOf("Then compare.") ?? 0,
+	);
+	expect(
+		sent?.querySelectorAll('[aria-label="Reveal selection: A passage"]'),
+	).toHaveLength(1);
+	expect(sent?.querySelector('[aria-label="Sent attachments"]')).toBeNull();
+	const request = mocks.api.chatSend.mock.calls[0][0];
+	expect(
+		chatInput(request.messages)
+			.slice(-1)[0]
+			?.content.match(/A passage/g),
+	).toHaveLength(1);
+	expect(chatInput(request.messages).slice(-1)[0]?.content).not.toContain(
+		'"source"',
+	);
+	expect(request.messages.at(-1)).toMatchObject({
+		text: "Please explain this. More Then compare.",
+		attachments: [expect.objectContaining({ offset: 25 })],
+	});
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(appStore.get())));
+	await act(async () => appStore.set(getInitialState()));
+	expect(
+		host.querySelectorAll('article [aria-label="Reveal selection: A passage"]'),
+	).toHaveLength(1);
 });
