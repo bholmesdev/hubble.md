@@ -8,7 +8,7 @@ Electron screenshots from a fresh, isolated profile:
 
 Verified in the real Electron app with native dialog results stubbed at the Electron boundary: all three buttons and keyboard shortcuts reach the expected picker, and creating a workspace creates and opens its folder. The welcome reveal uses 100 ms staggered delays and disables motion when reduced motion is requested.
 
-The skills row shares the Settings component's installation hook, installed indicator, and manual-install modal. Welcome changes the title, removes the description, and uses a green download-icon button in a filled row with a bolt icon. The row matches the other welcome options' width, 40 px height, horizontal padding, and label typography. It transitions to pale green over 500 ms after installation, with motion disabled under reduced motion.
+The skills row shares the Settings component's installation hook, installed indicator, and manual-install modal. Welcome changes the title, removes the description, and uses a dark download-icon button without a fill in a filled row with a bolt icon. The row matches the other welcome options' width, 40 px height, horizontal padding, and label typography. It transitions to pale green over 500 ms after installation, with motion disabled under reduced motion.
 
 Electron checks cover the icon button, busy indicator and duplicate-click prevention, success colors and stable geometry, already-installed detection after reload, manual installation, the Settings installed indicator, and failure/retry. Skill IPC handlers are stubbed for these checks.
 

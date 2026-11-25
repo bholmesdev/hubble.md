@@ -47,6 +47,8 @@ export function SkillsSettings({
 							</Button>
 							<Button
 								size={iconOnlyInstall ? "icon-sm" : "sm"}
+								variant={iconOnlyInstall ? "ghost" : "default"}
+								className={iconOnlyInstall ? "text-foreground" : undefined}
 								aria-label={
 									iconOnlyInstall ? "Install Hubble skills" : undefined
 								}
