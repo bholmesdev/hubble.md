@@ -116,3 +116,62 @@ it("limits a source-editor pulse to changed lines inside its code block", () => 
 	);
 	expect(highlights(editor)).toBe("updated line");
 });
+
+it("does not pulse the unchanged line after a source-line insertion", () => {
+	const editor = setup("placeholder");
+	const source = (text: string) => ({
+		type: "doc",
+		content: [{ type: "codeBlock", content: [{ type: "text", text }] }],
+	});
+	editor.commands.setContent(source("keep first\nkeep last"));
+	replaceEditorContent(
+		editor,
+		source("keep first\nadded line\nkeep last"),
+		true,
+		true,
+	);
+	expect(highlights(editor)).toBe("added line");
+});
+
+it("does not pulse unchanged text between nearby deletions", () => {
+	const editor = setup("Hello (a) world");
+	replaceEditorContent(editor, doc("Hello a world"), true, true);
+	expect(highlights(editor)).toBe("");
+});
+
+it("restarts the pulse animation for another edit to the same line", () => {
+	vi.useFakeTimers();
+	const editor = setup("Before");
+	replaceEditorContent(editor, doc("First update"), true, true);
+	const firstClass =
+		editor.view.dom.querySelector(".hubble-tool-edit")?.className;
+	vi.advanceTimersByTime(400);
+	replaceEditorContent(editor, doc("Second update"), true, true);
+	const secondClass =
+		editor.view.dom.querySelector(".hubble-tool-edit")?.className;
+	expect(secondClass).not.toBe(firstClass);
+	expect(highlights(editor)).toBe("Second update");
+	vi.advanceTimersByTime(400);
+	expect(highlights(editor)).toBe("Second update");
+	vi.advanceTimersByTime(400);
+	expect(highlights(editor)).toBe("");
+});
+
+it("skips pulse refinement when a large rewrite exhausts its time budget", () => {
+	const editor = setup("a".repeat(20_000));
+	let elapsed = 0;
+	const clock = vi.spyOn(Date, "now").mockImplementation(() => {
+		elapsed += 25;
+		// Fail quickly if refinement loses its timeout, without depending on CI speed.
+		if (elapsed > 10_000)
+			throw new Error("Pulse refinement exceeded its time budget");
+		return elapsed;
+	});
+	try {
+		replaceEditorContent(editor, doc("b".repeat(20_000)), true, true);
+		expect(editor.getText()).toBe("b".repeat(20_000));
+		expect(highlights(editor)).toBe("");
+	} finally {
+		clock.mockRestore();
+	}
+});

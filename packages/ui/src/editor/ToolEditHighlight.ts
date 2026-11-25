@@ -1,7 +1,9 @@
 import { Extension } from "@tiptap/core";
 import { ChangeSet } from "@tiptap/pm/changeset";
+import type { Node } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type Transaction } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { diffArrays } from "diff";
 
 const key = new PluginKey<{ decorations: DecorationSet; pulse: number }>(
 	"toolEditHighlight",
@@ -16,12 +18,23 @@ export const ToolEditHighlight = Extension.create({
 				state: {
 					init: () => ({ decorations: DecorationSet.empty, pulse: 0 }),
 					apply(tr, state) {
-						const highlight = tr.getMeta(key);
+						const highlight = tr.getMeta(key) as
+							| { from: number; to: number }[]
+							| "clear"
+							| undefined;
 						if (highlight === "clear")
 							return { ...state, decorations: DecorationSet.empty };
 						if (Array.isArray(highlight))
 							return {
-								decorations: DecorationSet.create(tr.doc, highlight),
+								decorations: DecorationSet.create(
+									tr.doc,
+									highlight.map(({ from, to }) =>
+										Decoration.inline(from, to, {
+											// Switching names restarts CSS animation even when ProseMirror reuses its span.
+											class: `hubble-tool-edit${state.pulse % 2 ? " hubble-tool-edit-alternate" : ""}`,
+										}),
+									),
+								),
 								pulse: state.pulse + 1,
 							};
 						return {
@@ -64,8 +77,28 @@ export function highlightToolEdits(tr: Transaction) {
 		tr.mapping.maps,
 		null,
 	);
-	const decorations: Decoration[] = [];
-	for (const { fromB, toB } of changes.changes) {
+	const decorations: { from: number; to: number }[] = [];
+	const before = documentTokens(tr.before);
+	const after = documentTokens(tr.doc);
+	const insertions: { fromB: number; toB: number }[] = [];
+	for (const { fromA, toA, fromB, toB } of changes.changes) {
+		// ChangeSet joins nearby edits across unchanged text, including deletion-only edits.
+		// Skip the pulse if exact refinement takes too long; feedback must not stall editing.
+		const parts = diffArrays(
+			before.slice(fromA, toA),
+			after.slice(fromB, toB),
+			{
+				timeout: 50,
+			},
+		);
+		let pos = fromB;
+		for (const part of parts ?? []) {
+			if (part.removed) continue;
+			if (part.added) insertions.push({ fromB: pos, toB: pos + part.count });
+			pos += part.count;
+		}
+	}
+	for (const { fromB, toB } of insertions) {
 		if (fromB === toB) continue;
 		tr.doc.nodesBetween(fromB, toB, (node, pos) => {
 			if (!node.isTextblock) return;
@@ -76,16 +109,31 @@ export function highlightToolEdits(tr: Transaction) {
 			const start = Math.max(0, fromB - pos - 1);
 			const end = Math.min(text.length, Math.max(0, toB - pos - 1));
 			const lineStart = start ? text.lastIndexOf("\n", start - 1) + 1 : 0;
-			const newline = text.indexOf("\n", end);
+			const newline = text.indexOf("\n", Math.max(start, end - 1));
 			const lineEnd = newline < 0 ? text.length : newline;
 			if (lineStart < lineEnd)
-				decorations.push(
-					Decoration.inline(pos + 1 + lineStart, pos + 1 + lineEnd, {
-						class: "hubble-tool-edit",
-					}),
-				);
+				decorations.push({
+					from: pos + 1 + lineStart,
+					to: pos + 1 + lineEnd,
+				});
 			return false;
 		});
 	}
 	tr.setMeta(key, decorations);
+}
+
+// Each token occupies one ProseMirror position, including node boundaries and UTF-16 text units.
+function documentTokens(doc: Node) {
+	const tokens: (string | number)[] = [];
+	doc.descendants((node, pos) => {
+		if (node.isText) {
+			const text = node.text ?? "";
+			for (let i = 0; i < text.length; i++)
+				tokens[pos + i] = text.charCodeAt(i);
+		} else {
+			tokens[pos] = node.type.name;
+			if (!node.isLeaf) tokens[pos + node.nodeSize - 1] = `/${node.type.name}`;
+		}
+	});
+	return tokens;
 }
