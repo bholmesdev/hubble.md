@@ -33,6 +33,36 @@ async function setup() {
 
 afterEach(() => vi.unstubAllGlobals());
 
+it("restores saved prototype tab IDs and chats before writing entry-based sessions", async () => {
+	const id = crypto.randomUUID();
+	const chat = { messages: [], draft: "Saved draft", model: "model" };
+	const app = await loadStoreActions(
+		createDesktopApi(),
+		JSON.stringify({
+			workspace: { workspacePath: "/notes" },
+			tabSessions: {
+				"/notes": {
+					paths: ["/notes/a.md"],
+					activePath: "/notes/a.md",
+					ids: { "/notes/a.md": id },
+					chats: { [id]: chat },
+				},
+			},
+		}),
+	);
+	expect(app.tabsStore.get()).toMatchObject({
+		order: [id],
+		activeTabId: id,
+		byId: { [id]: { path: "/notes/a.md", chat } },
+	});
+	const { serialize } = await import("./persistence");
+	expect(serialize(app.appStore.get()).tabSessions?.["/notes"]).toMatchObject({
+		entries: [{ id, path: "/notes/a.md" }],
+		activeTabId: id,
+		chats: { [id]: chat },
+	});
+});
+
 it("keeps the conversation when another file replaces the tab’s current file", async () => {
 	const app = await setup();
 	await app.loadPath("/notes/a.md");
@@ -81,4 +111,57 @@ it("discards a closed tab’s chat without clearing another tab’s conversation
 	await app.openTabForPath("/notes/a.md");
 	expect(app.current().id).not.toBe(closedId);
 	expect(app.current().chat).toBeUndefined();
+});
+
+it("keeps duplicate file tabs and independent chats through navigation and restart", async () => {
+	const app = await setup();
+	await app.openWorkspace("/notes");
+	await app.loadPath("/notes/a.md");
+	const first = app.current().id;
+	const firstChat = app.setConversation("A");
+	await app.openTabForPath("/notes/b.md");
+	const second = app.current().id;
+	const secondChat = app.setConversation("B");
+	await app.loadPath("/notes/a.md");
+	expect(app.current()).toMatchObject({ id: second, chat: secondChat });
+	await app.goBack();
+	expect(app.current()).toMatchObject({ id: second, path: "/notes/b.md" });
+	await app.goForward();
+	expect(app.current()).toMatchObject({ id: second, path: "/notes/a.md" });
+	const { serialize } = await import("./persistence");
+	const api = createDesktopApi();
+	api.pathExists.mockResolvedValue(true);
+	const restored = await loadStoreActions(
+		api,
+		JSON.stringify(serialize(app.appStore.get())),
+	);
+	await restored.restoreTabs();
+	expect(restored.tabsStore.get()).toMatchObject({
+		order: [first, second],
+		activeTabId: second,
+		byId: {
+			[first]: { path: "/notes/a.md", chat: firstChat },
+			[second]: { path: "/notes/a.md", chat: secondChat },
+		},
+	});
+	await restored.renameMarkdownFile("/notes/a.md", "renamed");
+	expect(
+		restored.tabsStore
+			.get()
+			.order.map((id) => restored.tabsStore.get().byId[id].path),
+	).toEqual(["/notes/renamed.md", "/notes/renamed.md"]);
+	await restored.openWorkspace("/other");
+	await restored.openWorkspace("/notes");
+	expect(restored.tabsStore.get().activeTabId).toBe(second);
+	expect(restored.tabsStore.get().byId[first].chat).toEqual(firstChat);
+	expect(restored.tabsStore.get().byId[second].chat).toEqual(secondChat);
+	await restored.closeTab(second);
+	expect(restored.tabsStore.get().activeTabId).toBe(first);
+	expect(restored.tabsStore.get().byId[first].chat).toEqual(firstChat);
+	await restored.reopenClosedTab();
+	const reopened = restored.tabsStore.get().activeTabId;
+	expect(reopened).not.toBe(first);
+	expect(reopened).not.toBe(second);
+	expect(restored.tabsStore.get().byId[reopened ?? ""].chat).toBeUndefined();
+	expect(restored.tabsStore.get().byId[first].chat).toEqual(firstChat);
 });
