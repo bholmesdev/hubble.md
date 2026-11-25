@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- macOS users can now install Hubble via Homebrew with `brew tap PARAM-ship/hubble && brew install --cask hubble-md`. Thanks [@paramcodes](https://github.com/paramcodes)! [#264](https://github.com/bholmesdev/hubble.md/pull/264)
+
 ### Changed
 
 ### Fixed
