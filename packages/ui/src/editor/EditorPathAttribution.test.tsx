@@ -420,6 +420,7 @@ it("attaches a formatted selection from the live editor without changing the doc
 		kind: "selection",
 		path: "/note.md",
 		text: "**bold**",
+		source: { from: 3, to: 7, text: "bold" },
 	});
 	expect(editor.getJSON()).toEqual(before);
 });

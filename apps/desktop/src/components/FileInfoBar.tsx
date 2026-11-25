@@ -88,6 +88,7 @@ export function FileInfoBar({
 	const renameRequest = useStoreValue(titleRenameRequestStore);
 	const compact = useCompactWindow();
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
+	const openChatTitle = useCommandShortcutLabel("Open Chat", "app.toggle-chat");
 	const [showBorder, setShowBorder] = useState(false);
 
 	useEffect(() => {
@@ -210,7 +211,7 @@ export function FileInfoBar({
 							variant="ghost"
 							size="icon-sm"
 							aria-label="Open Chat"
-							title="Open Chat"
+							title={openChatTitle}
 							aria-expanded={false}
 							aria-controls="chat-sidebar"
 							onClick={() => chatPanelOpen.set(true)}

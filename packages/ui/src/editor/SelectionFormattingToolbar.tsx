@@ -146,7 +146,10 @@ function fittingGroups(
 		];
 		if (
 			toolbarWidth(shown) +
-				(hasAttach ? TOOLBAR_BUTTON_WIDTH + TOOLBAR_GAP_WIDTH : 0) <=
+				(hasAttach ? TOOLBAR_BUTTON_WIDTH + TOOLBAR_GAP_WIDTH : 0) +
+				(hasAttach && !hasComment
+					? TOOLBAR_SEPARATOR_WIDTH + TOOLBAR_GAP_WIDTH
+					: 0) <=
 			width - TOOLBAR_EDGE_GAP
 		)
 			return shown;
@@ -473,7 +476,7 @@ export function SelectionFormattingToolbar({
 					))}
 				</div>
 			))}
-			{shownGroups.length > 0 && (
+			{onAttach && !onComment && shownGroups.length > 0 && (
 				<Separator orientation="vertical" className="mx-0.5" />
 			)}
 			{onAttach && (
@@ -489,6 +492,9 @@ export function SelectionFormattingToolbar({
 				>
 					<MingcuteAttachmentLine className="size-4" />
 				</Button>
+			)}
+			{(shownGroups.length > 0 || onAttach) && (
+				<Separator orientation="vertical" className="mx-0.5" />
 			)}
 			<Button
 				type="button"

@@ -40,6 +40,7 @@ const descriptions: Record<CommandId, string> = {
 	"app.reveal": "Reveal the selected item in Finder or Explorer.",
 	"app.chat-about-note": "Open the configured agent command for this note.",
 	"app.toggle-sidebar": "Show or hide the file sidebar.",
+	"app.toggle-chat": "Show or hide Chat for the open file.",
 	"app.show-folders":
 		"Show the folder view, or hide the sidebar if it is already showing.",
 	"app.show-inbox":

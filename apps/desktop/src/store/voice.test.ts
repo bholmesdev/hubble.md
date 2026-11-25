@@ -2,6 +2,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { chatInput } from "../desktopApi/chat";
 import type { VoiceEvent } from "../desktopApi/voice";
+import { chatConnection } from "./chatConnection";
 import { appStore } from "./state";
 import { attachToChat } from "./tabChat";
 import { tabsStore } from "./tabStore";
@@ -17,6 +18,10 @@ vi.mock("../desktopApi", () => ({ desktopApi: api }));
 let emit: (event: VoiceEvent) => void;
 beforeEach(() => {
 	vi.clearAllMocks();
+	chatConnection.set({
+		...chatConnection.get(),
+		account: { connected: true, sharing: true, label: "Test", expiresAt: null },
+	});
 	api.onVoice.mockImplementation((callback) => {
 		emit = callback;
 		return vi.fn();

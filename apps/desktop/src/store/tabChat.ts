@@ -5,7 +5,9 @@ import {
 	type ChatConversation,
 	chatAttachmentSchema,
 } from "../desktopApi/chat";
-import { appStore } from "./state";
+import { isNewTabPath } from "../lib/newTabPage";
+import { chatConnection } from "./chatConnection";
+import { appStore, uiStore } from "./state";
 import { tabsStore } from "./tabStore";
 import type { TabId } from "./tabs";
 
@@ -13,13 +15,20 @@ export const chatSelection = store<(ChatAttachment & { tabId: TabId }) | null>(
 	null,
 );
 
-export const chatPanelOpen = store(false);
+export const chatPanelOpen = uiStore.select("chatPanelOpen");
 export const chatPanelWidth = store(360);
+
 export const EMPTY_CHAT: ChatConversation = {
 	messages: [],
 	draft: "",
 	model: "",
 };
+
+export function toggleChatPanel() {
+	const tabs = tabsStore.get();
+	const path = tabs.byId[tabs.activeTabId ?? ""]?.path;
+	if (path && !isNewTabPath(path)) chatPanelOpen.set(!chatPanelOpen.get());
+}
 
 export function updateTabChat(
 	id: TabId,
@@ -62,9 +71,14 @@ export function clearChats() {
 
 export function attachToChat(
 	input: Omit<ChatAttachment, "id">,
-	inline = false,
+	repeat = false,
 ) {
+	if (!chatConnection.get().account?.connected) {
+		chatPanelOpen.set(true);
+		return false;
+	}
 	const id = tabsStore.get().activeTabId;
+	const inline = input.kind === "selection";
 	const attachment = chatAttachmentSchema.safeParse({
 		...input,
 		...(inline
@@ -75,10 +89,9 @@ export function attachToChat(
 	if (!id || !attachment.success) return false;
 	const pending = tabsStore.get().byId[id].chat?.attachments ?? [];
 	const match =
-		!inline &&
+		!repeat &&
 		pending.find(
 			(item) =>
-				item.offset === undefined &&
 				item.kind === input.kind &&
 				item.path === input.path &&
 				(input.kind === "thread"
@@ -88,7 +101,9 @@ export function attachToChat(
 	if (!match && pending.length >= 20) return false;
 	const next = match
 		? pending.map((item) =>
-				item.id === match.id ? { ...attachment.data, id: match.id } : item,
+				item.id === match.id
+					? { ...attachment.data, id: match.id, offset: match.offset }
+					: item,
 			)
 		: [...pending, attachment.data];
 	if (JSON.stringify(next).length > CHAT_CONTEXT_LIMIT) return false;

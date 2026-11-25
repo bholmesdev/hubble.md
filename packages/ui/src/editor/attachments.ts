@@ -48,5 +48,17 @@ export function revealAttachment(editor: Editor, attachment: EditorAttachment) {
 		.scrollIntoView()
 		.run();
 	editor.view.focus();
+	const viewport = editor.view.dom.closest<HTMLElement>(".editorViewport");
+	if (viewport) {
+		const coords = editor.view.coordsAtPos(from);
+		const bounds = viewport.getBoundingClientRect();
+		// Place the quote above center so a long selection has room below it.
+		viewport.scrollTo({
+			top: Math.max(
+				0,
+				viewport.scrollTop + coords.top - bounds.top - bounds.height / 3,
+			),
+		});
+	}
 	return true;
 }
