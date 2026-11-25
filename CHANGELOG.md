@@ -26,6 +26,28 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 - Keep longer Chat conversations going when working with large notes. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 - Diagram edits stay saved when you switch files, rename a diagram, or close its tab. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
 
+## [0.3.5-preview.1] - 2026-11-25
+
+This preview lets you try the Chat feature from [#348](https://github.com/bholmesdev/hubble.md/pull/348) ahead of its stable release. Download an installer below; this prerelease does not replace the latest stable release.
+
+### Added
+
+- Chat with your notes using Sign in with ChatGPT, with conversations and drafts saved per tab.
+- Ask agents to read and edit existing text files within your workspace.
+- Attach selected passages and comment threads; record editable voice drafts on macOS.
+- Follow streamed Markdown replies and tool activity, with brief highlights on edited lines.
+
+### Changed
+
+- Chat uses a 200,000-token input budget with background token counting. Automatic context compaction is tracked in [#349](https://github.com/bholmesdev/hubble.md/issues/349).
+
+### Preview limits
+
+- Workspace tools edit existing text files; creating or deleting files and shell execution are not included.
+- Voice dictation is available on macOS. Recordings stop after three minutes.
+- Chats still have a 100-message guard and may need a new conversation when context is full.
+- The API payload debugger is available only in the dev server.
+
 ## [0.3.4] - 2026-11-01
 
 ### Changed
