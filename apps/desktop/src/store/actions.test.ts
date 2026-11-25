@@ -43,6 +43,31 @@ describe("desktop savePathContent", () => {
 		systemPrefersDark = false;
 	});
 
+	it.each([
+		["new profile", null, "inbox"],
+		[
+			"older profile without a saved view",
+			JSON.stringify({ ui: {} }),
+			"folders",
+		],
+		[
+			"saved Folders view",
+			JSON.stringify({ ui: { sidebarView: "folders" } }),
+			"folders",
+		],
+		[
+			"saved Inbox view",
+			JSON.stringify({ ui: { sidebarView: "inbox" } }),
+			"inbox",
+		],
+	] as const)("restores the sidebar view for a %s", async (_profile, persisted, expected) => {
+		const { sidebarViewStore } = await loadStoreActions(
+			createDesktopApi(),
+			persisted,
+		);
+		expect(sidebarViewStore.get()).toBe(expected);
+	});
+
 	it("hydrates the default chat command and persists edits", async () => {
 		const api = createDesktopApi();
 		const { chatCommandStore, setChatCommand } = await loadStoreActions(api);

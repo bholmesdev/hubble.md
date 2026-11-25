@@ -31,6 +31,7 @@
 		"dogfood:desktop:mac": "node scripts/dogfood-desktop.mjs",
 		"postinstall": "pnpm --filter @hubble.md/desktop exec install-electron",
 		"dev:desktop": "pnpm --filter '@hubble.md/desktop^...' --if-present build && pnpm -r --parallel --stream --filter @hubble.md/desktop... --if-present dev",
+		"dev:desktop:fresh": "HUBBLE_DESKTOP_FRESH_START=1 pnpm dev:desktop",
 		"dev:desktop:debug": "HUBBLE_DESKTOP_ENABLE_CDP=1 pnpm dev:desktop",
 		"dev:www": "pnpm -r --parallel --stream --filter \"./packages/**\" --if-present dev & pnpm --filter \"./apps/www\" dev",
 		"dev:web": "pnpm --filter \"./apps/web\" dev",

@@ -1023,6 +1023,9 @@ function buildMenu() {
 				commandMenuItem("app.open-file", () =>
 					sendToRenderer("desktop:menu-open-file"),
 				),
+				commandMenuItem("app.new-workspace", () =>
+					sendToRenderer("desktop:menu-create-workspace"),
+				),
 				commandMenuItem("app.open-folder", () =>
 					sendToRenderer("desktop:menu-open-folder"),
 				),

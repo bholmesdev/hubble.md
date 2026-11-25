@@ -157,6 +157,8 @@ const desktopApi = {
 	onMenuCreateDiagramFile: (callback) =>
 		subscribe("desktop:menu-create-diagram-file", callback),
 	onMenuOpenFile: (callback) => subscribe("desktop:menu-open-file", callback),
+	onMenuCreateWorkspace: (callback) =>
+		subscribe("desktop:menu-create-workspace", callback),
 	onMenuOpenFolder: (callback) =>
 		subscribe("desktop:menu-open-folder", callback),
 	onMenuOpenSettings: (callback) =>

@@ -50,6 +50,11 @@ export const commandRegistry = {
 		label: "Open...",
 		isEnabled: always,
 	},
+	"app.new-workspace": {
+		defaultBinding: "CmdOrCtrl+Shift+N",
+		label: "Create New Workspace...",
+		isEnabled: always,
+	},
 	"app.open-folder": {
 		defaultBinding: "CmdOrCtrl+Shift+O",
 		label: "Open Folder...",

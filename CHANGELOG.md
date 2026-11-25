@@ -15,6 +15,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Get started with a workspace and agent skills from the welcome screen, and find your recent notes in Inbox by default on new installs. [#347](https://github.com/bholmesdev/hubble.md/pull/347)
 - The website’s agent demo no longer displays Claude Code branding.
 
 ### Fixed

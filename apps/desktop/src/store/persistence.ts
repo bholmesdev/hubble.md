@@ -124,7 +124,8 @@ export function getInitialState(): DesktopState {
 		tabs: tabsFromSession(tabSessions[workspace.workspacePath ?? ""]),
 		ui: {
 			sidebarOpen: p?.ui?.sidebarOpen ?? false,
-			sidebarView: p?.ui?.sidebarView === "inbox" ? "inbox" : "folders",
+			// Older profiles without a saved view keep their original Folders default.
+			sidebarView: !p || p.ui?.sidebarView === "inbox" ? "inbox" : "folders",
 			isSwitcherOpen: false,
 			isTerminalOpen: p?.ui?.isTerminalOpen ?? false,
 			terminalPosition:

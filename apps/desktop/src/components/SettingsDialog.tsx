@@ -56,7 +56,7 @@ export function SettingsSection({
 	action,
 	children,
 }: {
-	title: string;
+	title: ReactNode;
 	description?: ReactNode;
 	action?: ReactNode;
 	children?: ReactNode;

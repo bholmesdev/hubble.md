@@ -246,6 +246,11 @@ function App() {
 	const shortcutBindings = useStoreValue(shortcutBindingsStore);
 	const tabs = useStoreValue(tabsStore);
 	const hasWorkspace = workspacePath !== null;
+	const showWelcome =
+		!hasWorkspace &&
+		!state.currentPath &&
+		state.status !== "loading" &&
+		state.status !== "error";
 	const { canGoBack: menuCanGoBack, canGoForward: menuCanGoForward } =
 		useHistoryNav();
 	const [scrollContainerEl, setScrollContainerEl] =
@@ -589,6 +594,7 @@ function App() {
 				"app.go-to-file": () => openSearch(),
 				"app.new-tab": () => openNewTabPage(),
 				"app.all-tabs": () => setAllTabsOpen((open) => !open),
+				"app.new-workspace": createWorkspaceWithSidebar,
 				"app.open-folder": openWorkspaceWithSidebar,
 				"app.open-file": openFilePicker,
 				"app.copy-path": () => copyFilePath(currentPath),
@@ -695,6 +701,7 @@ function App() {
 				() => void createDiagramFile(focusedCreationFolder),
 			),
 			desktopApi.onMenuOpenFile(() => void openFilePicker()),
+			desktopApi.onMenuCreateWorkspace(() => void createWorkspaceWithSidebar()),
 			desktopApi.onMenuOpenFolder(() => void openWorkspaceWithSidebar()),
 			desktopApi.onMenuOpenSettings(() => setSettingsOpen(true)),
 			desktopApi.onMenuOpenChangelog(() => {
@@ -859,23 +866,30 @@ function App() {
 				}
 			}}
 		>
-			<WindowTitleBar
-				singleTab={!showTabStrip}
-				tabStripLeaving={showTabStrip && !wantsTabStrip}
-				allTabsOpen={allTabsOpen}
-				onAllTabsOpenChange={setAllTabsOpen}
-				showSidebarBadge={
-					!sidebarOpen &&
-					(showReadyCallout ||
-						whatsNewVersion !== null ||
-						telemetryConsent === "unset")
-				}
-				onNewTab={newTab}
-			>
-				{isFileOpen ? (
-					<FileInfoBar scrollContainer={scrollContainerEl} onNewTab={newTab} />
-				) : null}
-			</WindowTitleBar>
+			{showWelcome ? (
+				<div aria-hidden className="h-9 shrink-0 [-webkit-app-region:drag]" />
+			) : (
+				<WindowTitleBar
+					singleTab={!showTabStrip}
+					tabStripLeaving={showTabStrip && !wantsTabStrip}
+					allTabsOpen={allTabsOpen}
+					onAllTabsOpenChange={setAllTabsOpen}
+					showSidebarBadge={
+						!sidebarOpen &&
+						(showReadyCallout ||
+							whatsNewVersion !== null ||
+							telemetryConsent === "unset")
+					}
+					onNewTab={newTab}
+				>
+					{isFileOpen ? (
+						<FileInfoBar
+							scrollContainer={scrollContainerEl}
+							onNewTab={newTab}
+						/>
+					) : null}
+				</WindowTitleBar>
+			)}
 			{/* Compact windows anchor the sidebar overlay to the window instead. */}
 			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px max-sm:static">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
@@ -947,17 +961,13 @@ function App() {
 							{state.status === "error" && (
 								<p>{state.error ?? "Failed to open file."}</p>
 							)}
-							{state.status !== "loading" &&
-								state.status !== "error" &&
-								!state.currentPath &&
-								!hasWorkspace && (
-									<div className="flex h-full items-center justify-center p-6">
-										<WelcomeScreen
-											onCreateFolder={() => void createWorkspaceWithSidebar()}
-											onOpenFolder={() => void openWorkspaceWithSidebar()}
-										/>
-									</div>
-								)}
+							{showWelcome && (
+								<WelcomeScreen
+									onCreateWorkspace={() => void createWorkspaceWithSidebar()}
+									onOpenFolder={() => void openWorkspaceWithSidebar()}
+									onOpenFile={() => void openFilePicker()}
+								/>
+							)}
 							{/* With no tabs open, the blank page doubles as the empty state. */}
 							{state.status !== "loading" &&
 								state.status !== "error" &&

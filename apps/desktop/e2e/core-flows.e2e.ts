@@ -47,7 +47,18 @@ const test = base.extend<{ hubble: Hubble }>({
 						...(openWorkspace && { HUBBLE_DESKTOP_DEV_WORKSPACE: workspace }),
 					},
 				});
-				return app.firstWindow();
+				const page = await app.firstWindow();
+				// These flows exercise the folder tree; new profiles start in Inbox.
+				if (openWorkspace) {
+					const folders = page.getByRole("button", {
+						name: "Folders",
+						exact: true,
+					});
+					if ((await folders.getAttribute("aria-pressed")) !== "true") {
+						await folders.click();
+					}
+				}
+				return page;
 			},
 			close,
 		});

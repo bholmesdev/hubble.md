@@ -53,6 +53,8 @@ For the live desktop dev flow instead of a production bundle:
 pnpm dev:desktop
 ```
 
+To test the new-user welcome screen with a fresh profile and no playground, run `pnpm dev:desktop:fresh`. Each launch creates a separate profile and preserves your regular dev data.
+
 The repo is a pnpm workspace. See the [repository structure](./README.md#repository-structure) in the README for what each app and package does, and [`CONTEXT.md`](./CONTEXT.md) for the shared glossary of project terms.
 
 ### Run the tests

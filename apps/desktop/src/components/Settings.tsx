@@ -16,12 +16,10 @@ import {
 	useRef,
 	useState,
 } from "react";
-import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import MingcutePencilLine from "~icons/mingcute/pencil-line";
 import MingcuteRefresh2Line from "~icons/mingcute/refresh-2-line";
 import type { DesktopUpdateState } from "../desktopApi/types";
-import { useHubbleSkills } from "../lib/hubbleSkills";
 import {
 	resetShortcutBindings,
 	setChatCommand,
@@ -39,10 +37,9 @@ import {
 	spellcheckStore,
 	telemetryConsentStore,
 	themePreferenceStore,
-	workspacePathStore,
 } from "../store/state";
-import { ManualInstallModal } from "./ManualInstallModal";
 import { SettingsDialog, SettingsSection } from "./SettingsDialog";
+import { SkillsSettings } from "./SkillsSettings";
 import { SpellcheckSettingsSection } from "./SpellcheckSection";
 import {
 	filterShortcutGroups,
@@ -223,47 +220,6 @@ function AppearanceSettings() {
 				))}
 			</div>
 		</SettingsSection>
-	);
-}
-
-function SkillsSettings() {
-	const workspacePath = useStoreValue(workspacePathStore);
-	const { installed, installing, install } = useHubbleSkills(workspacePath);
-	const [manualOpen, setManualOpen] = useState(false);
-
-	return (
-		<>
-			<SettingsSection
-				title="Agent skills"
-				description="Teach your agents how to use Hubble's features: build HTML apps, edit diagrams, or leave and respond to comments."
-				action={
-					installed ? (
-						<span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary">
-							<MingcuteCheckCircleFill className="size-3.5" />
-							Skills installed
-						</span>
-					) : installed === false ? (
-						<span className="inline-flex shrink-0 items-center gap-1">
-							<Button
-								size="sm"
-								variant="ghost"
-								onClick={() => setManualOpen(true)}
-							>
-								Install manually
-							</Button>
-							<Button
-								size="sm"
-								disabled={installing}
-								onClick={() => void install()}
-							>
-								{installing ? "Installing..." : "Install"}
-							</Button>
-						</span>
-					) : null
-				}
-			/>
-			<ManualInstallModal open={manualOpen} onOpenChange={setManualOpen} />
-		</>
 	);
 }
 
