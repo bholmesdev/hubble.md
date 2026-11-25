@@ -1,8 +1,8 @@
 import { useCommandShortcut } from "@hubble.md/ui";
+import MingcuteDownload2Line from "~icons/mingcute/download-2-line";
 import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteFolderLine from "~icons/mingcute/folder-line";
 import MingcuteFolderOpenLine from "~icons/mingcute/folder-open-line";
-import MingcuteLightningLine from "~icons/mingcute/lightning-line";
 import { EmptyStateAction, EmptyStateKbd } from "./EmptyStateAction";
 import { SkillsSettings } from "./SkillsSettings";
 
@@ -68,17 +68,17 @@ export function WelcomeScreen({
 					</div>
 				</section>
 				<div className="welcome-rise" style={{ animationDelay: "0.45s" }}>
-					<div className="flex min-h-10 items-center gap-2.5 rounded-md border border-border bg-muted/40 px-3 py-1 transition-colors duration-500 has-[[data-skills-installed]]:border-primary/15 has-[[data-skills-installed]]:bg-primary/5 motion-reduce:transition-none">
-						<MingcuteLightningLine className="size-4 shrink-0 text-muted-foreground" />
+					<div className="relative flex min-h-10 items-center gap-2.5 rounded-md border border-border bg-muted/40 has-[[data-panel-install]:hover]:bg-muted/70 px-3 py-1 transition-colors duration-500 has-[[data-skills-installed]]:border-primary/15 has-[[data-skills-installed]]:bg-primary/5 motion-reduce:transition-none">
+						<MingcuteDownload2Line className="size-4 shrink-0 text-muted-foreground" />
 						<div className="min-w-0 flex-1">
 							<SkillsSettings
 								title={
 									<span className="text-sm font-normal">
-										Set up agent skills
+										Install agent skills
 									</span>
 								}
 								description={null}
-								iconOnlyInstall
+								panelInstall
 							/>
 						</div>
 					</div>
