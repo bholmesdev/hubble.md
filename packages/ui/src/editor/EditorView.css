@@ -707,10 +707,20 @@
 		animation: hubble-selection-attach 800ms ease-out;
 		background: color-mix(
 			in oklab,
-			var(--brand-accent) var(--hubble-attach-flash),
+			var(--hubble-tool-edit-tint, var(--brand-accent))
+				var(--hubble-attach-flash),
 			transparent
 		);
 		border-radius: 2px;
 		box-decoration-break: clone;
+	}
+
+	.dark .ProseMirror .hubble-tool-edit {
+		--hubble-tool-edit-tint: color-mix(
+			in oklab,
+			var(--brand-accent) 24%,
+			transparent
+		);
+		color: inherit;
 	}
 }
