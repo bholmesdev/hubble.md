@@ -19,7 +19,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { CHAT_CONTEXT_LIMIT, type ChatAttachment } from "../desktopApi/chat";
+import { CHAT_TEXT_LIMIT, type ChatAttachment } from "../desktopApi/chat";
 import { transcriptParts } from "../desktopApi/chatTranscript";
 import { QuotePill } from "./ChatTranscript";
 
@@ -77,7 +77,7 @@ export function ChatComposer({
 					new Plugin({
 						filterTransaction: (tr) =>
 							!tr.docChanged ||
-							readDraft(tr.doc.toJSON(), []).text.length <= CHAT_CONTEXT_LIMIT,
+							readDraft(tr.doc.toJSON(), []).text.length <= CHAT_TEXT_LIMIT,
 					}),
 				],
 				addAttributes: () => ({

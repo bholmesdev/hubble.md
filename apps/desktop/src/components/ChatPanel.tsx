@@ -19,10 +19,9 @@ import openaiBlossomBlack from "../assets/openai-blossom-black.svg";
 import openaiBlossomWhite from "../assets/openai-blossom-white.svg";
 import { desktopApi } from "../desktopApi";
 import {
-	CHAT_CONTEXT_LIMIT,
+	CHAT_TEXT_LIMIT,
 	type ChatAttachment,
 	type ChatMessage,
-	chatContextSize,
 	chatFile,
 } from "../desktopApi/chat";
 import { isEditableFile } from "../lib/filePath";
@@ -76,6 +75,13 @@ export function ChatPanel({
 		"app.toggle-chat",
 	);
 	const debugOpen = useStoreValue(chatDebug);
+	const lifetime = useRef(0);
+	useEffect(
+		() => () => {
+			lifetime.current++;
+		},
+		[],
+	);
 	const width = useStoreValue(chatPanelWidth);
 	const tabs = useStoreValue(tabsStore);
 	const tab = tabs.byId[tabId ?? ""];
@@ -151,7 +157,7 @@ export function ChatPanel({
 			}));
 	}
 	function setDraft(draft: string, attachments: ChatAttachment[]) {
-		if (draft.length > CHAT_CONTEXT_LIMIT) return;
+		if (draft.length > CHAT_TEXT_LIMIT) return;
 		if (tabId)
 			updateTabChat(tabId, (chat) => ({ ...chat, draft, attachments }));
 	}
@@ -198,7 +204,7 @@ export function ChatPanel({
 			open &&
 			attachmentKey &&
 			panel.kind === "conversation" &&
-			!(voice.get()?.tabId === tabId && isRecording())
+			!(voice.get()?.tabId === tabId && isRecording() && isRecording())
 		)
 			prompt.current?.focus();
 	}, [open, attachmentKey, panel.kind, tabId]);
@@ -331,10 +337,36 @@ export function ChatPanel({
 			status: "complete",
 		};
 		const history = [...messages, user];
-		if (history.length > 99 || chatContextSize(history) > CHAT_CONTEXT_LIMIT) {
+		const generation = lifetime.current;
+		const checked = await attempt(() => desktopApi.chatCheckBudget(history));
+		// The draft or active document may change while the worker counts a large input.
+		if (
+			lifetime.current !== generation ||
+			!chatPanelOpen.get() ||
+			active.current ||
+			tabsStore.get().activeTabId !== tabId ||
+			tabsStore.get().byId[tabId ?? ""]?.chat !== tab?.chat ||
+			viewerStore.get().currentPath !== document.currentPath ||
+			viewerStore.get().content !== document.content ||
+			viewerStore.get().status !== document.status ||
+			workspacePathStore.get() !== workspace ||
+			chatConnection.get().revision !== revision ||
+			chatConnection.get().account !== connection.account ||
+			chatConnection.get().models !== connection.models ||
+			chatConnection.get().sending ||
+			chatConnection.get().busy ||
+			(voice.get()?.tabId === tabId && isRecording())
+		)
+			return;
+		if (!checked.ok) {
+			setError(checked.error);
+			return;
+		}
+		if (history.length > 99 || !checked.value) {
 			setError("Chat is too long. Start a new chat.");
 			return;
 		}
+
 		const id = crypto.randomUUID();
 		active.current = id;
 

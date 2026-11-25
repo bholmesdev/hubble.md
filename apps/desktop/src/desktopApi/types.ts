@@ -7,6 +7,7 @@ import type {
 	ChatDelta,
 	ChatFileReply,
 	ChatFileRequest,
+	ChatMessage,
 	ChatModel,
 	ChatPayload,
 	ChatRequest,
@@ -174,6 +175,7 @@ export type DesktopApi = {
 	voiceStop(id: string): Promise<void>;
 	onVoice(callback: (event: VoiceEvent) => void): () => void;
 	chatPayloads(id: string): Promise<ChatPayload[]>;
+	chatCheckBudget(messages: ChatMessage[]): Promise<boolean>;
 	chatSend(input: ChatRequest): Promise<ChatResult>;
 	chatFileReply(reply: ChatFileReply): Promise<void>;
 	onChatFileRequest(callback: (request: ChatFileRequest) => void): Unsubscribe;

@@ -32,6 +32,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Keep longer Chat conversations going when working with large notes. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 - Diagram edits stay saved when you switch files, rename a diagram, or close its tab. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
 
 ## [0.3.4] - 2026-11-01
