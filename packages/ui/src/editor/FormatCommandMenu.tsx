@@ -5,7 +5,6 @@ import {
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import { Command } from "cmdk";
-import { keymatch } from "keymatch";
 import {
 	type ComponentType,
 	type RefObject,
@@ -27,6 +26,7 @@ import MingcuteListOrderedLine from "~icons/mingcute/list-ordered-line";
 import MingcuteQuoteLeftLine from "~icons/mingcute/quote-left-line";
 import MingcuteStrikethroughLine from "~icons/mingcute/strikethrough-line";
 import MingcuteTextLine from "~icons/mingcute/text-line";
+import { matchShortcut } from "../lib/keyboard";
 import { formatCommandShortcut, useCommandBindings } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { useCommandMenuPosition } from "./commandMenuPosition";
@@ -230,7 +230,7 @@ export function FormatCommandMenu({
 					return;
 				}
 				const binding = getCommandBinding("app.format-menu");
-				if (!binding || !keymatch(event, binding)) return;
+				if (!binding || !matchShortcut(event, binding)) return;
 				if (!editor.isFocused && !open) return;
 				if (!open && editor.state.selection.empty) return;
 				event.preventDefault();

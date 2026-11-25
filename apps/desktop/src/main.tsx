@@ -1,3 +1,4 @@
+import { setQwertyCommandKeys } from "@hubble.md/ui";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -6,6 +7,8 @@ import { preloadDiagrams } from "./editor/lazyDiagram";
 import { initThemePreference } from "./store/actions";
 import "./components/toast.css";
 import "./index.css";
+
+window.desktopApi.onKeyboardLayoutChange(setQwertyCommandKeys);
 
 initThemePreference();
 

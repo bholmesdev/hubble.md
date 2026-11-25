@@ -16,7 +16,6 @@ import {
 	useSensors,
 } from "@dnd-kit/core";
 import { getCommandBinding } from "@hubble.md/editor";
-import { keymatch } from "keymatch";
 import {
 	type CSSProperties,
 	forwardRef,
@@ -51,6 +50,7 @@ import {
 	normalizeDisplayPath,
 	splitFileName,
 } from "../lib/filePath";
+import { matchShortcut } from "../lib/keyboard";
 import { shouldShowFooterDivider } from "../lib/scrollOverflow";
 import { useCommandShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
@@ -722,7 +722,7 @@ export function Sidebar({
 		if (
 			!isEditableEventTarget(event.target) &&
 			deleteBinding &&
-			keymatch(event.nativeEvent, deleteBinding)
+			matchShortcut(event.nativeEvent, deleteBinding)
 		) {
 			const focusedRow = focusedIndex === null ? null : rows[focusedIndex];
 			const focusedKey = focusedRow ? sidebarRowKey(focusedRow) : null;

@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  keymatch@1.0.5: f2ab175247bf22773edf26e707cd34f66c5a842f832886d955c27a17b3a30eaf
+
 overrides:
   '@tiptap/extension-highlight': 3.20.0
 
@@ -82,7 +85,7 @@ importers:
         version: 7.0.5
       keymatch:
         specifier: ^1.0.5
-        version: 1.0.5
+        version: 1.0.5(patch_hash=f2ab175247bf22773edf26e707cd34f66c5a842f832886d955c27a17b3a30eaf)
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0
@@ -171,6 +174,10 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(happy-dom@20.10.3)(jiti@2.6.1)(lightningcss@1.30.2)(msw@2.12.13(@types/node@25.5.0)(typescript@5.8.3))(yaml@2.9.0)
+    optionalDependencies:
+      native-keymap:
+        specifier: 3.3.9
+        version: 3.3.9
 
   apps/web:
     dependencies:
@@ -477,7 +484,7 @@ importers:
         version: 11.11.1
       keymatch:
         specifier: ^1.0.5
-        version: 1.0.5
+        version: 1.0.5(patch_hash=f2ab175247bf22773edf26e707cd34f66c5a842f832886d955c27a17b3a30eaf)
       lowlight:
         specifier: ^3.3.0
         version: 3.3.0
@@ -5100,6 +5107,9 @@ packages:
     resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
+
+  native-keymap@3.3.9:
+    resolution: {integrity: sha512-d/ydQ5x+GM5W0dyAjFPwexhtc9CDH1g/xWZESS5CXk16ThyFzSBLvlBJq1+FyzUIFf/F2g1MaHdOpa6G9150YQ==}
 
   negotiator@1.0.0:
     resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
@@ -10938,7 +10948,7 @@ snapshots:
     optionalDependencies:
       graceful-fs: 4.2.11
 
-  keymatch@1.0.5: {}
+  keymatch@1.0.5(patch_hash=f2ab175247bf22773edf26e707cd34f66c5a842f832886d955c27a17b3a30eaf): {}
 
   keyv@4.5.4:
     dependencies:
@@ -11513,6 +11523,9 @@ snapshots:
   mute-stream@2.0.0: {}
 
   nanoid@3.3.11: {}
+
+  native-keymap@3.3.9:
+    optional: true
 
   negotiator@1.0.0: {}
 

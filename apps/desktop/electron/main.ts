@@ -61,6 +61,7 @@ import {
 import type { ThemePreference } from "../src/theme";
 import { AgentSkills } from "./agentSkills";
 import { DeleteUndo } from "./deleteUndo";
+import { KeyboardLayoutMonitor } from "./keyboardLayout";
 import { readNotePreviews } from "./notePreviews";
 import publishedSkillHashes from "./publishedSkillHashes.json";
 import { TelemetryManager } from "./telemetry";
@@ -101,6 +102,13 @@ type WindowBounds = {
 	width: number;
 	height: number;
 };
+
+const keyboardLayout = new KeyboardLayoutMonitor(
+	process.platform,
+	(enabled) => {
+		sendToRenderer("desktop:keyboard-layout-change", enabled);
+	},
+);
 
 const isDev = !app.isPackaged || process.env.HUBBLE_DESKTOP_FORCE_DEV === "1";
 const { autoUpdater } = electronUpdater;
@@ -1443,7 +1451,14 @@ async function createWindow() {
 			window.webContents.setIgnoreMenuShortcuts(
 				input.type === "keyDown" &&
 					pageBindings.some(
-						(binding) => binding !== null && keymatch(event, binding),
+						(binding) =>
+							binding !== null &&
+							keymatch(event, binding, {
+								keyMode:
+									keyboardLayout.qwertyCommandKeys && input.meta
+										? "physical"
+										: "character",
+							}),
 					),
 			);
 		});
@@ -1487,6 +1502,9 @@ async function createWindow() {
 }
 
 function registerIpc() {
+	ipcMain.on("desktop:keyboard-layout", (event) => {
+		event.returnValue = keyboardLayout.qwertyCommandKeys;
+	});
 	setupTerminalIpc(sendToRenderer);
 
 	ipcMain.handle(
@@ -2266,6 +2284,7 @@ if (!singleInstanceLock) {
 	app.on("browser-window-focus", () => void telemetry.recordActivity(false));
 
 	app.whenReady().then(async () => {
+		await keyboardLayout.initialize();
 		await telemetry.load();
 		void telemetry.recordActivity(false);
 		restoreSpellcheckConfig();

@@ -39,6 +39,7 @@ export default defineConfig({
 		plugins: [
 			externalizeDepsPlugin({
 				exclude: ["@hubble.md/runtime", "@tailwindcss/browser", "alpinejs"],
+				include: ["native-keymap"],
 			}),
 			bundleUserSkills(),
 		],

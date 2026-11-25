@@ -14,6 +14,7 @@ onlyBuiltDependencies:
   - msw
   - sharp
   - node-pty
+  - native-keymap
 
 allowBuilds:
   electron-winstaller: true
@@ -21,6 +22,11 @@ allowBuilds:
   msw: true
   sharp: true
   node-pty: true
+  native-keymap: true
+
+patchedDependencies:
+  keymatch@1.0.5: patches/keymatch@1.0.5.patch
+
 
 overrides:
   # tldraw pulls this in; keep it on the workspace's @tiptap/core version.

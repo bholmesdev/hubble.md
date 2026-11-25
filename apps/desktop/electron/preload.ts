@@ -23,9 +23,21 @@ function subscribe<T extends unknown[]>(
 	return () => ipcRenderer.removeListener(channel, listener);
 }
 
+// Read the current mode on every renderer load, then cache changes before React starts.
+let qwertyCommandKeys = Boolean(
+	ipcRenderer.sendSync("desktop:keyboard-layout"),
+);
+ipcRenderer.on("desktop:keyboard-layout-change", (_event, enabled: boolean) => {
+	qwertyCommandKeys = enabled;
+});
+
 let nextWatchId = 0;
 
 const desktopApi = {
+	onKeyboardLayoutChange: (callback) => {
+		callback(qwertyCommandKeys);
+		return subscribe("desktop:keyboard-layout-change", callback);
+	},
 	platform: process.platform,
 	homeDir: os.homedir(),
 	listDirectory: (path) =>

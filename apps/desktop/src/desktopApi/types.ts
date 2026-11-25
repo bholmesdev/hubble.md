@@ -153,6 +153,10 @@ export type SpellcheckState = {
 };
 
 export type DesktopApi = {
+	/** Supplies the current layout mode immediately, then follows OS changes. */
+	onKeyboardLayoutChange(
+		callback: (qwertyCommandKeys: boolean) => void,
+	): Unsubscribe;
 	platform: DesktopPlatform;
 	homeDir: string;
 	listDirectory(path: string): Promise<DirectoryListing>;

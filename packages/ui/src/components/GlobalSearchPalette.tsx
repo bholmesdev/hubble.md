@@ -1,11 +1,11 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { Command } from "cmdk";
-import { keymatch } from "keymatch";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import MingcuteCornerDownLeftLine from "~icons/mingcute/corner-down-left-line";
 import MingcuteFileLine from "~icons/mingcute/file-line";
 import MingcuteSearch2Line from "~icons/mingcute/search-2-line";
 import { type MatchRange, matchRanges, scorePath } from "../lib/fuzzy";
+import { matchShortcut } from "../lib/keyboard";
 import {
 	COMMAND_PREFIX,
 	groupCommands,
@@ -223,7 +223,7 @@ function GlobalSearchPalette({
 				(command) =>
 					command.globalShortcut &&
 					command.binding &&
-					keymatch(event.nativeEvent, command.binding),
+					matchShortcut(event.nativeEvent, command.binding),
 			)
 		) {
 			onOpenChange(false);

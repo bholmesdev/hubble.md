@@ -5,7 +5,6 @@ import {
 	selectFindMatch,
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
-import { keymatch } from "keymatch";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
@@ -18,6 +17,7 @@ import MingcuteCornerDownLeftLine from "~icons/mingcute/corner-down-left-line";
 import MingcuteDownLine from "~icons/mingcute/down-line";
 import MingcuteRightLine from "~icons/mingcute/right-line";
 import MingcuteUpLine from "~icons/mingcute/up-line";
+import { matchShortcut } from "../lib/keyboard";
 import { formatShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
@@ -97,7 +97,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 					close();
 					return;
 				}
-				if (keymatch(event, "CmdOrCtrl+Alt+f")) {
+				if (matchShortcut(event, "CmdOrCtrl+Alt+f")) {
 					if (!editor?.isEditable) return;
 					if (!editor.isFocused && !open) return;
 					event.preventDefault();
@@ -109,7 +109,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 					return;
 				}
 				const binding = getCommandBinding("app.find");
-				if (!binding || !keymatch(event, binding)) return;
+				if (!binding || !matchShortcut(event, binding)) return;
 				if (!editor?.isFocused && !open) return;
 				event.preventDefault();
 				openFind();
@@ -165,10 +165,10 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 	 * leaves replacements stranded.
 	 */
 	const handleHistoryKeys = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-		const isUndo = keymatch(event.nativeEvent, "CmdOrCtrl+z");
+		const isUndo = matchShortcut(event.nativeEvent, "CmdOrCtrl+z");
 		const isRedo =
-			keymatch(event.nativeEvent, "CmdOrCtrl+Shift+z") ||
-			keymatch(event.nativeEvent, "CmdOrCtrl+y");
+			matchShortcut(event.nativeEvent, "CmdOrCtrl+Shift+z") ||
+			matchShortcut(event.nativeEvent, "CmdOrCtrl+y");
 		if (!isUndo && !isRedo) return false;
 		event.preventDefault();
 		if (isUndo ? editor.commands.undo() : editor.commands.redo()) {
@@ -261,7 +261,7 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 								close();
 								return;
 							}
-							if (keymatch(event.nativeEvent, "CmdOrCtrl+Enter")) {
+							if (matchShortcut(event.nativeEvent, "CmdOrCtrl+Enter")) {
 								event.preventDefault();
 								editor.commands.replaceAllFindMatches(replacement);
 								return;

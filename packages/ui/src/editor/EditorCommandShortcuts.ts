@@ -6,7 +6,7 @@ import { Heading } from "@tiptap/extension-heading";
 import { Italic } from "@tiptap/extension-italic";
 import { Plugin } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
-import { keymatch } from "keymatch";
+import { matchShortcut } from "../lib/keyboard";
 
 const withoutShortcuts = { addKeyboardShortcuts: () => ({}) };
 
@@ -87,7 +87,7 @@ export const EditorCommandShortcuts = Extension.create({
 					handleKeyDown: (_view, event) => {
 						for (const id of editorCommandIds) {
 							const binding = getCommandBinding(id);
-							if (binding && keymatch(event, binding)) return run(id);
+							if (binding && matchShortcut(event, binding)) return run(id);
 						}
 						return false;
 					},
