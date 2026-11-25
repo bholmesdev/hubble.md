@@ -7,9 +7,11 @@ import {
 	useRef,
 	useState,
 } from "react";
-import MingcuteLayoutLeftLine from "~icons/mingcute/layout-left-line";
+import MingcuteSidebarLeftCollapseLine from "~icons/mingcute/sidebar-left-collapse-line";
+import MingcuteSidebarLeftLine from "~icons/mingcute/sidebar-left-line";
 import { desktopApi } from "../desktopApi";
 import { useCompactWindow } from "../lib/layout";
+import { windowControlsInset } from "../lib/windowChrome";
 import { setSidebarView, toggleSidebar } from "../store/actions";
 import { sidebarOpenStore, sidebarViewStore } from "../store/state";
 import { tabsStore } from "../store/tabStore";
@@ -21,10 +23,6 @@ const START_INSET =
 	desktopApi.platform === "darwin"
 		? "var(--hubble-traffic-light-inset, 70px)"
 		: "8px";
-const END_INSET =
-	desktopApi.platform === "darwin"
-		? "0px"
-		: "calc(100vw - env(titlebar-area-width, calc(100vw - 138px)))";
 const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
 
 const dragRegionStyle = {
@@ -65,7 +63,9 @@ export function WindowTitleBar({
 	);
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
 	const startInset = isFullScreen ? "0px" : START_INSET;
-	const endInset = isFullScreen ? "0px" : END_INSET;
+	const endInset = isFullScreen
+		? "0px"
+		: windowControlsInset(desktopApi.platform);
 	// A lone tab's row spans the whole bar so its title centers on the window;
 	// the sidebar toggle floats over its start unless the sidebar header holds it.
 	const overlayToggle = singleTab && !spansSidebar;
@@ -115,13 +115,21 @@ export function WindowTitleBar({
 					variant="ghost"
 					size="icon-sm"
 					// Stays above the compact sidebar overlay, which covers the title bar.
-					className="relative z-40"
+					className="relative z-40 aria-expanded:bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:bg-muted aria-expanded:hover:text-foreground"
 					style={noDragStyle}
 					onClick={toggleSidebar}
 					aria-label="Toggle sidebar"
+					aria-expanded={sidebarOpen}
 					title={toggleSidebarTitle}
 				>
-					<MingcuteLayoutLeftLine className="size-4" />
+					{sidebarOpen ? (
+						<MingcuteSidebarLeftLine aria-hidden="true" className="size-4" />
+					) : (
+						<MingcuteSidebarLeftCollapseLine
+							aria-hidden="true"
+							className="size-4"
+						/>
+					)}
 					{showSidebarBadge ? (
 						<span className="absolute top-1 end-1 size-1.5 rounded-full bg-primary" />
 					) : null}

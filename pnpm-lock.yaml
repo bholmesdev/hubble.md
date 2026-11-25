@@ -127,8 +127,8 @@ importers:
         version: 4.4.3
     devDependencies:
       '@iconify-json/mingcute':
-        specifier: ^1.2.7
-        version: 1.2.7
+        specifier: ^1.2.10
+        version: 1.2.10
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0
@@ -193,8 +193,8 @@ importers:
   apps/web:
     dependencies:
       '@iconify-json/mingcute':
-        specifier: ^1.2.7
-        version: 1.2.7
+        specifier: ^1.2.10
+        version: 1.2.10
       '@plausible-analytics/tracker':
         specifier: ^0.4.5
         version: 0.4.5
@@ -269,8 +269,8 @@ importers:
         version: 1.4.0
     devDependencies:
       '@iconify-json/mingcute':
-        specifier: ^1.2.7
-        version: 1.2.7
+        specifier: ^1.2.10
+        version: 1.2.10
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.1.18(vite@7.3.5(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.30.2)(yaml@2.9.0))
@@ -513,8 +513,8 @@ importers:
         version: 4.4.3
     devDependencies:
       '@iconify-json/mingcute':
-        specifier: ^1.2.7
-        version: 1.2.7
+        specifier: ^1.2.10
+        version: 1.2.10
       '@types/react':
         specifier: ^19.1.8
         version: 19.2.14
@@ -1373,8 +1373,8 @@ packages:
     peerDependencies:
       hono: ^4
 
-  '@iconify-json/mingcute@1.2.7':
-    resolution: {integrity: sha512-bp4z6F53KAQp99aSL7qPCHL7HWUNGMNKIhfo/dx9pwVHiad/WusUbTOFXEZfpA44syJPzSOxa3O6Pwiq7qZz1g==}
+  '@iconify-json/mingcute@1.2.10':
+    resolution: {integrity: sha512-TK1iGbnEpR8vcM3VMbKxWT2V3+PN1EYorh0HV4V5Fi4mF+2i/PRG4IJi84Sdu2jIMAqeYghN1wiAUOu8R7EPCg==}
 
   '@iconify/tools@4.2.0':
     resolution: {integrity: sha512-WRxPva/ipxYkqZd1+CkEAQmd86dQmrwH0vwK89gmp2Kh2WyyVw57XbPng0NehP3x4V1LzLsXUneP1uMfTMZmUA==}
@@ -7450,7 +7450,7 @@ snapshots:
     dependencies:
       hono: 4.12.8
 
-  '@iconify-json/mingcute@1.2.7':
+  '@iconify-json/mingcute@1.2.10':
     dependencies:
       '@iconify/types': 2.0.0
 

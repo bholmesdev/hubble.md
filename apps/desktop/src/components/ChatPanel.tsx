@@ -1,12 +1,18 @@
-import { Button } from "@hubble.md/ui";
+import { Button, ResizableSidebar } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import {
+	useEffect,
+	useEffectEvent,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
 import MingcuteArrowUpLine from "~icons/mingcute/arrow-up-line";
-import MingcuteCloseLine from "~icons/mingcute/close-line";
 import MingcuteDownLine from "~icons/mingcute/down-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteMicLine from "~icons/mingcute/mic-line";
+import MingcuteSidebarRightLine from "~icons/mingcute/sidebar-right-line";
 import { desktopApi } from "../desktopApi";
 import {
 	CHAT_CONTEXT_LIMIT,
@@ -19,6 +25,7 @@ import { editChatDraft } from "../desktopApi/chatTranscript";
 import { isEditableFile } from "../lib/filePath";
 import { isVirtualPath } from "../lib/newTabPage";
 import { resolveRelativeLinkPath } from "../lib/relativeLinkPath";
+import { windowControlsInset } from "../lib/windowChrome";
 import { loadPath } from "../store/actions";
 import {
 	attempt,
@@ -32,6 +39,7 @@ import { getChatPanelState } from "../store/chatPanelState";
 import { viewerStore, workspacePathStore } from "../store/state";
 import {
 	chatPanelOpen,
+	chatPanelWidth,
 	chatSelection,
 	EMPTY_CHAT,
 	updateTabChat,
@@ -49,11 +57,40 @@ export const TOGGLE_CHAT_EVENT = "hubble:toggle-chat";
 export function ChatPanel({
 	tabId,
 	onOpenSettings,
+	fullHeight = false,
 }: {
 	tabId: TabId | null;
 	onOpenSettings: () => void;
+	fullHeight?: boolean;
 }) {
 	const open = useStoreValue(chatPanelOpen);
+	const width = useStoreValue(chatPanelWidth);
+	const panelRef = useRef<HTMLElement>(null);
+	const [limit, setLimit] = useState(() => window.innerWidth * 0.85);
+	useLayoutEffect(() => {
+		if (!open) return;
+		const panel = panelRef.current;
+		const parent = panel?.parentElement;
+		const editor =
+			panel?.previousElementSibling?.querySelector("[data-chat-editor-area]") ??
+			panel?.previousElementSibling;
+		if (!parent || !editor) return;
+		const measure = () => {
+			const left = editor.getBoundingClientRect().left;
+			const right = parent.getBoundingClientRect().right || window.innerWidth;
+			// Leave room for the editor even when the file sidebar is open.
+			setLimit(
+				Math.max(280, Math.min(window.innerWidth * 0.85, right - left - 240)),
+			);
+		};
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(parent);
+		observer.observe(editor);
+		return () => observer.disconnect();
+	}, [open]);
+	const panelWidth = Math.min(width, limit);
+
 	const recording = useStoreValue(voice);
 	const voiceBusy =
 		recording?.tabId === tabId &&
@@ -359,17 +396,34 @@ export function ChatPanel({
 	if (!open || !tabId) return null;
 
 	return (
-		<aside
+		<ResizableSidebar
+			id="chat-sidebar"
 			aria-label="Chat"
-			className="flex h-full w-[360px] max-w-[85vw] shrink-0 flex-col border-s border-border bg-background text-sm"
+			panelRef={panelRef}
+			side="right"
+			resizeLabel="Resize chat panel"
+			width={panelWidth}
+			minWidth={280}
+			maxWidth={limit}
+			onWidthChange={(next) => chatPanelWidth.set(next)}
+			onCollapse={() => chatPanelOpen.set(false)}
+			className={`h-full min-h-0 bg-background text-sm ${fullHeight ? "col-start-2 row-start-1 row-span-2" : ""}`}
 		>
 			<header
-				className={`relative flex h-9 shrink-0 items-center justify-between px-2 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${scrolled ? "after:border-border" : "after:border-transparent"}`}
+				style={
+					fullHeight
+						? {
+								paddingInlineEnd: `max(8px, ${windowControlsInset(desktopApi.platform)})`,
+							}
+						: undefined
+				}
+				className={`relative flex h-9 shrink-0 items-center justify-between px-2 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-dashed ${scrolled ? "after:border-border" : "after:border-transparent"} ${fullHeight ? "[-webkit-app-region:drag]" : ""}`}
 			>
 				<Button
 					variant="ghost"
 					size="icon-sm"
 					aria-label="New chat"
+					className="[-webkit-app-region:no-drag]"
 					title="New chat"
 					disabled={sending || voiceBusy || panel.kind !== "conversation"}
 					onClick={() => {
@@ -382,15 +436,20 @@ export function ChatPanel({
 				>
 					<MingcuteEditLine aria-hidden="true" className="size-4" />
 				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Close chat"
-					title="Close chat"
-					onClick={() => chatPanelOpen.set(false)}
-				>
-					<MingcuteCloseLine aria-hidden="true" className="size-4" />
-				</Button>
+				<div className="ms-auto flex items-center [-webkit-app-region:no-drag]">
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Close Chat"
+						title="Close Chat"
+						aria-expanded={true}
+						aria-controls="chat-sidebar"
+						className="bg-muted text-foreground"
+						onClick={() => chatPanelOpen.set(false)}
+					>
+						<MingcuteSidebarRightLine aria-hidden="true" className="size-4" />
+					</Button>
+				</div>
 			</header>
 			{panel.kind === "checking" ? (
 				<div className="flex flex-1 items-center justify-center p-6 text-muted-foreground">
@@ -671,7 +730,7 @@ export function ChatPanel({
 					</div>
 				</>
 			)}
-		</aside>
+		</ResizableSidebar>
 	);
 }
 

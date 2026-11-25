@@ -67,7 +67,7 @@
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
-		"@iconify-json/mingcute": "^1.2.7",
+		"@iconify-json/mingcute": "^1.2.10",
 		"@playwright/test": "^1.63.0",
 		"@svgr/core": "^8.1.0",
 		"@svgr/plugin-jsx": "^8.1.0",

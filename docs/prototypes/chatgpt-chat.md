@@ -104,3 +104,7 @@ During recording, selections in the rich editor attach after staying unchanged f
 macOS builds require Xcode Command Line Tools. The build compiles a universal Swift helper app with its own privacy descriptions and audio-input entitlements. Launch Services starts it with a private Unix socket back to Hubble so microphone and speech permission belong to Hubble Dictation, even when the dev process was launched from a terminal. macOS Dictation must be enabled in System Settings → Keyboard → Dictation; the helper explains how to recover if it is disabled. The dev wrapper includes the same privacy descriptions.
 
 Speech recognition results can cover only the latest utterance after a pause. Hubble merges words by their timestamps in the recording, keeping earlier utterances and replacing revised overlapping words. Context attachments never restart dictation or clear the draft.
+
+## Chat panel layout
+
+Single-tab Chat spans the full window height beside the file title bar; with multiple tabs it remains below the tab strip. Changing that layout keeps the panel mounted.
