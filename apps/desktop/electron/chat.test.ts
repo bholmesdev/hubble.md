@@ -487,6 +487,73 @@ it("stops tool continuation when the workspace changes", async () => {
 	}
 });
 
+it("does not edit the previous workspace when it changes after the editor reply", async () => {
+	const fs = await import("node:fs/promises");
+	const os = await import("node:os");
+	const path = await import("node:path");
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "hubble-tool-switch-"));
+	const nextRoot = await fs.mkdtemp(
+		path.join(os.tmpdir(), "hubble-tool-next-"),
+	);
+	let workspace = root;
+	try {
+		await fs.writeFile(path.join(root, "note.md"), "Keep this\n");
+		setupChatIpc(
+			() => sender as unknown as WebContents,
+			() => workspace,
+		);
+		sender.send.mockImplementation((channel, payload) => {
+			if (channel !== "desktop:chat-file-request") return;
+			queueMicrotask(() => {
+				call("file-reply", {
+					requestId: payload.requestId,
+					callId: payload.callId,
+					open: false,
+				});
+				if (payload.operation === "write") workspace = nextRoot;
+			});
+		});
+		mocks.create.mockImplementation(async (body) => {
+			const read = body.input.find(
+				(item) => item.type === "function_call_output",
+			);
+			return stream([
+				{
+					type: "response.completed",
+					response: {
+						output: [
+							{
+								type: "function_call",
+								namespace: "workspace",
+								name: read ? "apply_patch" : "read_file",
+								arguments: JSON.stringify(
+									read
+										? {
+												expected_version: JSON.parse(read.output).version,
+												patch:
+													"*** Begin Patch\n*** Update File: note.md\n@@\n-Keep this\n+Unexpected edit\n*** End Patch",
+											}
+										: { path: "note.md" },
+								),
+								call_id: read ? "edit" : "read",
+								id: read ? "fc_edit" : "fc_read",
+							},
+						],
+					},
+				},
+			]);
+		});
+		expect(await call("send", request())).toMatchObject({ status: "stopped" });
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(await fs.readFile(path.join(root, "note.md"), "utf8")).toBe(
+			"Keep this\n",
+		);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+		await fs.rm(nextRoot, { recursive: true, force: true });
+	}
+});
+
 it("publishes the exact Responses bodies with quoted, spoken, and comment context", async () => {
 	const response = {
 		id: "resp_debug",
