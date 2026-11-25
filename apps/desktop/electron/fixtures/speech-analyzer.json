@@ -1,0 +1,541 @@
+[
+	{
+		"text": "Read",
+		"range": {
+			"start": 0,
+			"end": 1.1138125
+		}
+	},
+	{
+		"text": "Read this",
+		"range": {
+			"end": 1.1138125,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this se",
+		"range": {
+			"end": 1.1138125,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section",
+		"range": {
+			"end": 1.1138125,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section care",
+		"range": {
+			"end": 2.042625,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully",
+		"range": {
+			"end": 2.042625,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and",
+		"range": {
+			"end": 2.042625,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and keep",
+		"range": {
+			"end": 2.971375,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and keep all",
+		"range": {
+			"end": 2.971375,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and keep all of",
+		"range": {
+			"end": 2.971375,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and keep all of these",
+		"range": {
+			"end": 2.971375,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and keep all of these words",
+		"range": {
+			"end": 2.971375,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and keep all of these words in",
+		"range": {
+			"end": 3.9930625,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and keep all of these words in the",
+		"range": {
+			"end": 3.9930625,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and keep all of these words in the message",
+		"range": {
+			"start": 0,
+			"end": 3.9930625
+		}
+	},
+	{
+		"text": "Read this section carefully and keep all of these words in the message.",
+		"range": {
+			"end": 4.921875,
+			"start": 0
+		}
+	},
+	{
+		"text": "Read this section carefully and keep all of these words in the message.",
+		"range": {
+			"end": 3.96,
+			"start": 0
+		}
+	},
+	{
+		"text": " This",
+		"range": {
+			"end": 5.01475,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is",
+		"range": {
+			"end": 5.01475,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is the",
+		"range": {
+			"end": 5.01475,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is the 1",
+		"range": {
+			"end": 5.01475,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is the 1st",
+		"range": {
+			"end": 5.8506875,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is the 1st part",
+		"range": {
+			"end": 5.8506875,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is the 1st part of",
+		"range": {
+			"end": 5.8506875,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is the 1st part of a",
+		"range": {
+			"end": 5.8506875,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is the 1st part of a longer",
+		"range": {
+			"end": 5.8506875,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is the 1st part of a longer recording",
+		"range": {
+			"start": 3.96,
+			"end": 6.872375
+		}
+	},
+	{
+		"text": " This is the 1st part of a longer recording.",
+		"range": {
+			"end": 7.801125,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " This is the 1st part of a longer recording.",
+		"range": {
+			"end": 6.84,
+			"start": 3.96
+		}
+	},
+	{
+		"text": " Add",
+		"range": {
+			"end": 14.4885,
+			"start": 6.84
+		}
+	},
+	{
+		"text": " Add support",
+		"range": {
+			"end": 14.4885,
+			"start": 6.84
+		}
+	},
+	{
+		"text": " Add supporting",
+		"range": {
+			"end": 14.4885,
+			"start": 6.84
+		}
+	},
+	{
+		"text": " Add supporting c",
+		"range": {
+			"end": 15.5101875,
+			"start": 6.84
+		}
+	},
+	{
+		"text": " Add supporting cit",
+		"range": {
+			"end": 15.5101875,
+			"start": 6.84
+		}
+	},
+	{
+		"text": " Add supporting citations",
+		"range": {
+			"end": 15.5101875,
+			"start": 6.84
+		}
+	},
+	{
+		"text": " Add supporting citations to",
+		"range": {
+			"end": 15.5101875,
+			"start": 6.84
+		}
+	},
+	{
+		"text": " Add supporting citations to the",
+		"range": {
+			"end": 15.5101875,
+			"start": 6.84
+		}
+	},
+	{
+		"text": " Add supporting citations to the high",
+		"range": {
+			"start": 6.84,
+			"end": 16.439
+		}
+	},
+	{
+		"text": " Add supporting citations to the highlight",
+		"range": {
+			"start": 6.84,
+			"end": 16.439
+		}
+	},
+	{
+		"text": " Add supporting citations to the highlighted",
+		"range": {
+			"start": 6.84,
+			"end": 16.439
+		}
+	},
+	{
+		"text": " Add supporting citations to the highlighted pass",
+		"range": {
+			"start": 6.84,
+			"end": 16.439
+		}
+	},
+	{
+		"text": " Add supporting citations to the highlighted passage",
+		"range": {
+			"start": 6.84,
+			"end": 16.439
+		}
+	},
+	{
+		"text": " Add supporting citations to the highlighted passage.",
+		"range": {
+			"start": 6.84,
+			"end": 17.36775
+		}
+	},
+	{
+		"text": " Add supporting citations to the highlighted passage.",
+		"range": {
+			"start": 13.26,
+			"end": 16.44
+		}
+	},
+	{
+		"text": " Keep",
+		"range": {
+			"start": 16.44,
+			"end": 17.4141875
+		}
+	},
+	{
+		"text": " Keep the",
+		"range": {
+			"start": 16.44,
+			"end": 17.4141875
+		}
+	},
+	{
+		"text": " Keep the first",
+		"range": {
+			"start": 16.44,
+			"end": 18.3894375
+		}
+	},
+	{
+		"text": " Keep the first part",
+		"range": {
+			"start": 16.44,
+			"end": 18.3894375
+		}
+	},
+	{
+		"text": " Keep the first part and",
+		"range": {
+			"start": 16.44,
+			"end": 18.3894375
+		}
+	},
+	{
+		"text": " Keep the first part and add",
+		"range": {
+			"start": 16.44,
+			"end": 19.31825
+		}
+	},
+	{
+		"text": " Keep the first part and add the",
+		"range": {
+			"start": 16.44,
+			"end": 19.31825
+		}
+	},
+	{
+		"text": " Keep the first part and add the 2",
+		"range": {
+			"start": 16.44,
+			"end": 19.31825
+		}
+	},
+	{
+		"text": " Keep the first part and add the 2 part",
+		"range": {
+			"start": 16.44,
+			"end": 19.31825
+		}
+	},
+	{
+		"text": " Keep the first part and add the 2 part after",
+		"range": {
+			"start": 16.44,
+			"end": 20.2470625
+		}
+	},
+	{
+		"text": " Keep the first part and add the 2 part after it",
+		"range": {
+			"start": 16.44,
+			"end": 20.2470625
+		}
+	},
+	{
+		"text": " Keep the first part and add the 2 part after it.",
+		"range": {
+			"start": 16.44,
+			"end": 20.2470625
+		}
+	},
+	{
+		"text": " Keep the 1st part and add the 2nd part after it.",
+		"range": {
+			"start": 16.56,
+			"end": 19.5
+		}
+	},
+	{
+		"text": " Fin",
+		"range": {
+			"start": 19.5,
+			"end": 27.9560625
+		}
+	},
+	{
+		"text": " Finish",
+		"range": {
+			"start": 19.5,
+			"end": 27.9560625
+		}
+	},
+	{
+		"text": " Finish with",
+		"range": {
+			"start": 19.5,
+			"end": 27.9560625
+		}
+	},
+	{
+		"text": " Finish with the",
+		"range": {
+			"start": 19.5,
+			"end": 27.9560625
+		}
+	},
+	{
+		"text": " Finish with the short",
+		"range": {
+			"start": 19.5,
+			"end": 27.9560625
+		}
+	},
+	{
+		"text": " Finish with the short sum",
+		"range": {
+			"start": 19.5,
+			"end": 28.884875
+		}
+	},
+	{
+		"text": " Finish with the short summary",
+		"range": {
+			"start": 19.5,
+			"end": 28.884875
+		}
+	},
+	{
+		"text": " Finish with the short summary.",
+		"range": {
+			"start": 19.5,
+			"end": 28.884875
+		}
+	},
+	{
+		"text": " Finish with the short summary.",
+		"range": {
+			"start": 26.64,
+			"end": 28.14
+		}
+	},
+	{
+		"text": " All",
+		"range": {
+			"start": 28.14,
+			"end": 28.884875
+		}
+	},
+	{
+		"text": " All three",
+		"range": {
+			"start": 28.14,
+			"end": 29.9065625
+		}
+	},
+	{
+		"text": " All three parts",
+		"range": {
+			"start": 28.14,
+			"end": 29.9065625
+		}
+	},
+	{
+		"text": " All three parts should",
+		"range": {
+			"start": 28.14,
+			"end": 29.9065625
+		}
+	},
+	{
+		"text": " All three parts should rem",
+		"range": {
+			"start": 28.14,
+			"end": 29.9065625
+		}
+	},
+	{
+		"text": " All three parts should remain",
+		"range": {
+			"start": 28.14,
+			"end": 30.8353125
+		}
+	},
+	{
+		"text": " All three parts should remain in",
+		"range": {
+			"start": 28.14,
+			"end": 30.8353125
+		}
+	},
+	{
+		"text": " All three parts should remain in the",
+		"range": {
+			"start": 28.14,
+			"end": 30.8353125
+		}
+	},
+	{
+		"text": " All three parts should remain in the message",
+		"range": {
+			"start": 28.14,
+			"end": 30.8353125
+		}
+	},
+	{
+		"text": " All three parts should remain in the message.",
+		"range": {
+			"start": 28.14,
+			"end": 30.9218125
+		}
+	},
+	{
+		"text": " All three parts should remain in the message.",
+		"range": {
+			"start": 28.32,
+			"end": 30.84
+		}
+	}
+]

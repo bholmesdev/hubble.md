@@ -26,6 +26,9 @@ function subscribe<T extends unknown[]>(
 let nextWatchId = 0;
 
 const desktopApi = {
+	voiceStart: (id) => ipcRenderer.invoke("desktop:voice-start", id),
+	voiceStop: (id) => ipcRenderer.invoke("desktop:voice-stop", id),
+	onVoice: (callback) => subscribe("desktop:voice", callback),
 	chatAccount: () => ipcRenderer.invoke("desktop:chat-account"),
 	chatSignIn: () => ipcRenderer.invoke("desktop:chat-sign-in"),
 	chatCancelSignIn: () => ipcRenderer.invoke("desktop:chat-cancel-sign-in"),

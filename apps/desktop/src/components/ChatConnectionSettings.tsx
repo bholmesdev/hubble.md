@@ -1,6 +1,5 @@
 import { Button } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { useEffect } from "react";
 import { desktopApi } from "../desktopApi";
 import {
 	chatConnection,
@@ -14,9 +13,6 @@ import { SettingsSection } from "./SettingsDialog";
 export function ChatConnectionSettings() {
 	const { account, models, busy, signingIn, sending, error } =
 		useStoreValue(chatConnection);
-	useEffect(() => {
-		void refreshChatConnection();
-	}, []);
 	function report(error: unknown) {
 		chatConnection.set({ ...chatConnection.get(), error: errorText(error) });
 	}

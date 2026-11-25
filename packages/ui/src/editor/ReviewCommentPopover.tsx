@@ -18,16 +18,14 @@ import {
 	useState,
 } from "react";
 import MingcuteArrowUpLine from "~icons/mingcute/arrow-up-line";
+import MingcuteAttachmentLine from "~icons/mingcute/attachment-line";
 import MingcuteCheckCircleFill from "~icons/mingcute/check-circle-fill";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
-import MingcuteCopy2Line from "~icons/mingcute/copy-2-line";
 import MingcuteDelete2Line from "~icons/mingcute/delete-2-line";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 import { ReviewCommentGutter, useLayoutChange } from "./ReviewCommentGutter";
 import {
-	buildReviewAgentPrompt,
-	copyAgentPrompt,
 	deleteComment,
 	REVIEW_THREAD_COMMAND_EVENT,
 	type ReviewComment,
@@ -266,6 +264,8 @@ function selectionReference(
 	};
 }
 
+import type { EditorAttachment } from "./attachments";
+
 export function ReviewCommentPopover({
 	editor,
 	filePath,
@@ -273,6 +273,7 @@ export function ReviewCommentPopover({
 	request,
 	onMessage,
 	onThreadsChange,
+	onAttach,
 }: {
 	editor: Editor | null;
 	filePath: string;
@@ -281,6 +282,7 @@ export function ReviewCommentPopover({
 	onMessage?: (message: string, type: "success" | "error") => void;
 	/** Publishes the document's threads as plain data, so the toolbar can list
 	 * them without walking the document again or holding the editor. */
+	onAttach?: (attachment: EditorAttachment) => void;
 	onThreadsChange?: (threads: ReviewThread[]) => void;
 }) {
 	const [comments, setComments] = useState<ReviewComment[]>([]);
@@ -354,6 +356,33 @@ export function ReviewCommentPopover({
 		);
 	}, [activeComment, mode]);
 
+	const close = () => {
+		setOpen(false);
+		setActiveComment(null);
+	};
+
+	const attachThread = (comment: ReviewComment) => {
+		if (!editor || !onAttach) return;
+		onAttach({
+			kind: "thread",
+			path: filePath,
+			threadId: comment.id,
+			text: editor.state.doc.textBetween(comment.from, comment.to, "\n"),
+			comments: [
+				{
+					author:
+						comment.attrs.metadata?.author === "agent" ? "agent" : "human",
+					body: comment.attrs.body ?? "",
+				},
+				...(comment.attrs.replies ?? []).map((reply) => ({
+					author: reply.author ?? "human",
+					body: reply.body,
+				})),
+			],
+		});
+		close();
+	};
+
 	const openThread = (comment: ReviewComment) => {
 		setActiveComment(comment);
 		setAnchorRange({ from: comment.from, to: comment.to });
@@ -420,6 +449,10 @@ export function ReviewCommentPopover({
 			const { kind, id } = (event as CustomEvent<ReviewThreadCommand>).detail;
 			const comment = comments.find((entry) => entry.id === id);
 			if (!comment) return;
+			if (kind === "attach") {
+				attachThread(comment);
+				return;
+			}
 			if (kind === "toggleResolved") {
 				setCommentResolved(editor, comment, comment.attrs.resolved !== true);
 				return;
@@ -453,7 +486,7 @@ export function ReviewCommentPopover({
 		window.addEventListener(REVIEW_THREAD_COMMAND_EVENT, handleCommand);
 		return () =>
 			window.removeEventListener(REVIEW_THREAD_COMMAND_EVENT, handleCommand);
-	}, [comments, editor, viewportRef]);
+	}, [comments, editor, viewportRef, onAttach, filePath]);
 
 	// Anchored to the comment's live screen position, so it follows both the
 	// content growing under it and the viewport moving beneath it.
@@ -500,11 +533,6 @@ export function ReviewCommentPopover({
 		);
 		return () => window.cancelAnimationFrame(frame);
 	}, [mode, open]);
-
-	const close = () => {
-		setOpen(false);
-		setActiveComment(null);
-	};
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	useEffect(() => {
@@ -603,14 +631,6 @@ export function ReviewCommentPopover({
 		close();
 	};
 
-	const copyThreadPrompt = () => {
-		if (!activeComment) return;
-		void copyAgentPrompt(
-			buildReviewAgentPrompt({ filePath, commentId: activeComment.id }),
-			onMessage,
-		);
-	};
-
 	if (!editor) return null;
 
 	return (
@@ -671,17 +691,18 @@ export function ReviewCommentPopover({
 											<MingcuteCheckLine />
 										)}
 									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon-xs"
-										data-review-copy-agent-prompt
-										aria-label="Copy agent prompt"
-										title="Copy a prompt asking an agent to address this comment"
-										onClick={copyThreadPrompt}
-									>
-										<MingcuteCopy2Line />
-									</Button>
+									{onAttach && (
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon-xs"
+											aria-label="Attach to Chat"
+											title="Attach to Chat"
+											onClick={() => attachThread(activeComment)}
+										>
+											<MingcuteAttachmentLine />
+										</Button>
+									)}
 									<Button
 										type="button"
 										variant="ghost"

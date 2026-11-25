@@ -87,3 +87,20 @@ Unreadable saved credentials show a recovery state in both the panel and Chat
 settings. Reset connection and sign in again removes only the local connection,
 then starts sign-in. It preserves notes and tab conversations. A failed reset
 stays visible with the same retry action.
+
+
+### Attachments
+
+The selection toolbar and each comment thread can attach context to the current tab's draft. The comments list offers the same action. Attach opens Chat and focuses the composer. Pending attachments show a short quote above the prompt, with a remove control; thread previews use the first comment.
+
+Attachments capture the selection or the thread's highlighted text and comments at attachment time. They stay with the tab across file changes, workspace changes, and restarts. Sending moves them from the draft into that message, preserving the snapshot in later conversation context without attaching another copy on each follow-up. Reattaching the same selection avoids duplicates; reattaching a pending thread refreshes its snapshot. Starting a new chat clears pending attachments.
+
+## Voice drafts (macOS)
+
+The microphone records an editable draft using macOS on-device speech recognition. On supported macOS 26+ devices and languages it uses SpeechAnalyzer and SpeechTranscriber, installing system model assets when needed. Other Macs, unsupported languages, or unavailable model assets fall back to SFSpeechRecognizer, with automatic punctuation on macOS 13+. SpeechAnalyzer revisions replace their explicit audio ranges; the fallback keeps settled utterances separate from partial recognition updates. Audio is processed on device and is not saved. Stop recording to review the transcript and attachments before sending through the existing chat request. The prototype stops after three minutes, rolling recognition sessions over while microphone capture continues; another recording appends to the same draft. Microphone and speech permissions are requested only when starting a recording, with recovery instructions if denied or the current language is unavailable. Other platforms keep the text composer.
+
+During recording, selections in the rich editor attach after staying unchanged for 700 ms. Pointer drags must finish first. Successful attachments briefly flash the selection without moving focus out of the editor; reduced-motion settings suppress the flash. Duplicate passages use the existing attachment deduplication. Switching tabs or workspaces, closing Chat, and signing out stop the recording; partial transcripts remain in the originating tab. A file change inside the same tab keeps recording and attaches subsequent highlights from the new file.
+
+macOS builds require Xcode Command Line Tools. The build compiles a universal Swift helper app with its own privacy descriptions and audio-input entitlements. Launch Services starts it with a private Unix socket back to Hubble so microphone and speech permission belong to Hubble Dictation, even when the dev process was launched from a terminal. macOS Dictation must be enabled in System Settings → Keyboard → Dictation; the helper explains how to recover if it is disabled. The dev wrapper includes the same privacy descriptions.
+
+Speech recognition results can cover only the latest utterance after a pause. Hubble merges words by their timestamps in the recording, keeping earlier utterances and replacing revised overlapping words. Context attachments never restart dictation or clear the draft.

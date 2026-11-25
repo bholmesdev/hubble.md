@@ -42,6 +42,29 @@ const CLOSED: ReviewThread = {
 const ALSO_OPEN: ReviewThread = { ...CLOSED, resolved: false };
 
 describe("ReviewCommentSummary", () => {
+	it("attaches a thread and closes the list without taking focus back", async () => {
+		const prompt = document.createElement("textarea");
+		document.body.append(prompt);
+		const onCommand = vi.fn(() => prompt.focus());
+		render([OPEN], { canAttach: true, onCommand });
+		await open();
+		const attach = document.querySelector<HTMLButtonElement>(
+			'[data-review-comment-summary] [aria-label="Attach to Chat"]',
+		);
+		expect(attach).not.toBeNull();
+		expect(
+			document.querySelector('[aria-label="Copy agent prompt"]'),
+		).toBeNull();
+		await act(async () => attach?.click());
+		expect(onCommand).toHaveBeenCalledWith("attach", "c1");
+		expect(
+			document
+				.querySelector('[aria-label="Comments"]')
+				?.getAttribute("aria-expanded"),
+		).toBe("false");
+		expect(document.activeElement).toBe(prompt);
+	});
+
 	it("teaches the feature when the document has no comments", async () => {
 		render([]);
 
@@ -137,18 +160,10 @@ describe("ReviewCommentSummary", () => {
 		expect(findCopyButton()?.disabled).toBe(true);
 	});
 
-	it("commands resolve and delete from a row, and copies its own prompt", async () => {
-		const writeText = stubClipboard();
+	it("commands resolve and delete from a row", async () => {
 		const onCommand = vi.fn();
 		render([OPEN, ALSO_OPEN], { onCommand });
 		await open();
-
-		await act(async () => {
-			rowAction(0, "Copy agent prompt")?.click();
-		});
-		expect(writeText).toHaveBeenCalledWith(
-			"Address comment c1 in /notes/plan.md",
-		);
 
 		await act(async () => {
 			rowAction(0, "Resolve")?.click();
@@ -271,6 +286,7 @@ function render(threads: ReviewThread[], props: Record<string, unknown> = {}) {
 		root.render(
 			createElement(ReviewCommentSummary, {
 				filePath: "/notes/plan.md",
+				canAttach: true,
 				threads,
 				onCommand: () => {},
 				...props,

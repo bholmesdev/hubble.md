@@ -9,7 +9,8 @@ import {
 	chatInput,
 	chatResponseInput,
 } from "../desktopApi/chat";
-import { chatConnection } from "../store/chatConnection";
+import type { VoiceEvent } from "../desktopApi/voice";
+import { chatConnection, refreshChatConnection } from "../store/chatConnection";
 import { getInitialState, STORAGE_KEY, serialize } from "../store/persistence";
 import {
 	appStore,
@@ -20,11 +21,16 @@ import {
 import { chatPanelOpen } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import { emptyTabs, withOpenedTab } from "../store/tabs";
+import { voice } from "../store/voice";
 import { ChatConnectionSettings } from "./ChatConnectionSettings";
 import { ChatPanel, TOGGLE_CHAT_EVENT } from "./ChatPanel";
 
 const mocks = vi.hoisted(() => ({
 	api: {
+		platform: "darwin",
+		voiceStart: vi.fn(),
+		voiceStop: vi.fn(),
+		onVoice: vi.fn(),
 		chatAccount: vi.fn(),
 		chatSignIn: vi.fn(),
 		chatDisconnect: vi.fn(),
@@ -46,6 +52,9 @@ let finish: (result: ChatResult) => void;
 
 beforeEach(async () => {
 	vi.clearAllMocks();
+	voice.set(null);
+	mocks.api.voiceStart.mockResolvedValue(undefined);
+	mocks.api.voiceStop.mockResolvedValue(undefined);
 	localStorage.clear();
 	appStore.set((state) => ({
 		...state,
@@ -88,6 +97,7 @@ beforeEach(async () => {
 			}),
 	);
 	mocks.api.chatStop.mockResolvedValue(undefined);
+	await refreshChatConnection();
 	host = document.createElement("div");
 	document.body.append(host);
 	root = createRoot(host);
@@ -119,7 +129,9 @@ function TabChat() {
 
 function button(text: string) {
 	const element = [...host.querySelectorAll("button")].find(
-		(button) => button.textContent === text,
+		(button) =>
+			button.textContent === text ||
+			(text === "Send" && button.getAttribute("aria-label") === "Send message"),
 	);
 	if (!element) throw new Error(`Missing button: ${text}`);
 	return element;
@@ -645,6 +657,8 @@ it("renders Markdown as streamed formatting and code fences become complete", as
 });
 
 it("interweaves streamed text and workspace operations and restores their order", async () => {
+	const clock = Date.now();
+	const now = vi.spyOn(Date, "now").mockReturnValue(clock);
 	await sendMessage();
 	const { id } = mocks.api.chatSend.mock.calls[0][0];
 	const message = (id: string, text: string) => ({
@@ -684,6 +698,8 @@ it("interweaves streamed text and workspace operations and restores their order"
 	expect(reply().textContent?.indexOf("Read note.md")).toBeLessThan(
 		reply().textContent?.indexOf("Second thought") ?? 0,
 	);
+	expect(reply().querySelector("summary")?.textContent).toBe("Thinking");
+	now.mockReturnValue(clock + 65000);
 	const completed = [
 		...context,
 		message("m2", "Second thought"),
@@ -698,6 +714,9 @@ it("interweaves streamed text and workspace operations and restores their order"
 		}),
 	);
 	const assertOrder = () => {
+		expect(reply().querySelector("summary")?.textContent).toBe(
+			"Worked for 1m 5s",
+		);
 		const text = reply().textContent ?? "";
 		const positions = [
 			"First thought",
@@ -714,6 +733,7 @@ it("interweaves streamed text and workspace operations and restores their order"
 	localStorage.setItem(STORAGE_KEY, saved);
 	await act(async () => appStore.set(getInitialState()));
 	assertOrder();
+	now.mockRestore();
 });
 
 it("fades only appended text while preserving streaming Markdown", async () => {
@@ -733,4 +753,242 @@ it("fades only appended text while preserving streaming Markdown", async () => {
 	);
 	expect(host.querySelector(".chat-chunk-enter")).toBeNull();
 	expect(host.querySelector("strong")?.textContent).toBe("bold text");
+});
+
+it("keeps attachments with their tab, removes them, and sends their snapshots once", async () => {
+	const { attachToChat } = await import("../store/tabChat");
+	const firstTab = tabsStore.get().activeTabId;
+	if (!firstTab) throw new Error("Missing tab");
+	const selection = {
+		kind: "selection" as const,
+		path: "/notes/note.md",
+		text: "A highlighted passage",
+	};
+	const thread = {
+		kind: "thread" as const,
+		path: "/notes/note.md",
+		text: "Anchored text",
+		threadId: "c1",
+		comments: [
+			{ author: "human" as const, body: "Explain this claim" },
+			{ author: "agent" as const, body: "Earlier reply" },
+		],
+	};
+	await act(async () => {
+		attachToChat(selection);
+		attachToChat(selection);
+		attachToChat(thread);
+	});
+	const pending = () => host.querySelector('[aria-label="Attachments"]');
+	expect(pending()?.textContent).toContain("A highlighted passage");
+	expect(pending()?.textContent).toContain("Explain this claim");
+	expect(pending()?.querySelectorAll("li")).toHaveLength(2);
+	await act(async () =>
+		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new")),
+	);
+	expect(pending()).toBeNull();
+	await act(async () =>
+		tabsStore.set((tabs) => ({ ...tabs, activeTabId: firstTab })),
+	);
+	expect(pending()?.textContent).toContain("A highlighted passage");
+	const remove = pending()?.querySelector<HTMLButtonElement>(
+		'button[aria-label="Remove attachment: A highlighted passage"]',
+	);
+	expect(remove).not.toBeNull();
+	await act(async () => remove?.click());
+	expect(pending()?.textContent).not.toContain("A highlighted passage");
+	await act(async () =>
+		appStore.set((state) => ({
+			...state,
+			workspace: { ...state.workspace, workspacePath: "/notes" },
+		})),
+	);
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(appStore.get())));
+	await act(async () => appStore.set(getInitialState()));
+	expect(pending()?.textContent).toContain("Explain this claim");
+	await act(async () =>
+		viewerStore.set({
+			...emptyDoc(),
+			currentPath: "/notes/note.md",
+			...cleanFileState(""),
+		}),
+	);
+	await sendMessage("Address this thread");
+	const request = mocks.api.chatSend.mock.calls[0][0];
+	expect(request.messages.slice(-1)[0].attachments).toMatchObject([thread]);
+	expect(pending()).toBeNull();
+	const input = chatInput(request.messages).slice(-1)[0]?.content ?? "";
+	expect(input).toContain("Anchored text");
+	expect(input).toContain("Earlier reply");
+	expect(input).toContain("c1");
+	await act(async () => finish({ status: "complete", text: "Done" }));
+	expect(
+		host.querySelector('article [aria-label="Sent attachments"]')?.textContent,
+	).toContain("Explain this claim");
+	await sendMessage("Continue");
+	const followup = mocks.api.chatSend.mock.calls[1][0];
+	expect(followup.messages.slice(-1)[0].attachments).toBeUndefined();
+	expect(
+		chatInput(followup.messages)
+			.map((m) => m.content)
+			.join("\n")
+			.match(/Earlier reply/g),
+	).toHaveLength(1);
+});
+
+it("records a draft for review, leaves selection focus alone, and stops when changing tabs", async () => {
+	let voiceEvent: ((event: VoiceEvent) => void) | undefined;
+	mocks.api.onVoice.mockImplementation((callback) => {
+		voiceEvent = callback;
+		return vi.fn();
+	});
+	const record = host.querySelector<HTMLButtonElement>(
+		'[aria-label="Record voice message"]',
+	);
+	expect(record).not.toBeNull();
+	await act(async () => record?.click());
+	const id = mocks.api.voiceStart.mock.calls[0][0];
+	await act(async () =>
+		voiceEvent?.({ id, status: "listening", text: "Explain this passage" }),
+	);
+	expect(host.querySelector("textarea")?.value).toBe("Explain this passage");
+	expect(host.querySelector("textarea")?.readOnly).toBe(true);
+	expect(host.querySelector("textarea")?.placeholder).toBe("Recording...");
+	expect(button("Send").disabled).toBe(false);
+	const { attachToChat } = await import("../store/tabChat");
+	const editor = document.createElement("div");
+	editor.tabIndex = 0;
+	document.body.append(editor);
+	editor.focus();
+	await act(async () => {
+		attachToChat({
+			kind: "selection",
+			path: "/notes/note.md",
+			text: "A passage",
+		});
+	});
+	expect(document.activeElement).toBe(editor);
+	const original = tabsStore.get().activeTabId ?? "";
+	await act(async () => {
+		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new"));
+	});
+	expect(mocks.api.voiceStop).toHaveBeenCalledWith(id);
+	expect(mocks.api.chatSend).not.toHaveBeenCalled();
+	await act(async () =>
+		viewerStore.set({
+			...emptyDoc(),
+			currentPath: "/notes/other.md",
+			...cleanFileState(""),
+		}),
+	);
+	await sendMessage("A different question");
+	expect(mocks.api.chatSend).toHaveBeenCalledTimes(1);
+	await act(async () =>
+		voiceEvent?.({ id, status: "stopped", text: "Explain this passage." }),
+	);
+	expect(tabsStore.get().byId[original].chat?.draft).toBe(
+		"Explain this passage.",
+	);
+	expect(host.querySelector("textarea")?.value).toBe("");
+	editor.remove();
+});
+
+it("stops dictation and sends the final transcript and attachments exactly once", async () => {
+	let emit: ((event: VoiceEvent) => void) | undefined;
+	mocks.api.onVoice.mockImplementation((callback) => {
+		emit = callback;
+		return vi.fn();
+	});
+	await act(async () =>
+		host
+			.querySelector<HTMLButtonElement>('[aria-label="Record voice message"]')
+			?.click(),
+	);
+	const id = mocks.api.voiceStart.mock.calls[0][0];
+	await act(async () => emit?.({ id, status: "listening" }));
+	expect(button("Send").disabled).toBe(false);
+	await act(async () => {
+		button("Send").click();
+		button("Send").click();
+	});
+	expect(mocks.api.voiceStop).toHaveBeenCalledTimes(1);
+	expect(mocks.api.chatSend).not.toHaveBeenCalled();
+	const { attachToChat } = await import("../store/tabChat");
+	await act(async () => {
+		attachToChat({
+			kind: "selection",
+			path: "/notes/note.md",
+			text: "Context",
+		});
+		emit?.({ id, status: "listening", text: "Last words" });
+	});
+	expect(mocks.api.chatSend).not.toHaveBeenCalled();
+	await act(async () =>
+		emit?.({ id, status: "stopped", text: "Last words, complete." }),
+	);
+	expect(mocks.api.chatSend).toHaveBeenCalledTimes(1);
+	expect(mocks.api.chatSend.mock.calls[0][0].messages.at(-1)).toMatchObject({
+		text: "Last words, complete.",
+		attachments: [expect.objectContaining({ text: "Context" })],
+	});
+});
+
+it.each([
+	"error",
+	"tab",
+	"close",
+])("keeps the draft without sending if dictation ends with %s", async (reason) => {
+	let emit: ((event: VoiceEvent) => void) | undefined;
+	mocks.api.onVoice.mockImplementation((callback) => {
+		emit = callback;
+		return vi.fn();
+	});
+	await act(async () =>
+		host
+			.querySelector<HTMLButtonElement>('[aria-label="Record voice message"]')
+			?.click(),
+	);
+	const id = mocks.api.voiceStart.mock.calls[0][0];
+	await act(async () =>
+		emit?.({ id, status: "listening", text: "Keep these words" }),
+	);
+	const original = tabsStore.get().activeTabId ?? "";
+	await act(async () => button("Send").click());
+	await act(async () => {
+		if (reason === "tab")
+			tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new"));
+		if (reason === "close") chatPanelOpen.set(false);
+	});
+	await act(async () =>
+		emit?.({
+			id,
+			status: reason === "error" ? "error" : "stopped",
+			text: "Keep these words.",
+			...(reason === "error" ? { error: "Try recording again." } : {}),
+		}),
+	);
+	expect(mocks.api.chatSend).not.toHaveBeenCalled();
+	expect(tabsStore.get().byId[original].chat?.draft).toBe("Keep these words.");
+});
+
+it("uses the startup connection across sidebar opens, settings, and tab changes", async () => {
+	expect(mocks.api.chatAccount).toHaveBeenCalledTimes(1);
+	expect(mocks.api.chatModels).toHaveBeenCalledTimes(1);
+	expect(host.querySelector("aside textarea")).not.toBeNull();
+	await act(async () => chatPanelOpen.set(false));
+	await act(async () => chatPanelOpen.set(true));
+	await act(async () =>
+		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new")),
+	);
+	await act(async () =>
+		viewerStore.set({
+			...emptyDoc(),
+			currentPath: "/notes/other.md",
+			...cleanFileState(""),
+		}),
+	);
+	expect(host.querySelector("aside textarea")).not.toBeNull();
+	expect(host.textContent).not.toContain("Checking chat connection");
+	expect(mocks.api.chatAccount).toHaveBeenCalledTimes(1);
+	expect(mocks.api.chatModels).toHaveBeenCalledTimes(1);
 });

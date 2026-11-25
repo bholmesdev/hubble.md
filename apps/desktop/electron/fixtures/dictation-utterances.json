@@ -1,0 +1,563 @@
+[
+	{
+		"segments": [
+			{
+				"text": "Read ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"end": 0,
+				"start": 0,
+				"text": "this "
+			},
+			{
+				"start": 0,
+				"text": "section ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "carefully "
+			},
+			{
+				"text": "and ",
+				"end": 0,
+				"start": 0
+			},
+			{
+				"start": 0,
+				"text": "keep ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "all "
+			},
+			{
+				"text": "of ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"start": 0,
+				"text": "these ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "words "
+			},
+			{
+				"text": "in ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "the "
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "message "
+			},
+			{
+				"text": "this ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"end": 0,
+				"start": 0,
+				"text": "is "
+			},
+			{
+				"text": "the ",
+				"end": 0,
+				"start": 0
+			},
+			{
+				"end": 0,
+				"text": "first ",
+				"start": 0
+			},
+			{
+				"end": 0,
+				"text": "part ",
+				"start": 0
+			},
+			{
+				"start": 0,
+				"text": "of ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "a "
+			},
+			{
+				"end": 0,
+				"text": "longer ",
+				"start": 0
+			},
+			{
+				"start": 0,
+				"text": "recording",
+				"end": 0
+			}
+		],
+		"settled": false,
+		"text": "Read this section carefully and keep all of these words in the message this is the first part of a longer recording"
+	},
+	{
+		"segments": [
+			{
+				"text": "Read ",
+				"start": 0,
+				"end": 0.27
+			},
+			{
+				"end": 0.39,
+				"start": 0.27,
+				"text": "this "
+			},
+			{
+				"start": 0.39,
+				"text": "section ",
+				"end": 0.87
+			},
+			{
+				"start": 0.87,
+				"end": 1.47,
+				"text": "carefully "
+			},
+			{
+				"text": "and ",
+				"end": 1.59,
+				"start": 1.47
+			},
+			{
+				"start": 1.59,
+				"text": "keep ",
+				"end": 1.8900000000000001
+			},
+			{
+				"start": 1.8900000000000001,
+				"end": 2.1,
+				"text": "all "
+			},
+			{
+				"text": "of ",
+				"start": 2.1,
+				"end": 2.22
+			},
+			{
+				"start": 2.22,
+				"text": "these ",
+				"end": 2.46
+			},
+			{
+				"start": 2.46,
+				"end": 2.82,
+				"text": "words "
+			},
+			{
+				"text": "in ",
+				"start": 2.82,
+				"end": 2.91
+			},
+			{
+				"start": 2.91,
+				"end": 3.0300000000000002,
+				"text": "the "
+			},
+			{
+				"start": 3.0300000000000002,
+				"end": 3.69,
+				"text": "message "
+			},
+			{
+				"text": "this ",
+				"start": 3.84,
+				"end": 4.11
+			},
+			{
+				"end": 4.26,
+				"start": 4.11,
+				"text": "is "
+			},
+			{
+				"text": "the ",
+				"end": 4.41,
+				"start": 4.26
+			},
+			{
+				"end": 4.7700000000000005,
+				"text": "first ",
+				"start": 4.41
+			},
+			{
+				"end": 5.07,
+				"text": "part ",
+				"start": 4.7700000000000005
+			},
+			{
+				"start": 5.07,
+				"text": "of ",
+				"end": 5.19
+			},
+			{
+				"start": 5.19,
+				"end": 5.25,
+				"text": "a "
+			},
+			{
+				"end": 5.67,
+				"text": "longer ",
+				"start": 5.25
+			},
+			{
+				"start": 5.67,
+				"text": "recording",
+				"end": 6.42
+			}
+		],
+		"settled": true,
+		"text": "Read this section carefully and keep all of these words in the message this is the first part of a longer recording"
+	},
+	{
+		"segments": [
+			{
+				"text": "Add ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"end": 0,
+				"start": 0,
+				"text": "supporting "
+			},
+			{
+				"start": 0,
+				"text": "citations ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "to "
+			},
+			{
+				"text": "the ",
+				"end": 0,
+				"start": 0
+			},
+			{
+				"start": 0,
+				"text": "highlighted ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "passage "
+			},
+			{
+				"text": "keep ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"start": 0,
+				"text": "the ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "first "
+			},
+			{
+				"text": "part ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "and "
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "add "
+			},
+			{
+				"text": "the ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"end": 0,
+				"start": 0,
+				"text": "second "
+			},
+			{
+				"text": "part ",
+				"end": 0,
+				"start": 0
+			},
+			{
+				"end": 0,
+				"text": "after ",
+				"start": 0
+			},
+			{
+				"end": 0,
+				"text": "it",
+				"start": 0
+			}
+		],
+		"settled": false,
+		"text": "Add supporting citations to the highlighted passage keep the first part and add the second part after it"
+	},
+	{
+		"segments": [
+			{
+				"text": "Add ",
+				"start": 13.14,
+				"end": 13.38
+			},
+			{
+				"end": 13.95,
+				"start": 13.38,
+				"text": "supporting "
+			},
+			{
+				"start": 13.95,
+				"text": "citations ",
+				"end": 14.79
+			},
+			{
+				"start": 14.790000000000001,
+				"end": 14.940000000000001,
+				"text": "to "
+			},
+			{
+				"text": "the ",
+				"end": 15.060000000000002,
+				"start": 14.940000000000001
+			},
+			{
+				"start": 15.06,
+				"text": "highlighted ",
+				"end": 15.75
+			},
+			{
+				"start": 15.75,
+				"end": 16.47,
+				"text": "passage "
+			},
+			{
+				"text": "keep ",
+				"start": 16.560000000000002,
+				"end": 16.89
+			},
+			{
+				"start": 16.89,
+				"text": "the ",
+				"end": 17.07
+			},
+			{
+				"start": 17.07,
+				"end": 17.43,
+				"text": "first "
+			},
+			{
+				"text": "part ",
+				"start": 17.43,
+				"end": 17.759999999999998
+			},
+			{
+				"start": 17.759999999999998,
+				"end": 17.909999999999997,
+				"text": "and "
+			},
+			{
+				"start": 17.91,
+				"end": 18.09,
+				"text": "add "
+			},
+			{
+				"text": "the ",
+				"start": 18.09,
+				"end": 18.21
+			},
+			{
+				"end": 18.69,
+				"start": 18.21,
+				"text": "second "
+			},
+			{
+				"text": "part ",
+				"end": 19.05,
+				"start": 18.69
+			},
+			{
+				"end": 19.44,
+				"text": "after ",
+				"start": 19.05
+			},
+			{
+				"end": 19.740000000000002,
+				"text": "it",
+				"start": 19.44
+			}
+		],
+		"settled": true,
+		"text": "Add supporting citations to the highlighted passage keep the first part and add the second part after it"
+	},
+	{
+		"segments": [
+			{
+				"text": "Finish ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"end": 0,
+				"start": 0,
+				"text": "with "
+			},
+			{
+				"start": 0,
+				"text": "a ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "short "
+			},
+			{
+				"text": "summary ",
+				"end": 0,
+				"start": 0
+			},
+			{
+				"start": 0,
+				"text": "all ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "three "
+			},
+			{
+				"text": "parts ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"start": 0,
+				"text": "should ",
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "remain "
+			},
+			{
+				"text": "in ",
+				"start": 0,
+				"end": 0
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "the "
+			},
+			{
+				"start": 0,
+				"end": 0,
+				"text": "message"
+			}
+		],
+		"settled": false,
+		"text": "Finish with a short summary all three parts should remain in the message"
+	},
+	{
+		"segments": [
+			{
+				"text": "Finish ",
+				"start": 26.43,
+				"end": 26.88
+			},
+			{
+				"end": 27.180000000000003,
+				"start": 26.880000000000003,
+				"text": "with a "
+			},
+			{
+				"start": 27.18,
+				"text": "short ",
+				"end": 27.509999999999998
+			},
+			{
+				"start": 27.51,
+				"end": 28.17,
+				"text": "summary "
+			},
+			{
+				"text": "all ",
+				"end": 28.59,
+				"start": 28.32
+			},
+			{
+				"start": 28.590000000000003,
+				"text": "three ",
+				"end": 28.860000000000003
+			},
+			{
+				"start": 28.86,
+				"end": 29.25,
+				"text": "parts "
+			},
+			{
+				"text": "should ",
+				"start": 29.25,
+				"end": 29.490000000000002
+			},
+			{
+				"start": 29.490000000000002,
+				"text": "remain ",
+				"end": 29.910000000000004
+			},
+			{
+				"start": 29.910000000000004,
+				"end": 30.000000000000004,
+				"text": "in "
+			},
+			{
+				"text": "the ",
+				"start": 30,
+				"end": 30.119999999999997
+			},
+			{
+				"start": 30.12,
+				"end": 30.810000000000002,
+				"text": "message"
+			}
+		],
+		"settled": true,
+		"text": "Finish with a short summary all three parts should remain in the message"
+	}
+]

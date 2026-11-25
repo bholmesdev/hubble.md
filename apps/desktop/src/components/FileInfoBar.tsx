@@ -113,6 +113,7 @@ export function FileInfoBar({
 			? {
 					filePath: currentPath,
 					threads: reviewThreads,
+					canAttach: true,
 					onCommand: commandReviewThread,
 					onMessage: (message, kind) =>
 						kind === "success" ? toast.success(message) : toast.error(message),

@@ -1,6 +1,10 @@
 import { type CommandBindings, cleanCommandBindings } from "@hubble.md/editor";
 import { z } from "zod";
-import { CHAT_CONTEXT_LIMIT, chatMessageSchema } from "../desktopApi/chat";
+import {
+	CHAT_CONTEXT_LIMIT,
+	chatAttachmentSchema,
+	chatMessageSchema,
+} from "../desktopApi/chat";
 import type { ThemePreference } from "../theme";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
 import {
@@ -197,6 +201,7 @@ const closedTabSchema = z.object({
 });
 
 const chatSchema = z.object({
+	attachments: z.array(chatAttachmentSchema).max(20).optional(),
 	messages: z.array(chatMessageSchema).max(100),
 	draft: z.string().max(CHAT_CONTEXT_LIMIT),
 	model: z.string().max(200),
