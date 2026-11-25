@@ -108,3 +108,7 @@ Speech recognition results can cover only the latest utterance after a pause. Hu
 ## Chat panel layout
 
 Single-tab Chat spans the full window height beside the file title bar; with multiple tabs it remains below the tab strip. Changing that layout keeps the panel mounted.
+
+## API payload debugging
+
+The bug button beside Close chat toggles expandable payload details below each message. User turns expose the initial Responses request body; agent turns expose terminal response bodies, transport errors, and later requests made during tool rounds, in order. Captures come from the SDK call and stream events rather than reconstructing requests from visible messages. The latest 50 turns are retained in a file cache in app data, outside saved chat history and subsequent model input, and reloads fetch them on demand. Turns that were never captured expose their saved message input or reply under a distinct label. JSON is formatted only when its dropdown is expanded.

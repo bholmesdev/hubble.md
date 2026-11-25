@@ -9,6 +9,7 @@ import {
 } from "react";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
 import MingcuteArrowUpLine from "~icons/mingcute/arrow-up-line";
+import MingcuteBugLine from "~icons/mingcute/bug-line";
 import MingcuteDownLine from "~icons/mingcute/down-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteMicLine from "~icons/mingcute/mic-line";
@@ -34,6 +35,7 @@ import {
 	refreshChatConnection,
 	resetChatConnection,
 } from "../store/chatConnection";
+import { chatDebug, recordChatPayload } from "../store/chatDebug";
 import { handleChatFileRequest } from "../store/chatFiles";
 import { getChatPanelState } from "../store/chatPanelState";
 import { viewerStore, workspacePathStore } from "../store/state";
@@ -48,6 +50,7 @@ import { tabsStore } from "../store/tabStore";
 import type { TabId } from "../store/tabs";
 import { isRecording, startVoice, stopVoice, voice } from "../store/voice";
 import { ChatAttachments } from "./ChatAttachments";
+import { ChatPayloads } from "./ChatPayloads";
 import { ChatReply } from "./ChatReply";
 import { ChatTranscript } from "./ChatTranscript";
 import { VoiceMeter } from "./VoiceMeter";
@@ -64,6 +67,7 @@ export function ChatPanel({
 	fullHeight?: boolean;
 }) {
 	const open = useStoreValue(chatPanelOpen);
+	const debugOpen = useStoreValue(chatDebug);
 	const width = useStoreValue(chatPanelWidth);
 	const panelRef = useRef<HTMLElement>(null);
 	const [limit, setLimit] = useState(() => window.innerWidth * 0.85);
@@ -210,7 +214,11 @@ export function ChatPanel({
 		const toggle = () => chatPanelOpen.set(!chatPanelOpen.get());
 		window.addEventListener(TOGGLE_CHAT_EVENT, toggle);
 		const unsubscribe = desktopApi.onChatDelta(
-			({ id, text, context, activity }) => {
+			({ id, text, context, activity, debug }) => {
+				if (debug) {
+					recordChatPayload(id, debug);
+					return;
+				}
 				if (id !== active.current) return;
 				if (context) setActivity(activity);
 				if (tabId)
@@ -440,6 +448,17 @@ export function ChatPanel({
 					<Button
 						variant="ghost"
 						size="icon-sm"
+						aria-label={debugOpen ? "Hide API payloads" : "Show API payloads"}
+						title={debugOpen ? "Hide API payloads" : "Show API payloads"}
+						aria-pressed={debugOpen}
+						className="aria-pressed:bg-accent"
+						onClick={() => chatDebug.set(!chatDebug.get())}
+					>
+						<MingcuteBugLine aria-hidden="true" className="size-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
 						aria-label="Close Chat"
 						title="Close Chat"
 						aria-expanded={true}
@@ -535,7 +554,7 @@ export function ChatPanel({
 						aria-label="Chat messages"
 						aria-live="off"
 					>
-						{messages.map((message) => (
+						{messages.map((message, index) => (
 							<article
 								key={message.id}
 								aria-label={
@@ -591,6 +610,19 @@ export function ChatPanel({
 											: "Reply incomplete"}{" "}
 										· partial reply excluded from later context
 									</p>
+								) : null}
+								{debugOpen ? (
+									<ChatPayloads
+										message={message}
+										history={messages.slice(0, index + 1)}
+										requestId={
+											message.role === "assistant"
+												? message.id
+												: messages[index + 1]?.role === "assistant"
+													? messages[index + 1].id
+													: undefined
+										}
+									/>
 								) : null}
 							</article>
 						))}
