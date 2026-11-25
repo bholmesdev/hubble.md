@@ -2,7 +2,7 @@
 
 Electron screenshots from a fresh, isolated profile:
 
-- [Welcome](welcome.png): no top bar, workspace creation as the primary action, shortcut hints for all three file/workspace actions, and an Install agent skills panel with a separate Install manually button.
+- [Welcome](welcome.png): no top bar, semibold hubble wordmark, workspace creation as the primary action, shortcut hints for all three file/workspace actions, and an Install agent skills panel with a separate Install manually button.
 - [Skills installed](skills-installed.png): the entire skills row fades from gray to pale green without changing size.
 - [First workspace](inbox.png): the top bar returns and Inbox is selected.
 

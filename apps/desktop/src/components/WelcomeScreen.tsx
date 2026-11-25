@@ -26,7 +26,7 @@ export function WelcomeScreen({
 					style={{ animationDelay: "0.05s" }}
 				>
 					<h2 className="font-rounded text-3xl font-medium tracking-tight">
-						Welcome to hubble
+						Welcome to <span className="font-semibold">hubble</span>
 					</h2>
 					<p className="text-sm text-muted-foreground">
 						Let's start writing together.
