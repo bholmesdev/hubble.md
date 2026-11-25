@@ -31,10 +31,11 @@
 }
 
 @keyframes chat-work-sweep {
-	from {
+	0% {
 		background-position: 100% 0;
 	}
-	to {
+	50%,
+	100% {
 		background-position: -100% 0;
 	}
 }
@@ -50,7 +51,7 @@
 	background-size: 200% 100%;
 	background-clip: text;
 	color: transparent;
-	animation: chat-work-sweep 1.6s linear infinite;
+	animation: chat-work-sweep 3.2s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce), (forced-colors: active) {
