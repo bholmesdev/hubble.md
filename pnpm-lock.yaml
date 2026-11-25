@@ -490,6 +490,9 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      diff:
+        specifier: ^8.0.3
+        version: 8.0.3
       highlight.js:
         specifier: ^11.11.1
         version: 11.11.1
