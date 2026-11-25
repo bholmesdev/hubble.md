@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
@@ -34,6 +35,65 @@ function bundleUserSkills(): Plugin {
 	};
 }
 
+function bundleDictation(): Plugin {
+	return {
+		name: "hubble:dictation",
+		async closeBundle() {
+			if (process.platform !== "darwin") return;
+			const root = fileURLToPath(new URL(".", import.meta.url));
+			const bundle = path.join(root, "out/native/Hubble Dictation.app");
+			const executable = path.join(bundle, "Contents/MacOS/hubble-dictation");
+			await fs.mkdir(path.dirname(executable), { recursive: true });
+			await fs.copyFile(
+				path.join(root, "native/Dictation.plist"),
+				path.join(bundle, "Contents/Info.plist"),
+			);
+			const binaries: string[] = [];
+			for (const arch of ["arm64", "x86_64"]) {
+				const binary = path.join(root, `out/native/dictation-${arch}`);
+				binaries.push(binary);
+				execFileSync(
+					"xcrun",
+					[
+						"swiftc",
+						"-O",
+						"-target",
+						`${arch}-apple-macosx12.0`,
+						path.join(root, "native/Dictation.swift"),
+						"-o",
+						binary,
+						"-Xlinker",
+						"-sectcreate",
+						"-Xlinker",
+						"__TEXT",
+						"-Xlinker",
+						"__info_plist",
+						"-Xlinker",
+						path.join(root, "native/Dictation.plist"),
+					],
+					{ stdio: "inherit" },
+				);
+			}
+			execFileSync("xcrun", [
+				"lipo",
+				"-create",
+				...binaries,
+				"-output",
+				executable,
+			]);
+			for (const binary of binaries) await fs.unlink(binary);
+			execFileSync("/usr/bin/codesign", [
+				"--force",
+				"--sign",
+				"-",
+				"--identifier",
+				"com.benholmes.hubblemd.dictation",
+				bundle,
+			]);
+		},
+	};
+}
+
 export default defineConfig({
 	main: {
 		plugins: [
@@ -41,6 +101,7 @@ export default defineConfig({
 				exclude: ["@hubble.md/runtime", "@tailwindcss/browser", "alpinejs"],
 			}),
 			bundleUserSkills(),
+			bundleDictation(),
 		],
 		build: {
 			minify: "esbuild",

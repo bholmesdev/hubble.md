@@ -1,5 +1,5 @@
 .chat-markdown {
-	font-size: var(--font-size-content);
+	font-size: inherit;
 }
 .chat-markdown li + li,
 .chat-markdown li > :is(ul, ol) {
@@ -24,4 +24,8 @@
 	.chat-chunk-enter {
 		animation: none;
 	}
+}
+
+.chat-work > summary::-webkit-details-marker {
+	display: none;
 }

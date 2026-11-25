@@ -119,7 +119,22 @@
 				"dmg",
 				"zip"
 			],
-			"category": "public.app-category.productivity"
+			"category": "public.app-category.productivity",
+			"extendInfo": {
+				"NSMicrophoneUsageDescription": "Record speech for your chat draft.",
+				"NSSpeechRecognitionUsageDescription": "Turn your speech into an editable chat draft using on-device recognition."
+			},
+			"extraResources": [
+				{
+					"from": "out/native",
+					"to": "native",
+					"filter": [
+						"Hubble Dictation.app/**"
+					]
+				}
+			],
+			"entitlements": "native/entitlements.mac.plist",
+			"entitlementsInherit": "native/entitlements.mac.plist"
 		},
 		"win": {
 			"icon": "assets/icon-master-1024.png",

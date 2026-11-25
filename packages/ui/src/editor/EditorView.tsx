@@ -13,6 +13,7 @@ import {
 	ReviewMarkExtension,
 	RichTextClipboardExtension,
 	resetEditorHistory,
+	selectionToMarkdown,
 	tiptapDocToMarkdown,
 } from "@hubble.md/editor";
 import { type Editor, Extension } from "@tiptap/core";
@@ -27,6 +28,7 @@ import {
 } from "@tiptap/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { clearActiveEditor, setActiveEditor } from "./activeEditor";
+import { watchSelection } from "./autoAttach";
 import { CODE_BLOCK_COPY_EVENT, HubbleCodeBlock } from "./CodeBlockExtension";
 import { copySelectionAsMarkdown } from "./copyAsMarkdown";
 import { EmptyBlockDirectionExtension } from "./EmptyBlockDirectionExtension";
@@ -48,6 +50,7 @@ import {
 } from "./TableMarkdownExtensions";
 import { VirtualCursor } from "./VirtualCursor";
 import "./EditorView.css";
+import type { EditorAttachment } from "./attachments";
 import {
 	EditorCommandShortcuts,
 	starterKitWithRegistryShortcuts,
@@ -105,6 +108,8 @@ export type EditorViewProps = {
 	onMessage?: (message: string, type: "success" | "error") => void;
 	/** Review threads in the open document, republished on every edit, so an
 	 * app can list them in its own chrome. */
+	onAttach?: (attachment: EditorAttachment) => void;
+	onAutoAttach?: (attachment: EditorAttachment) => boolean;
 	onReviewThreadsChange?: (threads: ReviewThread[]) => void;
 	/** Footer status for non-default spellcheck languages. Desktop-only. */
 	spellcheckStatus?: SpellcheckStatus | null;
@@ -131,6 +136,8 @@ export function EditorView({
 	onOpenWikiLink,
 	onMessage,
 	onReviewThreadsChange,
+	onAttach,
+	onAutoAttach,
 	spellcheckStatus,
 }: EditorViewProps) {
 	const initialFrontMatter = parseMarkdownFrontMatter(initialMarkdown);
@@ -356,6 +363,11 @@ export function EditorView({
 		});
 	}, [copyAsMarkdownRequest, editor, onMessage]);
 
+	useEffect(() => {
+		if (editor && onAutoAttach)
+			return watchSelection(editor, path, onAutoAttach);
+	}, [editor, path, onAutoAttach]);
+
 	return (
 		<div
 			className="relative flex h-full min-h-0 flex-col"
@@ -401,6 +413,18 @@ export function EditorView({
 						<SelectionFormattingToolbar
 							editor={editor}
 							viewport={editorViewportEl}
+							onAttach={
+								onAttach && editor
+									? () =>
+											onAttach({
+												kind: "selection",
+												path,
+												text: selectionToMarkdown(
+													editor.state.selection,
+												).trimEnd(),
+											})
+									: undefined
+							}
 							onComment={() => setReviewCommentRequest((value) => value + 1)}
 						/>
 						<ReviewCommentPopover
@@ -410,6 +434,7 @@ export function EditorView({
 							request={reviewCommentRequest}
 							onMessage={onMessage}
 							onThreadsChange={onReviewThreadsChange}
+							onAttach={onAttach}
 						/>
 						<FormatCommandMenu
 							editor={editor}

@@ -1,5 +1,10 @@
 import { store } from "@simplestack/store";
-import type { ChatConversation } from "../desktopApi/chat";
+import {
+	CHAT_CONTEXT_LIMIT,
+	type ChatAttachment,
+	type ChatConversation,
+	chatAttachmentSchema,
+} from "../desktopApi/chat";
 import { appStore } from "./state";
 import { tabsStore } from "./tabStore";
 import type { TabId } from "./tabs";
@@ -48,4 +53,32 @@ export function clearChats() {
 			]),
 		),
 	}));
+}
+
+export function attachToChat(input: Omit<ChatAttachment, "id">) {
+	const id = tabsStore.get().activeTabId;
+	const attachment = chatAttachmentSchema.safeParse({
+		...input,
+		id: crypto.randomUUID(),
+	});
+	if (!id || !attachment.success) return false;
+	const pending = tabsStore.get().byId[id].chat?.attachments ?? [];
+	const match = pending.find(
+		(item) =>
+			item.kind === input.kind &&
+			item.path === input.path &&
+			(input.kind === "thread"
+				? item.threadId === input.threadId
+				: item.text === input.text),
+	);
+	if (!match && pending.length >= 20) return false;
+	const next = match
+		? pending.map((item) =>
+				item.id === match.id ? { ...attachment.data, id: match.id } : item,
+			)
+		: [...pending, attachment.data];
+	if (JSON.stringify(next).length > CHAT_CONTEXT_LIMIT) return false;
+	updateTabChat(id, (chat) => ({ ...chat, attachments: next }));
+	chatPanelOpen.set(true);
+	return true;
 }

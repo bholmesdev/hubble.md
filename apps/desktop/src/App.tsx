@@ -25,6 +25,7 @@ import {
 import { useStoreValue } from "@simplestack/store/react";
 import { keymatch } from "keymatch";
 import {
+	useCallback,
 	useEffect,
 	useLayoutEffect,
 	useRef,
@@ -145,7 +146,9 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
+import { attachToChat } from "./store/tabChat";
 import { tabsStore } from "./store/tabStore";
+import { voice } from "./store/voice";
 import { isDarkTheme, subscribeTheme } from "./theme";
 
 // Forces editor refresh when underlying TipTap extensions change
@@ -1259,6 +1262,26 @@ function MarkdownEditor({
 	spellcheckStatus?: SpellcheckStatus | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
 }) {
+	const recording = useStoreValue(voice);
+	const autoAttach = useCallback(
+		(attachment: Parameters<typeof attachToChat>[0]) => {
+			const current = voice.get();
+			if (
+				current?.status !== "listening" ||
+				current.tabId !== tabsStore.get().activeTabId ||
+				current.workspace !== workspacePathStore.get()
+			)
+				return false;
+			const attached = attachToChat(attachment);
+			if (!attached)
+				toast.error(
+					"Could not attach. Try a smaller selection or remove an attachment.",
+				);
+			return attached;
+		},
+		[],
+	);
+
 	const workspace = useStoreValue(workspaceStore);
 	const getPath = () => viewerStore.get().currentPath ?? path;
 	// External-only files stay out of autocomplete; explicit links still work.
@@ -1333,6 +1356,13 @@ function MarkdownEditor({
 			onMessage={(message, kind) =>
 				kind === "success" ? toast.success(message) : toast.error(message)
 			}
+			onAutoAttach={recording?.status === "listening" ? autoAttach : undefined}
+			onAttach={(attachment) => {
+				if (!attachToChat(attachment))
+					toast.error(
+						"Could not attach. Try a smaller selection or remove an attachment.",
+					);
+			}}
 			onReviewThreadsChange={setReviewThreads}
 			spellcheckStatus={spellcheckStatus}
 		/>

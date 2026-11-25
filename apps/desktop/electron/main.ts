@@ -66,6 +66,7 @@ import { readNotePreviews } from "./notePreviews";
 import publishedSkillHashes from "./publishedSkillHashes.json";
 import { TelemetryManager } from "./telemetry";
 import { setupTerminalIpc } from "./terminal";
+import { setupVoiceIpc } from "./voice";
 import { WorkspaceSession } from "./workspaceSession";
 import {
 	collectWorkspaceFiles,
@@ -1478,6 +1479,7 @@ async function createWindow() {
 }
 
 function registerIpc() {
+	setupVoiceIpc(() => mainWindow?.webContents);
 	setupTerminalIpc(sendToRenderer);
 	setupChatIpc(
 		() => mainWindow?.webContents,

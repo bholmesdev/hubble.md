@@ -11,6 +11,7 @@ import type {
 	ChatRequest,
 	ChatResult,
 } from "./chat";
+import type { VoiceEvent } from "./voice";
 
 export type FileEntry = {
 	path: string;
@@ -168,6 +169,9 @@ export type DesktopApi = {
 	chatReset(): Promise<void>;
 	chatDisconnect(): Promise<void>;
 	chatModels(): Promise<ChatModel[]>;
+	voiceStart(id: string): Promise<void>;
+	voiceStop(id: string): Promise<void>;
+	onVoice(callback: (event: VoiceEvent) => void): () => void;
 	chatSend(input: ChatRequest): Promise<ChatResult>;
 	chatFileReply(reply: ChatFileReply): Promise<void>;
 	onChatFileRequest(callback: (request: ChatFileRequest) => void): Unsubscribe;

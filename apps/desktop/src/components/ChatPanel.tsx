@@ -1,9 +1,12 @@
 import { Button } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import MingcuteArrowRightLine from "~icons/mingcute/arrow-right-line";
+import MingcuteArrowUpLine from "~icons/mingcute/arrow-up-line";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
+import MingcuteDownLine from "~icons/mingcute/down-line";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
+import MingcuteMicLine from "~icons/mingcute/mic-line";
 import { desktopApi } from "../desktopApi";
 import {
 	CHAT_CONTEXT_LIMIT,
@@ -28,8 +31,10 @@ import { viewerStore, workspacePathStore } from "../store/state";
 import { chatPanelOpen, EMPTY_CHAT, updateTabChat } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import type { TabId } from "../store/tabs";
+import { isRecording, startVoice, stopVoice, voice } from "../store/voice";
+import { ChatAttachments } from "./ChatAttachments";
 import { ChatReply } from "./ChatReply";
-import { HubbleMark } from "./HubbleMark";
+import { VoiceMeter } from "./VoiceMeter";
 
 export const TOGGLE_CHAT_EVENT = "hubble:toggle-chat";
 
@@ -41,11 +46,27 @@ export function ChatPanel({
 	onOpenSettings: () => void;
 }) {
 	const open = useStoreValue(chatPanelOpen);
+	const recording = useStoreValue(voice);
+	const voiceBusy =
+		recording?.tabId === tabId &&
+		["starting", "listening", "stopping"].includes(recording.status);
+	const recordingLabel =
+		recording?.tabId === tabId ? voiceLabel(recording) : null;
 	const tabs = useStoreValue(tabsStore);
 	const tab = tabs.byId[tabId ?? ""];
 	const chat = tab?.chat ?? EMPTY_CHAT;
+	const attachments = chat.attachments ?? [];
 	const document = useStoreValue(viewerStore);
 	const workspace = useStoreValue(workspacePathStore);
+	useEffect(() => {
+		const current = voice.get();
+		if (
+			current &&
+			(!open || current.tabId !== tabId || current.workspace !== workspace)
+		)
+			stopVoice();
+	}, [open, tabId, workspace]);
+	useEffect(() => () => stopVoice(), []);
 	const filePath = tab?.path && !isVirtualPath(tab.path) ? tab.path : null;
 	const editable = Boolean(filePath && isEditableFile(filePath));
 	const fileReady =
@@ -97,8 +118,30 @@ export function ChatPanel({
 	const [error, setError] = useState<string | null>(null);
 	const [activity, setActivity] = useState<string | undefined>();
 	const [scrolled, setScrolled] = useState(false);
+	const [sendAfterVoice, setSendAfterVoice] = useState<{
+		id: string;
+		workspace: string | undefined;
+		revision: number;
+	} | null>(null);
 	const active = useRef<string | null>(null);
 	const transcript = useRef<HTMLDivElement>(null);
+	const prompt = useRef<HTMLTextAreaElement>(null);
+	useEffect(() => {
+		if (
+			open &&
+			attachments.length &&
+			panel.kind === "conversation" &&
+			!(voice.get()?.tabId === tabId && isRecording())
+		)
+			prompt.current?.focus();
+	}, [open, attachments, panel.kind, tabId]);
+	function removeAttachment(id: string) {
+		if (tabId)
+			updateTabChat(tabId, (chat) => ({
+				...chat,
+				attachments: (chat.attachments ?? []).filter((item) => item.id !== id),
+			}));
+	}
 
 	useEffect(() => {
 		const toggle = () => chatPanelOpen.set(!chatPanelOpen.get());
@@ -144,7 +187,7 @@ export function ChatPanel({
 					...chat,
 					messages: chat.messages.map((message) =>
 						message.status === "streaming"
-							? { ...message, status: "stopped" }
+							? { ...message, status: "stopped", finishedAt: Date.now() }
 							: message,
 					),
 				}));
@@ -154,9 +197,7 @@ export function ChatPanel({
 	}, [tabId]);
 
 	useEffect(() => {
-		if (open) void refreshChatConnection();
-	}, [open]);
-	useEffect(() => {
+		stopVoice();
 		// Sign-out clears saved chats in the store; discard any transient request error.
 		if (!revision) return;
 		if (active.current)
@@ -173,8 +214,15 @@ export function ChatPanel({
 	}, [open, messages]);
 
 	async function send() {
+		if (voiceBusy && sendAfterVoice) return;
+		if (voiceBusy && recording) {
+			setSendAfterVoice({ id: recording.id, workspace, revision });
+			stopVoice();
+			return;
+		}
 		if (
 			active.current ||
+			voiceBusy ||
 			accountBusy ||
 			!model ||
 			panel.kind !== "conversation" ||
@@ -194,6 +242,7 @@ export function ChatPanel({
 			role: "user",
 			text: draft.trim(),
 			file: file ?? null,
+			...(attachments.length ? { attachments } : {}),
 			status: "complete",
 		};
 		const history = [...messages, user];
@@ -209,9 +258,16 @@ export function ChatPanel({
 		setActivity(undefined);
 		setModel(model);
 		setDraft("");
+		if (tabId) updateTabChat(tabId, (chat) => ({ ...chat, attachments: [] }));
 		setMessages([
 			...history,
-			{ id, role: "assistant", text: "", status: "streaming" },
+			{
+				id,
+				role: "assistant",
+				text: "",
+				status: "streaming",
+				startedAt: Date.now(),
+			},
 		]);
 		const result = await attempt(() =>
 			desktopApi.chatSend({ id, model, messages: history }),
@@ -226,6 +282,7 @@ export function ChatPanel({
 								...message,
 								text: reply.text,
 								status: reply.status,
+								finishedAt: Date.now(),
 								...(reply.context ? { context: reply.context } : {}),
 							}
 						: message,
@@ -236,7 +293,9 @@ export function ChatPanel({
 			setError(result.error);
 			setMessages((messages) =>
 				messages.map((message) =>
-					message.id === id ? { ...message, status: "failed" } : message,
+					message.id === id
+						? { ...message, status: "failed", finishedAt: Date.now() }
+						: message,
 				),
 			);
 		}
@@ -247,6 +306,27 @@ export function ChatPanel({
 			chatConnection.set({ ...chatConnection.get(), sending: false });
 		}
 	}
+
+	// Final recognition may revise the draft; send from the render that includes those words.
+	const sendTranscript = useEffectEvent(() => {
+		void send();
+	});
+	useEffect(() => {
+		if (!sendAfterVoice) return;
+		if (
+			!open ||
+			recording?.id !== sendAfterVoice.id ||
+			recording.tabId !== tabId ||
+			workspace !== sendAfterVoice.workspace ||
+			revision !== sendAfterVoice.revision
+		) {
+			setSendAfterVoice(null);
+			return;
+		}
+		if (recording.status !== "stopped" && recording.status !== "error") return;
+		setSendAfterVoice(null);
+		if (recording.status === "stopped") sendTranscript();
+	}, [sendAfterVoice, open, recording, tabId, workspace, revision]);
 
 	if (!open || !tabId) return null;
 
@@ -263,9 +343,11 @@ export function ChatPanel({
 					size="icon-sm"
 					aria-label="New chat"
 					title="New chat"
-					disabled={sending || panel.kind !== "conversation"}
+					disabled={sending || voiceBusy || panel.kind !== "conversation"}
 					onClick={() => {
 						setMessages([]);
+						if (tabId)
+							updateTabChat(tabId, (chat) => ({ ...chat, attachments: [] }));
 						setDraft("");
 						setError(null);
 					}}
@@ -319,10 +401,6 @@ export function ChatPanel({
 			) : panel.kind === "signed-out" || panel.kind === "signing-in" ? (
 				<div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
 					<div className="flex w-full max-w-sm flex-col gap-3">
-						<HubbleMark
-							aria-hidden="true"
-							className="mb-3 size-12 self-center text-muted-foreground"
-						/>
 						<button
 							type="button"
 							data-oai-siwc-button
@@ -347,6 +425,10 @@ export function ChatPanel({
 						<p className="px-3 text-xs text-muted-foreground">
 							Use your ChatGPT subscription to chat with your notes
 						</p>
+						<ChatAttachments
+							attachments={attachments}
+							onRemove={removeAttachment}
+						/>
 						{connectionError || error ? (
 							<p role="alert" className="text-xs text-destructive">
 								{connectionError || error}
@@ -364,26 +446,17 @@ export function ChatPanel({
 						aria-label="Chat messages"
 						aria-live="off"
 					>
-						{panel.kind === "conversation" && panel.conversation === "new" ? (
-							<div className="space-y-2 py-6 text-muted-foreground">
-								<p className="font-medium text-foreground">
-									Start a conversation.
-								</p>
-								<p>
-									Your current text file is included when you send. Edits are
-									attached as new snapshots; earlier versions stay in this chat.
-								</p>
-								<p className="text-xs">
-									Chats stay with this tab, including when you open another
-									file. Closing the tab clears its chat.
-								</p>
-							</div>
-						) : null}
 						{messages.map((message) => (
-							<article key={message.id} className="space-y-2">
-								<p className="text-xs font-medium text-muted-foreground">
-									{message.role === "user" ? "You" : "Chat"}
-								</p>
+							<article
+								key={message.id}
+								aria-label={
+									message.role === "user" ? "Your message" : "Chat reply"
+								}
+								className="space-y-2 border-b border-dashed border-border pb-5 last:border-b-0 last:pb-0"
+							>
+								{message.attachments?.length ? (
+									<ChatAttachments attachments={message.attachments} />
+								) : null}
 								{message.file ? (
 									<p
 										className="truncate text-xs text-muted-foreground"
@@ -433,7 +506,7 @@ export function ChatPanel({
 							</article>
 						))}
 					</div>
-					<div className="space-y-2 border-t border-border p-3">
+					<div className="shrink-0 space-y-2 border-t border-border px-4 pb-3 pt-2">
 						{error ? (
 							<p role="alert" className="text-xs text-destructive">
 								{error}
@@ -449,12 +522,24 @@ export function ChatPanel({
 								{panel.reason}
 							</output>
 						) : null}
+						{recordingLabel ? (
+							<output className="block text-xs text-muted-foreground">
+								{recordingLabel}
+							</output>
+						) : null}
+						<ChatAttachments
+							attachments={attachments}
+							onRemove={removeAttachment}
+						/>
 						<textarea
+							ref={prompt}
 							aria-label="Message Chat"
-							placeholder="Message Chat…"
-							className="min-h-24 max-h-48 w-full resize-y rounded-md border border-input bg-background p-2 outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+							placeholder={voiceBusy ? "Recording..." : "Message Chat…"}
+							rows={2}
+							className="block min-h-16 max-h-[min(40vh,20rem)] w-full resize-none border-0 bg-transparent py-2 outline-hidden [field-sizing:content]"
 							value={draft}
 							maxLength={CHAT_CONTEXT_LIMIT}
+							readOnly={voiceBusy}
 							onChange={(event) => setDraft(event.target.value)}
 							onKeyDown={(event) => {
 								if (
@@ -467,55 +552,120 @@ export function ChatPanel({
 								}
 							}}
 						/>
-						<div className="flex items-center justify-between gap-2">
-							<select
-								aria-label="Chat model"
-								className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-								value={model}
-								disabled={sending || accountBusy || !models.length}
-								onChange={(event) => setModel(event.target.value)}
-							>
-								{!models.length ? (
-									<option value="">
-										{accountBusy ? "Connecting…" : "No model available"}
-									</option>
+						<div className="flex items-center gap-3">
+							<div className="relative min-w-0">
+								<select
+									aria-label="Chat model"
+									className="block max-w-full appearance-none rounded-xs border-0 bg-transparent py-1.5 pe-6 text-xs text-muted-foreground outline-hidden hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 [field-sizing:content]"
+									value={model}
+									disabled={sending || accountBusy || !models.length}
+									onChange={(event) => setModel(event.target.value)}
+								>
+									{!models.length ? (
+										<option value="">
+											{accountBusy ? "Connecting…" : "No model available"}
+										</option>
+									) : null}
+									{models.map((item) => (
+										<option key={item.slug} value={item.slug}>
+											{item.name}
+										</option>
+									))}
+								</select>
+								<MingcuteDownLine
+									aria-hidden="true"
+									className="pointer-events-none absolute end-0.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+								/>
+							</div>
+							<div className="ms-auto flex shrink-0 items-center gap-2">
+								{voiceBusy && recording?.status === "listening" ? (
+									<VoiceMeter />
 								) : null}
-								{models.map((item) => (
-									<option key={item.slug} value={item.slug}>
-										{item.name}
-									</option>
-								))}
-							</select>
-							{sending ? (
-								<Button
-									size="sm"
-									variant="outline"
-									onClick={() => {
-										if (active.current)
-											void desktopApi
-												.chatStop(active.current)
-												.catch((error) => setError(errorText(error)));
-									}}
-								>
-									Stop
-								</Button>
-							) : (
-								<Button
-									size="sm"
-									disabled={
-										panel.kind !== "conversation" ||
-										panel.composer !== "ready" ||
-										!draft.trim()
-									}
-									onClick={() => void send()}
-								>
-									Send
-								</Button>
-							)}
+								{desktopApi.platform === "darwin" ? (
+									<Button
+										size="icon-sm"
+										variant="ghost"
+										aria-label={
+											voiceBusy ? "Stop recording" : "Record voice message"
+										}
+										title={
+											voiceBusy ? "Stop recording" : "Record voice message"
+										}
+										disabled={
+											sending ||
+											(isRecording() && !voiceBusy) ||
+											recording?.status === "stopping" ||
+											(!voiceBusy &&
+												(panel.kind !== "conversation" ||
+													panel.composer !== "ready"))
+										}
+										onClick={() =>
+											voiceBusy ? stopVoice() : void startVoice(tabId)
+										}
+									>
+										{voiceBusy ? (
+											<span className="size-2.5 rounded-xs bg-destructive" />
+										) : (
+											<MingcuteMicLine aria-hidden="true" className="size-4" />
+										)}
+									</Button>
+								) : null}
+								{sending ? (
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => {
+											if (active.current)
+												void desktopApi
+													.chatStop(active.current)
+													.catch((error) => setError(errorText(error)));
+										}}
+									>
+										Stop
+									</Button>
+								) : (
+									<Button
+										size="icon-sm"
+										aria-label="Send message"
+										title={
+											voiceBusy ? "Stop recording and send" : "Send message"
+										}
+										disabled={
+											panel.kind !== "conversation" ||
+											panel.composer !== "ready" ||
+											(!draft.trim() && !voiceBusy) ||
+											Boolean(sendAfterVoice)
+										}
+										onClick={() => void send()}
+									>
+										<MingcuteArrowUpLine
+											aria-hidden="true"
+											className="size-4"
+										/>
+									</Button>
+								)}
+							</div>
 						</div>
 					</div>
 				</>
 			)}
 		</aside>
 	);
+}
+
+function voiceLabel(recording: NonNullable<ReturnType<typeof voice.get>>) {
+	switch (recording.status) {
+		case "starting":
+			return "Starting…";
+		case "listening":
+			return null;
+		case "stopping":
+			return "Finishing transcript…";
+		case "error":
+			return recording.error;
+		case "stopped":
+			return recording.text?.trim()
+				? "Transcript ready to review and send."
+				: "No speech detected. Try recording again.";
+	}
 }

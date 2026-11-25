@@ -390,3 +390,36 @@ it("keeps a plain-text agent edit separate from prior human typing", async () =>
 	act(() => editor.commands.redo());
 	expect(editor.getText()).toBe("Human edit plus agent edit");
 });
+
+it("attaches a formatted selection from the live editor without changing the document", async () => {
+	const root = createTestRoot();
+	const getEditor = captureEditorCreation();
+	const onAttach = vi.fn();
+	await act(async () =>
+		root.render(
+			<EditorView
+				path="/note.md"
+				initialMarkdown="A **bold** passage"
+				onLocalChange={vi.fn()}
+				onSave={vi.fn()}
+				onOpenExternalLink={() => {}}
+				onOpenWikiLink={() => {}}
+				onAttach={onAttach}
+			/>,
+		),
+	);
+	const editor = getEditor();
+	await act(async () => editor.commands.setTextSelection({ from: 3, to: 7 }));
+	const before = editor.getJSON();
+	const attach = document.querySelector<HTMLButtonElement>(
+		'[aria-label="Attach to Chat"]',
+	);
+	expect(attach).not.toBeNull();
+	await act(async () => attach?.click());
+	expect(onAttach).toHaveBeenCalledWith({
+		kind: "selection",
+		path: "/note.md",
+		text: "**bold**",
+	});
+	expect(editor.getJSON()).toEqual(before);
+});

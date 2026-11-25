@@ -656,3 +656,43 @@
 		inset-inline-start: 100%;
 	}
 }
+
+/* Animate an inherited color weight because ::selection cannot animate directly. */
+@property --hubble-attach-flash {
+	syntax: "<percentage>";
+	inherits: true;
+	initial-value: 0%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.ProseMirror.hubble-selection-attached {
+		--hubble-selection-base: color-mix(
+			in oklab,
+			var(--selected) 70%,
+			transparent
+		);
+		animation: hubble-selection-attach 800ms ease-out;
+	}
+
+	.dark .ProseMirror.hubble-selection-attached {
+		--hubble-selection-base: color-mix(in oklab, #8a764b 88%, transparent);
+	}
+
+	.ProseMirror.hubble-selection-attached ::selection {
+		background: color-mix(
+			in oklab,
+			var(--brand-accent) var(--hubble-attach-flash),
+			var(--hubble-selection-base)
+		);
+	}
+}
+
+@keyframes hubble-selection-attach {
+	0%,
+	100% {
+		--hubble-attach-flash: 0%;
+	}
+	20% {
+		--hubble-attach-flash: 100%;
+	}
+}
