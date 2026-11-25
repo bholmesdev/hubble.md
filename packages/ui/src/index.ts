@@ -37,6 +37,7 @@ export {
 	setActiveEditor,
 } from "./editor/activeEditor";
 export type { EditorAttachment } from "./editor/attachments";
+export { revealAttachment } from "./editor/attachments";
 export {
 	EditorView,
 	type EditorViewProps,

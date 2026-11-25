@@ -1,6 +1,6 @@
 import { selectionToMarkdown } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
-import type { EditorAttachment } from "./attachments";
+import { type EditorAttachment, REVEAL_ATTACHMENT } from "./attachments";
 
 export function watchSelection(
 	editor: Editor,
@@ -25,7 +25,19 @@ export function watchSelection(
 			const text = selectionToMarkdown(selection).trimEnd();
 			const key = `${from}:${to}:${text}`;
 			if (!text || key === last) return;
-			if (!attach({ kind: "selection", path, text })) return;
+			if (
+				!attach({
+					kind: "selection",
+					path,
+					text,
+					source: {
+						from,
+						to,
+						text: editor.state.doc.textBetween(from, to, "\n"),
+					},
+				})
+			)
+				return;
 			last = key;
 			dom.classList.add("hubble-selection-attached");
 			clearTimeout(flash);
@@ -47,7 +59,18 @@ export function watchSelection(
 	window.addEventListener("pointerup", up);
 	dom.addEventListener("keydown", clear);
 	dom.addEventListener("keyup", schedule);
-	editor.on("selectionUpdate", schedule);
+	const selectionUpdate = ({
+		transaction,
+	}: {
+		transaction: import("@tiptap/pm/state").Transaction;
+	}) => {
+		if (transaction.getMeta(REVEAL_ATTACHMENT)) {
+			clear();
+			return;
+		}
+		schedule();
+	};
+	editor.on("selectionUpdate", selectionUpdate);
 	editor.on("update", schedule);
 	return () => {
 		clear();
@@ -57,7 +80,7 @@ export function watchSelection(
 		window.removeEventListener("pointerup", up);
 		dom.removeEventListener("keydown", clear);
 		dom.removeEventListener("keyup", schedule);
-		editor.off("selectionUpdate", schedule);
+		editor.off("selectionUpdate", selectionUpdate);
 		editor.off("update", schedule);
 	};
 }
