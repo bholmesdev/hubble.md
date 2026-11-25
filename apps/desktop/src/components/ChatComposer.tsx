@@ -1,6 +1,8 @@
 import { VirtualCursor } from "@hubble.md/ui";
 import { type JSONContent, Node } from "@tiptap/core";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin } from "@tiptap/pm/state";
+import { Transform } from "@tiptap/pm/transform";
 import {
 	EditorContent,
 	type NodeViewProps,
@@ -144,27 +146,39 @@ export function ChatComposer({
 		queueMicrotask(() => {
 			if (cancelled || editor.isDestroyed) return;
 			editor.setEditable(!readOnly, false);
-			const next = draftDocument(text, attachments);
 			const current = readDraft(editor.getJSON(), attachments);
+			const next = draftDocument(text, attachments);
 			if (
 				current.text !== text ||
 				JSON.stringify(current.attachments) !==
 					JSON.stringify(readDraft(next, attachments).attachments)
 			) {
-				const position = editor.state.selection.head;
 				const added = attachments.some(
 					(a) =>
 						a.offset !== undefined &&
 						!current.attachments.some((previous) => previous.id === a.id),
 				);
-				editor
-					.chain()
-					.setMeta("addToHistory", false)
-					.setContent(next, { emitUpdate: false })
-					.run();
-				editor.commands.setTextSelection(
-					Math.min(position, editor.state.doc.content.size - 1),
+				const document = editor.schema.nodeFromJSON(
+					current.text === text
+						? draftQuotes(editor.getJSON(), attachments)
+						: draftText(editor.state.doc, current.text, text, attachments),
 				);
+				const start = editor.state.doc.content.findDiffStart(document.content);
+				const end = editor.state.doc.content.findDiffEnd(document.content);
+				if (start !== null && end) {
+					// Keep unchanged text outside the replacement so existing undo steps still map to it.
+					const overlap = Math.max(0, start - Math.min(end.a, end.b));
+					editor.view.dispatch(
+						editor.state.tr
+							.replace(
+								start,
+								end.a + overlap,
+								document.slice(start, end.b + overlap),
+							)
+							.setMeta("addToHistory", false)
+							.setMeta("preventUpdate", true),
+					);
+				}
 				if (added && !readOnly) editor.commands.focus("end");
 			}
 		});
@@ -247,6 +261,130 @@ function QuoteView({
 			{spacing.after ? <span className="whitespace-normal"> </span> : null}
 		</NodeViewWrapper>
 	);
+}
+
+/** Keep typed paragraph and hard-break nodes intact when only quote context changes. */
+function draftQuotes(
+	doc: JSONContent,
+	attachments: ChatAttachment[],
+	previousDoc = doc,
+): JSONContent {
+	const quotes = attachments
+		.filter((attachment) => attachment.offset !== undefined)
+		.sort((a, b) => (a.offset ?? 0) - (b.offset ?? 0));
+	let offset = 0;
+	let index = 0;
+	let paragraphs = 0;
+	const previous = new Map<string, JSONContent>();
+	function collect(node: JSONContent) {
+		if (node.type === "quote") previous.set(node.attrs?.id, node);
+		for (const child of node.content ?? []) collect(child);
+	}
+	collect(previousDoc);
+	function insert(content: JSONContent[]) {
+		while (index < quotes.length && (quotes[index].offset ?? 0) <= offset) {
+			const attachment = quotes[index++];
+			const old = previous.get(attachment.id);
+			content.push({
+				type: "quote",
+				attrs: {
+					id: attachment.id,
+					attachment: old
+						? { ...attachment, offset: old.attrs?.attachment?.offset }
+						: attachment,
+				},
+			});
+		}
+	}
+	function visit(node: JSONContent): JSONContent {
+		if (node.type === "paragraph") {
+			if (paragraphs > 0) offset++;
+			paragraphs++;
+		}
+		const content: JSONContent[] = [];
+		for (const child of node.content ?? []) {
+			if (child.type === "quote") continue;
+			if (child.type === "text") {
+				for (const character of (child.text ?? "").split("")) {
+					insert(content);
+					const last = content[content.length - 1];
+					if (last?.type === "text") last.text += character;
+					else content.push({ ...child, text: character });
+					offset++;
+				}
+			} else {
+				if (child.type === "hardBreak") {
+					insert(content);
+					offset++;
+				}
+				content.push(visit(child));
+			}
+		}
+		if (node.type === "paragraph") insert(content);
+		return node.content || content.length ? { ...node, content } : node;
+	}
+	return visit(doc);
+}
+
+/** Apply recognition changes without flattening unchanged typed line breaks or paragraphs. */
+function draftText(
+	doc: ProseMirrorNode,
+	before: string,
+	after: string,
+	attachments: ChatAttachment[],
+) {
+	let start = 0;
+	while (
+		start < Math.min(before.length, after.length) &&
+		before[start] === after[start]
+	)
+		start++;
+	let end = before.length;
+	let nextEnd = after.length;
+	while (
+		end > start &&
+		nextEnd > start &&
+		before[end - 1] === after[nextEnd - 1]
+	) {
+		end--;
+		nextEnd--;
+	}
+	const plain = doc.type.schema.nodeFromJSON(draftQuotes(doc.toJSON(), []));
+	const content = after
+		.slice(start, nextEnd)
+		.split("\n")
+		.flatMap((line, index) => [
+			...(index ? [doc.type.schema.nodes.hardBreak.create()] : []),
+			...(line ? [doc.type.schema.text(line)] : []),
+		]);
+	const updated = new Transform(plain).replaceWith(
+		textPosition(plain, start),
+		textPosition(plain, end),
+		content,
+	).doc;
+	return draftQuotes(updated.toJSON(), attachments, doc.toJSON());
+}
+
+function textPosition(doc: ProseMirrorNode, target: number) {
+	let offset = 0;
+	let blocks = 0;
+	let position: number | undefined;
+	doc.descendants((node, at) => {
+		if (position !== undefined) return false;
+		if (node.isTextblock) {
+			if (blocks > 0) offset++;
+			blocks++;
+			if (target === offset) position = at + 1;
+		} else if (node.isText) {
+			if (target <= offset + node.nodeSize) position = at + target - offset;
+			offset += node.nodeSize;
+		} else if (node.type.name === "hardBreak") {
+			if (target === offset) position = at;
+			offset++;
+		}
+		return position === undefined;
+	});
+	return position ?? doc.content.size - 1;
 }
 
 function draftDocument(
