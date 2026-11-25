@@ -11,6 +11,7 @@ import {
 } from "../desktopApi/chat";
 import type { VoiceEvent } from "../desktopApi/voice";
 import { chatConnection, refreshChatConnection } from "../store/chatConnection";
+import { chatDebug, chatPayloads } from "../store/chatDebug";
 import { getInitialState, STORAGE_KEY, serialize } from "../store/persistence";
 import {
 	appStore,
@@ -37,6 +38,7 @@ const mocks = vi.hoisted(() => ({
 		chatReset: vi.fn(),
 		openExternalUrl: vi.fn(),
 		chatModels: vi.fn(),
+		chatPayloads: vi.fn(),
 		chatSend: vi.fn(),
 		chatStop: vi.fn(),
 		onChatDelta: vi.fn(),
@@ -53,6 +55,9 @@ let finish: (result: ChatResult) => void;
 beforeEach(async () => {
 	vi.clearAllMocks();
 	voice.set(null);
+	chatDebug.set(false);
+	chatPayloads.set({});
+	mocks.api.chatPayloads.mockResolvedValue([]);
 	mocks.api.voiceStart.mockResolvedValue(undefined);
 	mocks.api.voiceStop.mockResolvedValue(undefined);
 	localStorage.clear();
@@ -1087,6 +1092,257 @@ it("reviews and sends voice highlights in place, and reveals a pill's source wit
 	).toHaveLength(1);
 });
 
+it("resizes Chat within its bounds and keeps the width across tabs and reopening", async () => {
+	const separator = () =>
+		host.querySelector<HTMLElement>(
+			'[role="separator"][aria-label="Resize chat panel"]',
+		);
+	expect(separator()).not.toBeNull();
+	const resize = async (key: string) =>
+		act(async () =>
+			separator()?.dispatchEvent(
+				new KeyboardEvent("keydown", { key, bubbles: true }),
+			),
+		);
+	await resize("ArrowRight");
+	expect(separator()?.getAttribute("aria-valuenow")).toBe("376");
+	await act(async () =>
+		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new")),
+	);
+	expect(separator()?.getAttribute("aria-valuenow")).toBe("376");
+	await act(async () => chatPanelOpen.set(false));
+	await act(async () => chatPanelOpen.set(true));
+	expect(separator()?.getAttribute("aria-valuenow")).toBe("376");
+	await resize("Home");
+	await resize("ArrowLeft");
+	expect(separator()?.getAttribute("aria-valuenow")).toBe("280");
+	await resize("End");
+	await resize("ArrowRight");
+	expect(Number(separator()?.getAttribute("aria-valuenow"))).toBe(
+		Math.round(Number(separator()?.getAttribute("aria-valuemax"))),
+	);
+});
+
+it("reveals actual payloads for the matching turn and keeps debug data out of saved and sent history", async () => {
+	await sendMessage("Explain this");
+	const request = mocks.api.chatSend.mock.calls[0][0];
+	const initial = {
+		model: request.model,
+		input: chatResponseInput(request.messages),
+		instructions: "Debug instructions",
+		stream: true,
+		store: false,
+	};
+	await act(async () => {
+		delta({
+			id: request.id,
+			text: "",
+			debug: { round: 1, direction: "request", body: initial },
+		});
+		delta({
+			id: request.id,
+			text: "",
+			debug: {
+				round: 1,
+				direction: "response",
+				body: {
+					id: "debug_response_one",
+					output: [{ type: "function_call", name: "read_file" }],
+				},
+			},
+		});
+		delta({
+			id: request.id,
+			text: "",
+			debug: {
+				round: 2,
+				direction: "request",
+				body: {
+					...initial,
+					input: [
+						...initial.input,
+						{
+							type: "function_call_output",
+							call_id: "read",
+							output: "Tool result",
+						},
+					],
+				},
+			},
+		});
+		delta({
+			id: request.id,
+			text: "",
+			debug: {
+				round: 2,
+				direction: "response",
+				body: { id: "debug_response_two", usage: { input_tokens: 42 } },
+			},
+		});
+		finish({ status: "complete", text: "Done" });
+	});
+	expect(host.querySelector("article pre")).toBeNull();
+	await act(async () =>
+		host
+			.querySelector<HTMLButtonElement>('[aria-label="Show API payloads"]')
+			?.click(),
+	);
+	expect(
+		host
+			.querySelector('[aria-label="Hide API payloads"]')
+			?.getAttribute("aria-pressed"),
+	).toBe("true");
+	const expand = async () =>
+		act(async () => {
+			for (const details of host.querySelectorAll<HTMLDetailsElement>(
+				"article details",
+			)) {
+				details.open = true;
+				details.dispatchEvent(new Event("toggle"));
+			}
+		});
+	await expand();
+	const user = host.querySelector('article[aria-label="Your message"]');
+	const assistant = host.querySelector('article[aria-label="Chat reply"]');
+	expect(user?.querySelector("summary")?.textContent).toContain(
+		"Request payload",
+	);
+	expect(JSON.parse(user?.querySelector("pre")?.textContent ?? "null")).toEqual(
+		initial,
+	);
+	expect(user?.textContent).not.toContain("debug_response_one");
+	const received = [...(assistant?.querySelectorAll("pre") ?? [])].map((pre) =>
+		JSON.parse(pre.textContent ?? "null"),
+	);
+	expect(received.map((body) => body.id ?? "tool request")).toEqual([
+		"debug_response_one",
+		"tool request",
+		"debug_response_two",
+	]);
+	expect(received[1].input).toContainEqual({
+		type: "function_call_output",
+		call_id: "read",
+		output: "Tool result",
+	});
+	const active = tabsStore.get().activeTabId;
+	if (!active) throw new Error("Missing tab");
+	await act(async () =>
+		updateTabChat(active, (chat) => ({
+			...chat,
+			messages: chat.messages.map((message) =>
+				message.id === request.id
+					? { ...message, text: "Done with more detail" }
+					: message,
+			),
+		})),
+	);
+	expect(
+		host.querySelector('article[aria-label="Chat reply"] pre')?.textContent,
+	).toContain("debug_response_one");
+	expect(JSON.stringify(serialize(appStore.get()))).not.toContain(
+		"debug_response",
+	);
+	const tab = tabsStore.get().activeTabId;
+	await act(async () =>
+		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new")),
+	);
+	expect(host.querySelector('[aria-label="Hide API payloads"]')).not.toBeNull();
+	await act(async () =>
+		tabsStore.set((tabs) => ({ ...tabs, activeTabId: tab })),
+	);
+	await expand();
+	expect(
+		host.querySelector('article[aria-label="Chat reply"] pre')?.textContent,
+	).toContain("debug_response_one");
+	await act(async () =>
+		host
+			.querySelector<HTMLButtonElement>('[aria-label="Hide API payloads"]')
+			?.click(),
+	);
+	expect(host.querySelector("article pre")).toBeNull();
+	await sendMessage("Continue");
+	expect(JSON.stringify(mocks.api.chatSend.mock.calls[1][0])).not.toContain(
+		"debug_response",
+	);
+});
+
+it("loads durable payloads for saved turns, with saved message input as an honest fallback", async () => {
+	const tab = tabsStore.get().activeTabId;
+	if (!tab) throw new Error("Missing tab");
+	const id = crypto.randomUUID();
+	const saved: import("../desktopApi/chat").ChatMessage[] = [
+		{
+			id: "saved-user",
+			role: "user",
+			text: "Explain this quote",
+			status: "complete",
+			attachments: [
+				{
+					id: "quote",
+					kind: "selection",
+					path: "/notes/note.md",
+					text: "Original quote",
+				},
+			],
+		},
+		{ id, role: "assistant", text: "Saved answer", status: "complete" },
+	];
+	await act(async () => {
+		updateTabChat(tab, (chat) => ({ ...chat, messages: saved }));
+		chatDebug.set(true);
+	});
+	const expand = async () =>
+		act(async () => {
+			for (const details of host.querySelectorAll<HTMLDetailsElement>(
+				"article details",
+			)) {
+				details.open = true;
+				details.dispatchEvent(new Event("toggle"));
+			}
+		});
+	await expand();
+	const user = () => host.querySelector('article[aria-label="Your message"]');
+	const reply = () => host.querySelector('article[aria-label="Chat reply"]');
+	expect(user()?.querySelector("summary")?.textContent).toContain(
+		"Saved input",
+	);
+	expect(
+		JSON.parse(user()?.querySelector("pre")?.textContent ?? "null"),
+	).toEqual(chatResponseInput(saved.slice(0, 1)));
+	expect(reply()?.querySelector("summary")?.textContent).toContain(
+		"Saved reply",
+	);
+	expect(reply()?.querySelector("pre")?.textContent).toContain("Saved answer");
+	mocks.api.chatPayloads.mockResolvedValue([
+		{
+			round: 1,
+			direction: "request",
+			body: {
+				model: "captured-model",
+				input: chatResponseInput(saved.slice(0, 1)),
+			},
+		},
+		{
+			round: 1,
+			direction: "response",
+			body: { id: "durable-response", output: [] },
+		},
+	]);
+	await act(async () => chatPanelOpen.set(false));
+	await act(async () => chatPanelOpen.set(true));
+	await expand();
+	expect(user()?.querySelector("summary")?.textContent).toContain(
+		"Request payload",
+	);
+	expect(
+		JSON.parse(user()?.querySelector("pre")?.textContent ?? "null").model,
+	).toBe("captured-model");
+	expect(reply()?.querySelector("pre")?.textContent).toContain(
+		"durable-response",
+	);
+	expect(host.textContent).not.toContain("Payload unavailable");
+});
+
 it.each([
 	{ text: "Before   after", offset: 6, visible: "Before Quoted after" },
 	{ text: "Before   after", offset: 9, visible: "Before Quoted after" },
@@ -1120,37 +1376,6 @@ it.each([
 	const sent = mocks.api.chatSend.mock.calls[0][0].messages.slice(-1)[0];
 	expect(sent.text).toBe(text);
 	expect(sent.attachments[0].offset).toBe(offset);
-});
-
-it("resizes Chat within its bounds and keeps the width across tabs and reopening", async () => {
-	const separator = () =>
-		host.querySelector<HTMLElement>(
-			'[role="separator"][aria-label="Resize chat panel"]',
-		);
-	expect(separator()).not.toBeNull();
-	const resize = async (key: string) =>
-		act(async () =>
-			separator()?.dispatchEvent(
-				new KeyboardEvent("keydown", { key, bubbles: true }),
-			),
-		);
-	await resize("ArrowRight");
-	expect(separator()?.getAttribute("aria-valuenow")).toBe("376");
-	await act(async () =>
-		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/other.md", "new")),
-	);
-	expect(separator()?.getAttribute("aria-valuenow")).toBe("376");
-	await act(async () => chatPanelOpen.set(false));
-	await act(async () => chatPanelOpen.set(true));
-	expect(separator()?.getAttribute("aria-valuenow")).toBe("376");
-	await resize("Home");
-	await resize("ArrowLeft");
-	expect(separator()?.getAttribute("aria-valuenow")).toBe("280");
-	await resize("End");
-	await resize("ArrowRight");
-	expect(Number(separator()?.getAttribute("aria-valuenow"))).toBe(
-		Math.round(Number(separator()?.getAttribute("aria-valuemax"))),
-	);
 });
 
 it("moves the Chat toggle into the panel while open and keeps New tab independent", async () => {

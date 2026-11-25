@@ -199,7 +199,11 @@ describe("ChatGPT IPC and Responses", () => {
 				]),
 			);
 			expect(await response).toEqual({ status: "stopped", text: "" });
-			expect(sender.send).not.toHaveBeenCalled();
+			expect(
+				sender.send.mock.calls.every(
+					([, payload]) => payload.debug?.direction === "request",
+				),
+			).toBe(true);
 			mocks.create.mockClear();
 		}
 	});
@@ -376,6 +380,27 @@ it("runs namespaced workspace tools and retains calls and results for follow-ups
 			"Edited note\n",
 		);
 		expect(mocks.create).toHaveBeenCalledTimes(3);
+		const debug = sender.send.mock.calls
+			.filter(
+				([channel, event]) => channel === "desktop:chat-delta" && event.debug,
+			)
+			.map(([, event]) => event.debug);
+		expect(
+			debug.map(({ round, direction }) => `${round}:${direction}`),
+		).toEqual([
+			"1:request",
+			"1:response",
+			"2:request",
+			"2:response",
+			"3:request",
+			"3:response",
+		]);
+		expect(
+			debug
+				.filter((item) => item.direction === "request")
+				.map((item) => item.body),
+		).toEqual(mocks.create.mock.calls.map(([body]) => body));
+
 		expect(mocks.create.mock.calls[0][0].tools[0]).toMatchObject({
 			type: "namespace",
 			name: "workspace",
@@ -460,4 +485,60 @@ it("stops tool continuation when the workspace changes", async () => {
 	} finally {
 		await fs.rm(root, { recursive: true, force: true });
 	}
+});
+
+it("publishes the exact Responses bodies with quoted, spoken, and comment context", async () => {
+	const response = {
+		id: "resp_debug",
+		status: "completed",
+		output: [],
+		usage: { input_tokens: 30, output_tokens: 4 },
+	};
+	mocks.create.mockResolvedValue(
+		stream([{ type: "response.completed", response }]),
+	);
+	const input = request();
+	input.messages[0] = {
+		...input.messages[0],
+		text: "Read this. Then compare.",
+		file: { path: "note.md", version: "v1", text: "# Note" },
+		attachments: [
+			{
+				id: "quote",
+				kind: "selection",
+				path: "/notes/note.md",
+				text: "Selected quote",
+				offset: 10,
+				source: { from: 1, to: 15, text: "Selected quote" },
+			},
+			{
+				id: "comment",
+				kind: "thread",
+				path: "/notes/note.md",
+				text: "Comment anchor",
+				comments: [{ author: "human", body: "Comment body" }],
+			},
+		],
+	};
+	await call("send", input);
+	const payloads = sender.send.mock.calls
+		.filter(
+			([channel, event]) => channel === "desktop:chat-delta" && event.debug,
+		)
+		.map(([, event]) => event.debug);
+	expect(payloads).toEqual([
+		{ round: 1, direction: "request", body: mocks.create.mock.calls[0][0] },
+		{ round: 1, direction: "response", body: response },
+	]);
+	expect(await call("payloads", input.id)).toEqual(payloads);
+	const content = payloads[0].body.input[0].content;
+	expect(content.indexOf("Read this.")).toBeLessThan(
+		content.indexOf("Selected quote"),
+	);
+	expect(content.indexOf("Selected quote")).toBeLessThan(
+		content.indexOf("Then compare."),
+	);
+	expect(content).toContain("Comment body");
+	expect(content).not.toContain('"source"');
+	expect(JSON.stringify(payloads)).not.toContain("test-oauth-token");
 });

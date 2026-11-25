@@ -101,11 +101,19 @@ export type ChatResult = {
 	context?: z.infer<typeof chatContextSchema>;
 };
 
+export const chatPayloadSchema = z.object({
+	round: z.number().int().min(1).max(12),
+	direction: z.enum(["request", "response", "error"]),
+	body: z.unknown(),
+});
+export type ChatPayload = z.infer<typeof chatPayloadSchema>;
+
 export type ChatDelta = {
 	id: string;
 	text: string;
 	context?: z.infer<typeof chatContextSchema>;
 	activity?: string;
+	debug?: ChatPayload;
 };
 
 export type ChatFileRequest = {
