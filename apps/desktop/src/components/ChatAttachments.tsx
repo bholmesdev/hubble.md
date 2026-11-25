@@ -1,7 +1,7 @@
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import type { ChatAttachment } from "../desktopApi/chat";
 import { basename } from "../lib/filePath";
-import { quotePreview, shortQuote } from "../lib/quotePreview";
+import { quotePreview } from "../lib/quotePreview";
 
 export function ChatAttachments({
 	attachments,
@@ -34,9 +34,9 @@ export function ChatAttachments({
 							</p>
 							<blockquote
 								title={preview}
-								className="line-clamp-2 border-s-2 border-border ps-2 text-xs text-foreground"
+								className="truncate border-s-2 border-border ps-2 text-xs text-foreground"
 							>
-								{shortQuote(preview)}
+								{preview}
 							</blockquote>
 						</div>
 						{onRemove && (

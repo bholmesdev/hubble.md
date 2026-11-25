@@ -1,3 +1,4 @@
+import { Button as BaseButton } from "@base-ui/react/button";
 import type { Ref } from "react";
 import MingcuteCloseLine from "~icons/mingcute/close-line";
 import MingcuteQuoteLeftFill from "~icons/mingcute/quote-left-fill";
@@ -34,6 +35,10 @@ export function ChatTranscript({
 			className={`${onEdit ? "min-h-16 max-h-[min(40vh,20rem)] overflow-y-auto py-1 " : ""}whitespace-pre-wrap break-words leading-relaxed select-text`}
 		>
 			{parts.map((part, index) => {
+				// Use one collapsible display space at quote boundaries; keep stored text intact.
+				let display = part.text;
+				if (index > 0) display = display.replace(/^[\p{Zs}\t]+/u, "");
+				if (part.attachment) display = display.replace(/[\p{Zs}\t]+$/u, "");
 				const preview = part.attachment
 					? quotePreview(part.attachment.text)
 					: "";
@@ -75,42 +80,63 @@ export function ChatTranscript({
 								}}
 							/>
 						) : (
-							part.text
+							display
 						)}
 						{part.attachment ? (
-							<span
-								className={`my-1 inline-flex max-w-full items-center gap-1 rounded-md px-2 py-1 align-middle text-xs ${inBubble ? "bg-white/15 text-primary-foreground" : "bg-brand/10 text-brand"}`}
-							>
-								<button
-									type="button"
-									className="flex min-w-0 items-center gap-1.5 text-start hover:opacity-80 focus-visible:outline-2 focus-visible:outline-ring"
-									title={preview}
-									aria-label={`Reveal selection: ${part.attachment.text}`}
-									onClick={() => part.attachment && onReveal(part.attachment)}
+							<>
+								{!onEdit ? <span className="whitespace-normal"> </span> : null}
+								<span
+									className={`my-1 inline rounded-md box-decoration-clone whitespace-normal px-2 py-1 align-baseline text-xs leading-[inherit] ${inBubble ? "bg-white/15 text-primary-foreground" : "bg-brand/10 text-brand"}`}
 								>
-									<MingcuteQuoteLeftFill
-										aria-hidden="true"
-										className="size-3 shrink-0"
-									/>
-									<span className="truncate">{shortQuote(preview)}</span>
-								</button>
-								{onRemove ? (
-									<button
-										type="button"
-										className="shrink-0 rounded-sm p-0.5 hover:opacity-80 focus-visible:outline-2 focus-visible:outline-ring"
-										aria-label={`Remove attachment: ${part.attachment.text}`}
-										onClick={() =>
-											part.attachment && onRemove(part.attachment.id)
-										}
+									{/* Native buttons form one unbreakable box in inline text. */}
+									<BaseButton
+										nativeButton={false}
+										render={<span />}
+										className="inline cursor-pointer whitespace-normal text-start leading-[inherit] hover:opacity-80 focus-visible:outline-2 focus-visible:outline-ring"
+										title={preview}
+										aria-label={`Reveal selection: ${part.attachment.text}`}
+										onClick={() => part.attachment && onReveal(part.attachment)}
 									>
-										<MingcuteCloseLine aria-hidden="true" className="size-3" />
-									</button>
-								) : null}
-							</span>
+										<QuoteLabel text={shortQuote(preview)} />
+									</BaseButton>
+									{onRemove ? (
+										<button
+											type="button"
+											className="ms-1 inline-block rounded-sm p-0.5 align-baseline hover:opacity-80 focus-visible:outline-2 focus-visible:outline-ring"
+											aria-label={`Remove attachment: ${part.attachment.text}`}
+											onClick={() =>
+												part.attachment && onRemove(part.attachment.id)
+											}
+										>
+											<MingcuteCloseLine
+												aria-hidden="true"
+												className="size-3"
+											/>
+										</button>
+									) : null}
+								</span>
+								{!onEdit ? <span className="whitespace-normal"> </span> : null}
+							</>
 						) : null}
 					</span>
 				);
 			})}
 		</div>
+	);
+}
+
+function QuoteLabel({ text }: { text: string }) {
+	const space = text.indexOf(" ");
+	return (
+		<>
+			<span className={space < 0 ? undefined : "whitespace-nowrap"}>
+				<MingcuteQuoteLeftFill
+					aria-hidden="true"
+					className="me-1.5 inline-block size-3 align-[-0.1em]"
+				/>
+				{space < 0 ? text : text.slice(0, space)}
+			</span>
+			{space < 0 ? "" : text.slice(space)}
+		</>
 	);
 }
