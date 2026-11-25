@@ -20,16 +20,20 @@ export type TabsState = {
 };
 
 export type TabSession = {
+	entries?: { id: TabId; path: string }[];
+	activeTabId?: TabId | null;
+	// Earlier sessions stored paths separately from tab identity.
 	ids?: Record<string, TabId>;
 	chats?: Record<TabId, ChatConversation>;
 	closed?: ClosedTab[];
-	paths: string[];
-	activePath: string | null;
+	paths?: string[];
+	activePath?: string | null;
 };
 
 export function tabSession(tabs: TabsState): TabSession {
 	return {
-		ids: Object.fromEntries(tabs.order.map((id) => [tabs.byId[id].path, id])),
+		entries: tabs.order.map((id) => ({ id, path: tabs.byId[id].path })),
+		activeTabId: tabs.activeTabId,
 		chats: Object.fromEntries(
 			tabs.order.flatMap((id) => {
 				const chat = tabs.byId[id].chat;
@@ -37,18 +41,19 @@ export function tabSession(tabs: TabsState): TabSession {
 			}),
 		),
 		closed: tabs.closed,
-		paths: tabs.order.map((id) => tabs.byId[id].path),
-		activePath: tabs.activeTabId
-			? (tabs.byId[tabs.activeTabId]?.path ?? null)
-			: null,
 	};
 }
 
 export function tabsFromSession(session?: TabSession): TabsState {
 	const tabs = emptyTabs();
-	for (const path of session?.paths ?? []) {
-		if (findTabByPath(tabs, path)) continue;
-		const saved = session?.ids?.[path];
+	const entries =
+		session?.entries ??
+		[...new Set(session?.paths ?? [])].map((path) => ({
+			path,
+			id: session?.ids?.[path],
+		}));
+	for (const { path, id: saved } of entries) {
+		if (!session?.entries && findTabByPath(tabs, path)) continue;
 		const id = saved && !tabs.byId[saved] ? saved : mintTabId();
 		const chat = session?.chats?.[id];
 		tabs.order.push(id);
@@ -69,9 +74,12 @@ export function tabsFromSession(session?: TabSession): TabsState {
 	return {
 		...tabs,
 		closed: session?.closed ?? [],
-		activeTabId: session?.activePath
-			? (findTabByPath(tabs, session.activePath) ?? tabs.order[0] ?? null)
-			: (tabs.order[0] ?? null),
+		activeTabId:
+			session?.activeTabId && tabs.byId[session.activeTabId]
+				? session.activeTabId
+				: session?.activePath
+					? (findTabByPath(tabs, session.activePath) ?? tabs.order[0] ?? null)
+					: (tabs.order[0] ?? null),
 	};
 }
 
@@ -95,16 +103,12 @@ export function findTabByPath(tabs: TabsState, path: string): TabId | null {
 	);
 }
 
-/** Reuse an open path; otherwise replace the target or insert beside the active tab. */
+/** Replace the target or insert a new tab beside the active one. */
 export function withOpenedTab(
 	tabs: TabsState,
 	path: string,
 	target?: TabTarget,
 ): TabsState {
-	const existing = findTabByPath(tabs, path);
-	if (existing) {
-		return { ...tabs, activeTabId: existing };
-	}
 	if (target !== "new") {
 		const id = target && tabs.byId[target] ? target : tabs.activeTabId;
 		if (id && tabs.byId[id]) {
