@@ -482,7 +482,7 @@ export function ChatPanel({
 								aria-label={
 									message.role === "user" ? "Your message" : "Chat reply"
 								}
-								className="space-y-2 border-b border-dashed border-border pb-5 last:border-b-0 last:pb-0"
+								className="space-y-2"
 							>
 								{message.attachments?.length ? (
 									<ChatAttachments

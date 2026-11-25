@@ -18,7 +18,7 @@ import {
 	emptyDoc,
 	viewerStore,
 } from "../store/state";
-import { chatPanelOpen } from "../store/tabChat";
+import { chatPanelOpen, updateTabChat } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import { emptyTabs, withOpenedTab } from "../store/tabs";
 import { voice } from "../store/voice";
@@ -780,7 +780,7 @@ it("keeps attachments with their tab, removes them, and sends their snapshots on
 		attachToChat(thread);
 	});
 	const pending = () => host.querySelector('[aria-label="Attachments"]');
-	expect(pending()?.textContent).toContain("A highlighted passag…");
+	expect(pending()?.textContent).toContain("A highlighted passage");
 	expect(pending()?.querySelector("blockquote")?.title).toBe(
 		"A highlighted passage",
 	);
@@ -793,7 +793,7 @@ it("keeps attachments with their tab, removes them, and sends their snapshots on
 	await act(async () =>
 		tabsStore.set((tabs) => ({ ...tabs, activeTabId: firstTab })),
 	);
-	expect(pending()?.textContent).toContain("A highlighted passag…");
+	expect(pending()?.textContent).toContain("A highlighted passage");
 	expect(pending()?.querySelector("blockquote")?.title).toBe(
 		"A highlighted passage",
 	);
@@ -802,7 +802,7 @@ it("keeps attachments with their tab, removes them, and sends their snapshots on
 	);
 	expect(remove).not.toBeNull();
 	await act(async () => remove?.click());
-	expect(pending()?.textContent).not.toContain("A highlighted passag…");
+	expect(pending()?.textContent).not.toContain("A highlighted passage");
 	await act(async () =>
 		appStore.set((state) => ({
 			...state,
@@ -1084,4 +1084,39 @@ it("reviews and sends voice highlights in place, and reveals a pill's source wit
 	expect(
 		host.querySelectorAll('article [aria-label="Reveal selection: A passage"]'),
 	).toHaveLength(1);
+});
+
+it.each([
+	{ text: "Before   after", offset: 6, visible: "Before Quoted after" },
+	{ text: "Before   after", offset: 9, visible: "Before Quoted after" },
+	{ text: "Before\n after", offset: 6, visible: "Before Quoted \n after" },
+])("uses consistent quote boundary spacing without changing sent text: $offset / $text", async ({
+	text,
+	offset,
+	visible,
+}) => {
+	const tab = tabsStore.get().activeTabId;
+	if (!tab) throw new Error("Missing tab");
+	await act(async () =>
+		updateTabChat(tab, (chat) => ({
+			...chat,
+			draft: text,
+			attachments: [
+				{
+					id: "quote",
+					kind: "selection",
+					path: "/notes/note.md",
+					text: "Quoted",
+					offset,
+				},
+			],
+		})),
+	);
+	await act(async () => button("Send").click());
+	expect(
+		host.querySelector('article[aria-label="Your message"]')?.textContent,
+	).toBe(visible);
+	const sent = mocks.api.chatSend.mock.calls[0][0].messages.slice(-1)[0];
+	expect(sent.text).toBe(text);
+	expect(sent.attachments[0].offset).toBe(offset);
 });
