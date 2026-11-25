@@ -9,6 +9,7 @@ import {
 	schedulePendingSave,
 } from "./pendingSave";
 import { replaceEditorContent } from "./replaceEditorContent";
+import { ToolEditHighlight } from "./ToolEditHighlight";
 import { VirtualCursor } from "./VirtualCursor";
 import "./EditorView.css";
 
@@ -61,6 +62,7 @@ export function PlainTextEditor({
 	const editor = useEditor({
 		textDirection: "auto",
 		extensions: [
+			ToolEditHighlight,
 			StarterKit.configure({
 				blockquote: false,
 				bold: false,

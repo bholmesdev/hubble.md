@@ -50,7 +50,10 @@ Stop preserves partial text but excludes it from later context.
 - Tool results and original response items persist with the conversation and are
   replayed on follow-ups. Completed tool activity remains available after a stop;
   incomplete reply text is excluded. Each turn allows up to 12 model rounds.
-- Agent edits save directly. Each edit to an open text editor is one Undo action,
+- Agent edits save directly. Added or updated lines briefly pulse in yellow in
+  rich, source, and plain-text editors; unchanged lines and deletion-only edits
+  do not pulse. Reduced-motion settings suppress the effect.
+  Each edit to an open text editor is one Undo action,
   including front matter in Markdown. Undo and Redo save through the normal editor
   queue. Closed-file edits have no editor history; a review interface is deferred.
 - The panel checks the connection before showing a conversation. Signed-out
@@ -120,3 +123,7 @@ The composer is a plain-text Tiptap editor with inline quote nodes and the share
 ## API payload debugging
 
 The bug button beside Close chat toggles expandable payload details below each message. User turns expose the initial Responses request body; agent turns expose terminal response bodies, transport errors, and later requests made during tool rounds, in order. Captures come from the SDK call and stream events rather than reconstructing requests from visible messages. The latest 50 turns are retained in a file cache in app data, outside saved chat history and subsequent model input, and reloads fetch them on demand. Turns that were never captured expose their saved message input or reply under a distinct label. JSON is formatted only when its dropdown is expanded. Captures include note snapshots, tool results, and replies; they are stored locally without auth headers or tokens and can contain the same sensitive document text as the conversation.
+
+## Tool edit feedback
+
+![Changed lines briefly highlighted after a workspace tool edit](assets/tool-edit-pulse.png)
