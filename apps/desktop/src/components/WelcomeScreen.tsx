@@ -52,7 +52,7 @@ export function WelcomeScreen({
 					<div className="welcome-rise" style={{ animationDelay: "0.25s" }}>
 						<EmptyStateAction
 							icon={<MingcuteFolderOpenLine className="size-4" />}
-							className="min-h-10 border border-transparent px-3 py-2"
+							className="min-h-10 border border-transparent px-3 py-2 transition-colors duration-150 hover:bg-muted focus-visible:bg-muted motion-reduce:transition-none"
 							label="Open existing folder"
 							shortcut={folderShortcut}
 							onClick={onOpenFolder}
@@ -61,7 +61,7 @@ export function WelcomeScreen({
 					<div className="welcome-rise" style={{ animationDelay: "0.35s" }}>
 						<EmptyStateAction
 							icon={<MingcuteFileLine className="size-4" />}
-							className="min-h-10 border border-transparent px-3 py-2"
+							className="min-h-10 border border-transparent px-3 py-2 transition-colors duration-150 hover:bg-muted focus-visible:bg-muted motion-reduce:transition-none"
 							label="Open file"
 							shortcut={fileShortcut}
 							onClick={onOpenFile}

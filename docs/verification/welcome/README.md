@@ -6,7 +6,7 @@ Electron screenshots from a fresh, isolated profile:
 - [Skills installed](skills-installed.png): the entire skills row fades from gray to pale green without changing size.
 - [First workspace](inbox.png): the top bar returns and Inbox is selected.
 
-Verified in the real Electron app with native dialog results stubbed at the Electron boundary: all three buttons and keyboard shortcuts reach the expected picker, and creating a workspace creates and opens its folder. The welcome reveal uses 100 ms staggered delays and disables motion when reduced motion is requested.
+Verified in the real Electron app with native dialog results stubbed at the Electron boundary: all three buttons and keyboard shortcuts reach the expected picker, and creating a workspace creates and opens its folder. The welcome reveal uses 100 ms staggered delays and disables motion when reduced motion is requested. Folder and file actions fade to a neutral gray hover background over 150 ms, with transitions disabled for reduced motion.
 
 The skills row shares the Settings component's installation hook, installed indicator, and manual-install modal. Welcome changes the title, removes the description, and makes the entire filled panel an install button with a download icon. Install manually is an independent secondary button. The row matches the other welcome options' width, 40 px height, horizontal padding, and label typography. The panel has a small right inset while the manual-install button retains its standard horizontal padding. It transitions to pale green over 500 ms after installation, with motion disabled under reduced motion.
 
