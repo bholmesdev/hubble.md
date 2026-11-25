@@ -14,7 +14,10 @@ Stop preserves partial text but excludes it from later context.
 ## Prototype limits
 
 - Each tab owns its conversation, draft, and model choice. App state persists
-  these in localStorage with stable tab IDs. Switching files in a tab, renaming,
+  these in localStorage with stable tab IDs. Opening a file replaces the current
+  tab’s file even if another tab already shows it; both tabs keep independent
+  chats and IDs across restarts. Duplicate-file tabs share the live editor buffer.
+  Switching files in a tab, renaming,
   switching workspaces, and restarting preserve them. Closing a tab or signing
   out clears its chat. Switching tabs stops an in-progress reply and preserves
   its partial text as incomplete. Reopening a closed tab starts a new chat.
