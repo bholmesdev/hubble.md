@@ -5,6 +5,7 @@ import path from "node:path";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { z } from "zod/v4";
 import type { ChatAccount } from "../src/desktopApi/chat";
+import { chatAuthPage } from "./chatAuthPage";
 
 class UnreadableConnection extends Error {}
 
@@ -318,15 +319,18 @@ export class ChatGPTAuth {
 				return;
 			}
 			used = true;
-			response.setHeader("Content-Type", "text/plain; charset=utf-8");
+			response.setHeader("Content-Type", "text/html; charset=utf-8");
+			response.setHeader("Referrer-Policy", "no-referrer");
+			response.setHeader(
+				"Content-Security-Policy",
+				"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+			);
 			response.setHeader("Cache-Control", "no-store");
 			if (url.searchParams.has("error") || !url.searchParams.get("code")) {
-				response.end("Sign-in was declined. Return to Hubble.");
+				response.end(chatAuthPage(true));
 				reject(new Error("Sign-in was declined. You can try again."));
 			} else {
-				response.end(
-					"Sign-in received. Return to Hubble to finish connecting.",
-				);
+				response.end(chatAuthPage(false));
 				resolve(url.searchParams);
 			}
 		});
