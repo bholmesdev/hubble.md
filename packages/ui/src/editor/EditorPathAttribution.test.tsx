@@ -306,6 +306,54 @@ function changeEditorText(editor: Editor, text: string) {
 	editor.commands.insertContent(text);
 }
 
+for (const initialMarkdown of ["Body", "---\ntitle: Before\n---\n\nBody"]) {
+	it(`keeps property drafts and focus while editing ${initialMarkdown === "Body" ? "a new" : "an existing"} property`, async () => {
+		const root = createTestRoot();
+		const onLocalChange = vi.fn();
+		await act(async () =>
+			root.render(
+				<EditorView
+					path="/note.md"
+					initialMarkdown={initialMarkdown}
+					onLocalChange={onLocalChange}
+					onSave={vi.fn()}
+					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
+					onOpenExternalLink={() => {}}
+					onOpenWikiLink={() => {}}
+				/>,
+			),
+		);
+		if (initialMarkdown === "Body") {
+			const add = [...document.querySelectorAll("button")].find(
+				(button) => button.textContent === "Add property",
+			);
+			act(() => add?.click());
+		}
+		const input = document.querySelector<HTMLInputElement>(
+			"[data-property-name]",
+		);
+		expect(input).not.toBeNull();
+		act(() => input?.focus());
+		const setter = Object.getOwnPropertyDescriptor(
+			HTMLInputElement.prototype,
+			"value",
+		)?.set;
+		for (const value of ["t", "ti", "title"]) {
+			act(() => {
+				setter?.call(input, value);
+				input?.dispatchEvent(new Event("input", { bubbles: true }));
+			});
+			expect(document.querySelector("[data-property-name]")).toBe(input);
+			expect(document.activeElement).toBe(input);
+			expect(input?.value).toBe(value);
+		}
+		expect(onLocalChange).toHaveBeenLastCalledWith(
+			"/note.md",
+			expect.stringContaining("title:"),
+		);
+	});
+}
+
 for (const kind of ["rich", "source"] as const) {
 	it(`undoes an agent update as one ${kind} editor action, including front matter`, async () => {
 		const root = createTestRoot();
