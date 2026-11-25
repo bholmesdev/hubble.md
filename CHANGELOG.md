@@ -26,7 +26,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 - Keep longer Chat conversations going when working with large notes. [#348](https://github.com/bholmesdev/hubble.md/pull/348)
 - Diagram edits stay saved when you switch files, rename a diagram, or close its tab. [#322](https://github.com/bholmesdev/hubble.md/pull/322)
 
-## [0.3.5-preview.1] - 2026-11-25
+## [0.4.0-preview.1] - 2026-11-25
 
 This preview lets you try the Chat feature from [#348](https://github.com/bholmesdev/hubble.md/pull/348) ahead of its stable release. Download an installer below; this prerelease does not replace the latest stable release.
 
