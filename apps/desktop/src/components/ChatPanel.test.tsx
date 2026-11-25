@@ -224,6 +224,41 @@ it("stops the request when its tab changes and ignores late output", async () =>
 	expect(host.textContent).not.toContain("Late reply");
 });
 
+it("waits for a cancelled request to finish before sending from another tab", async () => {
+	await sendMessage();
+	const endCancelledRequest = finish;
+	await act(async () => {
+		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/second.md", "new"));
+	});
+	await act(async () => {
+		tabsStore.set(withOpenedTab(tabsStore.get(), "/notes/third.md", "new"));
+		viewerStore.set({
+			...emptyDoc(),
+			currentPath: "/notes/third.md",
+			...cleanFileState(""),
+		});
+	});
+	await fillDraft("Next request");
+	const editor = composer()?.editor;
+	if (!editor) throw new Error("Missing composer");
+	await act(async () => {
+		editor.view.someProp("handleKeyDown", (handler) =>
+			handler(editor.view, new KeyboardEvent("keydown", { key: "Enter" })),
+		);
+	});
+	expect(mocks.api.chatSend).toHaveBeenCalledOnce();
+	await act(async () =>
+		endCancelledRequest({ status: "stopped", text: "Old partial" }),
+	);
+	expect(chatConnection.get().sending).toBe(false);
+	expect(draftText()).toBe("Next request");
+	await act(async () => button("Send").click());
+	expect(mocks.api.chatSend).toHaveBeenCalledTimes(2);
+	expect(mocks.api.chatSend.mock.calls[1][0].messages).toEqual([
+		expect.objectContaining({ text: "Next request", role: "user" }),
+	]);
+});
+
 it("clears a signed-out conversation and picks up a reconnected account from Settings", async () => {
 	await sendMessage();
 	await act(async () =>
