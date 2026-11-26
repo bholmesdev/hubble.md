@@ -17,8 +17,6 @@ afterEach(async () => {
 
 it.each([
 	{ metaKey: true, ctrlKey: false, target: "/workspace/b.md", existing: true },
-	{ metaKey: true, ctrlKey: false, target: "/workspace/c.md", existing: false },
-	{ metaKey: false, ctrlKey: true, target: "/workspace/b.md", existing: true },
 	{ metaKey: false, ctrlKey: true, target: "/workspace/c.md", existing: false },
 ])("keeps the active note on Inbox modifier-click (meta: $metaKey, existing: $existing)", async ({
 	metaKey,

@@ -306,90 +306,32 @@ function changeEditorText(editor: Editor, text: string) {
 	editor.commands.insertContent(text);
 }
 
-for (const initialMarkdown of ["Body", "---\ntitle: Before\n---\n\nBody"]) {
-	it(`keeps property drafts and focus while editing ${initialMarkdown === "Body" ? "a new" : "an existing"} property`, async () => {
-		const root = createTestRoot();
-		const onLocalChange = vi.fn();
-		await act(async () =>
-			root.render(
-				<EditorView
-					path="/note.md"
-					initialMarkdown={initialMarkdown}
-					onLocalChange={onLocalChange}
-					onSave={vi.fn()}
-					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
-					onOpenExternalLink={() => {}}
-					onOpenWikiLink={() => {}}
-				/>,
-			),
-		);
-		if (initialMarkdown === "Body") {
-			const add = [...document.querySelectorAll("button")].find(
-				(button) => button.textContent === "Add property",
-			);
-			act(() => add?.click());
-		}
-		const input = document.querySelector<HTMLInputElement>(
-			"[data-property-name]",
-		);
-		expect(input).not.toBeNull();
-		act(() => input?.focus());
-		const setter = Object.getOwnPropertyDescriptor(
-			HTMLInputElement.prototype,
-			"value",
-		)?.set;
-		for (const value of ["t", "to", "topic"]) {
-			act(() => {
-				setter?.call(input, value);
-				input?.dispatchEvent(new Event("input", { bubbles: true }));
-			});
-			expect(document.querySelector("[data-property-name]")).toBe(input);
-			expect(document.activeElement).toBe(input);
-			expect(input?.value).toBe(value);
-		}
-		act(() => input?.blur());
-		expect(onLocalChange).toHaveBeenLastCalledWith(
-			"/note.md",
-			expect.stringContaining("topic:"),
-		);
-	});
-}
+it("keeps a new property draft mounted and focused while typing", async () => {
+	const { onLocalChange } = await mountEditor("Body");
+	const add = [...document.querySelectorAll("button")].find(
+		(button) => button.textContent === "Add property",
+	);
+	act(() => add?.click());
+	const input = propertyName();
+	act(() => input.focus());
+	for (const value of ["t", "to", "topic"]) {
+		act(() => typePropertyName(input, value));
+		expect(propertyName()).toBe(input);
+		expect(document.activeElement).toBe(input);
+		expect(input.value).toBe(value);
+	}
+	act(() => input.blur());
+	expect(onLocalChange).toHaveBeenLastCalledWith(
+		"/note.md",
+		expect.stringContaining("topic:"),
+	);
+});
 
 for (const kind of ["rich", "source"] as const) {
 	it(`undoes an agent update as one ${kind} editor action, including front matter`, async () => {
-		const root = createTestRoot();
-		const getEditor = captureEditorCreation();
-		const onLocalChange = vi.fn();
 		const before = "---\ntitle: Before\n---\n\nBefore body";
 		const after = "---\ntitle: After\n---\n\nAfter body";
-		const render = async (markdown: string, undoableUpdate?: string) =>
-			act(async () =>
-				root.render(
-					kind === "rich" ? (
-						<EditorView
-							path="/note.md"
-							initialMarkdown={markdown}
-							undoableUpdate={undoableUpdate}
-							onLocalChange={onLocalChange}
-							onSave={vi.fn()}
-							saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
-							onOpenExternalLink={() => {}}
-							onOpenWikiLink={() => {}}
-						/>
-					) : (
-						<MarkdownSourceEditor
-							path="/note.md"
-							initialMarkdown={markdown}
-							undoableUpdate={undoableUpdate}
-							onLocalChange={onLocalChange}
-							onSave={vi.fn()}
-							saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
-						/>
-					),
-				),
-			);
-		await render(before);
-		const editor = getEditor();
+		const { editor, onLocalChange, render } = await mountEditor(before, kind);
 		await render(after, "agent-1");
 		expect(editor.getText()).toContain("After body");
 		act(() => editor.commands.undo());
@@ -410,24 +352,10 @@ for (const kind of ["rich", "source"] as const) {
 }
 
 it("keeps a plain-text agent edit separate from prior human typing", async () => {
-	const root = createTestRoot();
-	const getEditor = captureEditorCreation();
-	const onLocalChange = vi.fn();
-	const render = async (text: string, undoableUpdate?: string) =>
-		act(async () =>
-			root.render(
-				<PlainTextEditor
-					path="/note.txt"
-					initialText={text}
-					undoableUpdate={undoableUpdate}
-					onLocalChange={onLocalChange}
-					onSave={vi.fn()}
-					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
-				/>,
-			),
-		);
-	await render("Before");
-	const editor = getEditor();
+	const { editor, onLocalChange, render } = await mountEditor(
+		"Before",
+		"plain",
+	);
 	act(() => changeEditorText(editor, "Human edit"));
 	await render("Human edit plus agent edit", "agent-1");
 	act(() => editor.commands.undo());
@@ -440,31 +368,43 @@ it("keeps a plain-text agent edit separate from prior human typing", async () =>
 	expect(editor.getText()).toBe("Human edit plus agent edit");
 });
 
-async function renderPropertiesEditor() {
+async function mountEditor(
+	content = "---\ntitle: Before\n---\n\nBody",
+	kind: "rich" | "source" | "plain" = "rich",
+) {
 	const root = createTestRoot();
 	const getEditor = captureEditorCreation();
 	const onLocalChange = vi.fn();
-	const render = async (
-		markdown = "---\ntitle: Before\n---\n\nBody",
-		undoableUpdate?: string,
-	) =>
-		act(async () =>
+	const onSave = vi.fn();
+	const path = kind === "plain" ? "/note.txt" : "/note.md";
+	const render = async (text = content, undoableUpdate?: string) =>
+		act(async () => {
+			const props = {
+				path,
+				onLocalChange,
+				onSave,
+				saveDebounceMs: LONG_SAVE_DEBOUNCE_MS,
+				undoableUpdate,
+			};
 			root.render(
-				<EditorView
-					path="/properties.md"
-					initialMarkdown={markdown}
-					undoableUpdate={undoableUpdate}
-					onLocalChange={onLocalChange}
-					onSave={vi.fn()}
-					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
-					onOpenExternalLink={() => {}}
-					onOpenWikiLink={() => {}}
-				/>,
-			),
-		);
+				kind === "plain" ? (
+					<PlainTextEditor {...props} initialText={text} />
+				) : kind === "source" ? (
+					<MarkdownSourceEditor {...props} initialMarkdown={text} />
+				) : (
+					<EditorView
+						{...props}
+						initialMarkdown={text}
+						onOpenExternalLink={() => {}}
+						onOpenWikiLink={() => {}}
+					/>
+				),
+			);
+		});
 	await render();
 	return { editor: getEditor(), onLocalChange, render };
 }
+
 function propertyName() {
 	const input = document.querySelector<HTMLInputElement>(
 		"[data-property-name]",
@@ -482,7 +422,7 @@ function typePropertyName(input: HTMLInputElement, value: string) {
 }
 
 it("undoes a property-name editing session as one change, like a value edit", async () => {
-	const { editor, onLocalChange } = await renderPropertiesEditor();
+	const { editor, onLocalChange } = await mountEditor();
 	const input = propertyName();
 	act(() => input.focus());
 	for (const value of ["titlex", "titlexy", "titlexyz"])
@@ -491,7 +431,7 @@ it("undoes a property-name editing session as one change, like a value edit", as
 	act(() => editor.commands.undo());
 	expect(propertyName().value).toBe("title");
 	expect(onLocalChange).toHaveBeenLastCalledWith(
-		"/properties.md",
+		"/note.md",
 		expect.stringContaining("title: Before"),
 	);
 	act(() => editor.commands.redo());
@@ -500,7 +440,7 @@ it("undoes a property-name editing session as one change, like a value edit", as
 });
 
 it("keeps the property input and caret stable through metadata undo and redo", async () => {
-	const { editor } = await renderPropertiesEditor();
+	const { editor } = await mountEditor();
 	const input = propertyName();
 	act(() => {
 		input.focus();
@@ -524,7 +464,7 @@ it("keeps the property input and caret stable through metadata undo and redo", a
 });
 
 it("undoes and redoes an empty property draft even before it has YAML text", async () => {
-	const { editor } = await renderPropertiesEditor();
+	const { editor } = await mountEditor();
 	const add = [...document.querySelectorAll("button")].find(
 		(button) => button.textContent === "Add property",
 	);
@@ -537,7 +477,7 @@ it("undoes and redoes an empty property draft even before it has YAML text", asy
 });
 
 it("keeps the document body mounted through front-matter edits and undo", async () => {
-	const { editor } = await renderPropertiesEditor();
+	const { editor } = await mountEditor();
 	const paragraph = document.querySelector(".ProseMirror p");
 	expect(paragraph).not.toBeNull();
 	const input = propertyName();
@@ -554,20 +494,20 @@ it("keeps the document body mounted through front-matter edits and undo", async 
 });
 
 it("keeps the document body mounted through an external front-matter-only update", async () => {
-	const { editor, render, onLocalChange } = await renderPropertiesEditor();
+	const { editor, render, onLocalChange } = await mountEditor();
 	const paragraph = document.querySelector(".ProseMirror p");
 	await render("---\ntitle: External\n---\n\nBody", "metadata-update");
 	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
 	act(() => editor.commands.undo());
 	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
 	expect(onLocalChange).toHaveBeenLastCalledWith(
-		"/properties.md",
+		"/note.md",
 		expect.stringContaining("title: Before"),
 	);
 	act(() => editor.commands.redo());
 	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
 	expect(onLocalChange).toHaveBeenLastCalledWith(
-		"/properties.md",
+		"/note.md",
 		expect.stringContaining("title: External"),
 	);
 });

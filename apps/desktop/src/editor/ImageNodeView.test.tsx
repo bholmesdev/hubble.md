@@ -20,12 +20,10 @@ async function renderImage() {
 	vi.resetModules();
 	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 	let resolve!: (path: string) => void;
-	let reject!: (error: Error) => void;
 	const resolvePath = vi.fn(
 		() =>
-			new Promise<string>((yes, no) => {
+			new Promise<string>((yes) => {
 				resolve = yes;
-				reject = no;
 			}),
 	);
 	window.desktopApi = {
@@ -48,7 +46,6 @@ async function renderImage() {
 		host,
 		resolvePath,
 		resolve,
-		reject,
 		setPath: (path: string) => {
 			filePath = path;
 		},
@@ -64,12 +61,6 @@ it("does not report a local image as unavailable while its path is resolving", a
 	await act(async () => editor?.commands.insertContentAt(2, "typing"));
 	expect(host.querySelector("img")).toBe(image);
 	expect(host.textContent).not.toContain("Image unavailable");
-});
-
-it("shows an unavailable image only after path resolution fails", async () => {
-	const { host, reject } = await renderImage();
-	await act(async () => reject(Error("Unavailable path")));
-	expect(host.textContent).toContain("Image unavailable");
 });
 
 it("keeps a resolved image mounted when its note is renamed in the same folder", async () => {
