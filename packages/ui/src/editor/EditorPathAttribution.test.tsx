@@ -338,7 +338,7 @@ for (const initialMarkdown of ["Body", "---\ntitle: Before\n---\n\nBody"]) {
 			HTMLInputElement.prototype,
 			"value",
 		)?.set;
-		for (const value of ["t", "ti", "title"]) {
+		for (const value of ["t", "to", "topic"]) {
 			act(() => {
 				setter?.call(input, value);
 				input?.dispatchEvent(new Event("input", { bubbles: true }));
@@ -347,9 +347,10 @@ for (const initialMarkdown of ["Body", "---\ntitle: Before\n---\n\nBody"]) {
 			expect(document.activeElement).toBe(input);
 			expect(input?.value).toBe(value);
 		}
+		act(() => input?.blur());
 		expect(onLocalChange).toHaveBeenLastCalledWith(
 			"/note.md",
-			expect.stringContaining("title:"),
+			expect.stringContaining("topic:"),
 		);
 	});
 }
@@ -437,4 +438,94 @@ it("keeps a plain-text agent edit separate from prior human typing", async () =>
 	act(() => editor.commands.redo());
 	act(() => editor.commands.redo());
 	expect(editor.getText()).toBe("Human edit plus agent edit");
+});
+
+async function renderPropertiesEditor() {
+	const root = createTestRoot();
+	const getEditor = captureEditorCreation();
+	const onLocalChange = vi.fn();
+	await act(async () =>
+		root.render(
+			<EditorView
+				path="/properties.md"
+				initialMarkdown={"---\ntitle: Before\n---\n\nBody"}
+				onLocalChange={onLocalChange}
+				onSave={vi.fn()}
+				saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
+				onOpenExternalLink={() => {}}
+				onOpenWikiLink={() => {}}
+			/>,
+		),
+	);
+	return { editor: getEditor(), onLocalChange };
+}
+function propertyName() {
+	const input = document.querySelector<HTMLInputElement>(
+		"[data-property-name]",
+	);
+	if (!input) throw Error("Missing property name");
+	return input;
+}
+function typePropertyName(input: HTMLInputElement, value: string) {
+	const setter = Object.getOwnPropertyDescriptor(
+		HTMLInputElement.prototype,
+		"value",
+	)?.set;
+	setter?.call(input, value);
+	input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+it("undoes a property-name editing session as one change, like a value edit", async () => {
+	const { editor, onLocalChange } = await renderPropertiesEditor();
+	const input = propertyName();
+	act(() => input.focus());
+	for (const value of ["titlex", "titlexy", "titlexyz"])
+		act(() => typePropertyName(input, value));
+	act(() => input.blur());
+	act(() => editor.commands.undo());
+	expect(propertyName().value).toBe("title");
+	expect(onLocalChange).toHaveBeenLastCalledWith(
+		"/properties.md",
+		expect.stringContaining("title: Before"),
+	);
+	act(() => editor.commands.redo());
+	expect(propertyName().value).toBe("titlexyz");
+	expect(editor.getText()).toBe("Body");
+});
+
+it("keeps the property input and caret stable through metadata undo and redo", async () => {
+	const { editor } = await renderPropertiesEditor();
+	const input = propertyName();
+	act(() => {
+		input.focus();
+		typePropertyName(input, "topic");
+	});
+	act(() => input.blur());
+	act(() => {
+		input.focus();
+		input.setSelectionRange(2, 4);
+	});
+	act(() => editor.commands.undo());
+	expect(propertyName()).toBe(input);
+	expect(document.activeElement).toBe(input);
+	expect(input.value).toBe("title");
+	expect([input.selectionStart, input.selectionEnd]).toEqual([2, 4]);
+	act(() => editor.commands.redo());
+	expect(propertyName()).toBe(input);
+	expect(document.activeElement).toBe(input);
+	expect(input.value).toBe("topic");
+	expect([input.selectionStart, input.selectionEnd]).toEqual([2, 4]);
+});
+
+it("undoes and redoes an empty property draft even before it has YAML text", async () => {
+	const { editor } = await renderPropertiesEditor();
+	const add = [...document.querySelectorAll("button")].find(
+		(button) => button.textContent === "Add property",
+	);
+	act(() => add?.click());
+	expect(document.querySelectorAll("[data-property-name]")).toHaveLength(2);
+	act(() => editor.commands.undo());
+	expect(document.querySelectorAll("[data-property-name]")).toHaveLength(1);
+	act(() => editor.commands.redo());
+	expect(document.querySelectorAll("[data-property-name]")).toHaveLength(2);
 });

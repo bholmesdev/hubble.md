@@ -19,6 +19,7 @@ import { type Editor, Extension } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
+import { closeHistory } from "@tiptap/pm/history";
 import {
 	EditorContent,
 	type EditorOptions,
@@ -74,7 +75,13 @@ const FrontMatterHistory = Extension.create({
 	name: "frontMatterHistory",
 	addGlobalAttributes() {
 		return [
-			{ types: ["doc"], attributes: { hubbleFrontMatter: { default: "" } } },
+			{
+				types: ["doc"],
+				attributes: {
+					hubbleFrontMatter: { default: "" },
+					hubbleProperties: { default: null },
+				},
+			},
 		];
 	},
 });
@@ -155,6 +162,7 @@ export function EditorView({
 	const [frontMatterState, setFrontMatterState] = useState(() =>
 		frontMatterStateFromMarkdown(initialMarkdown),
 	);
+	const frontMatterStateRef = useRef(frontMatterState);
 	const pathRef = useRef(path);
 	const updateRef = useRef(undoableUpdate);
 	const editorRef = useRef<Editor | null>(null);
@@ -174,6 +182,7 @@ export function EditorView({
 		attrs: {
 			hubbleFrontMatter:
 				initialFrontMatter.type === "none" ? "" : initialFrontMatter.raw,
+			hubbleProperties: frontMatterState,
 		},
 	}));
 
@@ -240,8 +249,19 @@ export function EditorView({
 				body,
 			);
 			latestMarkdownRef.current = markdown;
-			if (metadataChanged)
-				setFrontMatterState(frontMatterStateFromMarkdown(markdown));
+			const properties = current.state.doc.attrs.hubbleProperties as ReturnType<
+				typeof frontMatterStateFromMarkdown
+			> | null;
+			if (
+				metadataChanged ||
+				(properties && properties !== frontMatterStateRef.current)
+			) {
+				const next =
+					properties ??
+					frontMatterStateFromMarkdown(markdown, frontMatterStateRef.current);
+				frontMatterStateRef.current = next;
+				setFrontMatterState(next);
+			}
 			onLocalChange(pathRef.current, markdown);
 			scheduleSave();
 		},
@@ -298,17 +318,25 @@ export function EditorView({
 			frontMatter,
 			parsed.body,
 		);
-		setFrontMatterState(frontMatterStateFromMarkdown(initialMarkdown));
 		const currentBody = tiptapDocToMarkdown(editor.getJSON() as JSONContent);
 		if (
 			currentBody !== parsed.body ||
 			editor.state.doc.attrs.hubbleFrontMatter !== frontMatter
 		) {
+			const properties = frontMatterStateFromMarkdown(
+				initialMarkdown,
+				frontMatterStateRef.current,
+			);
+			frontMatterStateRef.current = properties;
+			setFrontMatterState(properties);
 			replaceEditorContent(
 				editor,
 				{
 					...markdownToTiptapDoc(parsed.body),
-					attrs: { hubbleFrontMatter: frontMatter },
+					attrs: {
+						hubbleFrontMatter: frontMatter,
+						hubbleProperties: properties,
+					},
 				},
 				undoable,
 				preserveHistoryOnUpdate,
@@ -368,16 +396,19 @@ export function EditorView({
 			>
 				{editable && (
 					<FilePropertiesPanel
-						path={path}
 						state={frontMatterState}
 						onChange={(nextState, frontMatter) => {
-							// YAML omits unfinished keys and row ids; keep those drafts while recording history.
+							// Row IDs and unfinished drafts must travel with history; YAML cannot retain them.
+							frontMatterStateRef.current = nextState;
 							setFrontMatterState(nextState);
 							partsRef.current = { ...partsRef.current, frontMatter };
+							if (editor) editor.view.dispatch(closeHistory(editor.state.tr));
 							editor?.commands.command(({ tr }) => {
 								tr.setDocAttribute("hubbleFrontMatter", frontMatter);
+								tr.setDocAttribute("hubbleProperties", nextState);
 								return true;
 							});
+							if (editor) editor.view.dispatch(closeHistory(editor.state.tr));
 						}}
 					/>
 				)}

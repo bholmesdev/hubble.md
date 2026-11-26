@@ -8,7 +8,13 @@ import {
 	parseMarkdownFrontMatter,
 	serializeFrontMatter,
 } from "@hubble.md/editor";
-import { type FocusEvent, useEffect, useRef, useState } from "react";
+import {
+	type FocusEvent,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteCalendarLine from "~icons/mingcute/calendar-line";
 import MingcuteCheckLine from "~icons/mingcute/check-line";
@@ -22,36 +28,53 @@ import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 import { Input } from "../primitives/input";
 
-type DraftFileProperty = FileProperty & { draftId?: string };
+type DraftFileProperty = FileProperty & {
+	draftId?: string;
+	typeOverride?: FilePropertyType;
+};
 
 type FrontMatterState =
 	| { type: "none"; properties: DraftFileProperty[] }
 	| { type: "valid"; properties: DraftFileProperty[] }
 	| { type: "invalid"; raw: string; error: string };
 
-const typeOverrides = new Map<string, FilePropertyType>();
 const ghostBoxClass =
 	"border-transparent bg-transparent shadow-none inset-shadow-none";
 
 export function frontMatterStateFromMarkdown(
 	markdown: string,
+	previous?: FrontMatterState,
 ): FrontMatterState {
 	const parsed = parseMarkdownFrontMatter(markdown);
 	if (parsed.type === "invalid") {
 		return { type: "invalid", raw: parsed.raw, error: parsed.error };
 	}
 	if (parsed.type === "valid") {
-		return { type: "valid", properties: parsed.properties.map(withDraftId) };
+		const previousByKey = new Map(
+			(previous && previous.type !== "invalid" ? previous.properties : []).map(
+				(property) => [property.key, property],
+			),
+		);
+		return {
+			type: "valid",
+			properties: parsed.properties.map((property) => ({
+				...property,
+				draftId:
+					previousByKey.get(property.key)?.draftId ?? crypto.randomUUID(),
+				typeOverride:
+					previousByKey.get(property.key)?.type === property.type
+						? previousByKey.get(property.key)?.typeOverride
+						: undefined,
+			})),
+		};
 	}
 	return { type: "none", properties: [] };
 }
 
 export function FilePropertiesPanel({
-	path,
 	state,
 	onChange,
 }: {
-	path: string;
 	state: FrontMatterState;
 	onChange: (state: FrontMatterState, frontMatter: string) => void;
 }) {
@@ -69,8 +92,6 @@ export function FilePropertiesPanel({
 				{properties.map((property, index) => (
 					<PropertyRow
 						key={property.draftId ?? property.key}
-						rowId={property.draftId ?? property.key}
-						path={path}
 						property={property}
 						autoFocusName={property.draftId === focusDraftId}
 						onNameAutoFocused={() => {
@@ -173,33 +194,63 @@ function InvalidFrontMatter({
 }
 
 function PropertyRow({
-	rowId,
-	path,
 	property,
 	autoFocusName,
 	onNameAutoFocused,
 	onChange,
 	onDelete,
 }: {
-	rowId: string;
-	path: string;
 	property: DraftFileProperty;
 	autoFocusName: boolean;
 	onNameAutoFocused: () => void;
 	onChange: (property: DraftFileProperty) => void;
 	onDelete: (options?: { focusAdd?: boolean }) => void;
 }) {
-	const overrideKey = `${path}\u0000${rowId}`;
-	const type = typeOverrides.get(overrideKey) ?? property.type;
+	const type = property.typeOverride ?? property.type;
 	const rowRef = useRef<HTMLDivElement>(null);
 	const nameInputRef = useRef<HTMLInputElement>(null);
-	const removeEmptyIfLeavingRow = (event: FocusEvent<HTMLElement>) => {
-		if (!isEmptyDraftProperty(property)) return;
+	const [nameDraft, setNameDraft] = useState(property.key);
+	const nameSelection = useRef<{
+		start: number;
+		end: number;
+		direction: "forward" | "backward" | "none";
+	} | null>(null);
+	// History may restore a different name while this input is still focused.
+	useLayoutEffect(() => {
+		const input = nameInputRef.current;
+		if (!input || input.value === property.key) return;
+		nameSelection.current =
+			document.activeElement === input
+				? {
+						start: input.selectionStart ?? 0,
+						end: input.selectionEnd ?? 0,
+						direction: input.selectionDirection ?? "none",
+					}
+				: null;
+		setNameDraft(property.key);
+	}, [property.key]);
+	useLayoutEffect(() => {
+		const selection = nameSelection.current;
+		nameSelection.current = null;
+		const input = nameInputRef.current;
+		if (selection && input && document.activeElement === input)
+			input.setSelectionRange(
+				Math.min(selection.start, nameDraft.length),
+				Math.min(selection.end, nameDraft.length),
+				selection.direction,
+			);
+	}, [nameDraft]);
+	const removeEmptyIfLeavingRow = (
+		event: FocusEvent<HTMLElement>,
+		next = property,
+	) => {
+		if (!isEmptyDraftProperty(next)) return false;
 		const nextFocus = event.relatedTarget;
 		if (nextFocus instanceof Node && rowRef.current?.contains(nextFocus)) {
-			return;
+			return false;
 		}
 		onDelete();
+		return true;
 	};
 	useEffect(() => {
 		if (!autoFocusName) return;
@@ -216,15 +267,15 @@ function PropertyRow({
 					value={type}
 					onDelete={onDelete}
 					onChange={(nextType) => {
-						typeOverrides.set(overrideKey, nextType);
-						onChange(
-							preserveDraftId(property, convertProperty(property, nextType)),
-						);
+						onChange({
+							...preserveDraftId(property, convertProperty(property, nextType)),
+							typeOverride: nextType,
+						});
 					}}
 				/>
 				<Input
 					ref={nameInputRef}
-					value={property.key}
+					value={nameDraft}
 					placeholder="Property"
 					variant="ghost"
 					className="h-7 px-2"
@@ -232,10 +283,12 @@ function PropertyRow({
 					aria-invalid={
 						property.key.length > 0 && !isSimplePropertyKey(property.key)
 					}
-					onChange={(event) =>
-						onChange({ ...property, key: event.target.value })
-					}
-					onBlur={removeEmptyIfLeavingRow}
+					onChange={(event) => setNameDraft(event.target.value)}
+					onBlur={(event) => {
+						const next = { ...property, key: event.currentTarget.value };
+						if (removeEmptyIfLeavingRow(event, next)) return;
+						if (next.key !== property.key) onChange(next);
+					}}
 					onKeyDown={(event) => {
 						if (event.key === "Escape" && isEmptyDraftProperty(property)) {
 							event.preventDefault();
@@ -247,16 +300,16 @@ function PropertyRow({
 			<div>
 				<PropertyValue
 					property={property}
-					autoDetect={typeOverrides.get(overrideKey) !== "text"}
+					autoDetect={property.typeOverride !== "text"}
 					onChange={(next) => {
-						const override = typeOverrides.get(overrideKey);
-						if (override === "text" && next.type === "number") {
-							typeOverrides.delete(overrideKey);
-						}
-						if (override === "number" && next.type === "text") {
-							typeOverrides.delete(overrideKey);
-						}
-						onChange(next);
+						const override = property.typeOverride;
+						const clearOverride =
+							(override === "text" && next.type === "number") ||
+							(override === "number" && next.type === "text");
+						onChange({
+							...next,
+							typeOverride: clearOverride ? undefined : override,
+						});
 					}}
 					onRemoveEmpty={onDelete}
 					onRemoveEmptyBlur={removeEmptyIfLeavingRow}
@@ -788,8 +841,6 @@ function preserveDraftId<T extends FileProperty>(
 }
 
 function withDraftId(property: FileProperty): DraftFileProperty {
-	// Property keys are editable, so they cannot be used as stable ids. The
-	// draft id keeps React from remounting the row while the name is typed and
-	// gives session-only type overrides a stable property identifier.
+	// Editable keys cannot identify rows without remounting their inputs.
 	return { ...property, draftId: crypto.randomUUID() };
 }
