@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Selected Inbox previews and folder labels are easier to read in dark mode. [#352](https://github.com/bholmesdev/hubble.md/pull/352)
+
 ## [0.3.5] - 2026-11-25
 
 ### Added
