@@ -60,7 +60,11 @@ function selectFile(path: string, options?: { keepSidebarOpen: boolean }) {
 	if (!options?.keepSidebarOpen) collapseInCompactWindow();
 }
 
-function openFileInNewTab(path: string) {
+function openFileInNewTab(path: string, options?: { background: boolean }) {
+	if (options?.background) {
+		void openBackgroundTab(path);
+		return;
+	}
 	void openTabForPath(path);
 	collapseInCompactWindow();
 }
@@ -149,13 +153,7 @@ export function Sidebar({
 			onCollapse={collapseSidebar}
 			onSortModeChange={setSortMode}
 			onSelectFile={selectFile}
-			onOpenFileInNewTab={(path, options) => {
-				if (options?.background) {
-					void openBackgroundTab(path);
-				} else {
-					openFileInNewTab(path);
-				}
-			}}
+			onOpenFileInNewTab={openFileInNewTab}
 			onOpenFileInDefaultApp={fileActions.onOpenFileInDefaultApp}
 			onRevealFile={fileActions.onRevealFile}
 			onCopyFilePath={fileActions.onCopyFilePath}
