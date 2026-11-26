@@ -15,6 +15,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Local images no longer flash an unavailable message while their paths resolve. [#350](https://github.com/bholmesdev/hubble.md/pull/350)
+
 - Undo property-name edits as a group without losing your place in the properties panel. [#350](https://github.com/bholmesdev/hubble.md/pull/350)
 
 - Command-click Inbox notes without switching away from your current tab. [#350](https://github.com/bholmesdev/hubble.md/pull/350)
