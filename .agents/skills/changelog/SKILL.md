@@ -10,6 +10,11 @@ metadata:
 Record what shipped as it lands. Do not scrape commits at release time, write
 the entry now while the change is fresh.
 
+Use one or two entries per PR, describing its final user-facing outcomes. Before
+adding an entry for follow-up work, find that PR's existing entries and revise or
+consolidate them. Do not accumulate separate entries for implementation steps or
+regressions introduced and fixed within the same PR.
+
 ## How
 
 1. Open root `CHANGELOG.md`.
