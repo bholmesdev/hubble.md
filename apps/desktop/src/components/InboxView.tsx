@@ -326,10 +326,10 @@ const InboxRow = memo(function InboxRow({
 				}}
 				className={cn(
 					// Warm the muted text on yellow so it doesn't read muddy.
-					"my-0.5 flex w-full cursor-pointer flex-col gap-0.5 rounded-md px-2 py-2 text-start [--row-muted:var(--muted-foreground)] hover:[--row-muted:var(--muted-warm)]",
+					"my-0.5 flex w-full cursor-pointer flex-col gap-0.5 rounded-md px-2 py-2 text-start [--row-muted:var(--muted-foreground)]",
 					isCurrent
-						? "bg-sidebar-accent text-sidebar-accent-foreground [--row-muted:var(--muted-warm)]"
-						: "hover:bg-accent",
+						? "bg-sidebar-accent text-sidebar-accent-foreground [--row-muted:color-mix(in_oklab,var(--sidebar-foreground)_85%,var(--sidebar-accent))]"
+						: "hover:bg-accent hover:[--row-muted:var(--muted-warm)]",
 				)}
 			>
 				{/* Leaves room for the actions buttons over this line. */}
