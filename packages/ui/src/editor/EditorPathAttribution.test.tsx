@@ -315,7 +315,7 @@ it("keeps a new property draft mounted and focused while typing", async () => {
 	const input = propertyName();
 	act(() => input.focus());
 	for (const value of ["t", "to", "topic"]) {
-		act(() => typePropertyName(input, value));
+		act(() => typeInput(input, value));
 		expect(propertyName()).toBe(input);
 		expect(document.activeElement).toBe(input);
 		expect(input.value).toBe(value);
@@ -412,9 +412,14 @@ function propertyName() {
 	if (!input) throw Error("Missing property name");
 	return input;
 }
-function typePropertyName(input: HTMLInputElement, value: string) {
+function typeInput(
+	input: HTMLInputElement | HTMLTextAreaElement,
+	value: string,
+) {
 	const setter = Object.getOwnPropertyDescriptor(
-		HTMLInputElement.prototype,
+		input instanceof HTMLTextAreaElement
+			? HTMLTextAreaElement.prototype
+			: HTMLInputElement.prototype,
 		"value",
 	)?.set;
 	setter?.call(input, value);
@@ -426,7 +431,7 @@ it("undoes a property-name editing session as one change, like a value edit", as
 	const input = propertyName();
 	act(() => input.focus());
 	for (const value of ["titlex", "titlexy", "titlexyz"])
-		act(() => typePropertyName(input, value));
+		act(() => typeInput(input, value));
 	act(() => input.blur());
 	act(() => editor.commands.undo());
 	expect(propertyName().value).toBe("title");
@@ -444,7 +449,7 @@ it("keeps the property input and caret stable through metadata undo and redo", a
 	const input = propertyName();
 	act(() => {
 		input.focus();
-		typePropertyName(input, "topic");
+		typeInput(input, "topic");
 	});
 	act(() => input.blur());
 	act(() => {
@@ -483,7 +488,7 @@ it("keeps the document body mounted through front-matter edits and undo", async 
 	const input = propertyName();
 	act(() => {
 		input.focus();
-		typePropertyName(input, "topic");
+		typeInput(input, "topic");
 	});
 	act(() => input.blur());
 	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
@@ -510,4 +515,55 @@ it("keeps the document body mounted through an external front-matter-only update
 		"/note.md",
 		expect.stringContaining("title: External"),
 	);
+});
+
+it("publishes a property-name draft before blur so keyboard navigation can save it", async () => {
+	const { onLocalChange } = await mountEditor();
+	const input = propertyName();
+	act(() => {
+		input.focus();
+		typeInput(input, "topic");
+	});
+	expect(document.activeElement).toBe(input);
+	expect(onLocalChange).toHaveBeenLastCalledWith(
+		"/note.md",
+		expect.stringContaining("topic:"),
+	);
+});
+
+it("skips unchanged property values when undoing a name edit", async () => {
+	const { editor } = await mountEditor();
+	const name = propertyName();
+	act(() => {
+		name.focus();
+		typeInput(name, "topic");
+	});
+	act(() => name.blur());
+	const value = document.querySelector<HTMLTextAreaElement>(
+		".editorPropertiesPanel textarea",
+	);
+	act(() => value?.focus());
+	act(() => value?.blur());
+	act(() => editor.commands.undo());
+	expect(propertyName().value).toBe("title");
+});
+
+it("restores the visible raw YAML along with saved metadata on undo", async () => {
+	const { editor, onLocalChange } = await mountEditor(
+		"---\ntitle: [\n---\n\nBody",
+	);
+	const input = document.querySelector<HTMLTextAreaElement>(
+		".editorPropertiesPanel textarea",
+	);
+	if (!input) throw Error("Missing raw YAML input");
+	act(() => {
+		input.focus();
+		typeInput(input, "title: [broken");
+	});
+	act(() => editor.commands.undo());
+	expect(onLocalChange).toHaveBeenLastCalledWith(
+		"/note.md",
+		expect.stringContaining("title: [\n"),
+	);
+	expect(input.value).toBe("title: [");
 });

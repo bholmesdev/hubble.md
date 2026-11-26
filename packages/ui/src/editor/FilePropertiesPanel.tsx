@@ -74,13 +74,24 @@ export function frontMatterStateFromMarkdown(
 export function FilePropertiesPanel({
 	state,
 	onChange,
+	onDraftChange,
 }: {
 	state: FrontMatterState;
 	onChange: (state: FrontMatterState, frontMatter: string) => void;
+	onDraftChange?: (state: FrontMatterState, frontMatter: string) => void;
 }) {
 	const addButtonRef = useRef<HTMLButtonElement>(null);
 	const [focusDraftId, setFocusDraftId] = useState<string | null>(null);
 	const properties = state.type === "invalid" ? [] : state.properties;
+	const changeProperty = (
+		index: number,
+		next: DraftFileProperty,
+		notify = onChange,
+	) =>
+		emitProperties(
+			properties.map((current, i) => (i === index ? next : current)),
+			notify,
+		);
 
 	if (state.type === "invalid") {
 		return <InvalidFrontMatter state={state} onChange={onChange} />;
@@ -99,11 +110,9 @@ export function FilePropertiesPanel({
 								setFocusDraftId(null);
 							}
 						}}
-						onChange={(next) => {
-							const nextProperties = properties.map((current, currentIndex) =>
-								currentIndex === index ? next : current,
-							);
-							emitProperties(nextProperties, onChange);
+						onChange={(next) => changeProperty(index, next)}
+						onDraftChange={(next) => {
+							if (onDraftChange) changeProperty(index, next, onDraftChange);
 						}}
 						onDelete={(options) => {
 							if (options?.focusAdd) {
@@ -154,7 +163,7 @@ function InvalidFrontMatter({
 	state: Extract<FrontMatterState, { type: "invalid" }>;
 	onChange: (state: FrontMatterState, frontMatter: string) => void;
 }) {
-	const [raw, setRaw] = useState(state.raw);
+	const raw = state.raw;
 	return (
 		<div className="editorPropertiesPanel border-b border-border/70">
 			<div className="flex flex-col gap-2 text-[12px]">
@@ -168,7 +177,6 @@ function InvalidFrontMatter({
 						value={raw}
 						onChange={(event) => {
 							const nextRaw = event.target.value;
-							setRaw(nextRaw);
 							onChange(
 								{ type: "invalid", raw: nextRaw, error: state.error },
 								nextRaw,
@@ -198,12 +206,14 @@ function PropertyRow({
 	autoFocusName,
 	onNameAutoFocused,
 	onChange,
+	onDraftChange,
 	onDelete,
 }: {
 	property: DraftFileProperty;
 	autoFocusName: boolean;
 	onNameAutoFocused: () => void;
 	onChange: (property: DraftFileProperty) => void;
+	onDraftChange: (property: DraftFileProperty) => void;
 	onDelete: (options?: { focusAdd?: boolean }) => void;
 }) {
 	const type = property.typeOverride ?? property.type;
@@ -283,7 +293,10 @@ function PropertyRow({
 					aria-invalid={
 						property.key.length > 0 && !isSimplePropertyKey(property.key)
 					}
-					onChange={(event) => setNameDraft(event.target.value)}
+					onChange={(event) => {
+						setNameDraft(event.target.value);
+						onDraftChange({ ...property, key: event.target.value });
+					}}
 					onBlur={(event) => {
 						const next = { ...property, key: event.currentTarget.value };
 						if (removeEmptyIfLeavingRow(event, next)) return;
@@ -423,6 +436,7 @@ function ScalarValue({
 				onChange={(event) => setDraft(event.target.value)}
 				onBlur={(event) => {
 					const value = event.target.value.trim();
+					if (event.target.value === String(property.value)) return;
 					if (value.length === 0 || !Number.isFinite(Number(value))) {
 						onChange({
 							draftId: property.draftId,
@@ -472,6 +486,7 @@ function ScalarValue({
 					onRemoveEmptyBlur(event);
 					return;
 				}
+				if (event.target.value === String(property.value)) return;
 				if (!autoDetect) {
 					onChange({
 						draftId: property.draftId,

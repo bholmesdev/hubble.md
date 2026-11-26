@@ -381,6 +381,16 @@ export function EditorView({
 				{editable && (
 					<FilePropertiesPanel
 						state={frontMatterState}
+						onDraftChange={(_state, frontMatter) => {
+							// Keyboard navigation can unmount a focused field without a blur.
+							// Publish its text now; commit one history step when editing ends.
+							latestMarkdownRef.current = combineMarkdownFrontMatter(
+								frontMatter,
+								partsRef.current.body,
+							);
+							onLocalChange(pathRef.current, latestMarkdownRef.current);
+							scheduleSave();
+						}}
 						onChange={(nextState, frontMatter) => {
 							// Row IDs and unfinished drafts must travel with history; YAML cannot retain them.
 							frontMatterStateRef.current = nextState;
