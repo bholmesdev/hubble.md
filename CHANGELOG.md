@@ -11,6 +11,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Open files in your current tab even when another tab already shows them. [#350](https://github.com/bholmesdev/hubble.md/pull/350)
+
 ### Fixed
 
 ## [0.3.5] - 2026-11-25
