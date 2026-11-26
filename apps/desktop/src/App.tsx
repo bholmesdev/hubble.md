@@ -991,6 +991,7 @@ function App() {
 										<DocumentViewer
 											path={state.currentPath}
 											content={state.content}
+											undoableUpdate={state.undoableUpdate}
 											copyAsMarkdownRequest={copyAsMarkdownRequest}
 											viewMode={state.viewMode}
 											spellcheckStatus={spellcheckStatus}
@@ -1030,6 +1031,7 @@ function App() {
 function DocumentViewer({
 	path,
 	content,
+	undoableUpdate,
 	copyAsMarkdownRequest,
 	viewMode,
 	spellcheckStatus,
@@ -1039,6 +1041,7 @@ function DocumentViewer({
 	onOpenSettings: () => void;
 	path: string;
 	content: string;
+	undoableUpdate?: string;
 	copyAsMarkdownRequest: number;
 	viewMode: ViewMode;
 	spellcheckStatus?: SpellcheckStatus | null;
@@ -1065,6 +1068,7 @@ function DocumentViewer({
 				documentId={documentId}
 				preserveHistoryOnUpdate={documentId !== path}
 				initialMarkdown={content}
+				undoableUpdate={undoableUpdate}
 				sourceLanguage={
 					isHtml ? "html" : hasTextExtension(path) ? "text" : "md"
 				}
@@ -1081,6 +1085,7 @@ function DocumentViewer({
 				key={`${path}:code:${HMR_REV}`}
 				path={path}
 				initialMarkdown={content}
+				undoableUpdate={undoableUpdate}
 				sourceLanguage={sourceLanguageForPath(path)}
 				autoFocus={false}
 				onLocalChange={updateEditorContent}
@@ -1096,6 +1101,7 @@ function DocumentViewer({
 				key={`${path}:rich:${HMR_REV}`}
 				path={path}
 				initialText={content}
+				undoableUpdate={undoableUpdate}
 				onLocalChange={updateEditorContent}
 				onSave={savePathContent}
 				onScrollContainerChange={onScrollContainerChange}
@@ -1145,6 +1151,7 @@ function DocumentViewer({
 			path={path}
 			documentId={documentId}
 			initialMarkdown={content}
+			undoableUpdate={undoableUpdate}
 			copyAsMarkdownRequest={copyAsMarkdownRequest}
 			spellcheckStatus={spellcheckStatus}
 			onScrollContainerChange={onScrollContainerChange}
@@ -1224,6 +1231,7 @@ function ExternalChangeBanner({
 
 function MarkdownEditor({
 	path,
+	undoableUpdate,
 	documentId,
 	initialMarkdown,
 	copyAsMarkdownRequest,
@@ -1233,6 +1241,7 @@ function MarkdownEditor({
 	path: string;
 	documentId: string;
 	initialMarkdown: string;
+	undoableUpdate?: string;
 	copyAsMarkdownRequest: number;
 	spellcheckStatus?: SpellcheckStatus | null;
 	onScrollContainerChange?: (el: HTMLDivElement | null) => void;
@@ -1282,6 +1291,7 @@ function MarkdownEditor({
 			documentId={documentId}
 			preserveHistoryOnUpdate={documentId !== path}
 			initialMarkdown={initialMarkdown}
+			undoableUpdate={undoableUpdate}
 			editable={!isChangelogPath(path)}
 			wikiTargets={wikiTargets}
 			extensions={[

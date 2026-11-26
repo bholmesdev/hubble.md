@@ -841,7 +841,11 @@ export async function openWorkspace(path?: string) {
 	await restoreTabs();
 }
 
-export function updateEditorContent(path: string, content: string) {
+export function updateEditorContent(
+	path: string,
+	content: string,
+	options?: { undoable?: boolean },
+) {
 	const currentPath = titleManager.currentPath(path);
 	const current = viewerStore.get();
 	if (current.currentPath !== currentPath || current.content === content)
@@ -862,6 +866,7 @@ export function updateEditorContent(path: string, content: string) {
 		return {
 			...state,
 			content,
+			...(options?.undoable ? { undoableUpdate: crypto.randomUUID() } : {}),
 			status: "ready",
 			error: null,
 		};

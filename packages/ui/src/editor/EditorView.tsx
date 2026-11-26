@@ -15,7 +15,7 @@ import {
 	resetEditorHistory,
 	tiptapDocToMarkdown,
 } from "@hubble.md/editor";
-import type { Editor } from "@tiptap/core";
+import { type Editor, Extension } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
@@ -38,6 +38,7 @@ import {
 	type PendingSave,
 	schedulePendingSave,
 } from "./pendingSave";
+import { replaceEditorContent } from "./replaceEditorContent";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { SmartLinkExtension } from "./SmartLinkExtension";
 import { TableCellSelectionExtension } from "./TableCellSelectionExtension";
@@ -68,6 +69,16 @@ import type { VirtualCursorMode } from "./virtualCursorMode";
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 120;
 
+// Doc attributes travel through ProseMirror Undo along with the body replacement.
+const FrontMatterHistory = Extension.create({
+	name: "frontMatterHistory",
+	addGlobalAttributes() {
+		return [
+			{ types: ["doc"], attributes: { hubbleFrontMatter: { default: "" } } },
+		];
+	},
+});
+
 export type { WikiTarget };
 
 export type EditorViewProps = {
@@ -76,6 +87,7 @@ export type EditorViewProps = {
 	documentId?: string;
 	/** Keep undo history when the same note receives rewritten Markdown. */
 	preserveHistoryOnUpdate?: boolean;
+	undoableUpdate?: string;
 	initialMarkdown: string;
 	editable?: boolean;
 	wikiTargets?: WikiTarget[];
@@ -102,6 +114,7 @@ export function EditorView({
 	path,
 	documentId = path,
 	preserveHistoryOnUpdate = false,
+	undoableUpdate,
 	initialMarkdown,
 	editable = true,
 	wikiTargets = [],
@@ -143,6 +156,7 @@ export function EditorView({
 		frontMatterStateFromMarkdown(initialMarkdown),
 	);
 	const pathRef = useRef(path);
+	const updateRef = useRef(undoableUpdate);
 	const editorRef = useRef<Editor | null>(null);
 	useLayoutEffect(() => {
 		pathRef.current = path;
@@ -155,9 +169,13 @@ export function EditorView({
 	};
 
 	// Only used at editor creation. Later file loads sync through setContent.
-	const [initialDoc] = useState(() =>
-		markdownToTiptapDoc(initialFrontMatter.body),
-	);
+	const [initialDoc] = useState(() => ({
+		...markdownToTiptapDoc(initialFrontMatter.body),
+		attrs: {
+			hubbleFrontMatter:
+				initialFrontMatter.type === "none" ? "" : initialFrontMatter.raw,
+		},
+	}));
 
 	const scheduleSave = () => {
 		schedulePendingSave({
@@ -173,6 +191,7 @@ export function EditorView({
 		editable,
 		textDirection: "auto",
 		extensions: [
+			FrontMatterHistory,
 			...starterKitWithRegistryShortcuts({
 				code: false,
 				codeBlock: false,
@@ -211,12 +230,18 @@ export function EditorView({
 			const doc = current.getJSON() as JSONContent;
 			if (hasUploadImage(doc)) return;
 			const body = tiptapDocToMarkdown(doc);
-			partsRef.current = { ...partsRef.current, body };
+			const frontMatter = String(
+				current.state.doc.attrs.hubbleFrontMatter ?? "",
+			);
+			const metadataChanged = frontMatter !== partsRef.current.frontMatter;
+			partsRef.current = { body, frontMatter };
 			const markdown = combineMarkdownFrontMatter(
 				partsRef.current.frontMatter,
 				body,
 			);
 			latestMarkdownRef.current = markdown;
+			if (metadataChanged)
+				setFrontMatterState(frontMatterStateFromMarkdown(markdown));
 			onLocalChange(pathRef.current, markdown);
 			scheduleSave();
 		},
@@ -259,6 +284,10 @@ export function EditorView({
 
 	useEffect(() => {
 		if (!editor) return;
+		const undoable = Boolean(
+			undoableUpdate && updateRef.current !== undoableUpdate,
+		);
+		updateRef.current = undoableUpdate;
 		if (initialMarkdown === latestMarkdownRef.current) {
 			return;
 		}
@@ -271,15 +300,21 @@ export function EditorView({
 		);
 		setFrontMatterState(frontMatterStateFromMarkdown(initialMarkdown));
 		const currentBody = tiptapDocToMarkdown(editor.getJSON() as JSONContent);
-		if (currentBody !== parsed.body) {
-			editor
-				.chain()
-				.setMeta("addToHistory", false)
-				.setContent(markdownToTiptapDoc(parsed.body), { emitUpdate: false })
-				.run();
-			if (!preserveHistoryOnUpdate) resetEditorHistory(editor);
+		if (
+			currentBody !== parsed.body ||
+			editor.state.doc.attrs.hubbleFrontMatter !== frontMatter
+		) {
+			replaceEditorContent(
+				editor,
+				{
+					...markdownToTiptapDoc(parsed.body),
+					attrs: { hubbleFrontMatter: frontMatter },
+				},
+				undoable,
+				preserveHistoryOnUpdate,
+			);
 		}
-	}, [editor, initialMarkdown, preserveHistoryOnUpdate]);
+	}, [editor, initialMarkdown, preserveHistoryOnUpdate, undoableUpdate]);
 
 	useEffect(() => {
 		// One editor instance can serve every file, so each new document starts its own
@@ -336,15 +371,13 @@ export function EditorView({
 						path={path}
 						state={frontMatterState}
 						onChange={(nextState, frontMatter) => {
+							// YAML omits unfinished keys and row ids; keep those drafts while recording history.
 							setFrontMatterState(nextState);
 							partsRef.current = { ...partsRef.current, frontMatter };
-							const markdown = combineMarkdownFrontMatter(
-								frontMatter,
-								partsRef.current.body,
-							);
-							latestMarkdownRef.current = markdown;
-							onLocalChange(pathRef.current, markdown);
-							scheduleSave();
+							editor?.commands.command(({ tr }) => {
+								tr.setDocAttribute("hubbleFrontMatter", frontMatter);
+								return true;
+							});
 						}}
 					/>
 				)}
