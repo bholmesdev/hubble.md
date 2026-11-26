@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Selected Inbox previews and folder labels are easier to read.
+
 ## [0.3.5] - 2026-11-25
 
 ### Added

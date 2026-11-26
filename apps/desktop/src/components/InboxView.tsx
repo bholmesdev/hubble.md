@@ -328,7 +328,7 @@ const InboxRow = memo(function InboxRow({
 					// Warm the muted text on yellow so it doesn't read muddy.
 					"my-0.5 flex w-full cursor-pointer flex-col gap-0.5 rounded-md px-2 py-2 text-start [--row-muted:var(--muted-foreground)] hover:[--row-muted:var(--muted-warm)]",
 					isCurrent
-						? "bg-sidebar-accent text-sidebar-accent-foreground [--row-muted:var(--muted-warm)]"
+						? "bg-sidebar-accent text-sidebar-accent-foreground [--row-muted:var(--sidebar-accent-foreground)] hover:[--row-muted:var(--sidebar-accent-foreground)]"
 						: "hover:bg-accent",
 				)}
 			>
