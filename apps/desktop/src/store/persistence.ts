@@ -197,17 +197,26 @@ const closedTabSchema = z.object({
 
 const tabSessionSchema = z
 	.object({
+		entries: z
+			.array(z.object({ id: z.string().uuid(), path: z.string().min(1) }))
+			.optional()
+			.catch(undefined),
+		activeTabId: z.string().uuid().nullable().optional().catch(undefined),
 		paths: z
 			.array(z.string().min(1).catch(""))
-			.transform((paths) => [...new Set(paths.filter(Boolean))]),
-		activePath: z.string().nullable().catch(null),
+			.optional()
+			.catch(undefined)
+			.transform((paths) => [...new Set((paths ?? []).filter(Boolean))]),
+		activePath: z.string().nullable().optional().catch(null),
 		closed: z
 			.array(closedTabSchema)
 			.catch([])
 			.transform((closed) => closed.slice(-MAX_CLOSED_TABS)),
 	})
 	.transform(
-		({ paths, activePath, closed }): TabSession => ({
+		({ paths, activePath, closed, entries, activeTabId }): TabSession => ({
+			entries,
+			activeTabId,
 			closed,
 			paths,
 			activePath:

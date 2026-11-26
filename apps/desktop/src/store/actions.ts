@@ -112,6 +112,7 @@ import {
 	tabSession,
 	tabsFromSession,
 	withClosedTab,
+	withOpenedTab,
 	withRewrittenTabPaths,
 } from "./tabs";
 import { createTitleManager } from "./titleManagement";
@@ -1449,7 +1450,26 @@ export async function forceKeepLocalEdits() {
 
 const { run: loadInternalPath, invalidate: invalidateLoadPath } = takeLatest(
 	async ({ isStale }, path: string, options?: LoadPathOptions) => {
+		const tab = options?.tab;
 		const historyMode = options?.history ?? "push";
+		if (
+			tab &&
+			(tab === "new" ||
+				pathEquals(tabsStore.get().byId[tab]?.path ?? "", path)) &&
+			pathEquals(viewerStore.get().currentPath ?? "", path)
+		) {
+			// Duplicate-file tabs share the live editor, including unsaved edits and conflicts.
+			appStore.set((state) => ({
+				...state,
+				tabs: withOpenedTab(state.tabs, path, tab),
+				document:
+					state.document.status === "loading"
+						? { ...state.document, status: "ready" }
+						: state.document,
+			}));
+			if (historyMode === "push") pushHistory(path);
+			return;
+		}
 		const missingMode = options?.missing ?? "toast";
 		const fileKind = fileKindForPath(path);
 		if (!(await leaveCurrentDocument(path))) return;

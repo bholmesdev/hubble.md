@@ -180,9 +180,7 @@ export function createTabActions({
 					continue;
 				}
 			}
-			const existing = findTabByPath(tabsStore.get(), closed.path);
-			if (existing) await activateTab(existing);
-			else await loadPath(closed.path, { tab: "new", launchExternal: false });
+			await loadPath(closed.path, { tab: "new", launchExternal: false });
 			if (request !== getWorkspaceRequest()) return;
 			const tabs = tabsStore.get();
 			const active = tabs.activeTabId;
