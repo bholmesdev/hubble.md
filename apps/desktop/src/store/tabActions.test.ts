@@ -366,7 +366,7 @@ describe("desktop tabs", () => {
 		expect(app.tabsStore.get().order).toEqual([]);
 	});
 
-	it("ignores malformed saved sessions and deduplicates valid paths", async () => {
+	it("migrates and sanitizes all workspace sessions when loading preferences", async () => {
 		const api = createDesktopApi();
 		api.pathExists.mockResolvedValue(true);
 		const app = await loadStoreActions(
@@ -375,6 +375,10 @@ describe("desktop tabs", () => {
 				workspace: { workspacePath: "/workspace" },
 				tabSessions: {
 					"/broken": null,
+					"/inactive": {
+						paths: ["/inactive/a.md", "/inactive/b.md", "/inactive/B.md"],
+						activePath: "/inactive/B.md",
+					},
 					"/workspace": {
 						paths: [
 							"/workspace/a.md",
@@ -393,6 +397,29 @@ describe("desktop tabs", () => {
 			app.tabsStore.get().order.map((id) => app.tabsStore.get().byId[id].path),
 		).toEqual(["/workspace/a.md", "/workspace/b.md"]);
 		expect(app.viewerStore.get().currentPath).toBe("/workspace/a.md");
+		const { serialize } = await import("./persistence");
+		const saved = serialize(app.appStore.get());
+		const sessions = saved.tabSessions;
+		if (!sessions) throw Error("Missing saved sessions");
+		expect(sessions["/inactive"]).toEqual({
+			entries: [
+				{ id: expect.any(String), path: "/inactive/a.md" },
+				{ id: expect.any(String), path: "/inactive/b.md" },
+			],
+			activeTabId: expect.any(String),
+			closed: [],
+		});
+		const inactive = sessions["/inactive"];
+		expect(inactive.activeTabId).toBe(inactive.entries[1].id);
+		for (const session of Object.values(sessions)) {
+			expect(session).not.toHaveProperty("paths");
+			expect(session).not.toHaveProperty("activePath");
+		}
+		const restored = await loadStoreActions(
+			createDesktopApi(),
+			JSON.stringify(saved),
+		);
+		expect(restored.appStore.get().tabSessions).toEqual(saved.tabSessions);
 	});
 
 	it("opens a second tab beside the active one", async () => {

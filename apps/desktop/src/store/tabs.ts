@@ -19,12 +19,9 @@ export type TabsState = {
 };
 
 export type TabSession = {
-	entries?: { id: TabId; path: string }[];
-	activeTabId?: TabId | null;
-	closed?: ClosedTab[];
-	// Read path-only sessions saved before tab IDs were persisted.
-	paths?: string[];
-	activePath?: string | null;
+	entries: { id: TabId; path: string }[];
+	activeTabId: TabId | null;
+	closed: ClosedTab[];
 };
 
 export function tabSession(tabs: TabsState): TabSession {
@@ -36,28 +33,14 @@ export function tabSession(tabs: TabsState): TabSession {
 }
 
 export function tabsFromSession(session?: TabSession): TabsState {
-	const tabs = emptyTabs();
-	const entries: { path: string; id?: TabId }[] =
-		session?.entries ??
-		[...new Set(session?.paths ?? [])].map((path) => ({
-			path,
-		}));
-	for (const { path, id: saved } of entries) {
-		if (!session?.entries && findTabByPath(tabs, path)) continue;
-		const id = saved && !tabs.byId[saved] ? saved : mintTabId();
-		tabs.order.push(id);
-		tabs.byId[id] = { path };
-	}
-
+	if (!session) return emptyTabs();
 	return {
-		...tabs,
-		closed: session?.closed ?? [],
-		activeTabId:
-			session?.activeTabId && tabs.byId[session.activeTabId]
-				? session.activeTabId
-				: session?.activePath
-					? (findTabByPath(tabs, session.activePath) ?? tabs.order[0] ?? null)
-					: (tabs.order[0] ?? null),
+		closed: session.closed,
+		order: session.entries.map(({ id }) => id),
+		byId: Object.fromEntries(
+			session.entries.map(({ id, path }) => [id, { path }]),
+		),
+		activeTabId: session.activeTabId,
 	};
 }
 
