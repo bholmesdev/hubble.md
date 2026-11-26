@@ -33,7 +33,7 @@ type DraftFileProperty = FileProperty & {
 	typeOverride?: FilePropertyType;
 };
 
-type FrontMatterState =
+export type FrontMatterState =
 	| { type: "none"; properties: DraftFileProperty[] }
 	| { type: "valid"; properties: DraftFileProperty[] }
 	| { type: "invalid"; raw: string; error: string };

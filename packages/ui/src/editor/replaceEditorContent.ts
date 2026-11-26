@@ -1,6 +1,7 @@
 import { resetEditorHistory } from "@hubble.md/editor";
 import type { Editor, JSONContent } from "@tiptap/core";
 import { closeHistory } from "@tiptap/pm/history";
+import type { Transaction } from "@tiptap/pm/state";
 
 /** Programmatic updates are separate undo events; disk reloads retain their existing history policy. */
 export function replaceEditorContent(
@@ -8,15 +9,18 @@ export function replaceEditorContent(
 	content: JSONContent,
 	undoable: boolean,
 	preserveHistory: boolean,
+	update?: (transaction: Transaction) => void,
 ) {
 	if (undoable) editor.view.dispatch(closeHistory(editor.state.tr));
-	editor
+	const chain = editor
 		.chain()
 		.setMeta("addToHistory", undoable)
-		.setContent(content, { emitUpdate: false })
+		.setMeta("preventUpdate", true);
+	if (!editor.state.doc.content.eq(editor.schema.nodeFromJSON(content).content))
+		chain.setContent(content, { emitUpdate: false });
+	chain
 		.command(({ tr }) => {
-			for (const [key, value] of Object.entries(content.attrs ?? {}))
-				tr.setDocAttribute(key, value);
+			update?.(tr);
 			return true;
 		})
 		.run();

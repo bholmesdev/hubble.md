@@ -444,20 +444,26 @@ async function renderPropertiesEditor() {
 	const root = createTestRoot();
 	const getEditor = captureEditorCreation();
 	const onLocalChange = vi.fn();
-	await act(async () =>
-		root.render(
-			<EditorView
-				path="/properties.md"
-				initialMarkdown={"---\ntitle: Before\n---\n\nBody"}
-				onLocalChange={onLocalChange}
-				onSave={vi.fn()}
-				saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
-				onOpenExternalLink={() => {}}
-				onOpenWikiLink={() => {}}
-			/>,
-		),
-	);
-	return { editor: getEditor(), onLocalChange };
+	const render = async (
+		markdown = "---\ntitle: Before\n---\n\nBody",
+		undoableUpdate?: string,
+	) =>
+		act(async () =>
+			root.render(
+				<EditorView
+					path="/properties.md"
+					initialMarkdown={markdown}
+					undoableUpdate={undoableUpdate}
+					onLocalChange={onLocalChange}
+					onSave={vi.fn()}
+					saveDebounceMs={LONG_SAVE_DEBOUNCE_MS}
+					onOpenExternalLink={() => {}}
+					onOpenWikiLink={() => {}}
+				/>,
+			),
+		);
+	await render();
+	return { editor: getEditor(), onLocalChange, render };
 }
 function propertyName() {
 	const input = document.querySelector<HTMLInputElement>(
@@ -528,4 +534,40 @@ it("undoes and redoes an empty property draft even before it has YAML text", asy
 	expect(document.querySelectorAll("[data-property-name]")).toHaveLength(1);
 	act(() => editor.commands.redo());
 	expect(document.querySelectorAll("[data-property-name]")).toHaveLength(2);
+});
+
+it("keeps the document body mounted through front-matter edits and undo", async () => {
+	const { editor } = await renderPropertiesEditor();
+	const paragraph = document.querySelector(".ProseMirror p");
+	expect(paragraph).not.toBeNull();
+	const input = propertyName();
+	act(() => {
+		input.focus();
+		typePropertyName(input, "topic");
+	});
+	act(() => input.blur());
+	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
+	act(() => editor.commands.undo());
+	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
+	act(() => editor.commands.redo());
+	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
+});
+
+it("keeps the document body mounted through an external front-matter-only update", async () => {
+	const { editor, render, onLocalChange } = await renderPropertiesEditor();
+	const paragraph = document.querySelector(".ProseMirror p");
+	await render("---\ntitle: External\n---\n\nBody", "metadata-update");
+	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
+	act(() => editor.commands.undo());
+	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
+	expect(onLocalChange).toHaveBeenLastCalledWith(
+		"/properties.md",
+		expect.stringContaining("title: Before"),
+	);
+	act(() => editor.commands.redo());
+	expect(document.querySelector(".ProseMirror p")).toBe(paragraph);
+	expect(onLocalChange).toHaveBeenLastCalledWith(
+		"/properties.md",
+		expect.stringContaining("title: External"),
+	);
 });
