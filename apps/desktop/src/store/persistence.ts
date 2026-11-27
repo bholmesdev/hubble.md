@@ -1,5 +1,6 @@
 import { type CommandBindings, cleanCommandBindings } from "@hubble.md/editor";
 import { z } from "zod";
+import { pathEquals } from "../lib/filePath";
 import type { ThemePreference } from "../theme";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
 import {
@@ -197,24 +198,56 @@ const closedTabSchema = z.object({
 
 const tabSessionSchema = z
 	.object({
+		entries: z
+			.array(z.object({ id: z.string().uuid(), path: z.string().min(1) }))
+			.optional()
+			.catch(undefined),
+		activeTabId: z.string().uuid().nullable().optional().catch(undefined),
+		// Legacy input only: older releases saved paths instead of tab IDs.
 		paths: z
 			.array(z.string().min(1).catch(""))
-			.transform((paths) => [...new Set(paths.filter(Boolean))]),
-		activePath: z.string().nullable().catch(null),
+			.optional()
+			.catch(undefined)
+			.transform((paths) =>
+				(paths ?? []).filter(
+					(path, index, all) =>
+						path &&
+						!all.slice(0, index).some((previous) => pathEquals(previous, path)),
+				),
+			),
+		activePath: z.string().nullable().optional().catch(null),
+
 		closed: z
 			.array(closedTabSchema)
 			.catch([])
 			.transform((closed) => closed.slice(-MAX_CLOSED_TABS)),
 	})
 	.transform(
-		({ paths, activePath, closed }): TabSession => ({
-			closed,
-			paths,
-			activePath:
-				activePath && paths.includes(activePath)
-					? activePath
-					: (paths[0] ?? null),
-		}),
+		({ paths, activePath, closed, entries, activeTabId }): TabSession => {
+			// Convert every saved workspace before it reaches the tab model, so the
+			// next preference save also upgrades workspaces that haven't been opened.
+			const ids = new Set<string>();
+			const currentEntries = (
+				entries ??
+				// Legacy migration: assign stable IDs to the saved paths.
+				paths.map((path) => ({ id: crypto.randomUUID(), path }))
+			).map((entry) => {
+				const id = ids.has(entry.id) ? crypto.randomUUID() : entry.id;
+				ids.add(id);
+				return { id, path: entry.path };
+			});
+			let active = activeTabId && ids.has(activeTabId) ? activeTabId : null;
+			// Legacy migration: translate the selected path to its new tab ID.
+			if (!active && !entries && activePath)
+				active =
+					currentEntries.find((entry) => pathEquals(entry.path, activePath))
+						?.id ?? null;
+			return {
+				entries: currentEntries,
+				activeTabId: active ?? currentEntries[0]?.id ?? null,
+				closed,
+			};
+		},
 	);
 
 const tabSessionsSchema = z

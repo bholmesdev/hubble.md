@@ -40,6 +40,7 @@ type DocumentState = {
 	status: ViewerStatus;
 	error: string | null;
 	viewMode: ViewMode;
+	undoableUpdate?: string;
 };
 
 const NO_CONFLICT: ExternalChange = { kind: "none" };

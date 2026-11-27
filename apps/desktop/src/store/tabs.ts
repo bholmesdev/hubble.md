@@ -19,32 +19,28 @@ export type TabsState = {
 };
 
 export type TabSession = {
-	closed?: ClosedTab[];
-	paths: string[];
-	activePath: string | null;
+	entries: { id: TabId; path: string }[];
+	activeTabId: TabId | null;
+	closed: ClosedTab[];
 };
 
 export function tabSession(tabs: TabsState): TabSession {
 	return {
+		entries: tabs.order.map((id) => ({ id, path: tabs.byId[id].path })),
+		activeTabId: tabs.activeTabId,
 		closed: tabs.closed,
-		paths: tabs.order.map((id) => tabs.byId[id].path),
-		activePath: tabs.activeTabId
-			? (tabs.byId[tabs.activeTabId]?.path ?? null)
-			: null,
 	};
 }
 
 export function tabsFromSession(session?: TabSession): TabsState {
-	let tabs = emptyTabs();
-	for (const path of session?.paths ?? []) {
-		tabs = withOpenedTab(tabs, path, "new");
-	}
+	if (!session) return emptyTabs();
 	return {
-		...tabs,
-		closed: session?.closed ?? [],
-		activeTabId: session?.activePath
-			? (findTabByPath(tabs, session.activePath) ?? tabs.order[0] ?? null)
-			: (tabs.order[0] ?? null),
+		closed: session.closed,
+		order: session.entries.map(({ id }) => id),
+		byId: Object.fromEntries(
+			session.entries.map(({ id, path }) => [id, { path }]),
+		),
+		activeTabId: session.activeTabId,
 	};
 }
 
@@ -58,12 +54,8 @@ export const emptyTabs = (): TabsState => ({
 	byId: {},
 });
 
-// Keep tab identity stable when a file is renamed or moved.
-let lastTabId = 0;
-
 function mintTabId(): TabId {
-	lastTabId += 1;
-	return `tab-${lastTabId}`;
+	return crypto.randomUUID();
 }
 
 export function findTabByPath(tabs: TabsState, path: string): TabId | null {
@@ -72,23 +64,19 @@ export function findTabByPath(tabs: TabsState, path: string): TabId | null {
 	);
 }
 
-/** Reuse an open path; otherwise replace the target or insert beside the active tab. */
+/** Replace the target or insert a new tab beside the active one. */
 export function withOpenedTab(
 	tabs: TabsState,
 	path: string,
 	target?: TabTarget,
 ): TabsState {
-	const existing = findTabByPath(tabs, path);
-	if (existing) {
-		return { ...tabs, activeTabId: existing };
-	}
 	if (target !== "new") {
 		const id = target && tabs.byId[target] ? target : tabs.activeTabId;
 		if (id && tabs.byId[id]) {
 			return {
 				...tabs,
 				activeTabId: id,
-				byId: { ...tabs.byId, [id]: { path } },
+				byId: { ...tabs.byId, [id]: { ...tabs.byId[id], path } },
 			};
 		}
 	}

@@ -317,7 +317,7 @@ const InboxRow = memo(function InboxRow({
 				aria-current={isCurrent ? "page" : undefined}
 				onClick={(event) =>
 					event.metaKey || event.ctrlKey
-						? actions.onOpenFileInNewTab?.(path)
+						? actions.onOpenFileInNewTab?.(path, { background: true })
 						: onOpen(path)
 				}
 				onContextMenu={(event) => {

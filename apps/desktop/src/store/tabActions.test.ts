@@ -3,6 +3,83 @@ import { describe, expect, it, vi } from "vitest";
 import { createDesktopApi, loadStoreActions } from "./testUtils";
 
 describe("desktop tabs", () => {
+	it.each([
+		false,
+		true,
+	])("keeps the live buffer when activating another tab for the same file (conflict: %s)", async (conflict) => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("Saved text");
+		const app = await loadStoreActions(api);
+		await app.loadPath("/workspace/a.md");
+		const first = app.tabsStore.get().activeTabId;
+		await app.loadPath("/workspace/b.md", { tab: "new" });
+		await app.loadPath("/workspace/a.md");
+		app.updateEditorContent("/workspace/a.md", "Unsaved text");
+		if (conflict)
+			app.viewerStore.set((doc) => ({
+				...doc,
+				externalChange: { kind: "conflict", diskContent: "External text" },
+			}));
+		const document = app.viewerStore.get();
+		api.readFileText.mockClear();
+		if (!first) throw new Error("Missing first tab");
+		await app.activateTab(first);
+		expect(app.tabsStore.get().activeTabId).toBe(first);
+		expect(app.viewerStore.get()).toEqual(document);
+		expect(api.readFileText).not.toHaveBeenCalled();
+	});
+
+	it("keeps the live buffer when reopening a duplicate file tab", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("Saved text");
+		api.pathExists.mockResolvedValue(true);
+		const app = await loadStoreActions(api);
+		await app.loadPath("/workspace/a.md");
+		const first = app.tabsStore.get().activeTabId;
+		await app.loadPath("/workspace/b.md", { tab: "new" });
+		await app.loadPath("/workspace/a.md");
+		if (!first) throw new Error("Missing first tab");
+		await app.closeTab(first);
+		app.updateEditorContent("/workspace/a.md", "Unsaved text");
+		const document = app.viewerStore.get();
+		api.readFileText.mockClear();
+		await app.reopenClosedTab();
+		expect(app.tabsStore.get().order).toHaveLength(2);
+		expect(app.viewerStore.get()).toEqual(document);
+		expect(app.activeHistory()).toEqual({
+			entries: ["/workspace/a.md"],
+			index: 0,
+		});
+		expect(api.readFileText).not.toHaveBeenCalled();
+	});
+
+	it("cancels a pending navigation when activating a duplicate file tab", async () => {
+		const api = createDesktopApi();
+		api.readFileText.mockResolvedValue("Saved text");
+		const app = await loadStoreActions(api);
+		await app.loadPath("/workspace/a.md");
+		const first = app.tabsStore.get().activeTabId;
+		await app.loadPath("/workspace/a.md", { tab: "new" });
+		let finish!: (text: string) => void;
+		api.readFileText.mockImplementationOnce(
+			() =>
+				new Promise<string>((resolve) => {
+					finish = resolve;
+				}),
+		);
+		const loading = app.loadPath("/workspace/b.md");
+		await vi.waitFor(() =>
+			expect(app.viewerStore.get().status).toBe("loading"),
+		);
+		if (!first) throw new Error("Missing first tab");
+		await app.activateTab(first);
+		expect(app.viewerStore.get().status).toBe("ready");
+		finish("Other file");
+		await loading;
+		expect(app.tabsStore.get().activeTabId).toBe(first);
+		expect(app.viewerStore.get().currentPath).toBe("/workspace/a.md");
+	});
+
 	it("keeps navigation history separate per tab", async () => {
 		const api = createDesktopApi();
 		api.pathExists.mockResolvedValue(true);
@@ -289,7 +366,7 @@ describe("desktop tabs", () => {
 		expect(app.tabsStore.get().order).toEqual([]);
 	});
 
-	it("ignores malformed saved sessions and deduplicates valid paths", async () => {
+	it("migrates and sanitizes all workspace sessions when loading preferences", async () => {
 		const api = createDesktopApi();
 		api.pathExists.mockResolvedValue(true);
 		const app = await loadStoreActions(
@@ -298,6 +375,10 @@ describe("desktop tabs", () => {
 				workspace: { workspacePath: "/workspace" },
 				tabSessions: {
 					"/broken": null,
+					"/inactive": {
+						paths: ["/inactive/a.md", "/inactive/b.md", "/inactive/B.md"],
+						activePath: "/inactive/B.md",
+					},
 					"/workspace": {
 						paths: [
 							"/workspace/a.md",
@@ -316,6 +397,29 @@ describe("desktop tabs", () => {
 			app.tabsStore.get().order.map((id) => app.tabsStore.get().byId[id].path),
 		).toEqual(["/workspace/a.md", "/workspace/b.md"]);
 		expect(app.viewerStore.get().currentPath).toBe("/workspace/a.md");
+		const { serialize } = await import("./persistence");
+		const saved = serialize(app.appStore.get());
+		const sessions = saved.tabSessions;
+		if (!sessions) throw Error("Missing saved sessions");
+		expect(sessions["/inactive"]).toEqual({
+			entries: [
+				{ id: expect.any(String), path: "/inactive/a.md" },
+				{ id: expect.any(String), path: "/inactive/b.md" },
+			],
+			activeTabId: expect.any(String),
+			closed: [],
+		});
+		const inactive = sessions["/inactive"];
+		expect(inactive.activeTabId).toBe(inactive.entries[1].id);
+		for (const session of Object.values(sessions)) {
+			expect(session).not.toHaveProperty("paths");
+			expect(session).not.toHaveProperty("activePath");
+		}
+		const restored = await loadStoreActions(
+			createDesktopApi(),
+			JSON.stringify(saved),
+		);
+		expect(restored.appStore.get().tabSessions).toEqual(saved.tabSessions);
 	});
 
 	it("opens a second tab beside the active one", async () => {
@@ -400,7 +504,6 @@ describe("desktop tabs", () => {
 		await loadPath("/workspace/a.md");
 		const first = appStore.get().tabs.activeTabId;
 		await openTabForPath("/workspace/b.md");
-		// Two tabs on one note would give it two autosave timers.
 		await openTabForPath("/workspace/a.md");
 
 		expect(appStore.get().tabs.order).toHaveLength(2);
@@ -408,8 +511,10 @@ describe("desktop tabs", () => {
 
 		await loadPath("/workspace/b.md");
 		expect(appStore.get().tabs.order).toHaveLength(2);
-		expect(appStore.get().tabs.activeTabId).not.toBe(first);
-		expect(appStore.get().tabs.activeTabId).toBe(appStore.get().tabs.order[1]);
+		expect(appStore.get().tabs.activeTabId).toBe(first);
+		expect(
+			Object.values(appStore.get().tabs.byId).map((tab) => tab.path),
+		).toEqual(["/workspace/b.md", "/workspace/b.md"]);
 	});
 
 	it("closing the active tab moves to the next one and opens it", async () => {
@@ -680,5 +785,38 @@ describe("desktop tabs", () => {
 		expect(appStore.get().tabs.activeTabId).toBe(first);
 		await activateAdjacentTab(-1);
 		expect(appStore.get().tabs.activeTabId).toBe(second);
+	});
+});
+
+it("keeps duplicate file tabs and their active identity through navigation and restart", async () => {
+	const api = createDesktopApi();
+	api.pathExists.mockResolvedValue(true);
+	const app = await loadStoreActions(api);
+	await app.openWorkspace("/notes");
+	await app.loadPath("/notes/a.md");
+	const first = app.tabsStore.get().activeTabId;
+	await app.openTabForPath("/notes/b.md");
+	const second = app.tabsStore.get().activeTabId;
+	await app.loadPath("/notes/a.md");
+	expect(app.tabsStore.get().activeTabId).toBe(second);
+	await app.goBack();
+	expect(app.viewerStore.get().currentPath).toBe("/notes/b.md");
+	await app.goForward();
+	expect(app.viewerStore.get().currentPath).toBe("/notes/a.md");
+	const { serialize } = await import("./persistence");
+	const restoredApi = createDesktopApi();
+	restoredApi.pathExists.mockResolvedValue(true);
+	const restored = await loadStoreActions(
+		restoredApi,
+		JSON.stringify(serialize(app.appStore.get())),
+	);
+	await restored.restoreTabs();
+	expect(restored.tabsStore.get()).toMatchObject({
+		order: [first, second],
+		activeTabId: second,
+		byId: {
+			[first ?? ""]: { path: "/notes/a.md" },
+			[second ?? ""]: { path: "/notes/a.md" },
+		},
 	});
 });

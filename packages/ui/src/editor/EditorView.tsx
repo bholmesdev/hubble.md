@@ -19,6 +19,7 @@ import type { Editor } from "@tiptap/core";
 import { TaskItem } from "@tiptap/extension-list";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
+import { closeHistory } from "@tiptap/pm/history";
 import {
 	EditorContent,
 	type EditorOptions,
@@ -38,6 +39,7 @@ import {
 	type PendingSave,
 	schedulePendingSave,
 } from "./pendingSave";
+import { replaceEditorContent } from "./replaceEditorContent";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { SmartLinkExtension } from "./SmartLinkExtension";
 import { TableCellSelectionExtension } from "./TableCellSelectionExtension";
@@ -61,6 +63,11 @@ import {
 	FormattingStatusBar,
 	type SpellcheckStatus,
 } from "./FormattingStatusBar";
+import {
+	FrontMatterHistory,
+	FrontMatterStep,
+	readFrontMatter,
+} from "./frontMatterHistory";
 import { ReviewCommentPopover } from "./ReviewCommentPopover";
 import type { ReviewThread } from "./reviewComments";
 import { SelectionFormattingToolbar } from "./SelectionFormattingToolbar";
@@ -76,6 +83,7 @@ export type EditorViewProps = {
 	documentId?: string;
 	/** Keep undo history when the same note receives rewritten Markdown. */
 	preserveHistoryOnUpdate?: boolean;
+	undoableUpdate?: string;
 	initialMarkdown: string;
 	editable?: boolean;
 	wikiTargets?: WikiTarget[];
@@ -102,6 +110,7 @@ export function EditorView({
 	path,
 	documentId = path,
 	preserveHistoryOnUpdate = false,
+	undoableUpdate,
 	initialMarkdown,
 	editable = true,
 	wikiTargets = [],
@@ -142,7 +151,9 @@ export function EditorView({
 	const [frontMatterState, setFrontMatterState] = useState(() =>
 		frontMatterStateFromMarkdown(initialMarkdown),
 	);
+	const frontMatterStateRef = useRef(frontMatterState);
 	const pathRef = useRef(path);
+	const updateRef = useRef(undoableUpdate);
 	const editorRef = useRef<Editor | null>(null);
 	useLayoutEffect(() => {
 		pathRef.current = path;
@@ -158,6 +169,10 @@ export function EditorView({
 	const [initialDoc] = useState(() =>
 		markdownToTiptapDoc(initialFrontMatter.body),
 	);
+	const [initialMetadata] = useState(() => ({
+		raw: initialFrontMatterRaw,
+		properties: frontMatterState,
+	}));
 
 	const scheduleSave = () => {
 		schedulePendingSave({
@@ -173,6 +188,7 @@ export function EditorView({
 		editable,
 		textDirection: "auto",
 		extensions: [
+			FrontMatterHistory.configure({ initial: initialMetadata }),
 			...starterKitWithRegistryShortcuts({
 				code: false,
 				codeBlock: false,
@@ -207,16 +223,32 @@ export function EditorView({
 			TableCellSelectionExtension,
 		],
 		content: initialDoc,
-		onUpdate: ({ editor: current }) => {
+		// Metadata steps leave the body unchanged, so TipTap skips its update event.
+		onTransaction: ({ editor: current, transaction }) => {
+			if (!transaction.docChanged || transaction.getMeta("preventUpdate"))
+				return;
 			const doc = current.getJSON() as JSONContent;
 			if (hasUploadImage(doc)) return;
 			const body = tiptapDocToMarkdown(doc);
-			partsRef.current = { ...partsRef.current, body };
+			const metadata = readFrontMatter(current.state);
+			const metadataChanged = transaction.steps.some(
+				(step) => step instanceof FrontMatterStep,
+			);
+			// Body edits must retain a property-name draft that has not been committed yet.
+			const frontMatter = metadataChanged
+				? metadata.raw
+				: partsRef.current.frontMatter;
+			partsRef.current = { body, frontMatter };
 			const markdown = combineMarkdownFrontMatter(
 				partsRef.current.frontMatter,
 				body,
 			);
 			latestMarkdownRef.current = markdown;
+			const properties = metadata.properties;
+			if (metadataChanged) {
+				frontMatterStateRef.current = properties;
+				setFrontMatterState(properties);
+			}
 			onLocalChange(pathRef.current, markdown);
 			scheduleSave();
 		},
@@ -259,6 +291,10 @@ export function EditorView({
 
 	useEffect(() => {
 		if (!editor) return;
+		const undoable = Boolean(
+			undoableUpdate && updateRef.current !== undoableUpdate,
+		);
+		updateRef.current = undoableUpdate;
 		if (initialMarkdown === latestMarkdownRef.current) {
 			return;
 		}
@@ -269,17 +305,33 @@ export function EditorView({
 			frontMatter,
 			parsed.body,
 		);
-		setFrontMatterState(frontMatterStateFromMarkdown(initialMarkdown));
 		const currentBody = tiptapDocToMarkdown(editor.getJSON() as JSONContent);
-		if (currentBody !== parsed.body) {
-			editor
-				.chain()
-				.setMeta("addToHistory", false)
-				.setContent(markdownToTiptapDoc(parsed.body), { emitUpdate: false })
-				.run();
-			if (!preserveHistoryOnUpdate) resetEditorHistory(editor);
+		if (
+			currentBody !== parsed.body ||
+			readFrontMatter(editor.state).raw !== frontMatter
+		) {
+			const properties = frontMatterStateFromMarkdown(
+				initialMarkdown,
+				frontMatterStateRef.current,
+			);
+			frontMatterStateRef.current = properties;
+			setFrontMatterState(properties);
+			replaceEditorContent(
+				editor,
+				markdownToTiptapDoc(parsed.body),
+				undoable,
+				preserveHistoryOnUpdate,
+				(tr) => {
+					tr.step(
+						new FrontMatterStep(readFrontMatter(editor.state), {
+							raw: frontMatter,
+							properties,
+						}),
+					);
+				},
+			);
 		}
-	}, [editor, initialMarkdown, preserveHistoryOnUpdate]);
+	}, [editor, initialMarkdown, preserveHistoryOnUpdate, undoableUpdate]);
 
 	useEffect(() => {
 		// One editor instance can serve every file, so each new document starts its own
@@ -333,18 +385,41 @@ export function EditorView({
 			>
 				{editable && (
 					<FilePropertiesPanel
-						path={path}
 						state={frontMatterState}
-						onChange={(nextState, frontMatter) => {
-							setFrontMatterState(nextState);
+						committedState={
+							editor
+								? readFrontMatter(editor.state).properties
+								: frontMatterState
+						}
+						onDraftChange={(nextState, frontMatter) => {
 							partsRef.current = { ...partsRef.current, frontMatter };
-							const markdown = combineMarkdownFrontMatter(
+							frontMatterStateRef.current = nextState;
+							setFrontMatterState(nextState);
+							// Keyboard navigation can unmount a focused field without a blur.
+							// Publish its text now; commit one history step when editing ends.
+							latestMarkdownRef.current = combineMarkdownFrontMatter(
 								frontMatter,
 								partsRef.current.body,
 							);
-							latestMarkdownRef.current = markdown;
-							onLocalChange(pathRef.current, markdown);
+							onLocalChange(pathRef.current, latestMarkdownRef.current);
 							scheduleSave();
+						}}
+						onChange={(nextState, frontMatter) => {
+							// Row IDs and unfinished drafts must travel with history; YAML cannot retain them.
+							frontMatterStateRef.current = nextState;
+							setFrontMatterState(nextState);
+							partsRef.current = { ...partsRef.current, frontMatter };
+							if (editor) editor.view.dispatch(closeHistory(editor.state.tr));
+							editor?.commands.command(({ tr, state }) => {
+								tr.step(
+									new FrontMatterStep(readFrontMatter(state), {
+										raw: frontMatter,
+										properties: nextState,
+									}),
+								);
+								return true;
+							});
+							if (editor) editor.view.dispatch(closeHistory(editor.state.tr));
 						}}
 					/>
 				)}

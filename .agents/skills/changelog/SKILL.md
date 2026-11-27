@@ -10,6 +10,9 @@ metadata:
 Record what shipped as it lands. Do not scrape commits at release time, write
 the entry now while the change is fresh.
 
+Use at most one entry per category per PR, consolidating related changes around
+their final user-facing outcomes.
+
 ## How
 
 1. Open root `CHANGELOG.md`.

@@ -11,8 +11,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 
+- Open files in your current tab even when another tab already shows them. [#350](https://github.com/bholmesdev/hubble.md/pull/350)
+
 ### Fixed
 
+- Add undo history support to frontmatter properties. [#350](https://github.com/bholmesdev/hubble.md/pull/350)
 - Selected Inbox previews and folder labels are easier to read in dark mode. [#352](https://github.com/bholmesdev/hubble.md/pull/352)
 
 ## [0.3.5] - 2026-11-25

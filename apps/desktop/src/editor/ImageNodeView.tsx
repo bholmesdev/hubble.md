@@ -21,7 +21,19 @@ export function ImageNodeView({
 	const width = typeof node.attrs.width === "number" ? node.attrs.width : 640;
 	const height =
 		typeof node.attrs.height === "number" ? node.attrs.height : 360;
-	const [resolvedSrc, setResolvedSrc] = useState(rawSrc);
+	const localPath =
+		rawSrc.trim().length > 0 && isResolvableLocalPath(rawSrc)
+			? joinPath(dirname(filePath), rawSrc)
+			: null;
+	const [resolved, setResolved] = useState<{
+		path: string;
+		src: string;
+	} | null>(null);
+	const resolvedSrc = localPath
+		? resolved?.path === localPath
+			? resolved.src
+			: null
+		: rawSrc;
 	const hasMeasuredFrame =
 		typeof node.attrs.width === "number" &&
 		typeof node.attrs.height === "number";
@@ -62,29 +74,25 @@ export function ImageNodeView({
 	}, [filePath, rawSrc, updateAttributes, uploadFile, uploadId]);
 
 	useEffect(() => {
+		if (!localPath) return;
 		let cancelled = false;
-		if (rawSrc.trim().length === 0) {
-			setResolvedSrc("");
-			return;
-		}
-		if (!isResolvableLocalPath(rawSrc)) {
-			setResolvedSrc(rawSrc);
-			return;
-		}
-		setResolvedSrc("");
-		const unresolvedPath = joinPath(dirname(filePath), rawSrc);
+		// Resolving a local path is not an image failure. Keep that state separate.
 		void desktopApi
-			.resolvePath(unresolvedPath)
+			.resolvePath(localPath)
 			.then((absolutePath) => {
-				if (!cancelled) setResolvedSrc(desktopApi.toAssetUrl(absolutePath));
+				if (!cancelled)
+					setResolved({
+						path: localPath,
+						src: desktopApi.toAssetUrl(absolutePath),
+					});
 			})
 			.catch(() => {
-				if (!cancelled) setResolvedSrc("");
+				if (!cancelled) setResolved({ path: localPath, src: "" });
 			});
 		return () => {
 			cancelled = true;
 		};
-	}, [rawSrc, filePath]);
+	}, [localPath]);
 
 	return (
 		<NodeViewWrapper as="div" data-drag-handle>
@@ -98,7 +106,7 @@ export function ImageNodeView({
 			>
 				{uploadId && rawSrc.length === 0 ? (
 					<UploadPlaceholder />
-				) : resolvedSrc.length > 0 ? (
+				) : resolvedSrc === null ? null : resolvedSrc.length > 0 ? (
 					<img
 						src={resolvedSrc}
 						alt={node.attrs.alt || ""}
