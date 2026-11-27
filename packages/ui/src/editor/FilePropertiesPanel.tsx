@@ -73,16 +73,20 @@ export function frontMatterStateFromMarkdown(
 
 export function FilePropertiesPanel({
 	state,
+	committedState,
 	onChange,
 	onDraftChange,
 }: {
 	state: FrontMatterState;
+	committedState: FrontMatterState;
 	onChange: (state: FrontMatterState, frontMatter: string) => void;
-	onDraftChange?: (state: FrontMatterState, frontMatter: string) => void;
+	onDraftChange: (state: FrontMatterState, frontMatter: string) => void;
 }) {
 	const addButtonRef = useRef<HTMLButtonElement>(null);
 	const [focusDraftId, setFocusDraftId] = useState<string | null>(null);
 	const properties = state.type === "invalid" ? [] : state.properties;
+	const committedProperties =
+		committedState.type === "invalid" ? [] : committedState.properties;
 	const changeProperty = (
 		index: number,
 		next: DraftFileProperty,
@@ -104,6 +108,11 @@ export function FilePropertiesPanel({
 					<PropertyRow
 						key={property.draftId ?? property.key}
 						property={property}
+						committedKey={
+							committedProperties.find(
+								(current) => current.draftId === property.draftId,
+							)?.key ?? property.key
+						}
 						autoFocusName={property.draftId === focusDraftId}
 						onNameAutoFocused={() => {
 							if (property.draftId === focusDraftId) {
@@ -112,7 +121,7 @@ export function FilePropertiesPanel({
 						}}
 						onChange={(next) => changeProperty(index, next)}
 						onDraftChange={(next) => {
-							if (onDraftChange) changeProperty(index, next, onDraftChange);
+							changeProperty(index, next, onDraftChange);
 						}}
 						onDelete={(options) => {
 							if (options?.focusAdd) {
@@ -203,6 +212,7 @@ function InvalidFrontMatter({
 
 function PropertyRow({
 	property,
+	committedKey,
 	autoFocusName,
 	onNameAutoFocused,
 	onChange,
@@ -210,6 +220,7 @@ function PropertyRow({
 	onDelete,
 }: {
 	property: DraftFileProperty;
+	committedKey: string;
 	autoFocusName: boolean;
 	onNameAutoFocused: () => void;
 	onChange: (property: DraftFileProperty) => void;
@@ -219,37 +230,33 @@ function PropertyRow({
 	const type = property.typeOverride ?? property.type;
 	const rowRef = useRef<HTMLDivElement>(null);
 	const nameInputRef = useRef<HTMLInputElement>(null);
-	const [nameDraft, setNameDraft] = useState(property.key);
 	const nameSelection = useRef<{
 		start: number;
 		end: number;
 		direction: "forward" | "backward" | "none";
 	} | null>(null);
-	// History may restore a different name while this input is still focused.
+	const rememberNameSelection = (input: HTMLInputElement) => {
+		nameSelection.current = {
+			start: input.selectionStart ?? 0,
+			end: input.selectionEnd ?? 0,
+			direction: input.selectionDirection ?? "none",
+		};
+	};
+	// React owns the value; selection still needs the DOM API when history replaces it.
 	useLayoutEffect(() => {
 		const input = nameInputRef.current;
-		if (!input || input.value === property.key) return;
-		nameSelection.current =
-			document.activeElement === input
-				? {
-						start: input.selectionStart ?? 0,
-						end: input.selectionEnd ?? 0,
-						direction: input.selectionDirection ?? "none",
-					}
-				: null;
-		setNameDraft(property.key);
-	}, [property.key]);
-	useLayoutEffect(() => {
 		const selection = nameSelection.current;
-		nameSelection.current = null;
-		const input = nameInputRef.current;
-		if (selection && input && document.activeElement === input)
-			input.setSelectionRange(
-				Math.min(selection.start, nameDraft.length),
-				Math.min(selection.end, nameDraft.length),
-				selection.direction,
-			);
-	}, [nameDraft]);
+		if (!input || !selection || document.activeElement !== input) return;
+		const start = Math.min(selection.start, property.key.length);
+		const end = Math.min(selection.end, property.key.length);
+		if (
+			input.selectionStart !== start ||
+			input.selectionEnd !== end ||
+			input.selectionDirection !== selection.direction
+		)
+			input.setSelectionRange(start, end, selection.direction);
+	}, [property.key]);
+
 	const removeEmptyIfLeavingRow = (
 		event: FocusEvent<HTMLElement>,
 		next = property,
@@ -285,7 +292,7 @@ function PropertyRow({
 				/>
 				<Input
 					ref={nameInputRef}
-					value={nameDraft}
+					value={property.key}
 					placeholder="Property"
 					variant="ghost"
 					className="h-7 px-2"
@@ -294,13 +301,14 @@ function PropertyRow({
 						property.key.length > 0 && !isSimplePropertyKey(property.key)
 					}
 					onChange={(event) => {
-						setNameDraft(event.target.value);
+						rememberNameSelection(event.currentTarget);
 						onDraftChange({ ...property, key: event.target.value });
 					}}
+					onSelect={(event) => rememberNameSelection(event.currentTarget)}
 					onBlur={(event) => {
 						const next = { ...property, key: event.currentTarget.value };
 						if (removeEmptyIfLeavingRow(event, next)) return;
-						if (next.key !== property.key) onChange(next);
+						if (next.key !== committedKey) onChange(next);
 					}}
 					onKeyDown={(event) => {
 						if (event.key === "Escape" && isEmptyDraftProperty(property)) {

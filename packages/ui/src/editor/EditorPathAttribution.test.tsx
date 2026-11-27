@@ -455,6 +455,7 @@ it("keeps the property input and caret stable through metadata undo and redo", a
 	act(() => {
 		input.focus();
 		input.setSelectionRange(2, 4);
+		input.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
 	});
 	act(() => editor.commands.undo());
 	expect(propertyName()).toBe(input);
@@ -517,8 +518,8 @@ it("keeps the document body mounted through an external front-matter-only update
 	);
 });
 
-it("publishes a property-name draft before blur so keyboard navigation can save it", async () => {
-	const { onLocalChange } = await mountEditor();
+it("preserves property-name drafts through body updates before blur", async () => {
+	const { editor, onLocalChange } = await mountEditor();
 	const input = propertyName();
 	act(() => {
 		input.focus();
@@ -528,6 +529,21 @@ it("publishes a property-name draft before blur so keyboard navigation can save 
 	expect(onLocalChange).toHaveBeenLastCalledWith(
 		"/note.md",
 		expect.stringContaining("topic:"),
+	);
+	act(() =>
+		editor.commands.insertContentAt(
+			editor.state.doc.content.size - 1,
+			" updated body",
+		),
+	);
+	expect(input.value).toBe("topic");
+	expect(onLocalChange).toHaveBeenLastCalledWith(
+		"/note.md",
+		expect.stringContaining("topic:"),
+	);
+	expect(onLocalChange).toHaveBeenLastCalledWith(
+		"/note.md",
+		expect.stringContaining("updated body"),
 	);
 });
 

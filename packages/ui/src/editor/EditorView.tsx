@@ -231,8 +231,13 @@ export function EditorView({
 			if (hasUploadImage(doc)) return;
 			const body = tiptapDocToMarkdown(doc);
 			const metadata = readFrontMatter(current.state);
-			const frontMatter = metadata.raw;
-			const metadataChanged = frontMatter !== partsRef.current.frontMatter;
+			const metadataChanged = transaction.steps.some(
+				(step) => step instanceof FrontMatterStep,
+			);
+			// Body edits must retain a property-name draft that has not been committed yet.
+			const frontMatter = metadataChanged
+				? metadata.raw
+				: partsRef.current.frontMatter;
 			partsRef.current = { body, frontMatter };
 			const markdown = combineMarkdownFrontMatter(
 				partsRef.current.frontMatter,
@@ -240,7 +245,7 @@ export function EditorView({
 			);
 			latestMarkdownRef.current = markdown;
 			const properties = metadata.properties;
-			if (metadataChanged || properties !== frontMatterStateRef.current) {
+			if (metadataChanged) {
 				frontMatterStateRef.current = properties;
 				setFrontMatterState(properties);
 			}
@@ -381,7 +386,15 @@ export function EditorView({
 				{editable && (
 					<FilePropertiesPanel
 						state={frontMatterState}
-						onDraftChange={(_state, frontMatter) => {
+						committedState={
+							editor
+								? readFrontMatter(editor.state).properties
+								: frontMatterState
+						}
+						onDraftChange={(nextState, frontMatter) => {
+							partsRef.current = { ...partsRef.current, frontMatter };
+							frontMatterStateRef.current = nextState;
+							setFrontMatterState(nextState);
 							// Keyboard navigation can unmount a focused field without a blur.
 							// Publish its text now; commit one history step when editing ends.
 							latestMarkdownRef.current = combineMarkdownFrontMatter(
