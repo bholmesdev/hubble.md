@@ -23,6 +23,7 @@ afterEach(async () => {
 	root = undefined;
 	document.body.replaceChildren();
 	vi.unstubAllGlobals();
+	vi.useRealTimers();
 });
 
 async function setup(account = signedOut) {
@@ -120,4 +121,20 @@ it("keeps the existing connection after a failed reconnect", async () => {
 	expect(host.textContent).toContain("test@example.com");
 	expect(button("Sign out").disabled).toBe(false);
 	expect(host.textContent).toContain("Sign-in cancelled.");
+});
+
+it("recovers pending browser sign-in after a renderer reload", async () => {
+	vi.useFakeTimers();
+	const { api, host } = await setup({
+		...signedOut,
+		signingIn: true,
+		busy: true,
+	});
+	expect(button("Cancel sign-in").disabled).toBe(false);
+	api.chatAccount.mockResolvedValue(signedIn);
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(1000);
+	});
+	expect(host.textContent).toContain("test@example.com");
+	expect(button("Sign out").disabled).toBe(false);
 });

@@ -77,11 +77,18 @@ it("serializes account changes while allowing a pending sign-in to be cancelled"
 		"fetch",
 		vi.fn(async (_input, init) => {
 			init.signal.throwIfAborted();
-			throw Error("Unexpected network request");
+			return new Promise((_resolve, reject) =>
+				init.signal.addEventListener(
+					"abort",
+					() => reject(init.signal.reason),
+					{ once: true },
+				),
+			);
 		}),
 	);
 	const pending = call("desktop:chat-sign-in");
 	await expect(call("desktop:chat-reset")).rejects.toThrow("Finish or cancel");
+	expect(await call("desktop:chat-account")).toMatchObject({ signingIn: true });
 	call("desktop:chat-cancel-sign-in");
 	await expect(pending).rejects.toThrow();
 	await expect(call("desktop:chat-reset")).resolves.toBeUndefined();

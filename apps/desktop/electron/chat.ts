@@ -41,7 +41,11 @@ export function setupChatIpc(getContents: () => WebContents | undefined) {
 			accountBusy = false;
 		}
 	}
-	handle("desktop:chat-account", () => auth.account());
+	handle("desktop:chat-account", async () => ({
+		...(await auth.account()),
+		signingIn: auth.signingIn,
+		busy: accountBusy,
+	}));
 	handle("desktop:chat-sign-in", () => changeAccount(() => auth.signIn()));
 	handle("desktop:chat-cancel-sign-in", () => auth.cancel());
 	handle("desktop:chat-reset", () => changeAccount(() => auth.reset()));

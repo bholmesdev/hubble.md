@@ -31,10 +31,14 @@ export async function attempt<T>(
 
 export async function refreshChatConnection(signIn = false) {
 	if (chatConnection.get().busy) return;
+	await loadConnection(signIn);
+}
+
+async function loadConnection(signIn: boolean) {
 	chatConnection.set({
 		...chatConnection.get(),
 		busy: true,
-		signingIn: signIn,
+		signingIn: signIn || chatConnection.get().signingIn,
 		error: null,
 	});
 	const result = await attempt(() =>
@@ -47,10 +51,12 @@ export async function refreshChatConnection(signIn = false) {
 	}
 	chatConnection.set({
 		account,
-		busy: false,
-		signingIn: false,
+		busy: !!account?.busy,
+		signingIn: !!account?.signingIn,
 		error: result.ok ? null : result.error,
 	});
+	// The main process owns browser sign-in and may outlive a renderer reload.
+	if (account?.busy) window.setTimeout(() => void loadConnection(false), 1000);
 }
 
 export async function disconnectChat() {

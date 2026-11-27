@@ -203,6 +203,10 @@ export class ChatGPTAuth {
 		}
 	}
 
+	get signingIn() {
+		return !!this.attempt;
+	}
+
 	cancel() {
 		this.attempt?.abort();
 	}
