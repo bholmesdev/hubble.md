@@ -1,0 +1,123 @@
+// @vitest-environment happy-dom
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, expect, it, vi } from "vitest";
+import type { ChatAccount } from "../desktopApi/chat";
+import type { DesktopApi } from "../desktopApi/types";
+
+const signedOut: ChatAccount = {
+	connected: false,
+	sharing: false,
+	label: null,
+	expiresAt: null,
+};
+const signedIn: ChatAccount = {
+	connected: true,
+	sharing: true,
+	label: "test@example.com",
+	expiresAt: Date.now() + 3600000,
+};
+let root: Root | undefined;
+afterEach(async () => {
+	await act(async () => root?.unmount());
+	root = undefined;
+	document.body.replaceChildren();
+	vi.unstubAllGlobals();
+});
+
+async function setup(account = signedOut) {
+	vi.resetModules();
+	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+	const api = {
+		chatAccount: vi.fn(async () => account),
+		chatSignIn: vi.fn(async () => signedIn),
+		chatCancelSignIn: vi.fn(async () => {}),
+		chatReset: vi.fn(async () => {}),
+		chatDisconnect: vi.fn(async () => {
+			account = signedOut;
+		}),
+		openExternalUrl: vi.fn(async () => {}),
+	};
+	window.desktopApi = api as unknown as DesktopApi;
+	const { refreshChatConnection, chatConnection } = await import(
+		"../store/chatConnection"
+	);
+	const { ChatConnectionSettings } = await import("./ChatConnectionSettings");
+	const host = document.createElement("div");
+	document.body.append(host);
+	root = createRoot(host);
+	await act(async () => {
+		root?.render(<ChatConnectionSettings />);
+		await refreshChatConnection();
+	});
+	return { api, host, chatConnection };
+}
+function button(label: string) {
+	const element = [...document.querySelectorAll("button")].find(
+		(item) => item.textContent === label,
+	);
+	if (!element) throw Error(`Missing button: ${label}`);
+	return element;
+}
+
+it("connects, shows the account, and signs out through the desktop bridge", async () => {
+	const { api, host } = await setup();
+	await act(async () => button("Sign in with ChatGPT").click());
+	expect(api.chatSignIn).toHaveBeenCalledOnce();
+	expect(host.textContent).toContain("test@example.com");
+	await act(async () => button("Sign out").click());
+	expect(api.chatDisconnect).toHaveBeenCalledOnce();
+	expect(host.textContent).not.toContain("test@example.com");
+	expect(button("Sign in with ChatGPT").disabled).toBe(false);
+});
+
+it("keeps cancellation available while sign-in is pending", async () => {
+	const { api } = await setup();
+	let reject!: (error: Error) => void;
+	api.chatSignIn.mockImplementationOnce(
+		() =>
+			new Promise((_resolve, no) => {
+				reject = no;
+			}),
+	);
+	api.chatCancelSignIn.mockImplementationOnce(async () =>
+		reject(Error("Sign-in cancelled.")),
+	);
+	await act(async () => button("Sign in with ChatGPT").click());
+	await act(async () => button("Cancel sign-in").click());
+	expect(api.chatCancelSignIn).toHaveBeenCalledOnce();
+	expect(button("Sign in with ChatGPT").disabled).toBe(false);
+	expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+		"cancelled",
+	);
+});
+
+it("recovers unreadable credentials and offers sign-in again", async () => {
+	const { api, host } = await setup({
+		...signedOut,
+		issue: "unreadable-credentials",
+	});
+	expect(host.textContent).toContain("Your saved sign-in could not be opened");
+	await act(async () => button("Reset connection and sign in again").click());
+	expect(api.chatReset).toHaveBeenCalledOnce();
+	expect(api.chatSignIn).toHaveBeenCalledOnce();
+	expect(host.textContent).toContain("test@example.com");
+});
+
+it("retains the real account state when local sign-out fails", async () => {
+	const { api, host } = await setup(signedIn);
+	api.chatDisconnect.mockRejectedValueOnce(Error("Could not save sign-out."));
+	await act(async () => button("Sign out").click());
+	expect(host.textContent).toContain("test@example.com");
+	expect(button("Sign out").disabled).toBe(false);
+	expect(host.textContent).toContain("Could not save sign-out.");
+});
+
+it("keeps the existing connection after a failed reconnect", async () => {
+	const { api, host } = await setup(signedIn);
+	api.chatSignIn.mockRejectedValueOnce(Error("Sign-in cancelled."));
+	await act(async () => button("Reconnect").click());
+	expect(host.textContent).toContain("test@example.com");
+	expect(button("Sign out").disabled).toBe(false);
+	expect(host.textContent).toContain("Sign-in cancelled.");
+});

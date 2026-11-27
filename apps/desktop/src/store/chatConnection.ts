@@ -1,0 +1,83 @@
+import { store } from "@simplestack/store";
+import { desktopApi } from "../desktopApi";
+import type { ChatAccount } from "../desktopApi/chat";
+
+export const chatConnection = store({
+	account: null as ChatAccount | null,
+	busy: false,
+	signingIn: false,
+	error: null as string | null,
+});
+
+export function errorText(error: unknown) {
+	return error instanceof Error
+		? error.message.replace(
+				/^Error invoking remote method '[^']+': (?:Error: )?/,
+				"",
+			)
+		: "Chat connection is unavailable. Try again.";
+}
+
+// Keep exception handling outside component handlers for React Compiler.
+export async function attempt<T>(
+	action: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+	try {
+		return { ok: true, value: await action() };
+	} catch (error) {
+		return { ok: false, error: errorText(error) };
+	}
+}
+
+export async function refreshChatConnection(signIn = false) {
+	if (chatConnection.get().busy) return;
+	chatConnection.set({
+		...chatConnection.get(),
+		busy: true,
+		signingIn: signIn,
+		error: null,
+	});
+	const result = await attempt(() =>
+		signIn ? desktopApi.chatSignIn() : desktopApi.chatAccount(),
+	);
+	let account = result.ok ? result.value : null;
+	if (!result.ok && signIn) {
+		const saved = await attempt(() => desktopApi.chatAccount());
+		account = saved.ok ? saved.value : null;
+	}
+	chatConnection.set({
+		account,
+		busy: false,
+		signingIn: false,
+		error: result.ok ? null : result.error,
+	});
+}
+
+export async function disconnectChat() {
+	if (chatConnection.get().busy) return;
+	chatConnection.set({ ...chatConnection.get(), busy: true, error: null });
+	const result = await attempt(() => desktopApi.chatDisconnect());
+	// Remote revocation may fail after local credentials have already been removed.
+	const account = await attempt(() => desktopApi.chatAccount());
+	chatConnection.set({
+		account: account.ok ? account.value : null,
+		busy: false,
+		signingIn: false,
+		error: result.ok ? (account.ok ? null : account.error) : result.error,
+	});
+}
+
+export async function resetChatConnection() {
+	if (chatConnection.get().busy) return;
+	chatConnection.set({ ...chatConnection.get(), busy: true, error: null });
+	const result = await attempt(() => desktopApi.chatReset());
+	chatConnection.set({
+		...chatConnection.get(),
+		busy: false,
+		error: result.ok ? null : result.error,
+	});
+	if (result.ok) {
+		chatConnection.set({ ...chatConnection.get(), account: null });
+		await refreshChatConnection(true);
+	}
+}
