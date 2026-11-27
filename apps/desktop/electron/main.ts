@@ -60,6 +60,7 @@ import {
 } from "../src/lib/searchContent";
 import type { ThemePreference } from "../src/theme";
 import { AgentSkills } from "./agentSkills";
+import { setupChatIpc } from "./chat";
 import { DeleteUndo } from "./deleteUndo";
 import { readNotePreviews } from "./notePreviews";
 import publishedSkillHashes from "./publishedSkillHashes.json";
@@ -1487,6 +1488,7 @@ async function createWindow() {
 }
 
 function registerIpc() {
+	setupChatIpc(() => mainWindow?.webContents);
 	setupTerminalIpc(sendToRenderer);
 
 	ipcMain.handle(
