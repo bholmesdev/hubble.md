@@ -203,6 +203,7 @@ const tabSessionSchema = z
 			.optional()
 			.catch(undefined),
 		activeTabId: z.string().uuid().nullable().optional().catch(undefined),
+		// Legacy input only: older releases saved paths instead of tab IDs.
 		paths: z
 			.array(z.string().min(1).catch(""))
 			.optional()
@@ -215,6 +216,7 @@ const tabSessionSchema = z
 				),
 			),
 		activePath: z.string().nullable().optional().catch(null),
+
 		closed: z
 			.array(closedTabSchema)
 			.catch([])
@@ -226,13 +228,16 @@ const tabSessionSchema = z
 			// next preference save also upgrades workspaces that haven't been opened.
 			const ids = new Set<string>();
 			const currentEntries = (
-				entries ?? paths.map((path) => ({ id: crypto.randomUUID(), path }))
+				entries ??
+				// Legacy migration: assign stable IDs to the saved paths.
+				paths.map((path) => ({ id: crypto.randomUUID(), path }))
 			).map((entry) => {
 				const id = ids.has(entry.id) ? crypto.randomUUID() : entry.id;
 				ids.add(id);
 				return { id, path: entry.path };
 			});
 			let active = activeTabId && ids.has(activeTabId) ? activeTabId : null;
+			// Legacy migration: translate the selected path to its new tab ID.
 			if (!active && !entries && activePath)
 				active =
 					currentEntries.find((entry) => pathEquals(entry.path, activePath))
