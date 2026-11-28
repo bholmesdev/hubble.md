@@ -56,26 +56,41 @@ function IframeEmbedNodeView({
 	filePath: string;
 	workspacePath: string | null;
 }) {
-	const [error, setError] = useState<string | null>(null);
+	return (
+		<IframeEmbed
+			key={JSON.stringify([filePath, attrs.src, workspacePath])}
+			attrs={attrs}
+			filePath={filePath}
+			workspacePath={workspacePath}
+		/>
+	);
+}
+
+function IframeEmbed({
+	attrs,
+	filePath,
+	workspacePath,
+}: {
+	attrs: EmbedAttrs;
+	filePath: string;
+	workspacePath: string | null;
+}) {
+	const src = attrs.src ?? "";
+	const [error, setError] = useState<string | null>(() =>
+		isValidIframeSrc(src)
+			? null
+			: "Iframe embed src must be a local .html path.",
+	);
 	const [height, setHeight] = useState(MIN_IFRAME_HEIGHT);
 	const [resolvedEmbed, setResolvedEmbed] = useState<{
 		path: string;
 		suffix: string;
 	} | null>(null);
 	const [reloadKey, setReloadKey] = useState(0);
-	const src = attrs.src ?? "";
 
 	useEffect(() => {
 		let cancelled = false;
-		setResolvedEmbed(null);
-		setError(null);
-		setHeight(MIN_IFRAME_HEIGHT);
-		setReloadKey(0);
-
-		if (!isValidIframeSrc(src)) {
-			setError("Iframe embed src must be a local .html path.");
-			return;
-		}
+		if (!isValidIframeSrc(src)) return;
 
 		const { path, suffix } = splitIframeSrc(src);
 		const htmlPath = joinPath(dirname(filePath), path);

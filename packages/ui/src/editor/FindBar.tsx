@@ -5,6 +5,7 @@ import {
 	selectFindMatch,
 } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
+import { useEditorState } from "@tiptap/react";
 import { keymatch } from "keymatch";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
@@ -22,22 +23,20 @@ import { formatShortcut } from "../lib/shortcut";
 import { cn } from "../lib/utils";
 import { Button } from "../primitives/button";
 
+const EMPTY_FIND_STATE: FindState = { query: "", activeIndex: 0, matches: [] };
+
 export function FindBar({ editor }: { editor: Editor | null }) {
 	const [open, setOpen] = useState(false);
 	const [replaceOpen, setReplaceOpen] = useState(false);
 	const [replacement, setReplacement] = useState("");
-	const [findState, setFindState] = useState<FindState>({
-		query: "",
-		activeIndex: 0,
-		matches: [],
-	});
+	const findState =
+		useEditorState({
+			editor,
+			selector: ({ editor }) =>
+				editor ? getFindState(editor.state) : EMPTY_FIND_STATE,
+		}) ?? EMPTY_FIND_STATE;
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const replaceInputRef = useRef<HTMLInputElement | null>(null);
-
-	const syncFindState = () => {
-		if (!editor) return;
-		setFindState(getFindState(editor.state));
-	};
 
 	const close = () => {
 		setOpen(false);
@@ -61,19 +60,6 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 			inputRef.current?.select();
 		});
 	};
-
-	useEffect(
-		() => {
-			if (!editor) return;
-			syncFindState();
-			editor.on("transaction", syncFindState);
-			return () => {
-				editor.off("transaction", syncFindState);
-			};
-		},
-		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-		[editor, syncFindState],
-	);
 
 	/**
 	 * Collapsing unmounts the replace field, so focus moves back to the find

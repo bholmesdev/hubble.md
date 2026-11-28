@@ -18,11 +18,15 @@ export function EditableFileTitle({
 	const title = currentPath ? fileNameFromPath(currentPath) : "";
 	const editing = draft !== null;
 
+	const [previousRequest, setPreviousRequest] = useState(false);
+	if (editRequested !== previousRequest) {
+		setPreviousRequest(editRequested);
+		if (editRequested && title && onRename) setDraft(title);
+	}
+
 	useEffect(() => {
-		if (!editRequested || !title || !onRename) return;
-		setDraft(title);
-		onEditStart?.();
-	}, [editRequested, title, onRename, onEditStart]);
+		if (editRequested && editing) onEditStart?.();
+	}, [editRequested, editing, onEditStart]);
 
 	useEffect(() => {
 		if (!editing) return;

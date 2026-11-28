@@ -126,12 +126,10 @@ export function TabStrip({
 		renameInputRef.current?.select();
 	}, [editingId]);
 
-	useEffect(() => {
-		if (editingId && !tabs.some((tab) => tab.id === editingId)) {
-			setEditingId(null);
-			setDraft("");
-		}
-	}, [editingId, tabs]);
+	if (editingId && !tabs.some((tab) => tab.id === editingId)) {
+		setEditingId(null);
+		setDraft("");
+	}
 
 	const beginRename = (tab: TabStripItem) => {
 		if (!onRename) return;

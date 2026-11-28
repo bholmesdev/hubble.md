@@ -554,9 +554,9 @@ function App() {
 		void desktopApi.setShortcutBindings(shortcutBindings);
 	}, [shortcutBindings]);
 
-	useEffect(() => {
-		if (!sidebarOpen) setFocusedSidebarItem(null);
-	}, [sidebarOpen]);
+	if (!sidebarOpen && focusedSidebarItem !== null) {
+		setFocusedSidebarItem(null);
+	}
 
 	useEffect(() => {
 		const onKeyDown = async (event: KeyboardEvent) => {

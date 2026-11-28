@@ -88,9 +88,7 @@ export function ReviewCommentGutter({
 		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	}, [comments.length, remeasure, viewportRef]);
 
-	useEffect(() => {
-		if (popoverOpen) setHoveredBlock(null);
-	}, [popoverOpen]);
+	if (popoverOpen && hoveredBlock !== null) setHoveredBlock(null);
 
 	useEffect(() => {
 		const viewport = viewportRef.current;
@@ -159,9 +157,9 @@ export function ReviewCommentGutter({
 	// Held so the add button fades out from its last position instead of
 	// vanishing the moment the pointer leaves.
 	const [restingTop, setRestingTop] = useState<number | null>(null);
-	useEffect(() => {
-		if (layout.hoverTop !== null) setRestingTop(layout.hoverTop);
-	}, [layout.hoverTop]);
+	if (layout.hoverTop !== null && layout.hoverTop !== restingTop) {
+		setRestingTop(layout.hoverTop);
+	}
 	const hoverTop = layout.hoverTop ?? restingTop;
 
 	return (

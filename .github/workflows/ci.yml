@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   check:
-    name: Biome
+    name: Static checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -39,6 +39,9 @@ jobs:
 
       - name: Run Biome
         run: pnpm check
+
+      - name: Check effects
+        run: pnpm check:effects
 
   test:
     name: Tests
