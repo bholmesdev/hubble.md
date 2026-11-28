@@ -1,10 +1,4 @@
-import {
-	startTransition,
-	useEffect,
-	useEffectEvent,
-	useRef,
-	useState,
-} from "react";
+import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import { z } from "zod/v4";
 import { fileNameFromPath, normalizeDisplayPath } from "../lib/filePath";
 
@@ -87,7 +81,7 @@ export function useSidebarTree({
 	const storageKey = storageScope
 		? `hubble-sidebar-expanded-folders:${storageScope}`
 		: null;
-	const revealedPathRef = useRef<string | null>(null);
+	const [revealedPath, setRevealedPath] = useState<string | null>(null);
 	const [expandedState, setExpandedState] = useState<ExpandedState>(() => ({
 		key: storageKey,
 		folders: readExpandedFolders(storageKey),
@@ -97,13 +91,13 @@ export function useSidebarTree({
 			? expandedState.folders
 			: new Set<string>();
 
-	useEffect(() => {
-		revealedPathRef.current = null;
+	if (expandedState.key !== storageKey) {
+		setRevealedPath(null);
 		setExpandedState({
 			key: storageKey,
 			folders: readExpandedFolders(storageKey),
 		});
-	}, [storageKey]);
+	}
 
 	useEffect(() => {
 		if (expandedState.key !== storageKey) return;
@@ -121,29 +115,17 @@ export function useSidebarTree({
 	});
 	const folderIds = getFolderIds(tree, uncompactFolderId);
 
-	useEffect(() => {
-		if (!highlightPath || revealedPathRef.current === highlightPath) return;
-		revealedPathRef.current = highlightPath;
-		const activeAncestorIds = getFolderAncestorIds(
-			getDisplayPath(highlightPath),
-		);
-		if (activeAncestorIds.size === 0) return;
-		// Auto-expand ancestors once per selected file so manual collapse still works.
-		setExpandedState((current) => {
-			const next = new Set(
-				current.key === storageKey
-					? current.folders
-					: readExpandedFolders(storageKey),
-			);
-			let changed = false;
-			for (const id of activeAncestorIds) {
-				if (next.has(id)) continue;
-				next.add(id);
-				changed = true;
-			}
-			return changed ? { key: storageKey, folders: next } : current;
-		});
-	}, [getDisplayPath, highlightPath, storageKey]);
+	if (
+		expandedState.key === storageKey &&
+		highlightPath &&
+		revealedPath !== highlightPath
+	) {
+		setRevealedPath(highlightPath);
+		const next = new Set(expandedFolders);
+		for (const id of getFolderAncestorIds(getDisplayPath(highlightPath)))
+			next.add(id);
+		setExpandedState({ key: storageKey, folders: next });
+	}
 
 	const setExpanded = (id: string, expanded: boolean) => {
 		setExpandedState((current) => {

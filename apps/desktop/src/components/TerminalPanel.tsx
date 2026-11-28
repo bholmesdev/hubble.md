@@ -151,7 +151,6 @@ function cssColorToRgba(color: string): string {
 async function startTerminalSession(
 	title: string,
 	options: StartSessionOptions,
-	onStart: (session: Session) => void,
 ) {
 	while (true) {
 		const requestedWorkspacePath = workspacePathStore.get();
@@ -162,8 +161,7 @@ async function startTerminalSession(
 			...options,
 		});
 		if (workspacePathStore.get() === requestedWorkspacePath) {
-			onStart({ id: sessionId, title });
-			return;
+			return { id: sessionId, title };
 		}
 		// The workspace changed while this shell booted. Adopting it would
 		// show a shell cwd'd to the old workspace, so drop it and retry.
@@ -292,22 +290,20 @@ export function TerminalPanel() {
 		);
 	}, [sessions, workspacePath]);
 
-	const startSession = async (
-		title: string,
-		options: StartSessionOptions = {},
-	) => {
-		setStartError(null);
-		try {
-			await startTerminalSession(title, options, (session) => {
+	const startSession = (title: string, options: StartSessionOptions = {}) =>
+		startTerminalSession(title, options).then(
+			(session) => {
+				if (!session) return;
+				setStartError(null);
 				dispatch({ type: "add", session });
-			});
-		} catch (error) {
-			console.error("Failed to start terminal session:", error);
-			setStartError(
-				"Terminal unavailable. The bundled shell module failed to load.",
-			);
-		}
-	};
+			},
+			(error) => {
+				console.error("Failed to start terminal session:", error);
+				setStartError(
+					"Terminal unavailable. The bundled shell module failed to load.",
+				);
+			},
+		);
 
 	// Start sessions while the panel is open: a pending chat command gets its
 	// own tab; otherwise an empty panel boots a plain shell. sessions.length

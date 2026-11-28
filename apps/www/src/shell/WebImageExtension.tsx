@@ -63,8 +63,22 @@ function WebImageNodeView({ node, selected, updateAttributes }: NodeViewProps) {
 	const assetKey = assets
 		.map((asset) => `${asset.path}:${asset.storageId}:${asset.deleted}`)
 		.join("|");
-	const [resolvedSrc, setResolvedSrc] = useState(rawSrc);
-	const [resolveFailed, setResolveFailed] = useState(false);
+	const [resolution, setResolution] = useState<{
+		rawSrc: string;
+		path: string;
+		assetKey: string;
+		url: string | null;
+	} | null>(null);
+	const relative = rawSrc.trim().length > 0 && isRelativeAssetPath(rawSrc);
+	const currentResolution =
+		resolution?.rawSrc === rawSrc &&
+		resolution.path === path &&
+		resolution.assetKey === assetKey
+			? resolution
+			: null;
+	const resolvedSrc = relative ? (currentResolution?.url ?? "") : rawSrc;
+	const resolveFailed =
+		relative && currentResolution !== null && currentResolution.url === null;
 	const hasMeasuredFrame =
 		typeof node.attrs.width === "number" &&
 		typeof node.attrs.height === "number";
@@ -104,28 +118,15 @@ function WebImageNodeView({ node, selected, updateAttributes }: NodeViewProps) {
 	}, [path, rawSrc, updateAttributes, uploadFile, uploadId]);
 
 	useEffect(() => {
-		void assetKey;
+		if (!relative) return;
 		let cancelled = false;
-		if (rawSrc.trim().length === 0) {
-			setResolvedSrc("");
-			setResolveFailed(false);
-			return;
-		}
-		if (!isRelativeAssetPath(rawSrc)) {
-			setResolvedSrc(rawSrc);
-			setResolveFailed(false);
-			return;
-		}
-		setResolveFailed(false);
 		void resolveAssetDownloadUrl(path, rawSrc).then((url) => {
-			if (cancelled) return;
-			setResolvedSrc(url ?? "");
-			setResolveFailed(!url);
+			if (!cancelled) setResolution({ rawSrc, path, assetKey, url });
 		});
 		return () => {
 			cancelled = true;
 		};
-	}, [rawSrc, assetKey, path]);
+	}, [rawSrc, assetKey, path, relative]);
 
 	const isWaitingForResolvedSrc =
 		rawSrc.trim().length > 0 && resolvedSrc.length === 0 && !resolveFailed;

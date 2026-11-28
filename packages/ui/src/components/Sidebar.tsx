@@ -670,18 +670,19 @@ export function Sidebar({
 	useLayoutEffect(() => {
 		activeItemRef.current = activeItem;
 	}, [activeItem]);
-	const { focusedIndex, focusItem, onKeyDown } = useSidebarKeyboardNav({
-		items: rows,
-		onSelect: activateRow,
-		onEnter: enterRowEdit,
-		onExpand: expandRow,
-		onCollapse: collapseRow,
-		navRef,
-		activeIndex,
-		getItemKey: sidebarRowKey,
-		// Arrow keys leave multi-select mode.
-		onNavigate: replaceSelection,
-	});
+	const { focusedIndex, focusItem, onKeyDown, setFocusKey } =
+		useSidebarKeyboardNav({
+			items: rows,
+			onSelect: activateRow,
+			onEnter: enterRowEdit,
+			onExpand: expandRow,
+			onCollapse: collapseRow,
+			navRef,
+			activeIndex,
+			getItemKey: sidebarRowKey,
+			// Arrow keys leave multi-select mode.
+			onNavigate: replaceSelection,
+		});
 	const creationFolderId = sidebarCreationFolderId({
 		rows,
 		focusedIndex,
@@ -750,22 +751,37 @@ export function Sidebar({
 		);
 	}, [focusedIndex, onFocusedItemChange, rows, selectedKeys]);
 
-	useEffect(() => {
-		if (!pendingFocusDisplayPath) return;
-		const index = rows.findIndex(
+	if (pendingFocusDisplayPath) {
+		const row = rows.find(
 			(row) =>
 				row.kind === "file" &&
 				normalizeDisplayPath(getDisplayPath(row.file.path)) ===
 					pendingFocusDisplayPath,
 		);
-		if (index < 0) return;
-		focusItem(rows[index]);
-		setPendingFocusDisplayPath(null);
-	}, [focusItem, getDisplayPath, pendingFocusDisplayPath, rows]);
+		if (row) {
+			setFocusKey(sidebarRowKey(row));
+			setPendingFocusDisplayPath(null);
+		}
+	}
 
-	useEffect(() => {
-		setSelection((current) => pruneSidebarSelection(current, rows));
-	}, [rows]);
+	const prunedSelection = pruneSidebarSelection(selection, rows);
+	if (prunedSelection !== selection) setSelection(prunedSelection);
+
+	const [previousHighlightPath, setPreviousHighlightPath] = useState<
+		string | null | undefined
+	>(undefined);
+	if (previousHighlightPath !== highlightPath) {
+		setPreviousHighlightPath(highlightPath);
+		setFocusKey(
+			selectedKeys.size > 1
+				? null
+				: activeItem
+					? sidebarRowKey(activeItem)
+					: null,
+		);
+		const next = snapSidebarSelection(prunedSelection, highlightPath);
+		if (next !== prunedSelection) setSelection(next);
+	}
 
 	// The selection follows the open file, so a bold row is always highlighted
 	// too, however the file was opened. Returning to the editor also snaps a
@@ -780,15 +796,18 @@ export function Sidebar({
 		const onFocusIn = (event: FocusEvent) => {
 			if (isEditorTarget(event.target)) selectOpenFile();
 		};
-		selectOpenFile();
 		document.addEventListener("focusin", onFocusIn);
 		return () => document.removeEventListener("focusin", onFocusIn);
 	}, [focusItem, highlightPath]);
 
 	// Each list remounts at its top when shown. Reveal the open file when the
 	// tree comes back, since it may have changed while another view showed.
-	useEffect(() => {
+	const [previousList, setPreviousList] = useState(list);
+	if (list !== previousList) {
+		setPreviousList(list);
 		setScrolledList(null);
+	}
+	useEffect(() => {
 		if (list !== "tree") return;
 		const nav = navRef.current;
 		nav
@@ -1846,11 +1865,14 @@ export function SidebarFrame({
 	const previewCollapsedRef = useRef(false);
 	const [previewCollapsed, setPreviewCollapsedState] = useState(false);
 
-	useEffect(() => {
-		const nextWidth = readSidebarWidth(widthStorageKey);
-		sidebarWidthRef.current = nextWidth;
-		setSidebarWidth(nextWidth);
-	}, [widthStorageKey]);
+	const [previousWidthKey, setPreviousWidthKey] = useState(widthStorageKey);
+	if (previousWidthKey !== widthStorageKey) {
+		setPreviousWidthKey(widthStorageKey);
+		setSidebarWidth(readSidebarWidth(widthStorageKey));
+	}
+	useLayoutEffect(() => {
+		sidebarWidthRef.current = sidebarWidth;
+	}, [sidebarWidth]);
 
 	// Publish width on the document root so the full-window toolbar (a sibling,
 	// not a descendant) can match the sidebar seam. Hoisting the variable onto a

@@ -15,6 +15,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Fixed
 
+- Search results stay in sync as you change the query. [#354](https://github.com/bholmesdev/hubble.md/pull/354)
 - Add undo history support to frontmatter properties. [#350](https://github.com/bholmesdev/hubble.md/pull/350)
 - Selected Inbox previews and folder labels are easier to read in dark mode. [#352](https://github.com/bholmesdev/hubble.md/pull/352)
 

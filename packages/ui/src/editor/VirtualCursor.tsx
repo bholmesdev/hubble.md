@@ -40,7 +40,6 @@ export function VirtualCursor({
 				window.clearTimeout(blinkTimeoutRef.current);
 				blinkTimeoutRef.current = null;
 			}
-			setCursorMode("hidden");
 			return;
 		}
 		const scrollContainer = viewportRef.current;
@@ -134,7 +133,7 @@ export function VirtualCursor({
 		};
 	}, [editor, inputMode, modeOverride, viewportRef]);
 
-	if (!cursorPosition || cursorMode === "hidden") return null;
+	if (!editor || !cursorPosition || cursorMode === "hidden") return null;
 
 	return (
 		<span

@@ -8,7 +8,10 @@ import { act, createElement, type ReactNode } from "react";
 // needs createRoot's render/unmount surface.
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ReviewCommentPopover } from "./ReviewCommentPopover";
+import {
+	type ReviewCommentHandle,
+	ReviewCommentPopover,
+} from "./ReviewCommentPopover";
 import { commandReviewThread } from "./reviewComments";
 
 type Root = {
@@ -337,7 +340,7 @@ describe("ReviewCommentPopover", () => {
 			editor.commands.setTextSelection({ from, to });
 		});
 		await act(async () => {
-			rerender({ request: 1, onMessage });
+			rerender.addComment();
 		});
 
 		expect(document.querySelector("[data-review-comment-popover]")).toBeNull();
@@ -373,7 +376,7 @@ describe("ReviewCommentPopover", () => {
 			editor.commands.setTextSelection({ from, to });
 		});
 		await act(async () => {
-			rerender({ request: 1 });
+			rerender.addComment();
 		});
 
 		const textarea = document.querySelector<HTMLTextAreaElement>(
@@ -519,18 +522,20 @@ function renderPopover(
 	viewport.append(rootEl);
 	const root = createRoot(rootEl);
 	roots.push(root);
+	const ref: { current: ReviewCommentHandle | null } = { current: null };
 	const render = (props: Record<string, unknown> = {}) => {
 		root.render(
 			createElement(ReviewCommentPopover, {
 				editor,
 				filePath: "/notes/plan.md",
 				viewportRef: { current: viewport },
-				request: 0,
+				ref,
 				...extraProps,
 				...props,
 			}),
 		);
 	};
+	render.addComment = () => ref.current?.addComment();
 	render.unmount = () => {
 		root.unmount();
 		rootEl.remove();

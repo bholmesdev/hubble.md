@@ -10,7 +10,7 @@ import {
 	useCommandShortcutLabel,
 } from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import MingcuteAddLine from "~icons/mingcute/add-line";
 import MingcuteArrowLeftLine from "~icons/mingcute/arrow-left-line";
@@ -84,18 +84,14 @@ export function FileInfoBar({
 	const renameRequest = useStoreValue(titleRenameRequestStore);
 	const compact = useCompactWindow();
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
-	const [showBorder, setShowBorder] = useState(false);
-
-	useEffect(() => {
-		if (!scrollContainer) {
-			setShowBorder(false);
-			return;
-		}
-		const update = () => setShowBorder(scrollContainer.scrollTop > 0);
-		update();
-		scrollContainer.addEventListener("scroll", update, { passive: true });
-		return () => scrollContainer.removeEventListener("scroll", update);
-	}, [scrollContainer]);
+	const showBorder = useSyncExternalStore(
+		(onChange) => {
+			scrollContainer?.addEventListener("scroll", onChange, { passive: true });
+			return () => scrollContainer?.removeEventListener("scroll", onChange);
+		},
+		() => hasScrolled(scrollContainer),
+		() => false,
+	);
 
 	// The changelog note is virtual: show a friendly title and disable the
 	// file actions (rename, reveal, copy path) that assume a file on disk.
@@ -204,6 +200,12 @@ export function FileInfoBar({
 			</div>
 		</div>
 	);
+}
+
+// Keep the snapshot tied to the element, even when two elements have the same
+// scrollTop. An inline property read lets the compiler reuse the old closure.
+function hasScrolled(container: HTMLElement | null) {
+	return (container?.scrollTop ?? 0) > 0;
 }
 
 function NavigationControls() {

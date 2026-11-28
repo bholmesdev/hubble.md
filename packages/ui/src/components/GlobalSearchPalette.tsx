@@ -112,8 +112,17 @@ function useContentResults(
 	open: boolean,
 	searchContents: GlobalSearchPaletteProps["searchContents"],
 ) {
-	const [result, setResult] = useState<PaletteContentResult | null>(null);
-	const [searching, setSearching] = useState(false);
+	const [response, setResponse] = useState<{
+		result: PaletteContentResult | null;
+	} | null>(null);
+	const enabled = open && query.trim().length >= MIN_CONTENT_QUERY_LENGTH;
+	const [previousQuery, setPreviousQuery] = useState(query);
+	const [previousOpen, setPreviousOpen] = useState(open);
+	if (previousQuery !== query || previousOpen !== open) {
+		setPreviousQuery(query);
+		setPreviousOpen(open);
+		setResponse(null);
+	}
 	const searchRef = useRef(searchContents);
 
 	useLayoutEffect(() => {
@@ -121,26 +130,19 @@ function useContentResults(
 	}, [searchContents]);
 
 	useEffect(() => {
-		if (!open || query.trim().length < MIN_CONTENT_QUERY_LENGTH) {
-			setResult(null);
-			setSearching(false);
-			return;
-		}
+		if (!enabled) return;
 
 		let cancelled = false;
-		setSearching(true);
 		const timer = setTimeout(() => {
 			searchRef
 				.current(query)
 				.then((next) => {
 					if (cancelled) return;
-					setResult(next);
-					setSearching(false);
+					setResponse({ result: next });
 				})
 				.catch(() => {
 					if (cancelled) return;
-					setResult(null);
-					setSearching(false);
+					setResponse({ result: null });
 				});
 		}, SEARCH_DEBOUNCE_MS);
 
@@ -148,9 +150,12 @@ function useContentResults(
 			cancelled = true;
 			clearTimeout(timer);
 		};
-	}, [open, query]);
+	}, [enabled, query]);
 
-	return { result, searching };
+	return {
+		result: enabled ? (response?.result ?? null) : null,
+		searching: enabled && response === null,
+	};
 }
 
 async function runPaletteCommand(command: PaletteCommand) {
@@ -230,12 +235,14 @@ function GlobalSearchPalette({
 		}
 	};
 
-	useEffect(() => {
+	const [previousOpen, setPreviousOpen] = useState(open);
+	if (open !== previousOpen) {
+		setPreviousOpen(open);
 		if (!open) {
 			setQuery("");
 			setCommandMode(false);
 		}
-	}, [open]);
+	}
 
 	useEffect(() => {
 		const openCommands = () => {

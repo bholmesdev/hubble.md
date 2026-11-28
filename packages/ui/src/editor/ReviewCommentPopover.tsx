@@ -10,9 +10,12 @@ import type { ReviewMarkAttrs, ReviewReply } from "@hubble.md/editor";
 import type { Editor } from "@tiptap/core";
 import type { Mark } from "@tiptap/pm/model";
 import { TextSelection, type Transaction } from "@tiptap/pm/state";
+import { useEditorState } from "@tiptap/react";
 import {
+	type Ref,
 	type RefObject,
 	useEffect,
+	useImperativeHandle,
 	useLayoutEffect,
 	useRef,
 	useState,
@@ -266,28 +269,42 @@ function selectionReference(
 	};
 }
 
+export type ReviewCommentHandle = { addComment: () => void };
+
 export function ReviewCommentPopover({
+	ref,
 	editor,
 	filePath,
 	viewportRef,
-	request,
 	onMessage,
 	onThreadsChange,
 }: {
 	editor: Editor | null;
 	filePath: string;
 	viewportRef: RefObject<HTMLDivElement | null>;
-	request: number;
+	ref?: Ref<ReviewCommentHandle>;
 	onMessage?: (message: string, type: "success" | "error") => void;
 	/** Publishes the document's threads as plain data, so the toolbar can list
 	 * them without walking the document again or holding the editor. */
 	onThreadsChange?: (threads: ReviewThread[]) => void;
 }) {
-	const [comments, setComments] = useState<ReviewComment[]>([]);
+	const snapshot = useEditorState({
+		editor,
+		selector: ({ editor }) => {
+			const comments = editor ? collectComments(editor) : [];
+			return {
+				comments,
+				threads: editor
+					? comments.map((comment) => toReviewThread(editor, comment))
+					: [],
+			};
+		},
+	});
+	const comments = snapshot?.comments ?? [];
 	const [activeComment, setActiveComment] = useState<ReviewComment | null>(
 		null,
 	);
-	const [anchorRange, setAnchorRange] = useState<AnchorRange | null>(null);
+	const [newCommentRange, setAnchorRange] = useState<AnchorRange | null>(null);
 	const [mode, setMode] = useState<PopoverMode>("new");
 	const [open, setOpen] = useState(false);
 	const [draft, setDraft] = useState("");
@@ -295,22 +312,21 @@ export function ReviewCommentPopover({
 	const [position, setPosition] = useState({ x: 0, y: 0 });
 	const [popoverEl, setPopoverEl] = useState<HTMLDivElement | null>(null);
 	const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
-	const requestRef = useRef(0);
+	const anchorRange = mode === "thread" ? activeComment : newCommentRange;
 
-	const refreshComments = (event?: {
+	const updateActiveComment = (event: {
 		transaction: Transaction;
 		appendedTransactions: Transaction[];
 	}) => {
 		if (!editor) return;
 		const nextComments = collectComments(editor);
-		setComments(nextComments);
-		onThreadsChange?.(nextComments.map((c) => toReviewThread(editor, c)));
 		setActiveComment((current) => {
 			if (!current) return null;
 			let { from, to } = current;
-			for (const transaction of event
-				? [event.transaction, ...event.appendedTransactions]
-				: []) {
+			for (const transaction of [
+				event.transaction,
+				...event.appendedTransactions,
+			]) {
 				from = transaction.mapping.map(from, 1);
 				to = transaction.mapping.map(to, -1);
 			}
@@ -328,31 +344,21 @@ export function ReviewCommentPopover({
 	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
 	useEffect(() => {
 		if (!editor) return;
-		refreshComments();
-		editor.on("transaction", refreshComments);
+		editor.on("transaction", updateActiveComment);
 		return () => {
-			editor.off("transaction", refreshComments);
-			onThreadsChange?.([]);
+			editor.off("transaction", updateActiveComment);
 		};
-	}, [editor, onThreadsChange]);
+	}, [editor]);
 
 	useEffect(() => {
-		if (open && mode === "thread" && !activeComment) {
-			setOpen(false);
-			setAnchorRange(null);
-		}
-	}, [activeComment, mode, open]);
+		onThreadsChange?.(snapshot?.threads ?? []);
+	}, [snapshot?.threads, onThreadsChange]);
+	useEffect(() => () => onThreadsChange?.([]), [onThreadsChange]);
 
-	// Keep the popover anchored to the comment's current text range; editing
-	// before an open thread shifts the mark's positions without this.
-	useEffect(() => {
-		if (mode !== "thread" || !activeComment) return;
-		setAnchorRange((current) =>
-			current?.from === activeComment.from && current?.to === activeComment.to
-				? current
-				: { from: activeComment.from, to: activeComment.to },
-		);
-	}, [activeComment, mode]);
+	if (open && mode === "thread" && !activeComment) {
+		setOpen(false);
+		setAnchorRange(null);
+	}
 
 	const openThread = (comment: ReviewComment) => {
 		setActiveComment(comment);
@@ -380,9 +386,7 @@ export function ReviewCommentPopover({
 		return () => editor.view.dom.removeEventListener("click", handleClick);
 	}, [comments, editor]);
 
-	// Shared by both entry points into the composer: the toolbar's Comment
-	// button (via `request`, below) and the hover gutter button, which has no
-	// text selection to anchor from.
+	// The gutter button supplies a block range; the toolbar supplies a selection.
 	const startNewCommentAt = (range: AnchorRange) => {
 		if (!editor) return;
 		const existing = comments.find(
@@ -403,14 +407,14 @@ export function ReviewCommentPopover({
 		setOpen(true);
 	};
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-	useEffect(() => {
-		if (!editor || request === 0 || requestRef.current === request) return;
-		requestRef.current = request;
-		const { selection } = editor.state;
-		if (!(selection instanceof TextSelection) || selection.empty) return;
-		startNewCommentAt({ from: selection.from, to: selection.to });
-	}, [editor, request]);
+	useImperativeHandle(ref, () => ({
+		addComment() {
+			if (!editor) return;
+			const { selection } = editor.state;
+			if (!(selection instanceof TextSelection) || selection.empty) return;
+			startNewCommentAt({ from: selection.from, to: selection.to });
+		},
+	}));
 
 	// Commands arrive from the toolbar's list, which knows ids but not positions.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.

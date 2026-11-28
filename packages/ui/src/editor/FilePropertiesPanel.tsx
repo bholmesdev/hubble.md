@@ -429,10 +429,15 @@ function ScalarValue({
 }) {
 	const [draft, setDraft] = useState(String(property.value));
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
-	useEffect(() => {
+	const [previousValue, setPreviousValue] = useState(property.value);
+	if (previousValue !== property.value) {
+		setPreviousValue(property.value);
 		setDraft(String(property.value));
-		resizeTextarea(textareaRef.current);
-	}, [property.value]);
+	}
+	useEffect(() => {
+		if (textareaRef.current?.value === draft)
+			resizeTextarea(textareaRef.current);
+	}, [draft]);
 	if (property.type === "number") {
 		return (
 			<Input

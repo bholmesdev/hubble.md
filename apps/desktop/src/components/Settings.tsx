@@ -77,12 +77,18 @@ export function Settings({
 	onViewChangelog: () => void;
 }) {
 	const [page, setPage] = useState<SettingsPage>("general");
-	const handledRequestId = useRef<number | null>(null);
+	const [handledRequestId, setHandledRequestId] = useState<number | null>(null);
 	const activeTabRef = useRef<HTMLButtonElement>(null);
 	const contentRef = useRef<HTMLDivElement>(null);
-	useEffect(() => {
+	const [previousOpen, setPreviousOpen] = useState(open);
+	const [previousTarget, setPreviousTarget] = useState<
+		SettingsTarget | undefined
+	>(undefined);
+	if (previousOpen !== open || previousTarget !== target) {
+		setPreviousOpen(open);
+		setPreviousTarget(target);
 		if (open && target) setPage(target.page);
-	}, [open, target]);
+	}
 	useEffect(() => {
 		if (!open || target?.shortcutId) return;
 		const timeout = window.setTimeout(() => activeTabRef.current?.focus());
@@ -142,6 +148,7 @@ export function Settings({
 							scrollRef={contentRef}
 							revealTarget={target?.page === "shortcuts" ? target : undefined}
 							handledRequestId={handledRequestId}
+							onRequestHandled={setHandledRequestId}
 						/>
 					)}
 				</div>
@@ -286,13 +293,19 @@ function ShortcutSettings({
 	scrollRef,
 	revealTarget,
 	handledRequestId,
+	onRequestHandled,
 }: {
 	open: boolean;
 	scrollRef: RefObject<HTMLDivElement | null>;
 	revealTarget?: SettingsTarget;
-	handledRequestId: RefObject<number | null>;
+	handledRequestId: number | null;
+	onRequestHandled: (requestId: number) => void;
 }) {
-	const state = useShortcutState(handledRequestId, revealTarget);
+	const state = useShortcutState(
+		handledRequestId,
+		onRequestHandled,
+		revealTarget,
+	);
 	const groups = filterShortcutGroups(state.query, state.bindings);
 	const searchRef = useRef<HTMLInputElement>(null);
 
@@ -449,7 +462,8 @@ function CommandRow({
 }
 
 function useShortcutState(
-	handledRequestId: RefObject<number | null>,
+	handledRequestId: number | null,
+	onRequestHandled: (requestId: number) => void,
 	revealTarget?: SettingsTarget,
 ) {
 	const bindings = useStoreValue(shortcutBindingsStore);
@@ -459,15 +473,19 @@ function useShortcutState(
 	// Conflict links change this ID to scroll to and pulse the matching row.
 	const [revealId, setRevealId] = useState<CommandId | null>(null);
 
-	useEffect(() => {
+	const [previousRequest, setPreviousRequest] = useState<number | undefined>(
+		undefined,
+	);
+	if (revealTarget?.requestId !== previousRequest) {
+		setPreviousRequest(revealTarget?.requestId);
 		if (
-			!revealTarget?.shortcutId ||
-			handledRequestId.current === revealTarget.requestId
-		)
-			return;
-		setQuery("");
-		setRevealId(revealTarget.shortcutId);
-	}, [revealTarget, handledRequestId]);
+			revealTarget?.shortcutId &&
+			handledRequestId !== revealTarget.requestId
+		) {
+			setQuery("");
+			setRevealId(revealTarget.shortcutId);
+		}
+	}
 
 	useEffect(() => {
 		if (!revealId) return;
@@ -487,7 +505,7 @@ function useShortcutState(
 				row.focus({ preventScroll: true });
 				pulseShortcutRow(row);
 				if (revealTarget?.shortcutId === revealId) {
-					handledRequestId.current = revealTarget.requestId;
+					onRequestHandled(revealTarget.requestId);
 				}
 				setRevealId(null);
 			});
@@ -496,7 +514,7 @@ function useShortcutState(
 			cancelAnimationFrame(frame);
 			cancelAnimationFrame(focusFrame);
 		};
-	}, [revealId, revealTarget, handledRequestId]);
+	}, [revealId, revealTarget, onRequestHandled]);
 
 	useEffect(() => {
 		if (!recordingId) return;

@@ -68,7 +68,10 @@ import {
 	FrontMatterStep,
 	readFrontMatter,
 } from "./frontMatterHistory";
-import { ReviewCommentPopover } from "./ReviewCommentPopover";
+import {
+	type ReviewCommentHandle,
+	ReviewCommentPopover,
+} from "./ReviewCommentPopover";
 import type { ReviewThread } from "./reviewComments";
 import { SelectionFormattingToolbar } from "./SelectionFormattingToolbar";
 import type { VirtualCursorMode } from "./virtualCursorMode";
@@ -147,7 +150,7 @@ export function EditorView({
 		useState<HTMLDivElement | null>(null);
 	const [cursorModeOverride, setCursorModeOverride] =
 		useState<VirtualCursorMode | null>(null);
-	const [reviewCommentRequest, setReviewCommentRequest] = useState(0);
+	const reviewCommentRef = useRef<ReviewCommentHandle | null>(null);
 	const [frontMatterState, setFrontMatterState] = useState(() =>
 		frontMatterStateFromMarkdown(initialMarkdown),
 	);
@@ -446,13 +449,13 @@ export function EditorView({
 						<SelectionFormattingToolbar
 							editor={editor}
 							viewport={editorViewportEl}
-							onComment={() => setReviewCommentRequest((value) => value + 1)}
+							onComment={() => reviewCommentRef.current?.addComment()}
 						/>
 						<ReviewCommentPopover
 							editor={editor}
 							filePath={path}
 							viewportRef={editorViewportRef}
-							request={reviewCommentRequest}
+							ref={reviewCommentRef}
 							onMessage={onMessage}
 							onThreadsChange={onReviewThreadsChange}
 						/>

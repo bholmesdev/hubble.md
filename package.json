@@ -14,6 +14,7 @@
 	"bugs": "https://github.com/bholmesdev/hubble.md/issues",
 	"scripts": {
 		"check": "biome check .",
+		"check:effects": "eslint \"apps/*/src/**/*.{js,jsx,ts,tsx}\" \"packages/*/src/**/*.{js,jsx,ts,tsx}\" --max-warnings 0",
 		"check:react-compiler": "node scripts/audit-react-compiler.mjs",
 		"check:fix": "biome check . --write",
 		"release:desktop": "node scripts/release-desktop.mjs",
@@ -40,6 +41,9 @@
 		"hubble": "node packages/cli/dist/index.js"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.4.4"
+		"@biomejs/biome": "^2.4.4",
+		"@typescript-eslint/parser": "^8.74.0",
+		"eslint": "^10.15.0",
+		"eslint-plugin-react-hooks": "^7.1.1"
 	}
 }
