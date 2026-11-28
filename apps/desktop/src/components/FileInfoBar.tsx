@@ -41,7 +41,7 @@ import {
 	relativeWorkspacePath,
 	supportsSourceToggle,
 } from "../lib/filePath";
-import { useCompactWindow } from "../lib/layout";
+import { useCompactWorkspace } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
 	deleteSidebarItems,
@@ -63,7 +63,7 @@ import {
 	viewerStore,
 	workspacePathStore,
 } from "../store/state";
-import { chatPanelOpen } from "../store/tabChat";
+import { chatPanelOpen, openChatPanel } from "../store/tabChat";
 import { ClaudeLogo } from "./AgentLogos";
 
 const noDragStyle = { WebkitAppRegion: "no-drag" } as CSSProperties;
@@ -86,7 +86,7 @@ export function FileInfoBar({
 	const titlePath = filePathForTitlePreview(currentPath, titlePreview);
 	const reviewThreads = useStoreValue(reviewThreadsStore);
 	const renameRequest = useStoreValue(titleRenameRequestStore);
-	const compact = useCompactWindow();
+	const compact = useCompactWorkspace();
 	const newTabTitle = useCommandShortcutLabel("New tab", "app.new-tab");
 	const openChatTitle = useCommandShortcutLabel("Open Chat", "app.toggle-chat");
 	const showBorder = useSyncExternalStore(
@@ -209,7 +209,7 @@ export function FileInfoBar({
 							title={openChatTitle}
 							aria-expanded={false}
 							aria-controls="chat-sidebar"
-							onClick={() => chatPanelOpen.set(true)}
+							onClick={openChatPanel}
 						>
 							<MingcuteSidebarRightCollapseLine
 								aria-hidden="true"

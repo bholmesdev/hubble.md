@@ -80,3 +80,69 @@ test("restores a tab’s conversation and draft after restarting Electron", asyn
 		await fs.rm(root, { recursive: true, force: true });
 	}
 });
+
+test("collapses Chat before the file sidebar when the workspace container narrows", async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "hubble-chat-layout-"));
+	const workspace = path.join(root, "workspace");
+	await fs.mkdir(workspace);
+	let app: ElectronApplication | undefined;
+	try {
+		app = await electron.launch({
+			args: [appDir],
+			env: {
+				...process.env,
+				ELECTRON_RENDERER_URL: "",
+				HUBBLE_DESKTOP_DEV_USER_DATA: path.join(root, "user-data"),
+				HUBBLE_DESKTOP_DEV_WORKSPACE: workspace,
+			},
+		});
+		const page = await app.firstWindow();
+		await page.getByRole("button", { name: "Folders", exact: true }).click();
+		await expect(chat(page)).toBeVisible();
+		const toggle = page.getByRole("button", {
+			name: "Toggle sidebar",
+			exact: true,
+		});
+		await expect(toggle).toHaveAttribute("aria-expanded", "true");
+		const handle = chat(page).getByRole("separator", {
+			name: "Resize chat panel",
+		});
+		const handleBox = await handle.boundingBox();
+		if (!handleBox) throw new Error("Missing Chat resize handle");
+		const startX = handleBox.x + handleBox.width / 2;
+		const startY = handleBox.y + handleBox.height / 2;
+		await page.mouse.move(startX, startY);
+		await page.mouse.down();
+		await page.mouse.move(startX - 80, startY, { steps: 5 });
+		await page.mouse.up();
+		await expect
+			.poll(async () =>
+				Math.abs(((await chat(page).boundingBox())?.width ?? 0) - 440),
+			)
+			.toBeLessThanOrEqual(2);
+		const windowWidth = await page.evaluate(() => window.innerWidth);
+		const narrow = (width: number) =>
+			page.locator("main").evaluate((main, next) => {
+				main.style.width = `${next}px`;
+			}, width);
+		await narrow(900);
+		await expect(chat(page)).not.toBeVisible();
+		await expect(toggle).toHaveAttribute("aria-expanded", "true");
+		await narrow(600);
+		await expect(toggle).toHaveAttribute("aria-expanded", "false");
+		await toggle.click();
+		await expect(toggle).toHaveAttribute("aria-expanded", "true");
+		await expect(page.locator("[data-sidebar-overlay]")).toHaveCSS(
+			"position",
+			"absolute",
+		);
+		await page.getByRole("button", { name: "Open Chat", exact: true }).click();
+		await expect(chat(page)).toBeVisible();
+		await expect(chat(page)).toHaveCSS("position", "absolute");
+		await expect(toggle).toHaveAttribute("aria-expanded", "false");
+		expect(await page.evaluate(() => window.innerWidth)).toBe(windowWidth);
+	} finally {
+		await app?.close();
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});

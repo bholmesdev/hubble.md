@@ -1,9 +1,18 @@
 import type { ChatConversation } from "../desktopApi/chat";
+import { workspaceLayout } from "../lib/layout";
 import { appStore, uiStore } from "./state";
 import { tabsStore } from "./tabStore";
 import type { TabId } from "./tabs";
 
 export const chatPanelOpen = uiStore.select("chatPanelOpen");
+export const chatPanelWidth = uiStore.select("chatPanelWidth");
+export function openChatPanel() {
+	uiStore.set((ui) => ({
+		...ui,
+		chatPanelOpen: true,
+		...(workspaceLayout.get().mode !== "wide" ? { sidebarOpen: false } : {}),
+	}));
+}
 
 export const EMPTY_CHAT: ChatConversation = {
 	messages: [],
@@ -14,7 +23,10 @@ export const EMPTY_CHAT: ChatConversation = {
 export function toggleChatPanel() {
 	const tabs = tabsStore.get();
 	const path = tabs.byId[tabs.activeTabId ?? ""]?.path;
-	if (path) chatPanelOpen.set(!chatPanelOpen.get());
+	if (path) {
+		if (chatPanelOpen.get()) chatPanelOpen.set(false);
+		else openChatPanel();
+	}
 }
 
 export function updateTabChat(

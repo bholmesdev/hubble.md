@@ -81,8 +81,7 @@ function isCurrent(
 		tabsStore.get().activeTabId === request.tabId &&
 		!!tabsStore.get().byId[request.tabId] &&
 		workspacePathStore.get() === request.workspace &&
-		chatConnection.get().revision === request.revision &&
-		chatPanelOpen.get()
+		chatConnection.get().revision === request.revision
 	);
 }
 

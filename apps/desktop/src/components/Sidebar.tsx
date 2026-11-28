@@ -14,7 +14,7 @@ import {
 } from "../fileActions";
 import { copyText } from "../lib/clipboard";
 import { DIAGRAMS_ENABLED } from "../lib/filePath";
-import { isCompactWindow, useCompactWindow } from "../lib/layout";
+import { isCompactWorkspace, useCompactWorkspace } from "../lib/layout";
 import { revealFileLabel } from "../lib/revealFile";
 import {
 	createFolderInFolder,
@@ -52,7 +52,7 @@ export type DesktopSidebarFocus = {
 // rows are memoized on them, and a new object per render would re-render
 // every row on each autosave.
 function collapseInCompactWindow() {
-	if (isCompactWindow()) setSidebarOpen(false);
+	if (isCompactWorkspace()) setSidebarOpen(false);
 }
 
 function selectFile(path: string, options?: { keepSidebarOpen: boolean }) {
@@ -91,7 +91,7 @@ export function Sidebar({
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const currentPath = useStoreValue(currentPathStore);
 	const sidebarView = useStoreValue(sidebarViewStore);
-	const compact = useCompactWindow();
+	const compact = useCompactWorkspace();
 	const { workspacePath, files, folders, pinnedNotes, sortMode } = workspace;
 	const pinnedSet = new Set(pinnedNotes);
 

@@ -61,15 +61,15 @@ export function ResizableSidebar({
 		},
 		getPointerValue: ({ event, startRect }) => {
 			const distance =
-				side === "left" ? event.clientX : window.innerWidth - event.clientX;
+				side === "left"
+					? event.clientX - (startRect?.left ?? 0)
+					: (startRect?.right ?? window.innerWidth) - event.clientX;
 			if (onCollapse && distance <= COLLAPSE_EDGE_DISTANCE) {
 				preview(true);
 				return null;
 			}
 			preview(false);
-			return side === "left"
-				? event.clientX - (startRect?.left ?? 0)
-				: (startRect?.right ?? window.innerWidth) - event.clientX;
+			return distance;
 		},
 	});
 	return (

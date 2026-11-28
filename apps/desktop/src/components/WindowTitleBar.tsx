@@ -11,7 +11,7 @@ import MingcuteSidebarLeftCollapseLine from "~icons/mingcute/sidebar-left-collap
 import MingcuteSidebarLeftLine from "~icons/mingcute/sidebar-left-line";
 import MingcuteSidebarRightCollapseLine from "~icons/mingcute/sidebar-right-collapse-line";
 import { desktopApi } from "../desktopApi";
-import { useCompactWindow } from "../lib/layout";
+import { useCompactWorkspace } from "../lib/layout";
 import { windowControlsInset } from "../lib/windowChrome";
 import { setSidebarView, toggleSidebar } from "../store/actions";
 import { sidebarOpenStore, sidebarViewStore } from "../store/state";
@@ -57,7 +57,7 @@ export function WindowTitleBar({
 	const sidebarView = useStoreValue(sidebarViewStore);
 	const hasTabs = useStoreValue(tabsStore, (tabs) => tabs.order.length > 0);
 	const isFullScreen = useIsFullScreen();
-	const compact = useCompactWindow();
+	const compact = useCompactWorkspace();
 	// Spans the sidebar, so the view toggle can right-align with the sidebar header.
 	const spansSidebar = sidebarOpen && !compact;
 	const toggleSidebarTitle = useCommandShortcutLabel(

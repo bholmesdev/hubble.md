@@ -144,3 +144,20 @@ it("starts a conversation from a new tab without attaching a file", async () => 
 	await pending;
 	expect(s.tabsStore.get().byId[id].chat?.messages).toHaveLength(2);
 });
+
+it("keeps working when the panel collapses without switching its tab", async () => {
+	const s = await setup();
+	const pending = s.sendChat(s.tabId, "model");
+	await vi.waitFor(() => expect(s.api.chatSend).toHaveBeenCalledOnce());
+	const id = s.chatSession.get().request?.id ?? "";
+	const { chatPanelOpen } = await import("./tabChat");
+	chatPanelOpen.set(false);
+	s.delta({ id, text: "Still working" });
+	expect(s.api.chatStop).not.toHaveBeenCalled();
+	s.finish({ status: "complete", text: "Done while collapsed." });
+	await pending;
+	expect(s.current()?.messages.slice(-1)[0]).toMatchObject({
+		text: "Done while collapsed.",
+		status: "complete",
+	});
+});

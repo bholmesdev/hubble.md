@@ -1,10 +1,15 @@
-import { Button, useCommandShortcutLabel } from "@hubble.md/ui";
+import {
+	Button,
+	ResizableSidebar,
+	useCommandShortcutLabel,
+} from "@hubble.md/ui";
 import { useStoreValue } from "@simplestack/store/react";
 import { useEffect, useRef, useState } from "react";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteSidebarRightLine from "~icons/mingcute/sidebar-right-line";
 import { desktopApi } from "../desktopApi";
 import { isEditableFile } from "../lib/filePath";
+import { workspaceLayout } from "../lib/layout";
 import { isVirtualPath } from "../lib/newTabPage";
 import { resolveRelativeLinkPath } from "../lib/relativeLinkPath";
 import { windowControlsInset } from "../lib/windowChrome";
@@ -16,8 +21,17 @@ import {
 } from "../store/chatConnection";
 import { getChatConnectionState } from "../store/chatConnectionState";
 import { chatSession, sendChat, stopChat } from "../store/chatSession";
-import { viewerStore, workspacePathStore } from "../store/state";
-import { chatPanelOpen, EMPTY_CHAT, updateTabChat } from "../store/tabChat";
+import {
+	sidebarOpenStore,
+	viewerStore,
+	workspacePathStore,
+} from "../store/state";
+import {
+	chatPanelOpen,
+	chatPanelWidth,
+	EMPTY_CHAT,
+	updateTabChat,
+} from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import { ChatComposer } from "./ChatComposer";
 import { ChatConnectionControls } from "./ChatConnectionControls";
@@ -34,6 +48,15 @@ export function ChatPanel({
 	fullHeight: boolean;
 }) {
 	const open = useStoreValue(chatPanelOpen);
+	const width = useStoreValue(chatPanelWidth);
+	const layout = useStoreValue(workspaceLayout);
+	const overlay = layout.mode !== "wide";
+	const sidebarOpen = useStoreValue(sidebarOpenStore);
+	const maxWidth = Math.max(
+		280,
+		layout.width -
+			(overlay ? 24 : 320 + (sidebarOpen ? layout.sidebarWidth : 0)),
+	);
 	const tabs = useStoreValue(tabsStore);
 	const tabId = tabs.activeTabId;
 	const tab = tabs.byId[tabId ?? ""];
@@ -77,10 +100,17 @@ export function ChatPanel({
 		});
 	}
 	return (
-		<aside
+		<ResizableSidebar
+			side="right"
+			width={Math.min(width, maxWidth)}
+			minWidth={280}
+			maxWidth={maxWidth}
+			onWidthChange={(next) => chatPanelWidth.set(next)}
+			onCollapse={() => chatPanelOpen.set(false)}
+			resizeLabel="Resize chat panel"
 			id="chat-sidebar"
 			aria-label="Chat"
-			className={`col-start-2 flex h-full min-h-0 w-[360px] max-w-[85vw] shrink-0 flex-col border-s border-border bg-background text-sm ${fullHeight ? "row-start-1 row-span-2" : "row-start-2"}`}
+			className={`h-full min-h-0 bg-background text-sm ${overlay ? "absolute inset-y-0 end-0 z-30 shadow-overlay" : `col-start-2 ${fullHeight ? "row-start-1 row-span-2" : "row-start-2"}`}`}
 		>
 			<header
 				style={
@@ -260,6 +290,6 @@ export function ChatPanel({
 					</div>
 				</>
 			)}
-		</aside>
+		</ResizableSidebar>
 	);
 }

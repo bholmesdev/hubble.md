@@ -38,7 +38,7 @@ vi.mock("../store/actions", () => ({
 	setSidebarView: vi.fn(),
 	toggleSidebar: state.toggleSidebar,
 }));
-vi.mock("../lib/layout", () => ({ useCompactWindow: () => state.compact }));
+vi.mock("../lib/layout", () => ({ useCompactWorkspace: () => state.compact }));
 vi.mock("./InboxView", () => ({
 	SidebarViewToggle: () => <div data-view-toggle />,
 }));

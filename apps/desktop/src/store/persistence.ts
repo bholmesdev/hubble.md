@@ -34,6 +34,7 @@ export type SidebarView = "folders" | "inbox";
 
 type UiState = {
 	chatPanelOpen: boolean;
+	chatPanelWidth: number;
 	sidebarOpen: boolean;
 	sidebarView: SidebarView;
 	isSwitcherOpen: boolean;
@@ -74,6 +75,7 @@ type Persisted = {
 	};
 	ui?: {
 		chatPanelOpen?: boolean;
+		chatPanelWidth?: number;
 		sidebarOpen?: boolean;
 		sidebarView?: SidebarView;
 		isTerminalOpen?: boolean;
@@ -128,6 +130,11 @@ export function getInitialState(): DesktopState {
 		tabs: tabsFromSession(tabSessions[workspace.workspacePath ?? ""]),
 		ui: {
 			chatPanelOpen: p?.ui?.chatPanelOpen ?? true,
+			chatPanelWidth:
+				typeof p?.ui?.chatPanelWidth === "number" &&
+				Number.isFinite(p.ui.chatPanelWidth)
+					? Math.max(280, Math.min(900, p.ui.chatPanelWidth))
+					: 360,
 			sidebarOpen: p?.ui?.sidebarOpen ?? false,
 			// Older profiles without a saved view keep their original Folders default.
 			sidebarView: !p || p.ui?.sidebarView === "inbox" ? "inbox" : "folders",
@@ -179,6 +186,7 @@ export function serialize(state: DesktopState): Persisted {
 		},
 		ui: {
 			chatPanelOpen: state.ui.chatPanelOpen,
+			chatPanelWidth: state.ui.chatPanelWidth,
 			sidebarOpen: state.ui.sidebarOpen,
 			sidebarView: state.ui.sidebarView,
 			isTerminalOpen: state.ui.isTerminalOpen,
