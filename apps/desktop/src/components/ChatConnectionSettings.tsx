@@ -23,16 +23,7 @@ export function ChatConnectionSettings() {
 				</p>
 			) : null}
 			<div className="flex flex-wrap items-center gap-2">
-				{account?.issue === "unreadable-credentials" ? (
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={busy}
-						onClick={() => void resetChatConnection()}
-					>
-						Reset connection and sign in again
-					</Button>
-				) : signingIn ? (
+				{signingIn ? (
 					<Button
 						variant="outline"
 						size="sm"
@@ -46,7 +37,11 @@ export function ChatConnectionSettings() {
 						variant="outline"
 						size="sm"
 						disabled={busy}
-						onClick={() => void refreshChatConnection(true)}
+						onClick={() =>
+							void (account?.issue === "unreadable-credentials"
+								? resetChatConnection()
+								: refreshChatConnection(true))
+						}
 					>
 						{account?.expiresAt ? "Reconnect" : "Sign in with ChatGPT"}
 					</Button>
@@ -76,12 +71,6 @@ export function ChatConnectionSettings() {
 			{!busy && account?.connected && !account.sharing ? (
 				<p role="alert" className="mt-2 text-xs text-destructive">
 					Enable plan usage in “Manage usage”, then reconnect.
-				</p>
-			) : null}
-			{account?.issue === "unreadable-credentials" && !error ? (
-				<p role="alert" className="mt-2 text-xs text-destructive">
-					Your saved sign-in could not be opened. Reset the connection and sign
-					in again. Your notes will stay here.
 				</p>
 			) : null}
 			{error ? (

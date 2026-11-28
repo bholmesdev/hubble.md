@@ -93,13 +93,14 @@ it("keeps cancellation available while sign-in is pending", async () => {
 	);
 });
 
-it("recovers unreadable credentials and offers sign-in again", async () => {
+it("shows unreadable credentials as signed out and replaces them on sign-in", async () => {
 	const { api, host } = await setup({
 		...signedOut,
 		issue: "unreadable-credentials",
 	});
-	expect(host.textContent).toContain("Your saved sign-in could not be opened");
-	await act(async () => button("Reset connection and sign in again").click());
+	expect(document.querySelector('[role="alert"]')).toBeNull();
+	expect(api.chatReset).not.toHaveBeenCalled();
+	await act(async () => button("Sign in with ChatGPT").click());
 	expect(api.chatReset).toHaveBeenCalledOnce();
 	expect(api.chatSignIn).toHaveBeenCalledOnce();
 	expect(host.textContent).toContain("test@example.com");
