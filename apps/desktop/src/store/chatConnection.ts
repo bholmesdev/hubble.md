@@ -7,11 +7,15 @@ export const chatConnection = store({
 	busy: false,
 	signingIn: false,
 	error: null as string | null,
+	disconnectPending: false,
 });
+
+export const DISCONNECT_WARNING =
+	"You’re signed out of Hubble. Finish disconnecting in ChatGPT settings.";
 
 export function errorText(error: unknown) {
 	if (error instanceof Error && error.message.includes("Signed out locally."))
-		return "You’re signed out of Hubble. To finish disconnecting, open “Manage usage”.";
+		return DISCONNECT_WARNING;
 	return "Something went wrong. Please try again.";
 }
 
@@ -48,6 +52,8 @@ async function loadConnection(signIn: boolean) {
 	}
 	chatConnection.set({
 		account,
+		disconnectPending:
+			signIn && result.ok ? false : chatConnection.get().disconnectPending,
 		busy: !!account?.busy,
 		signingIn: !!account?.signingIn,
 		error: result.ok
@@ -68,6 +74,7 @@ export async function disconnectChat() {
 	const account = await attempt(() => desktopApi.chatAccount());
 	chatConnection.set({
 		account: account.ok ? account.value : null,
+		disconnectPending: !result.ok && result.error === DISCONNECT_WARNING,
 		busy: false,
 		signingIn: false,
 		error: result.ok ? (account.ok ? null : account.error) : result.error,

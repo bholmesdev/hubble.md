@@ -11,9 +11,15 @@ import {
 import { SettingsSection } from "./SettingsDialog";
 
 export function ChatConnectionSettings() {
-	const { account, busy, signingIn, error } = useStoreValue(chatConnection);
+	const { account, busy, signingIn, error, disconnectPending } =
+		useStoreValue(chatConnection);
 	function report(error: unknown) {
 		chatConnection.set({ ...chatConnection.get(), error: errorText(error) });
+	}
+	function openUsage() {
+		void desktopApi
+			.openExternalUrl("https://chatgpt.com/settings/usage")
+			.catch(report);
 	}
 	return (
 		<SettingsSection title="Chat" description="Connect your ChatGPT account.">
@@ -62,17 +68,11 @@ export function ChatConnectionSettings() {
 						Sign out
 					</Button>
 				) : null}
-				<Button
-					variant="ghost"
-					size="sm"
-					onClick={() =>
-						void desktopApi
-							.openExternalUrl("https://chatgpt.com/settings/usage")
-							.catch(report)
-					}
-				>
-					Manage usage
-				</Button>
+				{account?.connected ? (
+					<Button variant="ghost" size="sm" onClick={openUsage}>
+						Manage usage
+					</Button>
+				) : null}
 			</div>
 			{!busy && account?.connected && !account.sharing ? (
 				<p role="alert" className="mt-2 text-xs text-destructive">
@@ -84,6 +84,11 @@ export function ChatConnectionSettings() {
 				<p role="alert" className="mt-2 text-xs text-destructive">
 					{error}
 				</p>
+			) : null}
+			{disconnectPending ? (
+				<Button variant="ghost" size="sm" onClick={openUsage}>
+					Open ChatGPT settings
+				</Button>
 			) : null}
 			{!busy && !error && account?.issue === "refresh-unavailable" ? (
 				<p role="alert" className="mt-2 text-xs text-destructive">

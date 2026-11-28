@@ -63,12 +63,15 @@ function button(label: string) {
 
 it("connects, shows the account, and signs out through the desktop bridge", async () => {
 	const { api, host } = await setup();
+	expect(host.textContent).not.toContain("Manage usage");
 	await act(async () => button("Sign in with ChatGPT").click());
 	expect(api.chatSignIn).toHaveBeenCalledOnce();
 	expect(host.textContent).toContain("test@example.com");
+	expect(button("Manage usage").disabled).toBe(false);
 	await act(async () => button("Sign out").click());
 	expect(api.chatDisconnect).toHaveBeenCalledOnce();
 	expect(host.textContent).not.toContain("test@example.com");
+	expect(host.textContent).not.toContain("Manage usage");
 	expect(button("Sign in with ChatGPT").disabled).toBe(false);
 });
 
@@ -156,4 +159,20 @@ it("retries temporary renewal failures without opening browser sign-in", async (
 	expect(api.chatReset).not.toHaveBeenCalled();
 	expect(host.textContent).toContain("test@example.com");
 	expect(document.querySelector('[role="alert"]')).toBeNull();
+});
+
+it("keeps a contextual recovery action if remote sign-out could not be confirmed", async () => {
+	const { api, host } = await setup(signedIn);
+	api.chatDisconnect.mockImplementationOnce(async () => {
+		api.chatAccount.mockResolvedValue(signedOut);
+		throw Error("Signed out locally. Remote sign-out was not confirmed.");
+	});
+	await act(async () => button("Sign out").click());
+	expect(host.textContent).not.toContain("Manage usage");
+	api.openExternalUrl.mockRejectedValueOnce(Error("Browser unavailable"));
+	await act(async () => button("Open ChatGPT settings").click());
+	await act(async () => button("Open ChatGPT settings").click());
+	expect(api.openExternalUrl).toHaveBeenCalledWith(
+		"https://chatgpt.com/settings/usage",
+	);
 });
