@@ -40,10 +40,16 @@ export function ChatConnectionSettings() {
 						onClick={() =>
 							void (account?.issue === "unreadable-credentials"
 								? resetChatConnection()
-								: refreshChatConnection(true))
+								: refreshChatConnection(
+										account?.issue !== "refresh-unavailable",
+									))
 						}
 					>
-						{account?.expiresAt ? "Reconnect" : "Sign in with ChatGPT"}
+						{account?.issue === "refresh-unavailable"
+							? "Try again"
+							: account?.expiresAt
+								? "Reconnect"
+								: "Sign in with ChatGPT"}
 					</Button>
 				)}
 				{account?.label && account.expiresAt ? (
@@ -76,6 +82,11 @@ export function ChatConnectionSettings() {
 			{error ? (
 				<p role="alert" className="mt-2 text-xs text-destructive">
 					{error}
+				</p>
+			) : null}
+			{!busy && !error && account?.issue === "refresh-unavailable" ? (
+				<p role="alert" className="mt-2 text-xs text-destructive">
+					Something went wrong. Please try again.
 				</p>
 			) : null}
 		</SettingsSection>

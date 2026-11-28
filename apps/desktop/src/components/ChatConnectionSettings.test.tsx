@@ -89,7 +89,7 @@ it("keeps cancellation available while sign-in is pending", async () => {
 	expect(api.chatCancelSignIn).toHaveBeenCalledOnce();
 	expect(button("Sign in with ChatGPT").disabled).toBe(false);
 	expect(document.querySelector('[role="alert"]')?.textContent).toContain(
-		"cancelled",
+		"Sign-in failed. Please try again.",
 	);
 });
 
@@ -112,7 +112,8 @@ it("retains the real account state when local sign-out fails", async () => {
 	await act(async () => button("Sign out").click());
 	expect(host.textContent).toContain("test@example.com");
 	expect(button("Sign out").disabled).toBe(false);
-	expect(host.textContent).toContain("Could not save sign-out.");
+	expect(host.textContent).toContain("Something went wrong. Please try again.");
+	expect(host.textContent).not.toContain("Could not save sign-out.");
 });
 
 it("keeps the existing connection after a failed reconnect", async () => {
@@ -121,7 +122,7 @@ it("keeps the existing connection after a failed reconnect", async () => {
 	await act(async () => button("Reconnect").click());
 	expect(host.textContent).toContain("test@example.com");
 	expect(button("Sign out").disabled).toBe(false);
-	expect(host.textContent).toContain("Sign-in cancelled.");
+	expect(host.textContent).toContain("Sign-in failed. Please try again.");
 });
 
 it("recovers pending browser sign-in after a renderer reload", async () => {
@@ -138,4 +139,21 @@ it("recovers pending browser sign-in after a renderer reload", async () => {
 	});
 	expect(host.textContent).toContain("test@example.com");
 	expect(button("Sign out").disabled).toBe(false);
+});
+
+it("retries temporary renewal failures without opening browser sign-in", async () => {
+	const { api, host } = await setup({
+		...signedIn,
+		connected: false,
+		sharing: false,
+		expiresAt: Date.now() - 1000,
+		issue: "refresh-unavailable",
+	});
+	expect(host.textContent).toContain("Something went wrong. Please try again.");
+	api.chatAccount.mockResolvedValue(signedIn);
+	await act(async () => button("Try again").click());
+	expect(api.chatSignIn).not.toHaveBeenCalled();
+	expect(api.chatReset).not.toHaveBeenCalled();
+	expect(host.textContent).toContain("test@example.com");
+	expect(document.querySelector('[role="alert"]')).toBeNull();
 });

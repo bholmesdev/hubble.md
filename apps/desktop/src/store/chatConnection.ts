@@ -10,12 +10,9 @@ export const chatConnection = store({
 });
 
 export function errorText(error: unknown) {
-	return error instanceof Error
-		? error.message.replace(
-				/^Error invoking remote method '[^']+': (?:Error: )?/,
-				"",
-			)
-		: "Chat connection is unavailable. Try again.";
+	if (error instanceof Error && error.message.includes("Signed out locally."))
+		return "You’re signed out of Hubble. To finish disconnecting, open “Manage usage”.";
+	return "Something went wrong. Please try again.";
 }
 
 // Keep exception handling outside component handlers for React Compiler.
@@ -53,7 +50,11 @@ async function loadConnection(signIn: boolean) {
 		account,
 		busy: !!account?.busy,
 		signingIn: !!account?.signingIn,
-		error: result.ok ? null : result.error,
+		error: result.ok
+			? null
+			: signIn
+				? "Sign-in failed. Please try again."
+				: result.error,
 	});
 	// The main process owns browser sign-in and may outlive a renderer reload.
 	if (account?.busy) window.setTimeout(() => void loadConnection(false), 1000);
