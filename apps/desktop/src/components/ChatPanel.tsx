@@ -3,8 +3,6 @@ import { useStoreValue } from "@simplestack/store/react";
 import { useEffect, useRef, useState } from "react";
 import MingcuteEditLine from "~icons/mingcute/edit-line";
 import MingcuteSidebarRightLine from "~icons/mingcute/sidebar-right-line";
-import openaiBlack from "../assets/openai-blossom-black.svg";
-import openaiWhite from "../assets/openai-blossom-white.svg";
 import { desktopApi } from "../desktopApi";
 import { isEditableFile } from "../lib/filePath";
 import { isVirtualPath } from "../lib/newTabPage";
@@ -15,13 +13,14 @@ import {
 	attempt,
 	chatConnection,
 	refreshChatConnection,
-	resetChatConnection,
 } from "../store/chatConnection";
+import { getChatConnectionState } from "../store/chatConnectionState";
 import { chatSession, sendChat, stopChat } from "../store/chatSession";
 import { viewerStore, workspacePathStore } from "../store/state";
 import { chatPanelOpen, EMPTY_CHAT, updateTabChat } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 import { ChatComposer } from "./ChatComposer";
+import { ChatConnectionControls } from "./ChatConnectionControls";
 import { ChatMark } from "./ChatMark";
 import { ChatModelPicker } from "./ChatModelPicker";
 import { ChatReply } from "./ChatReply";
@@ -51,8 +50,8 @@ export function ChatPanel({
 			transcript.current?.scrollTo({ top: transcript.current.scrollHeight });
 	}, [open, chat.messages]);
 	if (!open || !tabId || !tab?.path) return null;
-	const { account, busy, signingIn, models, error } = connection;
-	const ready = account?.connected && account.sharing;
+	const { busy, models, error } = connection;
+	const ready = getChatConnectionState(connection).ready;
 	const fileReady =
 		isVirtualPath(tab.path) ||
 		!isEditableFile(tab.path) ||
@@ -130,45 +129,7 @@ export function ChatPanel({
 							Work with your agents to draft notes, leave comments, and connect
 							ideas across files
 						</p>
-						<Button
-							variant="outline"
-							data-oai-siwc-button
-							disabled={busy && !signingIn}
-							className="h-auto min-h-10 justify-center gap-2.5 px-3 py-2 text-sm font-normal"
-							onClick={() => {
-								if (signingIn) void desktopApi.chatCancelSignIn();
-								else if (account?.issue === "unreadable-credentials")
-									void resetChatConnection();
-								else
-									void refreshChatConnection(
-										account?.issue !== "refresh-unavailable",
-									);
-							}}
-						>
-							{!signingIn &&
-							!account?.connected &&
-							account?.issue !== "refresh-unavailable" ? (
-								<>
-									<img
-										src={openaiBlack}
-										alt=""
-										className="size-5 dark:hidden"
-									/>
-									<img
-										src={openaiWhite}
-										alt=""
-										className="hidden size-5 dark:block"
-									/>
-								</>
-							) : null}
-							{signingIn
-								? "Cancel sign-in"
-								: account?.issue === "refresh-unavailable"
-									? "Try again"
-									: account?.connected
-										? "Enable access"
-										: "Sign in with ChatGPT"}
-						</Button>
+						<ChatConnectionControls variant="panel" />
 						<Button
 							variant="ghost"
 							className="h-auto self-center px-0 py-1 text-sm font-normal hover:bg-transparent"
@@ -179,15 +140,6 @@ export function ChatPanel({
 						>
 							Use the terminal
 						</Button>
-						{account?.connected && !account.sharing ? (
-							<p role="alert" className="text-xs text-destructive">
-								Hubble doesn’t have permission to use your ChatGPT plan.
-							</p>
-						) : error ? (
-							<p role="alert" className="text-xs text-destructive">
-								{error}
-							</p>
-						) : null}
 					</div>
 				</div>
 			) : (

@@ -219,3 +219,26 @@ async function seedChat() {
 	}));
 	return { current: () => appStore.get().tabs.byId[id].chat };
 }
+
+it("shares renewal recovery and error copy with the Chat panel", async () => {
+	const expired = {
+		...signedIn,
+		connected: false,
+		sharing: false,
+		issue: "refresh-unavailable" as const,
+	};
+	const { api, host } = await setup(expired);
+	const message = document.querySelector('[role="alert"]')?.textContent;
+	expect(button("Try again")).toBeDefined();
+	await seedChat();
+	const { ChatPanel } = await import("./ChatPanel");
+	await act(async () =>
+		root?.render(<ChatPanel fullHeight={false} onOpenSettings={() => {}} />),
+	);
+	expect(document.querySelector('[role="alert"]')?.textContent).toBe(message);
+	api.chatAccount.mockResolvedValueOnce(expired);
+	await act(async () => button("Try again").click());
+	expect(api.chatSignIn).not.toHaveBeenCalled();
+	expect(host.textContent).toContain("Something went wrong. Please try again.");
+	expect(button("Try again").disabled).toBe(false);
+});
