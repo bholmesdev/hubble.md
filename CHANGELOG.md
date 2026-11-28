@@ -9,8 +9,6 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Sign in with ChatGPT and keep your connection active automatically. [#353](https://github.com/bholmesdev/hubble.md/pull/353)
-
 ### Changed
 
 - Open files in your current tab even when another tab already shows them. [#350](https://github.com/bholmesdev/hubble.md/pull/350)
