@@ -1,0 +1,28 @@
+{
+	"name": "@hubble.md/react-core",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./commands": {
+			"types": "./dist/commands.d.ts",
+			"default": "./dist/commands.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"dev": "tsc -p tsconfig.json --watch",
+		"typecheck": "tsc -p tsconfig.json --noEmit"
+	},
+	"dependencies": {
+		"@hubble.md/editor": "workspace:*",
+		"keymatch": "^1.0.5"
+	},
+	"peerDependencies": {
+		"react": "^19.2.0"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.0",
+		"typescript": "~5.8.3"
+	}
+}

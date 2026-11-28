@@ -1,16 +1,15 @@
 import {
 	type FindState,
-	getCommandBinding,
 	getFindState,
 	selectFindMatch,
 } from "@hubble.md/editor";
+import { useWindowCommands } from "@hubble.md/react-core/commands";
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
 import { keymatch } from "keymatch";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
-	useEffect,
 	useRef,
 	useState,
 } from "react";
@@ -75,37 +74,25 @@ export function FindBar({ editor }: { editor: Editor | null }) {
 		});
 	};
 
-	useEffect(
-		() => {
-			const handleKeyDown = (event: KeyboardEvent) => {
-				if (open && event.key === "Escape") {
-					event.preventDefault();
-					close();
-					return;
+	useWindowCommands([
+		{ key: "Escape", enabled: () => open, run: close },
+		{
+			shortcut: "CmdOrCtrl+Alt+f",
+			enabled: () => Boolean(editor?.isEditable && (editor.isFocused || open)),
+			run: () => {
+				if (open) toggleReplace(true);
+				else {
+					setReplaceOpen(true);
+					openFind();
 				}
-				if (keymatch(event, "CmdOrCtrl+Alt+f")) {
-					if (!editor?.isEditable) return;
-					if (!editor.isFocused && !open) return;
-					event.preventDefault();
-					if (open) toggleReplace(true);
-					else {
-						setReplaceOpen(true);
-						openFind();
-					}
-					return;
-				}
-				const binding = getCommandBinding("app.find");
-				if (!binding || !keymatch(event, binding)) return;
-				if (!editor?.isFocused && !open) return;
-				event.preventDefault();
-				openFind();
-			};
-			window.addEventListener("keydown", handleKeyDown);
-			return () => window.removeEventListener("keydown", handleKeyDown);
+			},
 		},
-		// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler stabilizes render-local callbacks.
-		[close, editor, open, openFind, toggleReplace],
-	);
+		{
+			command: "app.find",
+			enabled: () => Boolean(editor?.isFocused || open),
+			run: openFind,
+		},
+	]);
 
 	if (!editor || !open) return null;
 
