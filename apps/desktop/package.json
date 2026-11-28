@@ -50,6 +50,7 @@
 		"clsx": "^2.1.1",
 		"electron-updater": "^6.8.3",
 		"ignore": "^7.0.5",
+		"jose": "^6.2.18",
 		"keymatch": "^1.0.5",
 		"node-pty": "^1.1.0",
 		"open-props": "^1.7.23",

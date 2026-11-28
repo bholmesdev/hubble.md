@@ -26,6 +26,11 @@ function subscribe<T extends unknown[]>(
 let nextWatchId = 0;
 
 const desktopApi = {
+	chatAccount: () => ipcRenderer.invoke("desktop:chat-account"),
+	chatSignIn: () => ipcRenderer.invoke("desktop:chat-sign-in"),
+	chatCancelSignIn: () => ipcRenderer.invoke("desktop:chat-cancel-sign-in"),
+	chatReset: () => ipcRenderer.invoke("desktop:chat-reset"),
+	chatDisconnect: () => ipcRenderer.invoke("desktop:chat-disconnect"),
 	platform: process.platform,
 	homeDir: os.homedir(),
 	listDirectory: (path) =>

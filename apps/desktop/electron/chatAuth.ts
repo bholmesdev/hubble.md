@@ -1,0 +1,574 @@
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import { createServer, type ServerResponse } from "node:http";
+import path from "node:path";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+import { z } from "zod/v4";
+import type { ChatAccount } from "../src/desktopApi/chat";
+import { chatAuthPage } from "./chatAuthPage";
+
+class UnreadableConnection extends Error {}
+
+const ISSUER = "https://auth.openai.com";
+const RESOURCE = "https://api.openai.com/v1";
+const SCOPES =
+	"openid profile email offline_access resource.invoke chatgpt.tokens.use.direct";
+const UNUSABLE_REFRESH = new Set([
+	"invalid_grant",
+	"invalid_refresh_token",
+	"token_expired",
+	"refresh_token_expired",
+	"refresh_token_invalidated",
+	"refresh_token_reused",
+]);
+const credentialsSchema = z.object({
+	access: z.string(),
+	refresh: z.string().optional(),
+	id: z.string(),
+	expiresAt: z.number(),
+	scopes: z.array(z.string()),
+});
+const savedSchema = z.object({
+	hostId: z.string(),
+	clientId: z.string().optional(),
+	subject: z.string().optional(),
+	label: z.string().optional(),
+	tokens: credentialsSchema.optional(),
+	pendingRefresh: z
+		.object({
+			tokens: credentialsSchema,
+			verifyIdentity: z.boolean(),
+			receivedAt: z.number(),
+		})
+		.optional(),
+});
+const tokenSchema = z.object({
+	access_token: z.string().min(1),
+	id_token: z.string().min(1),
+	refresh_token: z.string().optional(),
+	token_type: z.literal("Bearer"),
+	expires_in: z.number().positive(),
+	scope: z.string(),
+});
+const refreshSchema = tokenSchema.extend({
+	id_token: z.string().min(1).optional(),
+	refresh_token: z.string().min(1),
+	scope: z.string().optional(),
+});
+
+type SavedAccount = z.infer<typeof savedSchema>;
+type AuthOptions = {
+	storagePath: string;
+	encrypt: (text: string) => Buffer;
+	decrypt: (bytes: Buffer) => string;
+	openBrowser: (url: string) => Promise<void>;
+};
+
+/** Browser sign-in and encrypted credentials for one local ChatGPT registration. */
+export class ChatGPTAuth {
+	private saved: SavedAccount | undefined;
+	private loading: Promise<SavedAccount> | undefined;
+	private attempt: AbortController | undefined;
+	private renewal: Promise<void> | undefined;
+	private clearing = false;
+	private pendingSave: SavedAccount | undefined;
+
+	constructor(private options: AuthOptions) {}
+
+	async account(): Promise<ChatAccount> {
+		let saved: SavedAccount;
+		try {
+			saved = await this.load();
+		} catch (error) {
+			if (!(error instanceof UnreadableConnection)) throw error;
+			return {
+				connected: false,
+				sharing: false,
+				label: null,
+				expiresAt: null,
+				issue: "unreadable-credentials",
+			};
+		}
+		let refreshFailed = false;
+		try {
+			await this.renew(saved);
+		} catch {
+			refreshFailed = true;
+		}
+		saved = this.saved ?? saved;
+		const connected = !!saved.tokens && saved.tokens.expiresAt > Date.now();
+		return {
+			...(!connected && refreshFailed
+				? { issue: "refresh-unavailable" as const }
+				: {}),
+			connected,
+			sharing:
+				connected &&
+				!!saved.tokens?.scopes.includes("chatgpt.tokens.use.direct"),
+			label: saved.label ?? null,
+			expiresAt: saved.tokens?.expiresAt ?? null,
+		};
+	}
+
+	async accessToken() {
+		const account = await this.account();
+		if (account.issue === "refresh-unavailable")
+			throw new Error("Something went wrong. Please try again.");
+		if (!account.connected)
+			throw new Error(
+				"Your connection has expired. Sign in again to continue.",
+			);
+		if (!account.sharing)
+			throw new Error(
+				"Plan usage is not enabled. Choose “Enable access” to continue.",
+			);
+		return (await this.load()).tokens.access;
+	}
+
+	async signIn(): Promise<ChatAccount> {
+		if (this.attempt)
+			throw new Error("A sign-in is already open. Finish or cancel it first.");
+		const controller = new AbortController();
+		this.attempt = controller;
+		const timeout = setTimeout(() => controller.abort(), 5 * 60_000);
+		try {
+			await this.renewal?.catch(() => {});
+			const saved = { ...(await this.load()) };
+			const state = randomBytes(32).toString("base64url");
+			const nonce = randomBytes(32).toString("base64url");
+			const verifier = randomBytes(64).toString("base64url");
+			const discovery = await this.discovery(controller.signal);
+			const callback = await this.callback(state, controller.signal);
+			try {
+				const url = new URL(discovery.authorization_endpoint);
+				url.search = new URLSearchParams({
+					client_id: saved.clientId ?? "dynamic_agent_client",
+					...(saved.clientId ? {} : { agent_name_hint: "Hubble" }),
+					ext_agent_host_id: saved.hostId,
+					...(saved.tokens ? { id_token_hint: saved.tokens.id } : {}),
+					response_type: "code",
+					redirect_uri: callback.uri,
+					scope: SCOPES,
+					resource: RESOURCE,
+					// Only explicit permission requests repeat consent, not routine sign-in.
+					...(saved.tokens &&
+					!saved.tokens.scopes.includes("chatgpt.tokens.use.direct")
+						? { prompt: "consent" }
+						: {}),
+					state,
+					nonce,
+					code_challenge_method: "S256",
+					code_challenge: createHash("sha256")
+						.update(verifier)
+						.digest("base64url"),
+				}).toString();
+				await this.options.openBrowser(url.href);
+				const params = await callback.result;
+				const clientId = params.get("client_id") ?? saved.clientId;
+				if (
+					!clientId ||
+					clientId === "dynamic_agent_client" ||
+					(saved.clientId && clientId !== saved.clientId)
+				) {
+					throw new Error(
+						"The connection returned an unexpected registration. Try signing in again.",
+					);
+				}
+				// Keep registration even if its one-time code expires during exchange.
+				saved.clientId = clientId;
+				await this.save(saved);
+				const response = await fetch(discovery.token_endpoint, {
+					method: "POST",
+					signal: controller.signal,
+					headers: { "Content-Type": "application/x-www-form-urlencoded" },
+					body: new URLSearchParams({
+						grant_type: "authorization_code",
+						client_id: clientId,
+						code: params.get("code"),
+						code_verifier: verifier,
+						redirect_uri: callback.uri,
+						resource: RESOURCE,
+					}),
+				});
+				if (!response.ok)
+					throw new Error("Sign-in exchange failed. Please reconnect.");
+				const tokens = tokenSchema.parse(await response.json());
+				const { payload } = await jwtVerify(
+					tokens.id_token,
+					createRemoteJWKSet(new URL(discovery.jwks_uri)),
+					{
+						issuer: ISSUER,
+						audience: clientId,
+						requiredClaims: ["sub", "exp", "iat"],
+						clockTolerance: 5,
+					},
+				);
+				if (
+					payload.nonce !== nonce ||
+					!payload.sub ||
+					(saved.subject && saved.subject !== payload.sub)
+				) {
+					throw new Error(
+						"Sign-in identity could not be verified. Please reconnect.",
+					);
+				}
+				controller.signal.throwIfAborted();
+				const label =
+					typeof payload.email === "string"
+						? payload.email
+						: typeof payload.name === "string"
+							? payload.name
+							: "Chat account";
+				const credentials = {
+					access: tokens.access_token,
+					refresh: tokens.refresh_token,
+					id: tokens.id_token,
+					expiresAt: Date.now() + tokens.expires_in * 1000,
+					scopes: tokens.scope.split(/\s+/),
+				};
+				await this.save({
+					...saved,
+					pendingRefresh: undefined,
+					subject: payload.sub,
+					label,
+					tokens: credentials,
+				});
+				this.pendingSave = undefined;
+				callback.finish(false);
+				return this.account();
+			} finally {
+				callback.close();
+			}
+		} finally {
+			clearTimeout(timeout);
+			if (this.attempt === controller) this.attempt = undefined;
+		}
+	}
+
+	get signingIn() {
+		return !!this.attempt;
+	}
+
+	cancel() {
+		this.attempt?.abort();
+	}
+
+	/** Recovery must not decrypt the credentials it is trying to discard. */
+	async reset() {
+		this.cancel();
+		this.clearing = true;
+		try {
+			await this.renewal?.catch(() => {});
+			await fs.rm(this.options.storagePath, { force: true });
+			this.saved = undefined;
+			this.loading = undefined;
+			this.pendingSave = undefined;
+		} finally {
+			this.clearing = false;
+		}
+	}
+
+	async disconnect() {
+		this.cancel();
+		this.clearing = true;
+		try {
+			await this.renewal?.catch(() => {});
+			const saved = this.pendingSave ?? (await this.load());
+			const tokens = saved.pendingRefresh?.tokens ?? saved.tokens;
+			const clientId = saved.clientId;
+			// Explicit sign-out must let the next sign-in choose a different account.
+			await this.save({ hostId: saved.hostId });
+			this.pendingSave = undefined;
+			if (!tokens?.refresh || !clientId) return;
+			try {
+				const discovery = await this.discovery(AbortSignal.timeout(10_000));
+				const response = await fetch(discovery.revocation_endpoint, {
+					method: "POST",
+					signal: AbortSignal.timeout(10_000),
+					headers: { "Content-Type": "application/x-www-form-urlencoded" },
+					body: new URLSearchParams({
+						token: tokens.refresh,
+						token_type_hint: "refresh_token",
+						client_id: clientId,
+					}),
+				});
+				if (!response.ok) throw new Error();
+			} catch {
+				throw new Error(
+					"Signed out locally. Remote sign-out was not confirmed; disconnect Hubble in your account’s Settings → Usage.",
+				);
+			}
+		} finally {
+			this.clearing = false;
+		}
+	}
+
+	/** Share renewal calls; sign-out waits so renewal cannot restore cleared tokens. */
+	private async renew(saved: SavedAccount) {
+		if (this.attempt || this.clearing) return;
+		if (
+			!this.pendingSave &&
+			!saved.pendingRefresh &&
+			(!saved.tokens || saved.tokens.expiresAt > Date.now() + 60_000)
+		)
+			return;
+		const recovering = !!this.pendingSave || !!saved.pendingRefresh;
+		this.renewal ??= (async () => {
+			await this.refresh(saved);
+			const current = this.saved;
+			// A checkpoint can age during an outage. Verify it, then renew once if needed.
+			if (
+				recovering &&
+				current?.tokens &&
+				current.tokens.expiresAt <= Date.now() + 60_000
+			)
+				await this.refresh(current);
+		})().finally(() => {
+			this.renewal = undefined;
+		});
+		await this.renewal;
+	}
+
+	private async refresh(saved: SavedAccount) {
+		// Rotation may already have succeeded remotely when local storage failed.
+		if (this.pendingSave) {
+			await this.save(this.pendingSave);
+			saved = this.pendingSave;
+			this.pendingSave = undefined;
+		}
+		if (!saved.pendingRefresh) {
+			await this.requestRefresh(saved);
+			saved = this.saved ?? saved;
+		}
+		const pending = saved.pendingRefresh;
+		if (!pending) return;
+		if (pending.verifyIdentity) {
+			const discovery = await this.discovery(AbortSignal.timeout(15_000));
+			const keys = createRemoteJWKSet(new URL(discovery.jwks_uri));
+			let keysUnavailable = false;
+			try {
+				const { payload } = await jwtVerify(
+					pending.tokens.id,
+					async (header, token) => {
+						try {
+							return await keys(header, token);
+						} catch (error) {
+							keysUnavailable = true;
+							throw error;
+						}
+					},
+					{
+						issuer: ISSUER,
+						audience: saved.clientId,
+						requiredClaims: ["sub", "exp", "iat"],
+						clockTolerance: 5,
+						// Verification outages may outlast the ID token; validate at receipt.
+						currentDate: new Date(pending.receivedAt),
+					},
+				);
+				if (payload.sub !== saved.subject)
+					throw new Error("Sign-in identity could not be verified.");
+			} catch (error) {
+				// Key retrieval failures do not prove the signed identity is invalid.
+				if (keysUnavailable) throw error;
+				await this.save({
+					...saved,
+					tokens: undefined,
+					pendingRefresh: undefined,
+				});
+				return;
+			}
+		}
+		await this.save({
+			...saved,
+			tokens: pending.tokens,
+			pendingRefresh: undefined,
+		});
+	}
+
+	private async requestRefresh(saved: SavedAccount) {
+		const previous = saved.tokens;
+		if (!previous?.refresh || !saved.clientId) {
+			if (previous && previous.expiresAt <= Date.now())
+				await this.save({ ...saved, tokens: undefined });
+			return;
+		}
+		const signal = AbortSignal.timeout(15_000);
+		const discovery = await this.discovery(signal);
+		const response = await fetch(discovery.token_endpoint, {
+			method: "POST",
+			signal,
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				grant_type: "refresh_token",
+				client_id: saved.clientId,
+				refresh_token: previous.refresh,
+				resource: RESOURCE,
+			}),
+		});
+		const body = await response.json();
+		if (!response.ok) {
+			const code =
+				typeof body?.error === "string"
+					? body.error
+					: (body?.error?.code ?? body?.code);
+			if (
+				(response.status === 400 || response.status === 401) &&
+				UNUSABLE_REFRESH.has(code)
+			) {
+				await this.save({ ...saved, tokens: undefined });
+				return;
+			}
+			throw new Error("Something went wrong. Please try again.");
+		}
+		const tokens = refreshSchema.parse(body);
+		// Save rotation before key retrieval; this checkpoint is not an authorized session.
+		this.pendingSave = {
+			...saved,
+			pendingRefresh: {
+				verifyIdentity: !!tokens.id_token,
+				receivedAt: Date.now(),
+				tokens: {
+					access: tokens.access_token,
+					refresh: tokens.refresh_token,
+					id: tokens.id_token ?? previous.id,
+					expiresAt: Date.now() + tokens.expires_in * 1000,
+					scopes: tokens.scope?.split(/\s+/) ?? previous.scopes,
+				},
+			},
+		};
+		await this.save(this.pendingSave);
+		this.pendingSave = undefined;
+	}
+
+	private load(): Promise<SavedAccount> {
+		if (this.saved) return Promise.resolve(this.saved);
+		if (!this.loading)
+			this.loading = this.read().catch((error) => {
+				this.loading = undefined;
+				throw error;
+			});
+		return this.loading;
+	}
+
+	private async read() {
+		try {
+			this.saved = savedSchema.parse(
+				JSON.parse(
+					this.options.decrypt(await fs.readFile(this.options.storagePath)),
+				),
+			);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+				throw new UnreadableConnection(
+					"Your saved sign-in could not be opened. Reset the connection and sign in again.",
+				);
+			await this.save({ hostId: `urn:uuid:${randomUUID()}` });
+		}
+		return this.saved;
+	}
+
+	private async save(saved: SavedAccount) {
+		await fs.mkdir(path.dirname(this.options.storagePath), { recursive: true });
+		const temporary = `${this.options.storagePath}.tmp`;
+		await fs.writeFile(temporary, this.options.encrypt(JSON.stringify(saved)), {
+			mode: 0o600,
+		});
+		await fs.rename(temporary, this.options.storagePath);
+		this.saved = saved;
+	}
+
+	private async discovery(signal: AbortSignal) {
+		const response = await fetch(`${ISSUER}/.well-known/openid-configuration`, {
+			signal,
+		});
+		if (!response.ok) throw new Error("Sign-in is unavailable. Try again.");
+		const endpoint = z
+			.url()
+			.refine((value) => new URL(value).origin === ISSUER);
+		return z
+			.object({
+				issuer: z.literal(ISSUER),
+				authorization_endpoint: endpoint,
+				token_endpoint: endpoint,
+				jwks_uri: endpoint,
+				revocation_endpoint: endpoint,
+			})
+			.parse(await response.json());
+	}
+
+	private async callback(state: string, signal: AbortSignal) {
+		let resolve: (params: URLSearchParams) => void;
+		let reject: (error: Error) => void;
+		const result = new Promise<URLSearchParams>((yes, no) => {
+			resolve = yes;
+			reject = no;
+		});
+		// Browser launch may fail before the callback promise is awaited.
+		void result.catch(() => {});
+		let used = false;
+		let pendingResponse: ServerResponse | undefined;
+		const finish = (declined: boolean) => {
+			if (pendingResponse && !pendingResponse.writableEnded)
+				pendingResponse.end(chatAuthPage(declined));
+		};
+		const server = createServer((request, response) => {
+			const url = new URL(request.url ?? "/", "http://127.0.0.1");
+			if (
+				request.method !== "GET" ||
+				url.pathname !== "/auth/callback" ||
+				used ||
+				url.searchParams.get("state") !== state
+			) {
+				response.writeHead(400).end("Invalid sign-in callback.");
+				return;
+			}
+			used = true;
+			response.setHeader("Content-Type", "text/html; charset=utf-8");
+			response.setHeader("Referrer-Policy", "no-referrer");
+			response.setHeader(
+				"Content-Security-Policy",
+				"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+			);
+			response.setHeader("Cache-Control", "no-store");
+			if (url.searchParams.has("error") || !url.searchParams.get("code")) {
+				response.end(chatAuthPage(true));
+				reject(new Error("Sign-in was declined. You can try again."));
+			} else {
+				// Wait for token and identity verification before showing success.
+				pendingResponse = response;
+				resolve(url.searchParams);
+			}
+		});
+		const abort = () => {
+			finish(true);
+			reject(new Error("Sign-in cancelled or timed out."));
+			server.close();
+		};
+		signal.addEventListener("abort", abort, { once: true });
+		try {
+			await new Promise<void>((resolve, reject) => {
+				server.once("error", reject);
+				server.listen(0, "127.0.0.1", resolve);
+			});
+			signal.throwIfAborted();
+		} catch (error) {
+			signal.removeEventListener("abort", abort);
+			server.close();
+			throw error;
+		}
+		const address = server.address();
+		if (!address || typeof address === "string")
+			throw new Error("Could not start sign-in.");
+		return {
+			uri: `http://127.0.0.1:${address.port}/auth/callback`,
+			result,
+			finish,
+			close: () => {
+				finish(true);
+				signal.removeEventListener("abort", abort);
+				server.close();
+			},
+		};
+	}
+}

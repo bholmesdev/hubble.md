@@ -38,6 +38,7 @@ import {
 	telemetryConsentStore,
 	themePreferenceStore,
 } from "../store/state";
+import { ChatConnectionSettings } from "./ChatConnectionSettings";
 import { SettingsDialog, SettingsSection } from "./SettingsDialog";
 import { SkillsSettings } from "./SkillsSettings";
 import { SpellcheckSettingsSection } from "./SpellcheckSection";
@@ -258,6 +259,7 @@ function AgentSettings() {
 	return (
 		<div className="flex flex-col divide-y divide-border p-4">
 			<SkillsSettings />
+			<ChatConnectionSettings />
 			<SettingsSection
 				title="Chat about this note"
 				description={`This command runs in a new terminal when you pick "Chat about this note" from a note's ⋯ menu. The shell replaces $HUBBLE_NOTE_PATH with the current note's file path.`}
