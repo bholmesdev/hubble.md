@@ -74,7 +74,7 @@ export function ChatConnectionSettings() {
 				</Button>
 			</div>
 			{!busy && account?.connected && !account.sharing ? (
-				<p className="mt-2 text-xs text-muted-foreground">
+				<p role="alert" className="mt-2 text-xs text-destructive">
 					Enable plan usage in “Manage usage”, then reconnect.
 				</p>
 			) : null}
