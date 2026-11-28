@@ -312,7 +312,18 @@ export class ChatGPTAuth {
 			(!saved.tokens || saved.tokens.expiresAt > Date.now() + 60_000)
 		)
 			return;
-		this.renewal ??= this.refresh(saved).finally(() => {
+		const recovering = !!this.pendingSave || !!saved.pendingRefresh;
+		this.renewal ??= (async () => {
+			await this.refresh(saved);
+			const current = this.saved;
+			// A checkpoint can age during an outage. Verify it, then renew once if needed.
+			if (
+				recovering &&
+				current?.tokens &&
+				current.tokens.expiresAt <= Date.now() + 60_000
+			)
+				await this.refresh(current);
+		})().finally(() => {
 			this.renewal = undefined;
 		});
 		await this.renewal;

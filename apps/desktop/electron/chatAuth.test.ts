@@ -499,7 +499,9 @@ describe("automatic token renewal", () => {
 		);
 	});
 
-	it("resumes verification after a key-service failure and restart without reusing the consumed refresh token", async () => {
+	it.each([
+		0, 3541_000, 7201_000,
+	])("resumes verification after a key-service failure and %ims away without reusing a consumed refresh token", async (elapsed) => {
 		await auth.signIn();
 		now += 3601_000;
 		const reply = refreshReply;
@@ -516,9 +518,12 @@ describe("automatic token renewal", () => {
 		expect(await auth.account()).toMatchObject({
 			issue: "refresh-unavailable",
 		});
+		now += elapsed;
 		auth = new ChatGPTAuth(options);
 		expect(await auth.accessToken()).toBe("renewed-access");
-		expect(refreshes).toHaveLength(1);
+		expect(refreshes).toHaveLength(elapsed ? 2 : 1);
+		if (elapsed)
+			expect(refreshes[1].get("refresh_token")).toBe("rotated-refresh");
 	});
 
 	it("rejects a valid refreshed identity belonging to a different account", async () => {
