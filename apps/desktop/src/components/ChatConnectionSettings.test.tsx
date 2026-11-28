@@ -123,11 +123,15 @@ it("retains the real account state when local sign-out fails", async () => {
 
 it("keeps the existing connection after a failed permission request", async () => {
 	const { api, host } = await setup({ ...signedIn, sharing: false });
-	api.chatSignIn.mockRejectedValueOnce(Error("Sign-in cancelled."));
+	api.chatSignIn.mockRejectedValueOnce(Error("Permission request failed."));
 	await act(async () => button("Enable access").click());
 	expect(host.textContent).toContain("test@example.com");
 	expect(button("Sign out").disabled).toBe(false);
-	expect(host.textContent).toContain("Sign-in failed. Please try again.");
+	expect(host.textContent).toContain(
+		"Hubble doesn’t have permission to use your ChatGPT plan.",
+	);
+	expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1);
+	expect(button("Enable access").disabled).toBe(false);
 });
 
 it("requests plan access without signing out and hides the action after permission is granted", async () => {

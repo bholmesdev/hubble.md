@@ -56,11 +56,13 @@ async function loadConnection(signIn: boolean) {
 			signIn && result.ok ? false : chatConnection.get().disconnectPending,
 		busy: !!account?.busy,
 		signingIn: !!account?.signingIn,
-		error: result.ok
-			? null
-			: signIn
-				? "Sign-in failed. Please try again."
-				: result.error,
+		// A missing-permission message already explains why enabling access did not succeed.
+		error:
+			result.ok || (signIn && account?.connected && !account.sharing)
+				? null
+				: signIn
+					? "Sign-in failed. Please try again."
+					: result.error,
 	});
 	// The main process owns browser sign-in and may outlive a renderer reload.
 	if (account?.busy) window.setTimeout(() => void loadConnection(false), 1000);
