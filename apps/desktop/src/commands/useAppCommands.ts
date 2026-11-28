@@ -44,6 +44,7 @@ import {
 	toggleTerminal,
 } from "../store/actions";
 import { canGoBack, canGoForward } from "../store/history";
+import { toggleChatPanel } from "../store/tabChat";
 import { tabsStore } from "../store/tabStore";
 
 const CONTRIBUTING_URL =
@@ -73,6 +74,7 @@ function toRegistryContext(context: AppCommandContext): RegistryContext {
 	const isRealFile = path !== null && !isVirtualPath(path);
 	return {
 		hasCurrentFile: isRealFile,
+		hasTab: !!tabsStore.get().activeTabId,
 		hasEditableFile: isRealFile && isEditableFile(path),
 		hasSourceViewOpen: isRealFile && supportsSourceToggle(path),
 		hasWorkspace: context.workspacePath !== null,
@@ -335,6 +337,12 @@ function defineCommands(
 		]),
 		editorCommand("editor.blockquote", "blockquote", ["quote", "citation"]),
 
+		fromRegistry(
+			"app.toggle-chat",
+			"View",
+			["chat", "panel", "assistant"],
+			toggleChatPanel,
+		),
 		// View
 		fromRegistry(
 			"app.toggle-sidebar",

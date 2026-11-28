@@ -1,5 +1,6 @@
 export type CommandContext = {
 	hasCurrentFile?: boolean;
+	hasTab?: boolean;
 	hasEditableFile?: boolean;
 	hasSourceViewOpen?: boolean;
 	hasWorkspace?: boolean;
@@ -143,6 +144,11 @@ export const commandRegistry = {
 		label: "Chat About Note",
 		isEnabled: (context) =>
 			context.hasEditableFile === true && context.hasWorkspace === true,
+	},
+	"app.toggle-chat": {
+		defaultBinding: "CmdOrCtrl+Alt+B",
+		label: "Toggle Chat",
+		isEnabled: (context) => hasCurrentFile(context) || context.hasTab === true,
 	},
 	"app.toggle-sidebar": {
 		defaultBinding: "CmdOrCtrl+\\",

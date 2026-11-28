@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { undoToastLabel } from "../components/undoToastLabel";
 import { desktopApi } from "../desktopApi";
 import { pathInFolder } from "../lib/filePath";
+import { newTabPath } from "../lib/newTabPage";
 import { clearHistory, pruneHistory } from "./history";
 import {
 	appStore,
@@ -15,13 +16,20 @@ import { tabsStore } from "./tabStore";
 
 import { findTabByPath, type TabId, withoutTabsMatching } from "./tabs";
 
-const UNDO_MS = 5000;
+const HUMAN_UNDO_MS = 5000;
+
+type DeleteOptions = {
+	source?: "human" | "agent";
+	beforeStage?: (phase: "before-save" | "before-stage") => Promise<void>;
+	preserveTabId?: string;
+};
 
 type PendingDelete = {
 	token: string;
 	workspacePath: string;
 	reopenPath: string | null;
 	removedPins: string[];
+	keptTab?: { id: string; path: string };
 	historyBefore: ReturnType<typeof historyStore.get>;
 	historyAfter: ReturnType<typeof historyStore.get>;
 	// Keep tab positions so undo can restore the original order.
@@ -132,6 +140,18 @@ export function createDeleteActions(deps: DeleteDeps) {
 			if (tabsStore.get() === deletion.tabsAfter) {
 				appStore.set((state) => ({ ...state, tabs: deletion.tabsBefore }));
 			}
+			const kept = deletion.keptTab;
+			if (
+				kept &&
+				deletion.reopenPath &&
+				tabsStore.get().byId[kept.id]?.path === kept.path
+			) {
+				const path = deletion.reopenPath;
+				tabsStore.set((tabs) => ({
+					...tabs,
+					byId: { ...tabs.byId, [kept.id]: { ...tabs.byId[kept.id], path } },
+				}));
+			}
 			await deps.refreshFiles(deletion.workspacePath);
 			const restoredTab = deletion.reopenPath
 				? findTabByPath(tabsStore.get(), deletion.reopenPath)
@@ -162,6 +182,7 @@ export function createDeleteActions(deps: DeleteDeps) {
 		items: SidebarDeleteItem[],
 		workspacePath: string,
 		viewer: { currentPath: string | null; content: string },
+		beforeStage?: (phase: "before-save" | "before-stage") => Promise<void>,
 	): Promise<string | null> => {
 		const abandon = () => {
 			blockedItems = null;
@@ -171,6 +192,13 @@ export function createDeleteActions(deps: DeleteDeps) {
 		// ones, so a queued autosave cannot recreate a staged file.
 		blockedItems = items;
 		await deps.waitForSaves((path) => covers(path, items));
+		// Check disk before flushing too: a forced save must not overwrite a newer external edit.
+		try {
+			await beforeStage?.("before-save");
+		} catch (error) {
+			blockedItems = null;
+			throw error;
+		}
 		if (viewer.currentPath && covers(viewer.currentPath, items)) {
 			try {
 				// Flush the open note so the staged copy holds its latest text.
@@ -178,6 +206,13 @@ export function createDeleteActions(deps: DeleteDeps) {
 			} catch {
 				return abandon(); // The save already raised its own toast.
 			}
+		}
+		// Agent deletions recheck scope and the read version after queued saves settle.
+		try {
+			await beforeStage?.("before-stage");
+		} catch (error) {
+			blockedItems = null;
+			throw error;
 		}
 		let token: string;
 		try {
@@ -198,21 +233,26 @@ export function createDeleteActions(deps: DeleteDeps) {
 		return token;
 	};
 
-	const runDelete = async (items: SidebarDeleteItem[]) => {
-		if (items.length === 0) return;
+	const runDelete = async (
+		items: SidebarDeleteItem[],
+		options: DeleteOptions = {},
+	) => {
+		const { beforeStage, preserveTabId, source = "human" } = options;
+		if (items.length === 0) return false;
 		await expireDeleteUndo();
-		if (pending) return;
+		if (pending) return false;
 
 		const workspaceBefore = workspaceStore.get();
-		if (!workspaceBefore.workspacePath) return;
+		if (!workspaceBefore.workspacePath) return false;
 		const viewerBefore = viewerStore.get();
 		const historyBefore = historyStore.get();
 		const token = await stageItems(
 			items,
 			workspaceBefore.workspacePath,
 			viewerBefore,
+			beforeStage,
 		);
-		if (token === null) return;
+		if (token === null) return false;
 
 		const deletedPath = (path: string) => covers(path, items);
 		const deletedCurrent =
@@ -230,23 +270,58 @@ export function createDeleteActions(deps: DeleteDeps) {
 			clearHistory();
 		}
 		const tabsBefore = tabsStore.get();
-		appStore.set((state) => ({
-			...state,
-			workspace: {
-				...state.workspace,
-				files: state.workspace.files.filter((file) => !deletedPath(file.path)),
-				folders: state.workspace.folders.filter(
-					(folder) => !deletedPath(folder.path),
-				),
-				pinnedNotes: state.workspace.pinnedNotes.filter(
-					(pin) => !deletedPath(pin),
-				),
-			},
-			tabs: withoutTabsMatching(state.tabs, deletedPath),
-			document: deletedCurrent ? emptyDoc() : state.document,
-		}));
+		appStore.set((state) => {
+			let tabs = withoutTabsMatching(state.tabs, deletedPath);
+			const kept = preserveTabId ? state.tabs.byId[preserveTabId] : undefined;
+			if (preserveTabId && kept && deletedPath(kept.path)) {
+				// A tool must not erase the conversation that requested the deletion.
+				tabs = {
+					...tabs,
+					activeTabId:
+						state.tabs.activeTabId === preserveTabId
+							? preserveTabId
+							: tabs.activeTabId,
+					order: state.tabs.order.filter(
+						(id) => id === preserveTabId || !!tabs.byId[id],
+					),
+					byId: {
+						...tabs.byId,
+						[preserveTabId]: { ...kept, path: newTabPath() },
+					},
+				};
+			}
+			const keptActive = !!preserveTabId && tabs.activeTabId === preserveTabId;
+			return {
+				...state,
+				workspace: {
+					...state.workspace,
+					files: state.workspace.files.filter(
+						(file) => !deletedPath(file.path),
+					),
+					folders: state.workspace.folders.filter(
+						(folder) => !deletedPath(folder.path),
+					),
+					pinnedNotes: state.workspace.pinnedNotes.filter(
+						(pin) => !deletedPath(pin),
+					),
+				},
+				tabs,
+				document: deletedCurrent
+					? {
+							...emptyDoc(),
+							...(keptActive
+								? {
+										currentPath: tabs.byId[preserveTabId].path,
+										status: "ready" as const,
+									}
+								: {}),
+						}
+					: state.document,
+			};
+		});
+
 		// Load the surviving active tab after deleting the visible note.
-		if (deletedCurrent) {
+		if (deletedCurrent && tabsStore.get().activeTabId !== preserveTabId) {
 			const survivor = tabsStore.get().activeTabId;
 			const survivorPath = survivor
 				? tabsStore.get().byId[survivor]?.path
@@ -265,6 +340,13 @@ export function createDeleteActions(deps: DeleteDeps) {
 			workspacePath: workspaceBefore.workspacePath,
 			reopenPath: deletedCurrent ? viewerBefore.currentPath : null,
 			removedPins,
+			keptTab:
+				preserveTabId && tabsStore.get().byId[preserveTabId]
+					? {
+							id: preserveTabId,
+							path: tabsStore.get().byId[preserveTabId].path,
+						}
+					: undefined,
 			historyBefore,
 			historyAfter: historyStore.get(),
 			tabsBefore,
@@ -278,9 +360,11 @@ export function createDeleteActions(deps: DeleteDeps) {
 		deletion.toastId = toast(
 			`Deleted ${count === 1 ? "1 item" : `${count} items`}`,
 			{
-				duration: UNDO_MS,
+				// Agent replies may outlast the human Undo window.
+				duration: source === "agent" ? Infinity : HUMAN_UNDO_MS,
+				position: source === "agent" ? "bottom-left" : undefined,
 				action: {
-					label: undoToastLabel(),
+					label: source === "agent" ? "Undo" : undoToastLabel(),
 					onClick: (event) => {
 						event.preventDefault();
 						void undoDelete(token);
@@ -290,15 +374,19 @@ export function createDeleteActions(deps: DeleteDeps) {
 				onDismiss: () => void expireDeleteUndo(token),
 			},
 		);
-		await desktopApi.setDeleteUndoAvailable(true);
+		await desktopApi.setDeleteUndoAvailable(source === "human");
 		await pinRemovalSaved;
+		return true;
 	};
 
-	const deleteSidebarItems = async (items: SidebarDeleteItem[]) => {
-		if (deleting) return;
+	const deleteSidebarItems = async (
+		items: SidebarDeleteItem[],
+		options?: DeleteOptions,
+	) => {
+		if (deleting) return false;
 		deleting = true;
 		try {
-			await runDelete(items);
+			return await runDelete(items, options);
 		} finally {
 			deleting = false;
 		}

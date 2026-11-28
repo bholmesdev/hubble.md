@@ -30,6 +30,7 @@ async function setup(account = signedOut) {
 	vi.resetModules();
 	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 	const api = {
+		chatModels: vi.fn(async () => [{ slug: "test", name: "Test" }]),
 		chatAccount: vi.fn(async () => account),
 		chatSignIn: vi.fn(async () => signedIn),
 		chatCancelSignIn: vi.fn(async () => {}),
@@ -70,8 +71,10 @@ it("connects, shows the account, and signs out through the desktop bridge", asyn
 	expect(button("Manage usage").disabled).toBe(false);
 	expect(host.textContent).not.toContain("Reconnect");
 	expect(host.textContent).not.toContain("Enable access");
+	const saved = await seedChat();
 	await act(async () => button("Sign out").click());
 	expect(api.chatDisconnect).toHaveBeenCalledOnce();
+	expect(saved.current()).toBeUndefined();
 	expect(host.textContent).not.toContain("test@example.com");
 	expect(host.textContent).not.toContain("Manage usage");
 	expect(button("Sign in with ChatGPT").disabled).toBe(false);
@@ -113,12 +116,14 @@ it("shows unreadable credentials as signed out and replaces them on sign-in", as
 
 it("retains the real account state when local sign-out fails", async () => {
 	const { api, host } = await setup(signedIn);
+	const saved = await seedChat();
 	api.chatDisconnect.mockRejectedValueOnce(Error("Could not save sign-out."));
 	await act(async () => button("Sign out").click());
 	expect(host.textContent).toContain("test@example.com");
 	expect(button("Sign out").disabled).toBe(false);
 	expect(host.textContent).toContain("Something went wrong. Please try again.");
 	expect(host.textContent).not.toContain("Could not save sign-out.");
+	expect(saved.current()?.draft).toBe("Keep my draft");
 });
 
 it("keeps the existing connection after a failed permission request", async () => {
@@ -193,4 +198,47 @@ it("keeps a contextual recovery action if remote sign-out could not be confirmed
 	expect(api.openExternalUrl).toHaveBeenCalledWith(
 		"https://chatgpt.com/settings/usage",
 	);
+});
+
+async function seedChat() {
+	const { appStore } = await import("../store/state");
+	const id = crypto.randomUUID();
+	appStore.set((state) => ({
+		...state,
+		tabs: {
+			...state.tabs,
+			activeTabId: id,
+			order: [id],
+			byId: {
+				[id]: {
+					path: "/notes/a.md",
+					chat: { messages: [], draft: "Keep my draft", model: "test" },
+				},
+			},
+		},
+	}));
+	return { current: () => appStore.get().tabs.byId[id].chat };
+}
+
+it("shares renewal recovery and error copy with the Chat panel", async () => {
+	const expired = {
+		...signedIn,
+		connected: false,
+		sharing: false,
+		issue: "refresh-unavailable" as const,
+	};
+	const { api, host } = await setup(expired);
+	const message = document.querySelector('[role="alert"]')?.textContent;
+	expect(button("Try again")).toBeDefined();
+	await seedChat();
+	const { ChatPanel } = await import("./ChatPanel");
+	await act(async () =>
+		root?.render(<ChatPanel fullHeight={false} onOpenSettings={() => {}} />),
+	);
+	expect(document.querySelector('[role="alert"]')?.textContent).toBe(message);
+	api.chatAccount.mockResolvedValueOnce(expired);
+	await act(async () => button("Try again").click());
+	expect(api.chatSignIn).not.toHaveBeenCalled();
+	expect(host.textContent).toContain("Something went wrong. Please try again.");
+	expect(button("Try again").disabled).toBe(false);
 });

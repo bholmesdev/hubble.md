@@ -47,6 +47,7 @@ import {
 	MarkdownTableCell,
 	MarkdownTableHeader,
 } from "./TableMarkdownExtensions";
+import { ToolEditHighlight } from "./ToolEditHighlight";
 import { VirtualCursor } from "./VirtualCursor";
 import "./EditorView.css";
 import {
@@ -191,6 +192,7 @@ export function EditorView({
 		editable,
 		textDirection: "auto",
 		extensions: [
+			ToolEditHighlight,
 			FrontMatterHistory.configure({ initial: initialMetadata }),
 			...starterKitWithRegistryShortcuts({
 				code: false,

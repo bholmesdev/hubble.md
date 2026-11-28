@@ -1,9 +1,10 @@
+import type { ChatConversation } from "../desktopApi/chat";
 import { isChangelogPath } from "../lib/changelogNote";
 import { fileStem, pathEquals } from "../lib/filePath";
 import { isNewTabPath } from "../lib/newTabPage";
 
 /** Tabs hold paths; DocumentState holds the active document's contents. */
-export type Tab = { path: string };
+export type Tab = { path: string; chat?: ChatConversation };
 
 export type TabId = string;
 
@@ -22,13 +23,23 @@ export type TabSession = {
 	entries: { id: TabId; path: string }[];
 	activeTabId: TabId | null;
 	closed: ClosedTab[];
+	chats?: Record<TabId, ChatConversation>;
 };
 
 export function tabSession(tabs: TabsState): TabSession {
 	return {
-		entries: tabs.order.map((id) => ({ id, path: tabs.byId[id].path })),
+		entries: tabs.order.map((id) => ({
+			id,
+			path: tabs.byId[id].path,
+		})),
 		activeTabId: tabs.activeTabId,
 		closed: tabs.closed,
+		chats: Object.fromEntries(
+			tabs.order.flatMap((id) => {
+				const chat = tabs.byId[id].chat;
+				return chat ? [[id, chat]] : [];
+			}),
+		),
 	};
 }
 
@@ -38,7 +49,10 @@ export function tabsFromSession(session?: TabSession): TabsState {
 		closed: session.closed,
 		order: session.entries.map(({ id }) => id),
 		byId: Object.fromEntries(
-			session.entries.map(({ id, path }) => [id, { path }]),
+			session.entries.map(({ id, path }) => [
+				id,
+				{ path, ...(session.chats?.[id] ? { chat: session.chats[id] } : {}) },
+			]),
 		),
 		activeTabId: session.activeTabId,
 	};
@@ -76,7 +90,10 @@ export function withOpenedTab(
 			return {
 				...tabs,
 				activeTabId: id,
-				byId: { ...tabs.byId, [id]: { ...tabs.byId[id], path } },
+				byId: {
+					...tabs.byId,
+					[id]: { ...tabs.byId[id], path },
+				},
 			};
 		}
 	}

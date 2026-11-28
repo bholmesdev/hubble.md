@@ -9,7 +9,7 @@ import { ResizableSidebar } from "./ResizableSidebar";
 it.each([
 	"left",
 	"right",
-] as const)("previews and cancels collapse before committing at the %s window edge", async (side) => {
+] as const)("previews and cancels collapse before committing at the %s container edge", async (side) => {
 	Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 	const host = document.createElement("div");
 	document.body.append(host);
@@ -45,8 +45,8 @@ it.each([
 		const handle = host.querySelector<HTMLElement>('[role="separator"]');
 		if (!panel || !handle) throw new Error("Missing panel");
 		vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
-			left: side === "left" ? 0 : window.innerWidth - 360,
-			right: side === "left" ? 360 : window.innerWidth,
+			left: side === "left" ? 160 : window.innerWidth - 520,
+			right: side === "left" ? 520 : window.innerWidth - 160,
 		} as DOMRect);
 		Object.assign(handle, {
 			setPointerCapture: vi.fn(),
@@ -54,7 +54,7 @@ it.each([
 			releasePointerCapture: vi.fn(),
 		});
 		const x = (distance: number) =>
-			side === "left" ? distance : window.innerWidth - distance;
+			side === "left" ? 160 + distance : window.innerWidth - 160 - distance;
 		const pointer = async (type: string, distance: number) =>
 			act(async () => {
 				handle.dispatchEvent(

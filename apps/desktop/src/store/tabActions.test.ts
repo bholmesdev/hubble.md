@@ -402,6 +402,7 @@ describe("desktop tabs", () => {
 		const sessions = saved.tabSessions;
 		if (!sessions) throw Error("Missing saved sessions");
 		expect(sessions["/inactive"]).toEqual({
+			chats: {},
 			entries: [
 				{ id: expect.any(String), path: "/inactive/a.md" },
 				{ id: expect.any(String), path: "/inactive/b.md" },

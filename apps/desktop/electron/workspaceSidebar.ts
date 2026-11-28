@@ -372,7 +372,7 @@ async function hasExternalSymlink(
 	return false;
 }
 
-function matchesGlob(relativePath: string, glob: string): boolean {
+export function matchesGlob(relativePath: string, glob: string): boolean {
 	if (glob === "" || glob === "**" || glob === "**/*") return true;
 	let source = "";
 	for (let index = 0; index < glob.length; index += 1) {

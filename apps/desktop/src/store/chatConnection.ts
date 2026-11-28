@@ -1,8 +1,12 @@
 import { store } from "@simplestack/store";
 import { desktopApi } from "../desktopApi";
-import type { ChatAccount } from "../desktopApi/chat";
+import type { ChatAccount, ChatModel } from "../desktopApi/chat";
+import { clearChats } from "./tabChat";
 
 export const chatConnection = store({
+	models: [] as ChatModel[],
+	sending: false,
+	revision: 0,
 	account: null as ChatAccount | null,
 	busy: false,
 	signingIn: false,
@@ -31,7 +35,7 @@ export async function attempt<T>(
 }
 
 export async function refreshChatConnection(signIn = false) {
-	if (chatConnection.get().busy) return;
+	if (chatConnection.get().busy || chatConnection.get().sending) return;
 	await loadConnection(signIn);
 }
 
@@ -50,7 +54,13 @@ async function loadConnection(signIn: boolean) {
 		const saved = await attempt(() => desktopApi.chatAccount());
 		account = saved.ok ? saved.value : null;
 	}
+	const catalog =
+		account?.connected && account.sharing && !account.busy
+			? await attempt(() => desktopApi.chatModels())
+			: { ok: true as const, value: [] as ChatModel[] };
 	chatConnection.set({
+		...chatConnection.get(),
+		models: catalog.ok ? catalog.value : [],
 		account,
 		disconnectPending:
 			signIn && result.ok ? false : chatConnection.get().disconnectPending,
@@ -59,7 +69,9 @@ async function loadConnection(signIn: boolean) {
 		// A missing-permission message already explains why enabling access did not succeed.
 		error:
 			result.ok || (signIn && account?.connected && !account.sharing)
-				? null
+				? catalog.ok
+					? null
+					: catalog.error
 				: signIn
 					? "Sign-in failed. Please try again."
 					: result.error,
@@ -72,9 +84,14 @@ export async function disconnectChat() {
 	if (chatConnection.get().busy) return;
 	chatConnection.set({ ...chatConnection.get(), busy: true, error: null });
 	const result = await attempt(() => desktopApi.chatDisconnect());
+	const signedOut = result.ok || result.error === DISCONNECT_WARNING;
+	if (signedOut) clearChats();
 	// Remote revocation may fail after local credentials have already been removed.
 	const account = await attempt(() => desktopApi.chatAccount());
 	chatConnection.set({
+		...chatConnection.get(),
+		models: signedOut ? [] : chatConnection.get().models,
+		revision: chatConnection.get().revision + (signedOut ? 1 : 0),
 		account: account.ok ? account.value : null,
 		disconnectPending: !result.ok && result.error === DISCONNECT_WARNING,
 		busy: false,
@@ -84,7 +101,7 @@ export async function disconnectChat() {
 }
 
 export async function resetChatConnection() {
-	if (chatConnection.get().busy) return;
+	if (chatConnection.get().busy || chatConnection.get().sending) return;
 	chatConnection.set({ ...chatConnection.get(), busy: true, error: null });
 	const result = await attempt(() => desktopApi.chatReset());
 	chatConnection.set({

@@ -252,3 +252,17 @@
 		opacity: 0;
 	}
 }
+
+.workspace-layout-state {
+	--workspace-mode: wide;
+}
+@container workspace (width < 64rem) {
+	.workspace-layout-state {
+		--workspace-mode: chat-collapsed;
+	}
+}
+@container workspace (width < 40rem) {
+	.workspace-layout-state {
+		--workspace-mode: compact;
+	}
+}

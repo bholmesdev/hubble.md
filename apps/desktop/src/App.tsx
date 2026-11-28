@@ -38,6 +38,7 @@ import {
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
+import { ChatPanel } from "./components/ChatPanel";
 import { FileInfoBar } from "./components/FileInfoBar";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { NewTabPage } from "./components/NewTabPage";
@@ -83,7 +84,12 @@ import {
 	supportsSourceToggle,
 } from "./lib/filePath";
 import { installHubbleSkills } from "./lib/hubbleSkills";
-import { isCompactWindow, useCompactWindow } from "./lib/layout";
+import {
+	isCompactWorkspace,
+	observeWorkspaceLayout,
+	useCompactWorkspace,
+	workspaceLayout,
+} from "./lib/layout";
 import { isNewTabPath, isVirtualPath } from "./lib/newTabPage";
 import { resolveRelativeLinkPath } from "./lib/relativeLinkPath";
 import { isDefaultLanguage, languageName } from "./lib/spellcheckLanguages";
@@ -144,6 +150,7 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
+import { chatPanelOpen, openChatPanel } from "./store/tabChat";
 import { tabsStore } from "./store/tabStore";
 import { isDarkTheme, subscribeTheme } from "./theme";
 
@@ -209,11 +216,11 @@ async function openFilePicker() {
 
 // Covers the title bar too, so the view toggle sits where the docked sidebar puts it.
 const SIDEBAR_OVERLAY =
-	"max-sm:absolute max-sm:inset-y-0 max-sm:start-0 max-sm:z-30 max-sm:flex max-sm:flex-col max-sm:bg-sidebar max-sm:shadow-overlay max-sm:transition-transform max-sm:motion-reduce:transition-none";
+	"absolute inset-y-0 start-0 z-30 flex flex-col bg-sidebar shadow-overlay transition-transform motion-reduce:transition-none";
 const SIDEBAR_OVERLAY_SHOWN =
-	"contents max-sm:translate-x-0 max-sm:duration-[180ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
+	"translate-x-0 duration-[180ms] ease-[cubic-bezier(0.25,1,0.5,1)]";
 const SIDEBAR_OVERLAY_HIDDEN =
-	"hidden max-sm:-translate-x-full max-sm:pointer-events-none max-sm:duration-[140ms] max-sm:ease-[cubic-bezier(0.25,1,0.5,1)]";
+	"-translate-x-full pointer-events-none duration-[140ms] ease-[cubic-bezier(0.25,1,0.5,1)]";
 
 let nextSearchRequestId = 0;
 
@@ -238,10 +245,15 @@ async function searchFileContents(query: string) {
 
 function App() {
 	const state = useStoreValue(viewerStore);
-	const compact = useCompactWindow();
+	const compact = useCompactWorkspace();
+	const chatOverlay = useStoreValue(
+		workspaceLayout,
+		(layout) => layout.mode !== "wide",
+	);
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const sidebarView = useStoreValue(sidebarViewStore);
+	const chatOpen = useStoreValue(chatPanelOpen);
 	const terminalPosition = useStoreValue(terminalPositionStore);
 	const shortcutBindings = useStoreValue(shortcutBindingsStore);
 	const tabs = useStoreValue(tabsStore);
@@ -316,10 +328,6 @@ function App() {
 			setSidebarOpen(false);
 		}
 	};
-
-	useEffect(() => {
-		if (compact) setSidebarOpen(false);
-	}, [compact]);
 
 	// An open folder always keeps at least one tab, so closing the last one
 	// (or deleting its file) lands on a blank new tab page.
@@ -828,7 +836,7 @@ function App() {
 				launchWorkspacePath.length > 0
 			) {
 				await openWorkspace(launchWorkspacePath);
-				if (!isCompactWindow()) {
+				if (!isCompactWorkspace()) {
 					setSidebarOpen(true);
 				}
 				return;
@@ -843,8 +851,15 @@ function App() {
 
 	return (
 		<main
-			className="relative flex h-dvh flex-col bg-background text-foreground"
+			className={`@container/workspace relative h-dvh bg-background text-foreground ${chatOpen && !chatOverlay && !!tabs.activeTabId ? "grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)]" : "flex flex-col"}`}
 			onPointerDownCapture={(event) => {
+				if (
+					chatOverlay &&
+					chatOpen &&
+					event.target instanceof Element &&
+					!event.target.closest("#chat-sidebar")
+				)
+					chatPanelOpen.set(false);
 				if (
 					event.target instanceof Element &&
 					!event.target.closest(
@@ -859,45 +874,65 @@ function App() {
 					!event.defaultPrevented &&
 					event.key === "Escape" &&
 					sidebarOpen &&
-					isCompactWindow()
+					isCompactWorkspace()
 				) {
 					event.preventDefault();
 					setSidebarOpen(false);
 				}
 			}}
 		>
+			<span
+				ref={observeWorkspaceLayout}
+				aria-hidden="true"
+				className="workspace-layout-state pointer-events-none absolute"
+			/>
 			{showWelcome ? (
 				<div aria-hidden className="h-9 shrink-0 [-webkit-app-region:drag]" />
 			) : (
-				<WindowTitleBar
-					singleTab={!showTabStrip}
-					tabStripLeaving={showTabStrip && !wantsTabStrip}
-					allTabsOpen={allTabsOpen}
-					onAllTabsOpenChange={setAllTabsOpen}
-					showSidebarBadge={
-						!sidebarOpen &&
-						(showReadyCallout ||
-							whatsNewVersion !== null ||
-							telemetryConsent === "unset")
-					}
-					onNewTab={newTab}
-				>
-					{isFileOpen ? (
-						<FileInfoBar
-							scrollContainer={scrollContainerEl}
-							onNewTab={newTab}
-						/>
-					) : null}
-				</WindowTitleBar>
+				<div className={showTabStrip ? "col-span-2" : "min-w-0"}>
+					<WindowTitleBar
+						onOpenChat={
+							tabs.activeTabId && !isFileOpen && !chatOpen
+								? openChatPanel
+								: undefined
+						}
+						singleTab={!showTabStrip}
+						tabStripLeaving={showTabStrip && !wantsTabStrip}
+						allTabsOpen={allTabsOpen}
+						onAllTabsOpenChange={setAllTabsOpen}
+						showSidebarBadge={
+							!sidebarOpen &&
+							(showReadyCallout ||
+								whatsNewVersion !== null ||
+								telemetryConsent === "unset")
+						}
+						onNewTab={newTab}
+					>
+						{isFileOpen ? (
+							<FileInfoBar
+								scrollContainer={scrollContainerEl}
+								onNewTab={newTab}
+							/>
+						) : null}
+					</WindowTitleBar>
+				</div>
 			)}
-			{/* Compact windows anchor the sidebar overlay to the window instead. */}
-			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px max-sm:static">
+			{/* Compact workspaces anchor the sidebar overlay to the workspace root. */}
+			<div
+				className={`${compact ? "static" : "relative"} col-start-1 row-start-2 -mt-px flex min-h-0 min-w-0 flex-1 overflow-hidden pt-px`}
+			>
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
 				<div
 					data-sidebar-overlay
 					aria-hidden={!sidebarOpen}
 					inert={!sidebarOpen}
-					className={`${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`}
+					className={
+						compact
+							? `${sidebarOpen ? SIDEBAR_OVERLAY_SHOWN : SIDEBAR_OVERLAY_HIDDEN} ${SIDEBAR_OVERLAY}`
+							: sidebarOpen
+								? "contents"
+								: "hidden"
+					}
 				>
 					{compact ? <SidebarOverlayTitleRow /> : null}
 					<Sidebar
@@ -1005,6 +1040,10 @@ function App() {
 					<TerminalPanel />
 				</section>
 			</div>
+			<ChatPanel
+				fullHeight={!showTabStrip || chatOverlay}
+				onOpenSettings={openSkillsSettings}
+			/>
 			<GlobalSearchPalette
 				open={searchOpen}
 				onOpenChange={changeSearchOpen}

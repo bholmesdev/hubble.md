@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
+- Chat with your notes and create, edit, or delete workspace files using your ChatGPT account. [#355](https://github.com/bholmesdev/hubble.md/pull/355)
+
 ### Changed
 
 - Open files in your current tab even when another tab already shows them. [#350](https://github.com/bholmesdev/hubble.md/pull/350)
