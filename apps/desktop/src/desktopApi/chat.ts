@@ -1,5 +1,5 @@
 export type ChatAccount = {
-	issue?: "unreadable-credentials";
+	issue?: "unreadable-credentials" | "refresh-unavailable";
 	signingIn?: boolean;
 	busy?: boolean;
 	connected: boolean;

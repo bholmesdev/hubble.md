@@ -13,18 +13,32 @@ const ISSUER = "https://auth.openai.com";
 const RESOURCE = "https://api.openai.com/v1";
 const SCOPES =
 	"openid profile email offline_access resource.invoke chatgpt.tokens.use.direct";
+const UNUSABLE_REFRESH = new Set([
+	"invalid_grant",
+	"invalid_refresh_token",
+	"token_expired",
+	"refresh_token_expired",
+	"refresh_token_invalidated",
+	"refresh_token_reused",
+]);
+const credentialsSchema = z.object({
+	access: z.string(),
+	refresh: z.string().optional(),
+	id: z.string(),
+	expiresAt: z.number(),
+	scopes: z.array(z.string()),
+});
 const savedSchema = z.object({
 	hostId: z.string(),
 	clientId: z.string().optional(),
 	subject: z.string().optional(),
 	label: z.string().optional(),
-	tokens: z
+	tokens: credentialsSchema.optional(),
+	pendingRefresh: z
 		.object({
-			access: z.string(),
-			refresh: z.string().optional(),
-			id: z.string(),
-			expiresAt: z.number(),
-			scopes: z.array(z.string()),
+			tokens: credentialsSchema,
+			verifyIdentity: z.boolean(),
+			receivedAt: z.number(),
 		})
 		.optional(),
 });
@@ -35,6 +49,11 @@ const tokenSchema = z.object({
 	token_type: z.literal("Bearer"),
 	expires_in: z.number().positive(),
 	scope: z.string(),
+});
+const refreshSchema = tokenSchema.extend({
+	id_token: z.string().min(1).optional(),
+	refresh_token: z.string().min(1),
+	scope: z.string().optional(),
 });
 
 type SavedAccount = z.infer<typeof savedSchema>;
@@ -50,6 +69,9 @@ export class ChatGPTAuth {
 	private saved: SavedAccount | undefined;
 	private loading: Promise<SavedAccount> | undefined;
 	private attempt: AbortController | undefined;
+	private renewal: Promise<void> | undefined;
+	private clearing = false;
+	private pendingSave: SavedAccount | undefined;
 
 	constructor(private options: AuthOptions) {}
 
@@ -67,8 +89,18 @@ export class ChatGPTAuth {
 				issue: "unreadable-credentials",
 			};
 		}
+		let refreshFailed = false;
+		try {
+			await this.renew(saved);
+		} catch {
+			refreshFailed = true;
+		}
+		saved = this.saved ?? saved;
 		const connected = !!saved.tokens && saved.tokens.expiresAt > Date.now();
 		return {
+			...(!connected && refreshFailed
+				? { issue: "refresh-unavailable" as const }
+				: {}),
 			connected,
 			sharing:
 				connected &&
@@ -80,6 +112,8 @@ export class ChatGPTAuth {
 
 	async accessToken() {
 		const account = await this.account();
+		if (account.issue === "refresh-unavailable")
+			throw new Error("Something went wrong. Please try again.");
 		if (!account.connected)
 			throw new Error(
 				"Your connection has expired. Sign in again to continue.",
@@ -98,6 +132,7 @@ export class ChatGPTAuth {
 		this.attempt = controller;
 		const timeout = setTimeout(() => controller.abort(), 5 * 60_000);
 		try {
+			await this.renewal?.catch(() => {});
 			const saved = { ...(await this.load()) };
 			const state = randomBytes(32).toString("base64url");
 			const nonce = randomBytes(32).toString("base64url");
@@ -188,10 +223,12 @@ export class ChatGPTAuth {
 				};
 				await this.save({
 					...saved,
+					pendingRefresh: undefined,
 					subject: payload.sub,
 					label,
 					tokens: credentials,
 				});
+				this.pendingSave = undefined;
 				callback.finish(false);
 				return this.account();
 			} finally {
@@ -214,36 +251,178 @@ export class ChatGPTAuth {
 	/** Recovery must not decrypt the credentials it is trying to discard. */
 	async reset() {
 		this.cancel();
-		await fs.rm(this.options.storagePath, { force: true });
-		this.saved = undefined;
-		this.loading = undefined;
+		this.clearing = true;
+		try {
+			await this.renewal?.catch(() => {});
+			await fs.rm(this.options.storagePath, { force: true });
+			this.saved = undefined;
+			this.loading = undefined;
+			this.pendingSave = undefined;
+		} finally {
+			this.clearing = false;
+		}
 	}
 
 	async disconnect() {
 		this.cancel();
-		const saved = { ...(await this.load()) };
-		const tokens = saved.tokens;
-		saved.tokens = undefined;
-		await this.save(saved);
-		if (!tokens?.refresh || !saved.clientId) return;
+		this.clearing = true;
 		try {
-			const discovery = await this.discovery(AbortSignal.timeout(10_000));
-			const response = await fetch(discovery.revocation_endpoint, {
-				method: "POST",
-				signal: AbortSignal.timeout(10_000),
-				headers: { "Content-Type": "application/x-www-form-urlencoded" },
-				body: new URLSearchParams({
-					token: tokens.refresh,
-					token_type_hint: "refresh_token",
-					client_id: saved.clientId,
-				}),
-			});
-			if (!response.ok) throw new Error();
-		} catch {
-			throw new Error(
-				"Signed out locally. Remote sign-out was not confirmed; disconnect Hubble in your account’s Settings → Usage.",
-			);
+			await this.renewal?.catch(() => {});
+			const saved = { ...(this.pendingSave ?? (await this.load())) };
+			const tokens = saved.pendingRefresh?.tokens ?? saved.tokens;
+			saved.tokens = undefined;
+			saved.pendingRefresh = undefined;
+			await this.save(saved);
+			this.pendingSave = undefined;
+			if (!tokens?.refresh || !saved.clientId) return;
+			try {
+				const discovery = await this.discovery(AbortSignal.timeout(10_000));
+				const response = await fetch(discovery.revocation_endpoint, {
+					method: "POST",
+					signal: AbortSignal.timeout(10_000),
+					headers: { "Content-Type": "application/x-www-form-urlencoded" },
+					body: new URLSearchParams({
+						token: tokens.refresh,
+						token_type_hint: "refresh_token",
+						client_id: saved.clientId,
+					}),
+				});
+				if (!response.ok) throw new Error();
+			} catch {
+				throw new Error(
+					"Signed out locally. Remote sign-out was not confirmed; disconnect Hubble in your account’s Settings → Usage.",
+				);
+			}
+		} finally {
+			this.clearing = false;
 		}
+	}
+
+	/** Share renewal calls; sign-out waits so renewal cannot restore cleared tokens. */
+	private async renew(saved: SavedAccount) {
+		if (this.attempt || this.clearing) return;
+		if (
+			!this.pendingSave &&
+			!saved.pendingRefresh &&
+			(!saved.tokens || saved.tokens.expiresAt > Date.now() + 60_000)
+		)
+			return;
+		this.renewal ??= this.refresh(saved).finally(() => {
+			this.renewal = undefined;
+		});
+		await this.renewal;
+	}
+
+	private async refresh(saved: SavedAccount) {
+		// Rotation may already have succeeded remotely when local storage failed.
+		if (this.pendingSave) {
+			await this.save(this.pendingSave);
+			saved = this.pendingSave;
+			this.pendingSave = undefined;
+		}
+		if (!saved.pendingRefresh) {
+			await this.requestRefresh(saved);
+			saved = this.saved ?? saved;
+		}
+		const pending = saved.pendingRefresh;
+		if (!pending) return;
+		if (pending.verifyIdentity) {
+			const discovery = await this.discovery(AbortSignal.timeout(15_000));
+			const keys = createRemoteJWKSet(new URL(discovery.jwks_uri));
+			let keysUnavailable = false;
+			try {
+				const { payload } = await jwtVerify(
+					pending.tokens.id,
+					async (header, token) => {
+						try {
+							return await keys(header, token);
+						} catch (error) {
+							keysUnavailable = true;
+							throw error;
+						}
+					},
+					{
+						issuer: ISSUER,
+						audience: saved.clientId,
+						requiredClaims: ["sub", "exp", "iat"],
+						clockTolerance: 5,
+						// Verification outages may outlast the ID token; validate at receipt.
+						currentDate: new Date(pending.receivedAt),
+					},
+				);
+				if (payload.sub !== saved.subject)
+					throw new Error("Sign-in identity could not be verified.");
+			} catch (error) {
+				// Key retrieval failures do not prove the signed identity is invalid.
+				if (keysUnavailable) throw error;
+				await this.save({
+					...saved,
+					tokens: undefined,
+					pendingRefresh: undefined,
+				});
+				return;
+			}
+		}
+		await this.save({
+			...saved,
+			tokens: pending.tokens,
+			pendingRefresh: undefined,
+		});
+	}
+
+	private async requestRefresh(saved: SavedAccount) {
+		const previous = saved.tokens;
+		if (!previous?.refresh || !saved.clientId) {
+			if (previous && previous.expiresAt <= Date.now())
+				await this.save({ ...saved, tokens: undefined });
+			return;
+		}
+		const signal = AbortSignal.timeout(15_000);
+		const discovery = await this.discovery(signal);
+		const response = await fetch(discovery.token_endpoint, {
+			method: "POST",
+			signal,
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				grant_type: "refresh_token",
+				client_id: saved.clientId,
+				refresh_token: previous.refresh,
+				resource: RESOURCE,
+			}),
+		});
+		const body = await response.json();
+		if (!response.ok) {
+			const code =
+				typeof body?.error === "string"
+					? body.error
+					: (body?.error?.code ?? body?.code);
+			if (
+				(response.status === 400 || response.status === 401) &&
+				UNUSABLE_REFRESH.has(code)
+			) {
+				await this.save({ ...saved, tokens: undefined });
+				return;
+			}
+			throw new Error("Something went wrong. Please try again.");
+		}
+		const tokens = refreshSchema.parse(body);
+		// Save rotation before key retrieval; this checkpoint is not an authorized session.
+		this.pendingSave = {
+			...saved,
+			pendingRefresh: {
+				verifyIdentity: !!tokens.id_token,
+				receivedAt: Date.now(),
+				tokens: {
+					access: tokens.access_token,
+					refresh: tokens.refresh_token,
+					id: tokens.id_token ?? previous.id,
+					expiresAt: Date.now() + tokens.expires_in * 1000,
+					scopes: tokens.scope?.split(/\s+/) ?? previous.scopes,
+				},
+			},
+		};
+		await this.save(this.pendingSave);
+		this.pendingSave = undefined;
 	}
 
 	private load(): Promise<SavedAccount> {

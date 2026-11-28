@@ -9,7 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Added
 
-- Sign in with ChatGPT and manage your saved connection. [#353](https://github.com/bholmesdev/hubble.md/pull/353)
+- Sign in with ChatGPT and keep your connection active automatically. [#353](https://github.com/bholmesdev/hubble.md/pull/353)
 
 ### Changed
 

@@ -32,6 +32,10 @@ let exchange: URLSearchParams | undefined;
 let callbackResponse: Promise<Response> | undefined;
 let auth: ChatGPTAuth;
 let options: ConstructorParameters<typeof ChatGPTAuth>[0];
+let refreshReply: () => Promise<Response>;
+let refreshes: URLSearchParams[];
+let now: number;
+let refreshIdentity: (subject: string) => Promise<string>;
 
 beforeEach(async () => {
 	folder = await fs.mkdtemp(path.join(os.tmpdir(), "hubble-chat-auth-"));
@@ -43,7 +47,27 @@ beforeEach(async () => {
 	callbackClient = "oaiapp_test";
 	exchange = undefined;
 	callbackResponse = undefined;
+	refreshes = [];
+	now = Date.now();
+	vi.spyOn(Date, "now").mockImplementation(() => now);
+	refreshReply = async () =>
+		Response.json({
+			access_token: "renewed-access",
+			refresh_token: "rotated-refresh",
+			token_type: "Bearer",
+			expires_in: 3600,
+			scope,
+		});
 	const { privateKey, publicKey } = await generateKeyPair("RS256");
+	refreshIdentity = (subject) =>
+		new SignJWT({})
+			.setProtectedHeader({ alg: "RS256" })
+			.setIssuer(ISSUER)
+			.setAudience("oaiapp_test")
+			.setSubject(subject)
+			.setIssuedAt(Math.floor(now / 1000))
+			.setExpirationTime(Math.floor(now / 1000) + 3600)
+			.sign(privateKey);
 	vi.mocked(createRemoteJWKSet).mockReturnValue(
 		Object.assign(createLocalJWKSet({ keys: [await exportJWK(publicKey)] }), {
 			coolingDown: false,
@@ -69,6 +93,10 @@ beforeEach(async () => {
 				return new Response(null, { status: revokeStatus });
 			if (!url.endsWith("/oauth/token")) throw new Error("Unexpected request");
 			exchange = init?.body as URLSearchParams;
+			if (exchange.get("grant_type") === "refresh_token") {
+				refreshes.push(exchange);
+				return refreshReply();
+			}
 			const id = await new SignJWT({
 				nonce: authorization.searchParams.get("nonce"),
 				...identityOverride,
@@ -257,4 +285,250 @@ it("recovers an unreadable connection by resetting without decrypting it", async
 		code: "ENOENT",
 	});
 	await expect(auth.signIn()).resolves.toMatchObject({ connected: true });
+});
+
+describe("automatic token renewal", () => {
+	it("renews near expiry, persists rotation across restart, and reuses the newest refresh token", async () => {
+		await auth.signIn();
+		const browser = vi.spyOn(options, "openBrowser");
+		now += 3541_000;
+		expect(await auth.accessToken()).toBe("renewed-access");
+		expect(refreshes).toHaveLength(1);
+		expect(Object.fromEntries(refreshes[0])).toEqual({
+			grant_type: "refresh_token",
+			client_id: "oaiapp_test",
+			refresh_token: "secret-refresh",
+			resource: "https://api.openai.com/v1",
+		});
+		expect(browser).not.toHaveBeenCalled();
+		auth = new ChatGPTAuth(options);
+		expect(await auth.accessToken()).toBe("renewed-access");
+		expect(refreshes).toHaveLength(1);
+		now += 3601_000;
+		expect(await auth.account()).toMatchObject({
+			connected: true,
+			sharing: true,
+		});
+		expect(refreshes[1].get("refresh_token")).toBe("rotated-refresh");
+		expect((await fs.readFile(options.storagePath)).toString()).not.toContain(
+			"rotated-refresh",
+		);
+	});
+
+	it("shares a renewal between concurrent status and token requests", async () => {
+		await auth.signIn();
+		now += 3601_000;
+		let finish!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			finish = resolve;
+		});
+		const reply = refreshReply;
+		refreshReply = async () => {
+			await gate;
+			return reply();
+		};
+		const requests = [auth.account(), auth.accessToken(), auth.accessToken()];
+		await vi.waitFor(() => expect(refreshes).toHaveLength(1));
+		finish();
+		expect(await Promise.all(requests)).toMatchObject([
+			{ connected: true },
+			"renewed-access",
+			"renewed-access",
+		]);
+		expect(refreshes).toHaveLength(1);
+	});
+
+	it.each([
+		"network",
+		"server",
+		"invalid_client",
+	])("preserves expired credentials after a %s failure and retries without browser sign-in", async (failure) => {
+		await auth.signIn();
+		now += 3601_000;
+		const before = await fs.readFile(options.storagePath);
+		const goodReply = refreshReply;
+		refreshReply = async () => {
+			if (failure === "network") throw Error("offline");
+			return Response.json(
+				{ error: failure === "server" ? "invalid_grant" : "invalid_client" },
+				{ status: failure === "server" ? 503 : 400 },
+			);
+		};
+		expect(await auth.account()).toMatchObject({
+			connected: false,
+			label: "Chat account",
+			issue: "refresh-unavailable",
+		});
+		expect(await fs.readFile(options.storagePath)).toEqual(before);
+		await expect(auth.accessToken()).rejects.toThrow("try again");
+		refreshReply = goodReply;
+		expect(await auth.accessToken()).toBe("renewed-access");
+	});
+
+	it("continues using a valid token if early renewal fails", async () => {
+		await auth.signIn();
+		now += 3541_000;
+		refreshReply = async () => {
+			throw Error("offline");
+		};
+		expect(await auth.accessToken()).toBe("secret-access");
+		const account = await auth.account();
+		expect(account.connected).toBe(true);
+		expect(account.issue).toBeUndefined();
+	});
+
+	it.each([
+		"invalid_grant",
+		"refresh_token_expired",
+		"refresh_token_reused",
+	])("returns to normal sign-in after %s while retaining registration", async (code) => {
+		await auth.signIn();
+		now += 3601_000;
+		refreshReply = async () =>
+			Response.json({ error: { code } }, { status: 400 });
+		expect(await auth.account()).toMatchObject({
+			connected: false,
+			expiresAt: null,
+		});
+		await expect(auth.accessToken()).rejects.toThrow("Sign in");
+		expect(refreshes).toHaveLength(1);
+		await auth.signIn();
+		expect(authorization.searchParams.get("client_id")).toBe("oaiapp_test");
+	});
+
+	it("does not let a pending renewal restore credentials after sign-out", async () => {
+		await auth.signIn();
+		now += 3601_000;
+		let finish!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			finish = resolve;
+		});
+		const reply = refreshReply;
+		refreshReply = async () => {
+			await gate;
+			return reply();
+		};
+		const checking = auth.account();
+		await vi.waitFor(() => expect(refreshes).toHaveLength(1));
+		const signingOut = auth.disconnect();
+		finish();
+		await Promise.all([checking, signingOut]);
+		expect(await new ChatGPTAuth(options).account()).toMatchObject({
+			connected: false,
+			expiresAt: null,
+		});
+	});
+
+	it("keeps a rotated result for retry if saving it fails", async () => {
+		await auth.signIn();
+		now += 3601_000;
+		const encrypt = vi.spyOn(options, "encrypt");
+		encrypt.mockImplementationOnce(() => {
+			throw Error("Permission denied");
+		});
+		expect(await auth.account()).toMatchObject({
+			issue: "refresh-unavailable",
+		});
+		expect(await auth.accessToken()).toBe("renewed-access");
+		expect(refreshes).toHaveLength(1);
+		expect(await new ChatGPTAuth(options).accessToken()).toBe("renewed-access");
+	});
+
+	it("requires sign-in after expiry when no refresh token was granted", async () => {
+		await auth.signIn();
+		const saved = JSON.parse(
+			options.decrypt(await fs.readFile(options.storagePath)),
+		);
+		delete saved.tokens.refresh;
+		await fs.writeFile(
+			options.storagePath,
+			options.encrypt(JSON.stringify(saved)),
+		);
+		auth = new ChatGPTAuth(options);
+		now += 3601_000;
+		expect(await auth.account()).toMatchObject({
+			connected: false,
+			expiresAt: null,
+		});
+		expect(refreshes).toHaveLength(0);
+	});
+
+	it("retains the existing grant if refresh omits scope", async () => {
+		await auth.signIn();
+		now += 3601_000;
+		refreshReply = async () =>
+			Response.json({
+				access_token: "renewed-access",
+				refresh_token: "rotated-refresh",
+				token_type: "Bearer",
+				expires_in: 3600,
+			});
+		expect(await auth.account()).toMatchObject({
+			connected: true,
+			sharing: true,
+		});
+	});
+
+	it("does not authorize an unverifiable refreshed identity", async () => {
+		await auth.signIn();
+		now += 3601_000;
+		refreshReply = async () =>
+			Response.json({
+				access_token: "untrusted-access",
+				refresh_token: "untrusted-refresh",
+				id_token: "not-a-signed-identity",
+				token_type: "Bearer",
+				expires_in: 3600,
+				scope,
+			});
+		await expect(auth.accessToken()).rejects.toThrow("Sign in");
+		expect(
+			JSON.parse(options.decrypt(await fs.readFile(options.storagePath)))
+				.tokens,
+		).toBeUndefined();
+		await expect(new ChatGPTAuth(options).accessToken()).rejects.toThrow(
+			"Sign in",
+		);
+	});
+
+	it("resumes verification after a key-service failure and restart without reusing the consumed refresh token", async () => {
+		await auth.signIn();
+		now += 3601_000;
+		const reply = refreshReply;
+		refreshReply = async () => {
+			const body = await (await reply()).json();
+			return Response.json({
+				...body,
+				id_token: await refreshIdentity("user-a"),
+			});
+		};
+		vi.mocked(createRemoteJWKSet).mockImplementationOnce(() => {
+			throw Error("Key service offline");
+		});
+		expect(await auth.account()).toMatchObject({
+			issue: "refresh-unavailable",
+		});
+		auth = new ChatGPTAuth(options);
+		expect(await auth.accessToken()).toBe("renewed-access");
+		expect(refreshes).toHaveLength(1);
+	});
+
+	it("rejects a valid refreshed identity belonging to a different account", async () => {
+		await auth.signIn();
+		now += 3601_000;
+		refreshReply = async () =>
+			Response.json({
+				access_token: "other-account-access",
+				refresh_token: "other-account-refresh",
+				id_token: await refreshIdentity("user-b"),
+				token_type: "Bearer",
+				expires_in: 3600,
+				scope,
+			});
+		await expect(auth.accessToken()).rejects.toThrow("Sign in");
+		expect(
+			JSON.parse(options.decrypt(await fs.readFile(options.storagePath)))
+				.tokens,
+		).toBeUndefined();
+	});
 });
