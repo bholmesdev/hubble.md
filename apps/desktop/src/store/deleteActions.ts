@@ -16,7 +16,13 @@ import { tabsStore } from "./tabStore";
 
 import { findTabByPath, type TabId, withoutTabsMatching } from "./tabs";
 
-const UNDO_MS = 5000;
+const HUMAN_UNDO_MS = 5000;
+
+type DeleteOptions = {
+	source?: "human" | "agent";
+	beforeStage?: (phase: "before-save" | "before-stage") => Promise<void>;
+	preserveTabId?: string;
+};
 
 type PendingDelete = {
 	token: string;
@@ -229,9 +235,9 @@ export function createDeleteActions(deps: DeleteDeps) {
 
 	const runDelete = async (
 		items: SidebarDeleteItem[],
-		beforeStage?: (phase: "before-save" | "before-stage") => Promise<void>,
-		preserveTabId?: string,
+		options: DeleteOptions = {},
 	) => {
+		const { beforeStage, preserveTabId, source = "human" } = options;
 		if (items.length === 0) return false;
 		await expireDeleteUndo();
 		if (pending) return false;
@@ -354,9 +360,11 @@ export function createDeleteActions(deps: DeleteDeps) {
 		deletion.toastId = toast(
 			`Deleted ${count === 1 ? "1 item" : `${count} items`}`,
 			{
-				duration: UNDO_MS,
+				// Agent replies may outlast the human Undo window.
+				duration: source === "agent" ? Infinity : HUMAN_UNDO_MS,
+				position: source === "agent" ? "bottom-left" : undefined,
 				action: {
-					label: undoToastLabel(),
+					label: source === "agent" ? "Undo" : undoToastLabel(),
 					onClick: (event) => {
 						event.preventDefault();
 						void undoDelete(token);
@@ -366,26 +374,19 @@ export function createDeleteActions(deps: DeleteDeps) {
 				onDismiss: () => void expireDeleteUndo(token),
 			},
 		);
-		await desktopApi.setDeleteUndoAvailable(true);
+		await desktopApi.setDeleteUndoAvailable(source === "human");
 		await pinRemovalSaved;
 		return true;
 	};
 
 	const deleteSidebarItems = async (
 		items: SidebarDeleteItem[],
-		options?: {
-			beforeStage?: (phase: "before-save" | "before-stage") => Promise<void>;
-			preserveTabId?: string;
-		},
+		options?: DeleteOptions,
 	) => {
 		if (deleting) return false;
 		deleting = true;
 		try {
-			return await runDelete(
-				items,
-				options?.beforeStage,
-				options?.preserveTabId,
-			);
+			return await runDelete(items, options);
 		} finally {
 			deleting = false;
 		}

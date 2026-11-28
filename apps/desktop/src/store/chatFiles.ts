@@ -31,6 +31,7 @@ export async function handleChatFileRequest(
 			const deleted = await deleteSidebarItems(
 				[{ kind: "file", path: request.path }],
 				{
+					source: "agent",
 					preserveTabId: ownerTabId,
 					beforeStage: async (phase) => {
 						guard();
