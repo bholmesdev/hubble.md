@@ -1,3 +1,5 @@
+@import "./Markdown.css";
+
 [data-hubble-editor] .editorViewport {
 	--editor-content-max-inline-size: 56rem;
 	--editor-content-padding-inline: clamp(1rem, 4vw, 3rem);
@@ -14,9 +16,6 @@
 }
 
 [data-hubble-editor] .ProseMirror {
-	--editor-gap: 0.75em;
-	--editor-list-gap: 0.25em;
-
 	inline-size: 100%;
 	max-inline-size: var(--editor-content-max-inline-size);
 	margin-inline: auto;
@@ -32,79 +31,8 @@
 	font-size: var(--font-size-content);
 }
 
-[data-hubble-editor]
-	.ProseMirror
-	:where(h1, h2, h3, h4, h5, h6, p, ul, ol, blockquote, pre, table, hr) {
-	margin-block: 0;
-}
-
-/* Default separation between any two blocks. */
-[data-hubble-editor] .ProseMirror > * + * {
-	margin-block-start: var(--editor-gap);
-}
-
-[data-hubble-editor] .ProseMirror > * + :is(h1, h2, h3, h4, h5, h6) {
-	margin-block-start: 1.3em;
-}
-
-/* Restore flow inside containers whose child margins are reset above. */
-[data-hubble-editor]
-	.ProseMirror
-	:is(blockquote, li, td, th)
-	:is(p, ul, ol, blockquote, pre)
-	+ :is(p, ul, ol, blockquote, pre) {
-	margin-block-start: var(--editor-gap);
-}
-
 [data-hubble-editor] .ProseMirror > .react-renderer.node-codeBlock {
 	margin-block: var(--editor-gap);
-}
-
-[data-hubble-editor] .ProseMirror h1 {
-	font-size: 1.75rem;
-	font-weight: 600;
-	line-height: 1.2;
-}
-
-[data-hubble-editor] .ProseMirror h2 {
-	font-size: 1.4rem;
-	font-weight: 600;
-	line-height: 1.25;
-}
-
-[data-hubble-editor] .ProseMirror h3 {
-	font-size: 1.15rem;
-	font-weight: 600;
-	line-height: 1.3;
-}
-
-[data-hubble-editor] .ProseMirror h4 {
-	font-size: 1.05rem;
-	font-weight: 600;
-	line-height: 1.35;
-	color: color-mix(in oklab, var(--foreground) 75%, var(--muted-foreground));
-}
-
-[data-hubble-editor] .ProseMirror :is(h5, h6) {
-	font-size: 1rem;
-	font-weight: 600;
-	line-height: 1.4;
-}
-
-[data-hubble-editor] .ProseMirror h6 {
-	color: var(--muted-foreground);
-}
-
-[data-hubble-editor] .ProseMirror ul {
-	list-style-type: disc;
-}
-
-[data-hubble-editor] .ProseMirror ol {
-	list-style-type: decimal;
-}
-
-[data-hubble-editor] .ProseMirror :is(ul, ol) li {
-	margin-inline-start: 1.3rem;
 }
 
 /* Match each text block's direction on its structural parent so markers,
@@ -281,19 +209,6 @@
 	}
 }
 
-[data-hubble-editor] .ProseMirror blockquote {
-	margin-inline-start: calc(1rem - 2px);
-	border-inline-start: 2px solid var(--border);
-	border-radius: 1px;
-	padding-inline-start: 1rem;
-	color: color-mix(in oklab, var(--foreground) 78%, var(--muted-foreground));
-}
-
-[data-hubble-editor] .ProseMirror hr {
-	border: 0;
-	border-block-start: 1px solid var(--border);
-}
-
 [data-hubble-editor] .pm-fake-selection {
 	background: color-mix(in oklab, var(--selected) 70%, transparent);
 	border-radius: 2px;
@@ -325,13 +240,6 @@
 	pointer-events: auto;
 	position: relative;
 	cursor: text;
-}
-
-[data-hubble-editor] .ProseMirror code {
-	background: var(--muted);
-	padding: 0.1em 0.3em;
-	border-radius: 3px;
-	font-size: 0.9em;
 }
 
 /* Keep room for the gutter comment badges when the clamp would leave less. */
@@ -370,15 +278,6 @@
 	background: color-mix(in oklab, var(--muted-foreground) 10%, transparent);
 	box-shadow: none;
 	opacity: 0.72;
-}
-
-[data-hubble-editor] .ProseMirror pre {
-	background: var(--muted);
-	padding-block: 1.5rem;
-	padding-inline: 0.85rem;
-	border-radius: var(--radius-md);
-	font-size: 0.9em;
-	overflow-x: auto;
 }
 
 [data-hubble-editor]:not([data-hubble-source-editor]) .ProseMirror pre {
@@ -490,12 +389,6 @@
 [data-hubble-editor] .pm-code-block-language [data-slot="value"] {
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-
-[data-hubble-editor] .ProseMirror pre code {
-	background: transparent;
-	color: #000;
-	padding: 0;
 }
 
 [data-hubble-editor]:not([data-hubble-source-editor]) .ProseMirror pre code {
@@ -766,32 +659,8 @@
 	}
 }
 
-[data-hubble-editor] .ProseMirror table {
-	border-collapse: separate;
-	border-spacing: 0;
-	border-radius: var(--radius);
-	table-layout: fixed;
-	inline-size: 100%;
-	margin-block: var(--editor-gap);
-	overflow: hidden;
-}
-
-[data-hubble-editor] .ProseMirror td,
-[data-hubble-editor] .ProseMirror th {
-	min-inline-size: 1em;
-	border: 1px solid var(--border);
-	padding: 0.5rem 0.75rem;
-	vertical-align: top;
-	box-sizing: border-box;
-	position: relative;
-}
-
 [data-hubble-editor] .ProseMirror tr:not(:first-child) :is(td, th) {
 	border-block-start: 0;
-}
-
-[data-hubble-editor] .ProseMirror :is(td, th):not(:first-child) {
-	border-inline-start: 0;
 }
 
 [data-hubble-editor] .ProseMirror tr:first-child :is(td, th):first-child {
@@ -810,8 +679,60 @@
 	border-end-end-radius: var(--radius);
 }
 
-[data-hubble-editor] .ProseMirror th {
-	background-color: var(--muted);
-	font-weight: 600;
-	text-align: start;
+@property --hubble-attach-flash {
+	syntax: "<percentage>";
+	inherits: true;
+	initial-value: 0%;
+}
+
+@keyframes hubble-selection-attach {
+	0%,
+	100% {
+		--hubble-attach-flash: 0%;
+	}
+	20% {
+		--hubble-attach-flash: 100%;
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.ProseMirror .hubble-tool-edit {
+		color: color-mix(
+			in oklab,
+			var(--brand-accent-foreground) var(--hubble-attach-flash),
+			var(--foreground)
+		);
+		animation: hubble-selection-attach 800ms ease-out;
+		background: color-mix(
+			in oklab,
+			var(--hubble-tool-edit-tint, var(--brand-accent))
+				var(--hubble-attach-flash),
+			transparent
+		);
+		border-radius: 2px;
+		box-decoration-break: clone;
+	}
+
+	.ProseMirror .hubble-tool-edit-alternate {
+		animation-name: hubble-tool-edit-alternate;
+	}
+
+	.dark .ProseMirror .hubble-tool-edit {
+		--hubble-tool-edit-tint: color-mix(
+			in oklab,
+			var(--brand-accent) 24%,
+			transparent
+		);
+		color: inherit;
+	}
+}
+
+@keyframes hubble-tool-edit-alternate {
+	0%,
+	100% {
+		--hubble-attach-flash: 0%;
+	}
+	20% {
+		--hubble-attach-flash: 100%;
+	}
 }

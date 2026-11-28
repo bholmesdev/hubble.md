@@ -2,6 +2,7 @@ import { resetEditorHistory } from "@hubble.md/editor";
 import type { Editor, JSONContent } from "@tiptap/core";
 import { closeHistory } from "@tiptap/pm/history";
 import type { Transaction } from "@tiptap/pm/state";
+import { highlightToolEdits } from "./ToolEditHighlight";
 
 /** Programmatic updates are separate undo events; disk reloads retain their existing history policy. */
 export function replaceEditorContent(
@@ -21,6 +22,7 @@ export function replaceEditorContent(
 	chain
 		.command(({ tr }) => {
 			update?.(tr);
+			if (undoable) highlightToolEdits(tr);
 			return true;
 		})
 		.run();

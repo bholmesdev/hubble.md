@@ -39,6 +39,7 @@ const descriptions: Record<CommandId, string> = {
 	"app.copy-path": "Copy the selected file path.",
 	"app.reveal": "Reveal the selected item in Finder or Explorer.",
 	"app.chat-about-note": "Open the configured agent command for this note.",
+	"app.toggle-chat": "Show or hide Chat.",
 	"app.toggle-sidebar": "Show or hide the file sidebar.",
 	"app.show-folders":
 		"Show the folder view, or hide the sidebar if it is already showing.",

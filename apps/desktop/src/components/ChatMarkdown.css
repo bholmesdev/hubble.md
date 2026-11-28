@@ -1,0 +1,64 @@
+.chat-markdown {
+	font-size: inherit;
+}
+.chat-markdown li + li,
+.chat-markdown li > :is(ul, ol) {
+	margin-block-start: var(--editor-list-gap);
+}
+.chat-markdown pre {
+	white-space: pre;
+	overflow-wrap: normal;
+}
+@keyframes chat-chunk-enter {
+	from {
+		opacity: 0.25;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.chat-chunk-enter {
+	animation: chat-chunk-enter 140ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+	.chat-chunk-enter {
+		animation: none;
+	}
+}
+
+.chat-work > summary::-webkit-details-marker {
+	display: none;
+}
+
+@keyframes chat-work-sweep {
+	0% {
+		background-position: 100% 0;
+	}
+	50%,
+	100% {
+		background-position: 0% 0;
+	}
+}
+
+.chat-work-label[data-working] {
+	background-image: linear-gradient(
+		100deg,
+		var(--muted-foreground) 40%,
+		var(--foreground) 48%,
+		var(--foreground) 52%,
+		var(--muted-foreground) 60%
+	);
+	background-size: 300% 100%;
+	background-repeat: no-repeat;
+	background-clip: text;
+	color: transparent;
+	animation: chat-work-sweep 3.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce), (forced-colors: active) {
+	.chat-work-label[data-working] {
+		animation: none;
+		background: none;
+		color: inherit;
+	}
+}

@@ -38,6 +38,7 @@ import {
 	recordRecentCommand,
 } from "./commands/recentCommands";
 import { buildAppCommands } from "./commands/useAppCommands";
+import { ChatPanel } from "./components/ChatPanel";
 import { FileInfoBar } from "./components/FileInfoBar";
 import { HtmlAppEmptyState } from "./components/HtmlAppEmptyState";
 import { NewTabPage } from "./components/NewTabPage";
@@ -144,6 +145,7 @@ import {
 	workspacePathStore,
 	workspaceStore,
 } from "./store/state";
+import { chatPanelOpen } from "./store/tabChat";
 import { tabsStore } from "./store/tabStore";
 import { isDarkTheme, subscribeTheme } from "./theme";
 
@@ -242,6 +244,7 @@ function App() {
 	const workspacePath = useStoreValue(workspacePathStore);
 	const sidebarOpen = useStoreValue(sidebarOpenStore);
 	const sidebarView = useStoreValue(sidebarViewStore);
+	const chatOpen = useStoreValue(chatPanelOpen);
 	const terminalPosition = useStoreValue(terminalPositionStore);
 	const shortcutBindings = useStoreValue(shortcutBindingsStore);
 	const tabs = useStoreValue(tabsStore);
@@ -843,7 +846,7 @@ function App() {
 
 	return (
 		<main
-			className="relative flex h-dvh flex-col bg-background text-foreground"
+			className={`relative h-dvh bg-background text-foreground ${chatOpen && !!tabs.activeTabId ? "grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)]" : "flex flex-col"}`}
 			onPointerDownCapture={(event) => {
 				if (
 					event.target instanceof Element &&
@@ -869,29 +872,36 @@ function App() {
 			{showWelcome ? (
 				<div aria-hidden className="h-9 shrink-0 [-webkit-app-region:drag]" />
 			) : (
-				<WindowTitleBar
-					singleTab={!showTabStrip}
-					tabStripLeaving={showTabStrip && !wantsTabStrip}
-					allTabsOpen={allTabsOpen}
-					onAllTabsOpenChange={setAllTabsOpen}
-					showSidebarBadge={
-						!sidebarOpen &&
-						(showReadyCallout ||
-							whatsNewVersion !== null ||
-							telemetryConsent === "unset")
-					}
-					onNewTab={newTab}
-				>
-					{isFileOpen ? (
-						<FileInfoBar
-							scrollContainer={scrollContainerEl}
-							onNewTab={newTab}
-						/>
-					) : null}
-				</WindowTitleBar>
+				<div className={showTabStrip ? "col-span-2" : "min-w-0"}>
+					<WindowTitleBar
+						onOpenChat={
+							tabs.activeTabId && !isFileOpen && !chatOpen
+								? () => chatPanelOpen.set(true)
+								: undefined
+						}
+						singleTab={!showTabStrip}
+						tabStripLeaving={showTabStrip && !wantsTabStrip}
+						allTabsOpen={allTabsOpen}
+						onAllTabsOpenChange={setAllTabsOpen}
+						showSidebarBadge={
+							!sidebarOpen &&
+							(showReadyCallout ||
+								whatsNewVersion !== null ||
+								telemetryConsent === "unset")
+						}
+						onNewTab={newTab}
+					>
+						{isFileOpen ? (
+							<FileInfoBar
+								scrollContainer={scrollContainerEl}
+								onNewTab={newTab}
+							/>
+						) : null}
+					</WindowTitleBar>
+				</div>
 			)}
 			{/* Compact windows anchor the sidebar overlay to the window instead. */}
-			<div className="relative -mt-px flex min-h-0 flex-1 overflow-hidden pt-px max-sm:static">
+			<div className="relative col-start-1 row-start-2 -mt-px flex min-h-0 min-w-0 flex-1 overflow-hidden pt-px max-sm:static">
 				{/* Compact sidebar stays mounted while closed so it can slide out. */}
 				<div
 					data-sidebar-overlay
@@ -1005,6 +1015,10 @@ function App() {
 					<TerminalPanel />
 				</section>
 			</div>
+			<ChatPanel
+				fullHeight={!showTabStrip}
+				onOpenSettings={openSkillsSettings}
+			/>
 			<GlobalSearchPalette
 				open={searchOpen}
 				onOpenChange={changeSearchOpen}
