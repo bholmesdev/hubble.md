@@ -39,6 +39,7 @@
 		"@dnd-kit/core": "^6.3.1",
 		"@floating-ui/dom": "^1.7.5",
 		"@hubble.md/editor": "workspace:*",
+		"@hubble.md/react-core": "workspace:*",
 		"@tiptap/core": "^3.4.3",
 		"@tiptap/extension-blockquote": "^3.20.0",
 		"@tiptap/extension-bold": "^3.20.0",

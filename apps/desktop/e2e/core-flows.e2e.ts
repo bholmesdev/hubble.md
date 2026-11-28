@@ -102,6 +102,32 @@ test("edits an existing note and saves it", async ({ hubble }) => {
 		.toBe("# Existing\n\nHello world");
 });
 
+test("find and replace shortcuts follow editor focus", async ({ hubble }) => {
+	const page = await hubble.launch();
+	await sidebarFile(page, "existing.md").click();
+	await expect(editor(page)).toContainText("Hello");
+
+	await page.getByRole("tree").focus();
+	await page.keyboard.press("ControlOrMeta+f");
+	const find = page.getByPlaceholder("Find", { exact: true });
+	await expect(find).toHaveCount(0);
+
+	await editor(page).getByText("Hello").click();
+	await page.keyboard.press("ControlOrMeta+f");
+	await expect(find).toBeFocused();
+	await find.fill("Hello");
+	await expect(page.getByText("1 of 1", { exact: true })).toBeVisible();
+
+	await page.keyboard.press("ControlOrMeta+Alt+f");
+	const replacement = page.getByPlaceholder("Replace with...");
+	await expect(replacement).toBeFocused();
+	await replacement.fill("Goodbye");
+	await page.getByRole("button", { name: "Replace all matches" }).click();
+	await expect(editor(page)).toContainText("Goodbye");
+	await page.keyboard.press("Escape");
+	await expect(find).toHaveCount(0);
+});
+
 test("renames a note from the sidebar and keeps it open", async ({
 	hubble,
 }) => {

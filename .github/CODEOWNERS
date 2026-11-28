@@ -1,0 +1,5 @@
+/packages/react-core/ @bholmesdev
+/eslint.config.mjs @bholmesdev
+/package.json @bholmesdev
+/.github/workflows/ci.yml @bholmesdev
+/.github/CODEOWNERS @bholmesdev
