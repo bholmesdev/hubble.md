@@ -86,7 +86,7 @@ export class ChatGPTAuth {
 			);
 		if (!account.sharing)
 			throw new Error(
-				"Plan usage is not enabled. Open Manage usage, then reconnect.",
+				"Plan usage is not enabled. Open “Manage usage”, then reconnect.",
 			);
 		return (await this.load()).tokens.access;
 	}

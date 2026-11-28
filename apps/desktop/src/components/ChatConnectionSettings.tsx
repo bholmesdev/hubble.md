@@ -75,7 +75,7 @@ export function ChatConnectionSettings() {
 			</div>
 			{!busy && account?.connected && !account.sharing ? (
 				<p className="mt-2 text-xs text-muted-foreground">
-					Enable plan usage in Manage usage, then reconnect.
+					Enable plan usage in “Manage usage”, then reconnect.
 				</p>
 			) : null}
 			{account?.issue === "unreadable-credentials" && !error ? (
