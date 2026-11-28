@@ -5,9 +5,11 @@ import { Toaster } from "./components/Toaster";
 import { preloadDiagrams } from "./editor/lazyDiagram";
 import { initThemePreference } from "./store/actions";
 import { refreshChatConnection } from "./store/chatConnection";
+import { initializeChatSession } from "./store/chatSession";
 import "./components/toast.css";
 import "./index.css";
 
+initializeChatSession();
 initThemePreference();
 void refreshChatConnection();
 

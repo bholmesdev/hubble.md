@@ -1,5 +1,6 @@
 import { type CommandBindings, cleanCommandBindings } from "@hubble.md/editor";
 import { z } from "zod";
+import { CHAT_TEXT_LIMIT, chatMessageSchema } from "../desktopApi/chat";
 import { pathEquals } from "../lib/filePath";
 import type { ThemePreference } from "../theme";
 import { DEFAULT_CHAT_COMMAND } from "./settings";
@@ -32,6 +33,7 @@ export type TerminalPosition = "bottom" | "right";
 export type SidebarView = "folders" | "inbox";
 
 type UiState = {
+	chatPanelOpen: boolean;
 	sidebarOpen: boolean;
 	sidebarView: SidebarView;
 	isSwitcherOpen: boolean;
@@ -71,6 +73,7 @@ type Persisted = {
 		sortMode?: SortMode;
 	};
 	ui?: {
+		chatPanelOpen?: boolean;
 		sidebarOpen?: boolean;
 		sidebarView?: SidebarView;
 		isTerminalOpen?: boolean;
@@ -124,6 +127,7 @@ export function getInitialState(): DesktopState {
 		document: emptyDoc(),
 		tabs: tabsFromSession(tabSessions[workspace.workspacePath ?? ""]),
 		ui: {
+			chatPanelOpen: p?.ui?.chatPanelOpen ?? true,
 			sidebarOpen: p?.ui?.sidebarOpen ?? false,
 			// Older profiles without a saved view keep their original Folders default.
 			sidebarView: !p || p.ui?.sidebarView === "inbox" ? "inbox" : "folders",
@@ -174,6 +178,7 @@ export function serialize(state: DesktopState): Persisted {
 			sortMode: state.workspace.sortMode,
 		},
 		ui: {
+			chatPanelOpen: state.ui.chatPanelOpen,
 			sidebarOpen: state.ui.sidebarOpen,
 			sidebarView: state.ui.sidebarView,
 			isTerminalOpen: state.ui.isTerminalOpen,
@@ -196,12 +201,35 @@ const closedTabSchema = z.object({
 	index: z.number().int().nonnegative(),
 });
 
+const conversationSchema = z.object({
+	messages: z
+		.array(chatMessageSchema)
+		.max(100)
+		.transform((messages) =>
+			messages.map((message) =>
+				message.status === "streaming"
+					? { ...message, status: "stopped" as const }
+					: message,
+			),
+		),
+	draft: z.string().max(CHAT_TEXT_LIMIT),
+	model: z.string().max(200),
+});
+
 const tabSessionSchema = z
 	.object({
 		entries: z
-			.array(z.object({ id: z.string().uuid(), path: z.string().min(1) }))
+			.array(
+				z.object({
+					id: z.string().uuid(),
+					path: z.string().min(1),
+				}),
+			)
 			.optional()
 			.catch(undefined),
+		chats: z
+			.record(z.string(), conversationSchema.nullable().catch(null))
+			.catch({}),
 		activeTabId: z.string().uuid().nullable().optional().catch(undefined),
 		// Legacy input only: older releases saved paths instead of tab IDs.
 		paths: z
@@ -223,7 +251,14 @@ const tabSessionSchema = z
 			.transform((closed) => closed.slice(-MAX_CLOSED_TABS)),
 	})
 	.transform(
-		({ paths, activePath, closed, entries, activeTabId }): TabSession => {
+		({
+			paths,
+			activePath,
+			closed,
+			entries,
+			activeTabId,
+			chats,
+		}): TabSession => {
 			// Convert every saved workspace before it reaches the tab model, so the
 			// next preference save also upgrades workspaces that haven't been opened.
 			const ids = new Set<string>();
@@ -246,6 +281,11 @@ const tabSessionSchema = z
 				entries: currentEntries,
 				activeTabId: active ?? currentEntries[0]?.id ?? null,
 				closed,
+				chats: Object.fromEntries(
+					Object.entries(chats).filter(
+						([id, chat]) => ids.has(id) && chat !== null,
+					),
+				) as NonNullable<TabSession["chats"]>,
 			};
 		},
 	);
