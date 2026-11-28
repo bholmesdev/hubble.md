@@ -37,7 +37,7 @@ export function ChatConnectionSettings() {
 					>
 						Cancel sign-in
 					</Button>
-				) : (
+				) : !account?.connected || !account.sharing ? (
 					<Button
 						data-oai-siwc-button
 						variant="outline"
@@ -53,11 +53,11 @@ export function ChatConnectionSettings() {
 					>
 						{account?.issue === "refresh-unavailable"
 							? "Try again"
-							: account?.expiresAt
-								? "Reconnect"
+							: account?.connected
+								? "Enable access"
 								: "Sign in with ChatGPT"}
 					</Button>
-				)}
+				) : null}
 				{account?.label && account.expiresAt ? (
 					<Button
 						variant="ghost"
@@ -76,8 +76,7 @@ export function ChatConnectionSettings() {
 			</div>
 			{!busy && account?.connected && !account.sharing ? (
 				<p role="alert" className="mt-2 text-xs text-destructive">
-					Hubble doesn’t have permission to use your ChatGPT plan. Enable access
-					in “Manage usage”, then reconnect.
+					Hubble doesn’t have permission to use your ChatGPT plan.
 				</p>
 			) : null}
 			{error ? (

@@ -120,7 +120,7 @@ export class ChatGPTAuth {
 			);
 		if (!account.sharing)
 			throw new Error(
-				"Plan usage is not enabled. Open “Manage usage”, then reconnect.",
+				"Plan usage is not enabled. Choose “Enable access” to continue.",
 			);
 		return (await this.load()).tokens.access;
 	}
@@ -150,6 +150,11 @@ export class ChatGPTAuth {
 					redirect_uri: callback.uri,
 					scope: SCOPES,
 					resource: RESOURCE,
+					// Only explicit permission requests repeat consent, not routine sign-in.
+					...(saved.tokens &&
+					!saved.tokens.scopes.includes("chatgpt.tokens.use.direct")
+						? { prompt: "consent" }
+						: {}),
 					state,
 					nonce,
 					code_challenge_method: "S256",

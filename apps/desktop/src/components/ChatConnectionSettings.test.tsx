@@ -68,6 +68,8 @@ it("connects, shows the account, and signs out through the desktop bridge", asyn
 	expect(api.chatSignIn).toHaveBeenCalledOnce();
 	expect(host.textContent).toContain("test@example.com");
 	expect(button("Manage usage").disabled).toBe(false);
+	expect(host.textContent).not.toContain("Reconnect");
+	expect(host.textContent).not.toContain("Enable access");
 	await act(async () => button("Sign out").click());
 	expect(api.chatDisconnect).toHaveBeenCalledOnce();
 	expect(host.textContent).not.toContain("test@example.com");
@@ -119,13 +121,25 @@ it("retains the real account state when local sign-out fails", async () => {
 	expect(host.textContent).not.toContain("Could not save sign-out.");
 });
 
-it("keeps the existing connection after a failed reconnect", async () => {
-	const { api, host } = await setup(signedIn);
+it("keeps the existing connection after a failed permission request", async () => {
+	const { api, host } = await setup({ ...signedIn, sharing: false });
 	api.chatSignIn.mockRejectedValueOnce(Error("Sign-in cancelled."));
-	await act(async () => button("Reconnect").click());
+	await act(async () => button("Enable access").click());
 	expect(host.textContent).toContain("test@example.com");
 	expect(button("Sign out").disabled).toBe(false);
 	expect(host.textContent).toContain("Sign-in failed. Please try again.");
+});
+
+it("requests plan access without signing out and hides the action after permission is granted", async () => {
+	const { api, host } = await setup({ ...signedIn, sharing: false });
+	expect(host.textContent).toContain("Hubble doesn’t have permission");
+	await act(async () => button("Enable access").click());
+	expect(api.chatSignIn).toHaveBeenCalledOnce();
+	expect(api.chatDisconnect).not.toHaveBeenCalled();
+	expect(api.chatReset).not.toHaveBeenCalled();
+	expect(host.textContent).not.toContain("Enable access");
+	expect(host.textContent).not.toContain("Reconnect");
+	expect(document.querySelector('[role="alert"]')).toBeNull();
 });
 
 it("recovers pending browser sign-in after a renderer reload", async () => {

@@ -172,6 +172,7 @@ describe("ChatGPT public-client sign-in", () => {
 		expect(authorization.searchParams.get("client_id")).toBe(
 			"dynamic_agent_client",
 		);
+		expect(authorization.searchParams.has("prompt")).toBe(false);
 		expect(exchange.get("client_id")).toBe("oaiapp_test");
 		expect(exchange.get("redirect_uri")).toBe(
 			authorization.searchParams.get("redirect_uri"),
@@ -199,13 +200,20 @@ describe("ChatGPT public-client sign-in", () => {
 		expect(authorization.searchParams.has("id_token_hint")).toBe(false);
 	});
 
-	it("does not infer plan permission from a successful identity login", async () => {
+	it("requests consent explicitly when enabling missing plan permission", async () => {
 		scope = "openid profile email";
 		expect(await auth.signIn()).toMatchObject({
 			connected: true,
 			sharing: false,
 		});
 		await expect(auth.accessToken()).rejects.toThrow("not enabled");
+		scope = "openid resource.invoke chatgpt.tokens.use.direct";
+		expect(await auth.signIn()).toMatchObject({
+			connected: true,
+			sharing: true,
+		});
+		expect(authorization.searchParams.get("client_id")).toBe("oaiapp_test");
+		expect(authorization.searchParams.get("prompt")).toBe("consent");
 	});
 
 	it("rejects an unrelated callback without exchanging a code", async () => {
