@@ -27,6 +27,7 @@ let scope = "openid resource.invoke chatgpt.tokens.use.direct";
 let identityOverride: Record<string, unknown>;
 let tokenStatus = 200;
 let revokeStatus = 200;
+let revocation: URLSearchParams | undefined;
 let callbackClient = "oaiapp_test";
 let exchange: URLSearchParams | undefined;
 let callbackResponse: Promise<Response> | undefined;
@@ -44,6 +45,7 @@ beforeEach(async () => {
 	identityOverride = {};
 	tokenStatus = 200;
 	revokeStatus = 200;
+	revocation = undefined;
 	callbackClient = "oaiapp_test";
 	exchange = undefined;
 	callbackResponse = undefined;
@@ -89,8 +91,10 @@ beforeEach(async () => {
 					jwks_uri: `${ISSUER}/.well-known/jwks.json`,
 					revocation_endpoint: `${ISSUER}/revoke`,
 				});
-			if (url.endsWith("/revoke"))
+			if (url.endsWith("/revoke")) {
+				revocation = init?.body as URLSearchParams;
 				return new Response(null, { status: revokeStatus });
+			}
 			if (!url.endsWith("/oauth/token")) throw new Error("Unexpected request");
 			exchange = init?.body as URLSearchParams;
 			if (exchange.get("grant_type") === "refresh_token") {
@@ -103,7 +107,7 @@ beforeEach(async () => {
 			})
 				.setProtectedHeader({ alg: "RS256" })
 				.setIssuer(ISSUER)
-				.setAudience("oaiapp_test")
+				.setAudience(callbackClient)
 				.setSubject(subject)
 				.setIssuedAt()
 				.setExpirationTime("1h")
@@ -189,15 +193,35 @@ describe("ChatGPT public-client sign-in", () => {
 		expect(await new ChatGPTAuth(options).account()).toEqual(account);
 	});
 
-	it("retains host and issued registration across sign-out and reconnect", async () => {
-		await auth.signIn();
+	it("allows a different account after sign-out and restart without reusing the previous registration", async () => {
+		identityOverride = { email: "a@example.com" };
+		expect(await auth.signIn()).toMatchObject({
+			connected: true,
+			label: "a@example.com",
+		});
 		const host = authorization.searchParams.get("ext_agent_host_id");
 		await auth.disconnect();
-		await auth.signIn();
-		expect(authorization.searchParams.get("client_id")).toBe("oaiapp_test");
+		expect(revocation?.get("client_id")).toBe("oaiapp_test");
+		expect(revocation?.get("token")).toBe("secret-refresh");
+		auth = new ChatGPTAuth(options);
+		subject = "user-b";
+		callbackClient = "oaiapp_account_b";
+		identityOverride = { email: "b@example.com" };
+		expect(await auth.signIn()).toMatchObject({
+			connected: true,
+			label: "b@example.com",
+		});
+		expect(authorization.searchParams.get("client_id")).toBe(
+			"dynamic_agent_client",
+		);
 		expect(authorization.searchParams.get("ext_agent_host_id")).toBe(host);
-		expect(authorization.searchParams.has("agent_name_hint")).toBe(false);
+		expect(authorization.searchParams.get("agent_name_hint")).toBe("Hubble");
 		expect(authorization.searchParams.has("id_token_hint")).toBe(false);
+		expect(exchange?.get("client_id")).toBe("oaiapp_account_b");
+		expect(await new ChatGPTAuth(options).account()).toMatchObject({
+			connected: true,
+			label: "b@example.com",
+		});
 	});
 
 	it("requests consent explicitly when enabling missing plan permission", async () => {

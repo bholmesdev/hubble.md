@@ -273,13 +273,13 @@ export class ChatGPTAuth {
 		this.clearing = true;
 		try {
 			await this.renewal?.catch(() => {});
-			const saved = { ...(this.pendingSave ?? (await this.load())) };
+			const saved = this.pendingSave ?? (await this.load());
 			const tokens = saved.pendingRefresh?.tokens ?? saved.tokens;
-			saved.tokens = undefined;
-			saved.pendingRefresh = undefined;
-			await this.save(saved);
+			const clientId = saved.clientId;
+			// Explicit sign-out must let the next sign-in choose a different account.
+			await this.save({ hostId: saved.hostId });
 			this.pendingSave = undefined;
-			if (!tokens?.refresh || !saved.clientId) return;
+			if (!tokens?.refresh || !clientId) return;
 			try {
 				const discovery = await this.discovery(AbortSignal.timeout(10_000));
 				const response = await fetch(discovery.revocation_endpoint, {
@@ -289,7 +289,7 @@ export class ChatGPTAuth {
 					body: new URLSearchParams({
 						token: tokens.refresh,
 						token_type_hint: "refresh_token",
-						client_id: saved.clientId,
+						client_id: clientId,
 					}),
 				});
 				if (!response.ok) throw new Error();
