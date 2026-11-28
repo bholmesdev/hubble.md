@@ -76,7 +76,8 @@ export function ChatConnectionSettings() {
 			</div>
 			{!busy && account?.connected && !account.sharing ? (
 				<p role="alert" className="mt-2 text-xs text-destructive">
-					Enable plan usage in “Manage usage”, then reconnect.
+					Hubble doesn’t have permission to use your ChatGPT plan. Enable access
+					in “Manage usage”, then reconnect.
 				</p>
 			) : null}
 			{error ? (
