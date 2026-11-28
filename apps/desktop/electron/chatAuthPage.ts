@@ -1,7 +1,5 @@
 export function chatAuthPage(declined: boolean) {
-	const title = declined
-		? "Sign-in could not finish"
-		: "Signed in successfully";
+	const title = declined ? "Failed to sign in" : "Signed in successfully";
 	const description = declined
 		? "Return to Hubble to try signing in again."
 		: "You can close this tab and return to Hubble.";
