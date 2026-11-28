@@ -121,6 +121,11 @@ export function VirtualCursor({
 			passive: true,
 		});
 		window.addEventListener("resize", updateCursor);
+		const observer = new ResizeObserver(updateCursor);
+		const container = containerRef.current;
+		if (container) observer.observe(container);
+		if (scrollContainer && scrollContainer !== container)
+			observer.observe(scrollContainer);
 
 		return () => {
 			editor.off("selectionUpdate", updateCursor);
@@ -129,9 +134,10 @@ export function VirtualCursor({
 			editor.off("blur", updateCursor);
 			scrollContainer?.removeEventListener("scroll", updateCursor);
 			window.removeEventListener("resize", updateCursor);
+			observer.disconnect();
 			clearBlinkTimeout();
 		};
-	}, [editor, inputMode, modeOverride, viewportRef]);
+	}, [editor, inputMode, modeOverride, containerRef, viewportRef]);
 
 	if (!editor || !cursorPosition || cursorMode === "hidden") return null;
 
